@@ -1,0 +1,36 @@
+# .github/workflows/run-importer.yml
+
+name: Daily Grants Import
+
+on:
+  schedule:
+    - cron: '0 6 * * *' # Runs at 6:00 AM UTC every day
+  workflow_dispatch:
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        # This path is from the root, so it's correct
+        working-directory: ./importer
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run the grants importer script
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: node importer.js

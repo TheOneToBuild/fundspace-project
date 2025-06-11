@@ -1,0 +1,46 @@
+/* src/index.css */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom Scrollbar for Modals and long content */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 8px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: #f1f5f9; /* slate-100 */
+  border-radius: 10px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #94a3b8; /* slate-400 */
+  border-radius: 10px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #64748b; /* slate-600 */
+}
+
+/* Custom Scrollbar for smaller sections (e.g., impact stories) */
+.custom-scrollbar-small::-webkit-scrollbar {
+  width: 6px;
+}
+.custom-scrollbar-small::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar-small::-webkit-scrollbar-thumb {
+  background: #cbd5e1; /* slate-300 */
+  border-radius: 10px;
+}
+.custom-scrollbar-small::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8; /* slate-400 */
+}
+
+/* Animation for fade in slide effect */
+@keyframes fadeInSlide {
+  from { opacity: 0.3; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fadeInSlide {
+  animation: fadeInSlide 0.6s ease-out forwards;
+}

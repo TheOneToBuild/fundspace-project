@@ -1,0 +1,19 @@
+{
+  "name": "1rfp-data-importer",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "@google/generative-ai": "^0.24.1",
+    "@supabase/supabase-js": "^2.50.0",
+    "axios": "^1.9.0",
+    "cheerio": "^1.1.0",
+    "xml2js": "^0.6.2"
+  }
+}
