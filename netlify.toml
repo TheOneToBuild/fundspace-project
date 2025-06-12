@@ -1,0 +1,11 @@
+# Netlify Build Settings for the 1RFP Project
+
+[build]
+  # The command to build the site
+  command = "npm run build"
+
+  # The directory to publish after the build is complete (relative to the base)
+  publish = "dist"
+
+  # The directory where the site's source code is located
+  base = "1rfp-app"
