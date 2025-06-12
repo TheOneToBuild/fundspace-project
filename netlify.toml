@@ -1,11 +1,10 @@
-# Netlify Build Settings for the 1RFP Project
-
+# Correct Netlify build settings
 [build]
-  # The command to build the site
-  command = "npm run build"
+  # Set the base directory to where your package.json is
+  base = "1rfp-app"
 
-  # The directory to publish after the build is complete (relative to the base)
+  # Set the publish directory to what Vite builds (relative to the base)
   publish = "dist"
 
-  # The directory where the site's source code is located
-  base = "1rfp-app"
+  # The command to build your site
+  command = "npm run build"
