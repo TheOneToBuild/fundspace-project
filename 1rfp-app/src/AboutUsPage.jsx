@@ -6,13 +6,13 @@ const teamMembers = [
   {
     name: 'Elena Rodriguez',
     title: 'Co-Founder, Former Nonprofit Director',
-    imageUrl: 'https://placehold.co/400x400/a0aec0/FFFFFF?text=ER&font=inter',
+    imageUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?q=80&w=1976&auto=format&fit=crop',
     bio: 'After 15 years on the front lines of nonprofit development, Elena has submitted hundreds of grant proposals. She co-founded 1RFP to build the tool she always wished she had—one that respects a nonprofit\'s time and helps great programs find the spotlight they deserve.'
   },
   {
     name: 'David Chen',
     title: 'Co-Founder, Former Foundation Program Officer',
-    imageUrl: 'https://placehold.co/400x400/718096/FFFFFF?text=DC&font=inter',
+    imageUrl: 'https://images.unsplash.com/photo-1557862921-37829c790f19?q=80&w=2071&auto=format&fit=crop',
     bio: 'From his seat inside a major Bay Area foundation, David saw the disconnect. He knew countless innovative organizations were out there, but funders struggled to find them. He brings his grantmaking experience to 1RFP to build a more transparent and effective funding ecosystem.'
   }
 ];
@@ -48,7 +48,7 @@ const AboutUsPage = () => {
           </div>
           <div>
             <img 
-              src="https://placehold.co/800x600/d4e4f7/4299e1?text=Bay+Area+Community+Collaboration&font=inter" 
+              src="https://images.unsplash.com/photo-1521791136064-7986c2920216?q=80&w=2070&auto=format&fit=crop" 
               alt="Community collaboration in the Bay Area"
               className="rounded-xl shadow-lg w-full h-full object-cover" 
             />
@@ -66,7 +66,7 @@ const AboutUsPage = () => {
           <div className="grid sm:grid-cols-2 gap-10 max-w-4xl mx-auto">
             {teamMembers.map(member => (
               <div key={member.name} className="bg-white rounded-xl p-6 text-center border border-slate-200 shadow-lg">
-                <img className="mx-auto h-32 w-32 rounded-full mb-4" src={member.imageUrl} alt={member.name} />
+                <img className="mx-auto h-32 w-32 rounded-full mb-4 object-cover" src={member.imageUrl} alt={member.name} />
                 <h3 className="text-xl font-bold text-slate-900">{member.name}</h3>
                 <p className="font-semibold text-blue-600 mb-3">{member.title}</p>
                 <p className="text-slate-600 text-sm">{member.bio}</p>

@@ -19,8 +19,8 @@ const ForFundersPage = ({ navigateToPage }) => {
           </div>
           <div>
             <img 
-              src="https://placehold.co/800x600/cce3de/047857?text=Strategic+Philanthropy&font=inter"
-              alt="Data visualization for strategic philanthropy"
+              src="https://images.unsplash.com/photo-1552664730-d307ca884978?q=80&w=2070&auto=format&fit=crop"
+              alt="Professionals collaborating on a strategic plan with charts"
               className="rounded-xl shadow-lg w-full h-full object-cover"
             />
           </div>
@@ -72,7 +72,6 @@ const ForFundersPage = ({ navigateToPage }) => {
               Our Nonprofit Directory is a powerful tool for discovering the incredible organizations driving change across the Bay Area. Search by focus area and location to find the grassroots innovators who are perfectly aligned with your mission.
             </p>
             <div className="mt-6">
-                {/* UPDATED: This button now calls the new navigation function with a scroll target */}
                 <button onClick={() => navigateToPage('nonprofits', 'nonprofit-intro')} className="inline-flex items-center justify-center px-8 py-3.5 border border-transparent text-base font-medium rounded-lg text-white bg-purple-600 hover:bg-purple-700 transition-all duration-200 ease-in-out shadow-md hover:shadow-lg transform hover:scale-105">
                   Explore Bay Area Nonprofits
                 </button>
@@ -96,12 +95,11 @@ const ForFundersPage = ({ navigateToPage }) => {
               <li className="flex items-center"><CheckCircle2 className="h-6 w-6 text-green-600 mr-3" /><span>Data visualizations of the Bay Area's funding needs.</span></li>
             </ul>
           </div>
-          <div className="bg-slate-200 rounded-lg shadow-xl border border-slate-300 p-8 h-80 flex items-center justify-center">
-             <div className="text-center text-slate-500">
-                <BarChart3 size={48} className="mx-auto" />
-                <p className="mt-4 font-medium">Conceptual Funder Dashboard</p>
-             </div>
-          </div>
+          <img 
+            src="https://images.unsplash.com/photo-1551288049-bebda4e38f71?q=80&w=2070&auto=format&fit=crop"
+            alt="Conceptual Funder Dashboard with various charts and graphs"
+            className="rounded-lg shadow-xl border border-slate-200 w-full h-full object-cover"
+          />
         </div>
       </div>
 

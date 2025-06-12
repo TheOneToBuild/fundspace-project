@@ -29,7 +29,7 @@ import AnimatedCounter from './components/AnimatedCounter.jsx';
 import { formatDate, getPillClasses, parseMaxFundingAmount, getGrantTypePillClasses } from './utils.js';
 import { heroImpactCardsData } from './data.js';
 import headerLogoImage from './assets/1rfp-logo.png';
-import { COMMON_LOCATIONS, GRANT_STATUSES } from './constants.js';
+import { GRANT_STATUSES } from './constants.js';
 import usePaginatedFilteredData from './hooks/usePaginatedFilteredData.js';
 import { filterGrants } from './filtering.js';
 import { sortGrants } from './sorting.js';
@@ -218,8 +218,8 @@ const HeroImpactSection = ({ grants }) => {
           <div className="text-center lg:text-left">
             <div className="flex flex-col sm:flex-row gap-8 justify-center lg:justify-start mb-8">
               {totalGrantsAvailable > 0 && (
-                <div className="text-left">
-                  <div className="flex items-center gap-3">
+                <div className="text-center sm:text-left">
+                  <div className="flex items-center gap-3 justify-center sm:justify-start">
                     <ClipboardList size={32} className="text-purple-500" />
                     <AnimatedCounter
                       targetValue={totalGrantsAvailable}
@@ -232,8 +232,8 @@ const HeroImpactSection = ({ grants }) => {
                 </div>
               )}
               {totalAvailableFunding > 0 && (
-                <div className="text-left">
-                  <div className="flex items-center gap-3">
+                <div className="text-center sm:text-left">
+                  <div className="flex items-center gap-3 justify-center sm:justify-start">
                     <TrendingUp size={32} className="text-green-500" />
                     <AnimatedCounter
                       targetValue={totalAvailableFunding}
@@ -362,6 +362,14 @@ const GrantsPageContent = () => {
   const uniqueGrantTypes = useMemo(() => {
     if (!grants) return [];
     return Array.from(new Set(grants.map(g => g.grantType).filter(Boolean))).sort();
+  }, [grants]);
+
+  const uniqueLocations = useMemo(() => {
+    if (!grants) return [];
+    const allLocations = grants.flatMap(g => 
+      g.location ? g.location.split(',').map(loc => loc.trim()) : []
+    );
+    return Array.from(new Set(allLocations)).filter(Boolean).sort();
   }, [grants]);
 
 
@@ -499,7 +507,7 @@ const GrantsPageContent = () => {
             sortCriteria={filterConfig.sortCriteria}
             setSortCriteria={(value) => handleFilterChange('sortCriteria', value)}
             uniqueCategories={uniqueCategories}
-            uniqueLocations={COMMON_LOCATIONS}
+            uniqueLocations={uniqueLocations}
             uniqueGrantTypes={uniqueGrantTypes}
             uniqueGrantStatuses={GRANT_STATUSES}
             pageType="grants"

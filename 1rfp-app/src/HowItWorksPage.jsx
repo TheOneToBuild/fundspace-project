@@ -73,11 +73,11 @@ const HowItWorksPage = () => {
                 <h3 className="text-2xl font-bold text-slate-800 mt-1">Find Your Next Grant</h3>
                 <p className="mt-2 text-slate-600 leading-relaxed">Use our powerful, intuitive search and filter bar to narrow down hundreds of opportunities. Filter by category, location, funding amount, and more to find the grants that are a perfect fit for your mission.</p>
               </div>
-              <img src="https://placehold.co/1024x588/e2e8f0/4a5568?text=Grants+Page+Screenshot&font=inter" alt="Screenshot of finding grants on 1RFP" className="rounded-lg shadow-xl border border-slate-200" />
+              <img src="https://images.unsplash.com/photo-1516321497487-e288fb19713f?q=80&w=2070&auto=format&fit=crop" alt="People collaborating around a laptop to find grants" className="rounded-lg shadow-xl border border-slate-200" />
             </div>
             {/* Step 2: Explore Funders */}
             <div className="grid md:grid-cols-2 gap-8 items-center">
-              <img src="https://placehold.co/1024x588/e2e8f0/4a5568?text=Funders+Page+Screenshot&font=inter" alt="Screenshot of exploring funders on 1RFP" className="rounded-lg shadow-xl border border-slate-200 md:order-last" />
+              <img src="https://images.unsplash.com/photo-1556761175-5973dc0f32e7?q=80&w=2232&auto=format&fit=crop" alt="Professional meeting to research potential funders" className="rounded-lg shadow-xl border border-slate-200 md:order-last" />
               <div>
                 <span className="font-bold text-green-600">STEP 2</span>
                 <h3 className="text-2xl font-bold text-slate-800 mt-1">Research Potential Funders</h3>
@@ -91,9 +91,7 @@ const HowItWorksPage = () => {
                 <h3 className="text-2xl font-bold text-slate-800 mt-1">Connect with the Community</h3>
                 <p className="mt-2 text-slate-600 leading-relaxed">Explore the landscape of other nonprofits in your field. Use our Nonprofit Directory to identify potential collaborators, understand the ecosystem, and see where your organization fits into the bigger picture of social change in the Bay Area.</p>
               </div>
-              <div className="bg-slate-200 rounded-lg shadow-xl border border-slate-300 h-64 flex items-center justify-center">
-                <p className="text-slate-500 font-medium">Nonprofit Directory Screenshot</p>
-              </div>
+              <img src="https://images.unsplash.com/photo-1521791136064-7986c2920216?q=80&w=2070&auto=format&fit=crop" alt="Community members connecting and collaborating" className="rounded-lg shadow-xl border border-slate-200" />
             </div>
           </div>
         </div>
