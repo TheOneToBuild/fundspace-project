@@ -42,12 +42,14 @@ const FunderCard = ({ funder }) => {
                 <div><span className="font-medium text-slate-600">Grants Offered Annually:</span> {funder.grantsOffered}</div>
               </div>
           )}
+          {/* --- THIS BLOCK WAS REMOVED ---
           {funder.lastUpdated && (
               <div className="flex items-center text-slate-700">
                 <Calendar size={15} className="mr-2.5 text-slate-400 flex-shrink-0" />
                 <div><span className="font-medium text-slate-600">Last Updated:</span> {formatDate(funder.lastUpdated)}</div>
               </div>
           )}
+          */}
         </div>
         {funder.focusAreas && funder.focusAreas.length > 0 && (
             <div className="mt-4 pt-4 border-t border-slate-200 bg-slate-50 p-3 rounded-md">

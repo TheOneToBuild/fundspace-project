@@ -6,6 +6,7 @@ import {
   Linkedin,
   Youtube,
   Instagram,
+  PlusCircle, // <-- NEW ICON
 } from './components/Icons.jsx';
 
 import ExploreFunders from './ExploreFunders.jsx';
@@ -21,6 +22,7 @@ import RoadmapPage from './RoadmapPage.jsx';
 import FaqPage from './FaqPage.jsx';
 import BlogPage from './BlogPage.jsx';
 import GrantWritingTipsPage from './GrantWritingTipsPage.jsx';
+import SubmitGrantPage from './SubmitGrantPage.jsx'; // <-- NEW: IMPORT THE PAGE
 
 import headerLogoImage from './assets/1rfp-logo.png';
 import footerLogoImage from './assets/1rfp-footer-logo.png';
@@ -29,15 +31,14 @@ import footerLogoImage from './assets/1rfp-footer-logo.png';
 export default function App() {
   const [currentPageView, setCurrentPageView] = useState('grants');
 
-  // NEW: A smarter navigation function that can also handle scrolling
+  // A smarter navigation function that can also handle scrolling
   const navigateToPage = (page, targetId = null) => {
     setCurrentPageView(page);
     if (targetId) {
-        // Use a timeout to ensure the new page has rendered before we try to scroll
         setTimeout(() => {
             const element = document.getElementById(targetId);
             if (element) {
-                const offset = 80; // Offset for the sticky header
+                const offset = 80;
                 const position = element.getBoundingClientRect().top + window.pageYOffset - offset;
                 window.scrollTo({
                     top: position,
@@ -46,13 +47,13 @@ export default function App() {
             }
         }, 100);
     } else {
-        // If no target, just scroll to the top of the page
         window.scrollTo(0, 0);
     }
   };
 
 
   useEffect(() => {
+    // ... (existing useEffect code remains the same)
     if (currentPageView === 'grants') {
         document.title = '1RFP - Find Your Next Funding Opportunity';
     } else if (currentPageView === 'funders') {
@@ -79,24 +80,34 @@ export default function App() {
         document.title = '1RFP - Blog';
     } else if (currentPageView === 'grant-writing-tips') {
         document.title = '1RFP - Grant Writing Tips';
+    // NEW: ADDED TITLE FOR NEW PAGE
+    } else if (currentPageView === 'submit-grant') {
+        document.title = '1RFP - Submit a Grant';
     }
   }, [currentPageView]);
 
    return (
     <div className="min-h-screen bg-gradient-to-br from-rose-50 via-orange-50 to-yellow-50 font-sans text-slate-800">
       <header className="bg-white shadow-sm sticky top-0 z-40 border-b border-slate-200">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-3 flex flex-col sm:flex-row justify-between items-center">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-3 flex justify-between items-center">
           <a href="#" aria-label="1RFP Home" onClick={() => navigateToPage('grants')}><img src={headerLogoImage} alt="1RFP Logo" className="h-12 md:h-14 w-auto" /></a>
-          <nav className="flex items-center space-x-4 md:space-x-6">
+          <nav className="hidden md:flex items-center space-x-4 md:space-x-6">
             <a href="#" onClick={() => navigateToPage('grants')} className={`text-sm md:text-base font-medium ${currentPageView === 'grants' ? 'text-blue-600 font-semibold' : 'text-slate-700 hover:text-blue-600'} transition-colors`}>Find Grants</a>
             <a href="#" onClick={() => navigateToPage('funders')} className={`text-sm md:text-base font-medium ${currentPageView === 'funders' ? 'text-green-600 font-semibold' : 'text-slate-700 hover:text-green-600'} transition-colors`}>Explore Funders</a>
             <a href="#" onClick={() => navigateToPage('nonprofits')} className={`text-sm md:text-base font-medium ${currentPageView === 'nonprofits' ? 'text-purple-600 font-semibold' : 'text-slate-700 hover:text-purple-600'} transition-colors`}>Explore Nonprofits</a>
             <a href="#" onClick={() => navigateToPage('spotlight')} className={`text-sm md:text-base font-medium ${currentPageView === 'spotlight' ? 'text-rose-600 font-semibold' : 'text-slate-700 hover:text-rose-600'} transition-colors`}>Spotlight</a>
           </nav>
+          {/* NEW: ADDED SUBMIT BUTTON TO HEADER */}
+          <div className="hidden md:flex">
+            <a href="#" onClick={() => navigateToPage('submit-grant')} className="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 transition-all duration-200 ease-in-out shadow-sm">
+                <PlusCircle size={16} className="mr-2" />
+                Submit Grant
+            </a>
+          </div>
         </div>
       </header>
 
-      {/* UPDATED: Passing navigateToPage to all pages that need to navigate */}
+      {/* RENDER THE CORRECT PAGE BASED ON STATE */}
       {currentPageView === 'grants' && <GrantsPageContent />}
       {currentPageView === 'funders' && <ExploreFunders />}
       {currentPageView === 'nonprofits' && <ExploreNonprofits />}
@@ -110,6 +121,7 @@ export default function App() {
       {currentPageView === 'faq' && <FaqPage />}
       {currentPageView === 'blog' && <BlogPage />}
       {currentPageView === 'grant-writing-tips' && <GrantWritingTipsPage navigateToPage={navigateToPage} />}
+      {currentPageView === 'submit-grant' && <SubmitGrantPage />} {/* <-- NEW: RENDER THE PAGE */}
 
 
       <footer className=" text-black py-12">
@@ -126,7 +138,8 @@ export default function App() {
                 Product
               </h4>
               <ul className="space-y-2 text-base">
-                <li>
+                {/* ... existing links ... */}
+                 <li>
                   <a href="#" onClick={() => navigateToPage('how-it-works')} className={`text-black hover:text-blue-600 transition-colors ${currentPageView === 'how-it-works' ? 'text-blue-600 font-semibold' : ''}`}>
                     How 1RFP Works
                   </a>
@@ -148,6 +161,7 @@ export default function App() {
                 Resources
               </h4>
               <ul className="space-y-2 text-base">
+                {/* ... existing links ... */}
                 <li>
                     <a href="#" onClick={() => navigateToPage('blog')} className={`text-black hover:text-blue-600 transition-colors ${currentPageView === 'blog' ? 'text-blue-600 font-semibold' : ''}`}>
                         Blog
@@ -158,6 +172,12 @@ export default function App() {
                         Grant Writing Tips
                     </a>
                 </li>
+                {/* NEW: ADDED SUBMIT LINK TO FOOTER */}
+                <li>
+                    <a href="#" onClick={() => navigateToPage('submit-grant')} className={`text-black hover:text-blue-600 transition-colors ${currentPageView === 'submit-grant' ? 'text-blue-600 font-semibold' : ''}`}>
+                        Submit a Grant
+                    </a>
+                </li>
               </ul>
             </div>
             <div>
@@ -165,6 +185,7 @@ export default function App() {
                 Company
               </h4>
               <ul className="space-y-2 text-base">
+                {/* ... existing links ... */}
                 <li>
                   <a href="#" onClick={() => navigateToPage('about')} className={`text-black hover:text-blue-600 transition-colors ${currentPageView === 'about' ? 'text-blue-600 font-semibold' : ''}`}>
                     About Us

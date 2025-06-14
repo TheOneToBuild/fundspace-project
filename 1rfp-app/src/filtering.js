@@ -29,11 +29,33 @@ export const filterGrants = (grant, filters) => {
   const matchesMaxFunding = !maxFunding || grantMinAmount <= parseFloat(maxFunding);
 
   const matchesGrantType = !grantTypeFilter || grant.grantType === grantTypeFilter;
-  const matchesGrantStatus = !grantStatusFilter || grant.status === grantStatusFilter;
+
+  // --- THIS IS THE UPDATED DYNAMIC STATUS LOGIC ---
+  let matchesGrantStatus = true; // Default to true, only filter if a status is selected
+
+  if (grantStatusFilter) {
+      const today = new Date();
+      // Set time to 0 to compare dates only, avoiding timezone issues
+      today.setHours(0, 0, 0, 0); 
+      
+      const grantDueDateString = grant.dueDate; // e.g., "2025-06-14" or null
+
+      if (grantStatusFilter === 'Open') {
+          // "Open" is true if there's no due date (continuous) OR the due date is today or in the future.
+          matchesGrantStatus = !grantDueDateString || new Date(grantDueDateString) >= today;
+      } else if (grantStatusFilter === 'Rolling') {
+          // "Rolling" is true ONLY if there is no due date.
+          matchesGrantStatus = !grantDueDateString;
+      } else if (grantStatusFilter === 'Closed') {
+          // "Closed" is true ONLY if a due date exists AND it's in the past.
+          matchesGrantStatus = grantDueDateString && new Date(grantDueDateString) < today;
+      }
+  }
 
   return matchesSearch && matchesLocation && matchesCategory && matchesMinFunding && matchesMaxFunding && matchesGrantType && matchesGrantStatus;
 };
 
+// --- THIS FUNCTION IS UNCHANGED ---
 export const filterFunders = (funder, filters) => {
   const { searchTerm, locationFilter, focusAreaFilter, grantTypeFilter, minFunding, maxFunding } = filters;
 
@@ -61,6 +83,7 @@ export const filterFunders = (funder, filters) => {
   return matchesSearch && matchesLocation && matchesFocusArea && matchesGrantType && matchesMinFunding && matchesMaxFunding;
 };
 
+// --- THIS FUNCTION IS UNCHANGED ---
 export const filterNonprofits = (nonprofit, filters) => {
   const { searchTerm, locationFilter, focusAreaFilter, minBudget, maxBudget, minStaff, maxStaff } = filters;
 

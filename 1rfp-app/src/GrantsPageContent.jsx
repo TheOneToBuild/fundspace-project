@@ -34,22 +34,31 @@ import usePaginatedFilteredData from './hooks/usePaginatedFilteredData.js';
 import { filterGrants } from './filtering.js';
 import { sortGrants } from './sorting.js';
 
-// Grant Card Component
+// --- UPDATED GrantCard Component ---
 const GrantCard = ({ grant, onOpenDetailModal }) => {
     const today = new Date();
-    const grantAddedDate = new Date(grant.dateAdded);
-    const timeDiff = today.getTime() - grantAddedDate.getTime();
-    const dayDiff = Math.floor(timeDiff / (1000 * 3600 * 24));
-    const isNew = grant.dateAdded && dayDiff >= 0 && dayDiff <= 14;
+    today.setHours(0, 0, 0, 0); // Normalize today's date for accurate comparison
+
+    // New logic for "Ending Soon" tag
+    let isEndingSoon = false;
+    let daysUntilDue = null;
+
+    if (grant.dueDate) {
+        const dueDate = new Date(grant.dueDate);
+        // Calculate the difference in days, rounding up.
+        daysUntilDue = Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 3600 * 24));
+        isEndingSoon = daysUntilDue >= 0 && daysUntilDue <= 3;
+    }
 
     return (
         <div className="bg-white p-6 rounded-xl border border-slate-200 hover:shadow-xl transition-all duration-300 ease-in-out flex flex-col justify-between transform hover:-translate-y-1 relative overflow-hidden">
-            {isNew && (
+            {/* --- REPLACED "NEW" with "ENDING SOON" --- */}
+            {isEndingSoon && (
                 <span
-                    className="absolute top-0 right-[-1px] bg-emerald-500 text-white text-[10px] font-bold px-3 py-1 rounded-bl-lg z-10 uppercase tracking-wider shadow-sm"
-                    title={`Added ${dayDiff === 0 ? 'today' : `${dayDiff} day${dayDiff > 1 ? 's' : ''} ago`}`}
+                    className="absolute top-0 right-[-1px] bg-amber-500 text-white text-[10px] font-bold px-3 py-1 rounded-bl-lg z-10 uppercase tracking-wider shadow-sm"
+                    title={`Due in ${daysUntilDue} day${daysUntilDue === 1 ? '' : 's'}`}
                 >
-                    NEW
+                    ENDING SOON
                 </span>
             )}
             <div>
@@ -90,12 +99,16 @@ const GrantCard = ({ grant, onOpenDetailModal }) => {
                     </div>
                     <div className="flex items-center text-slate-700">
                         <Calendar size={15} className="mr-2.5 text-red-500 flex-shrink-0" />
-                        <div><span className="font-medium text-slate-600">Due:</span> {formatDate(grant.dueDate)}</div>
+                        <div>
+                            <span className="font-medium text-slate-600">Due:</span>{' '}
+                            {grant.dueDate ? formatDate(grant.dueDate) : 'Continuous'}
+                        </div>
                     </div>
-                    {grant.dateAdded && (
+                    {/* --- REPLACED "Posted" with "Start Date" --- */}
+                    {grant.startDate && (
                         <div className="flex items-center text-slate-700">
-                            <Clock size={15} className="mr-2.5 text-slate-400 flex-shrink-0" />
-                            <div><span className="font-medium text-slate-600">Posted:</span> {formatDate(grant.dateAdded)}</div>
+                            <Zap size={15} className="mr-2.5 text-yellow-500 flex-shrink-0" />
+                            <div><span className="font-medium text-slate-600">Start Date:</span> {formatDate(grant.startDate)}</div>
                         </div>
                     )}
                 </div>
@@ -158,7 +171,6 @@ const HeroImageCard = ({ card, layoutClass, initialDelay = 0 }) => {
     };
   }, [card.imageUrls, initialDelay]);
 
-  // Updated base classes with better positioning and sizing
   const baseClasses = `rounded-xl shadow-lg overflow-hidden relative group ${layoutClass} [perspective:1000px]`;
   const flipClasses = `
     w-full h-full
@@ -194,10 +206,9 @@ const HeroImageCard = ({ card, layoutClass, initialDelay = 0 }) => {
 };
 
 const HeroImpactSection = ({ grants }) => {
-  // Updated layout classes with better responsive behavior
   const layoutClasses = [
-    'col-span-1 row-span-2 h-full min-h-[300px] md:min-h-[400px]', // Tall card
-    'col-span-1 row-span-1 h-full min-h-[140px] md:min-h-[190px]', // Square cards
+    'col-span-1 row-span-2 h-full min-h-[300px] md:min-h-[400px]',
+    'col-span-1 row-span-1 h-full min-h-[140px] md:min-h-[190px]',
     'col-span-1 row-span-1 h-full min-h-[140px] md:min-h-[190px]',
     'col-span-1 row-span-1 h-full min-h-[140px] md:min-h-[190px]',
     'col-span-1 row-span-1 h-full min-h-[140px] md:min-h-[190px]'
@@ -264,7 +275,6 @@ const HeroImpactSection = ({ grants }) => {
             </div>
           </div>
           
-          {/* Updated grid with explicit heights and better responsive behavior */}
           <div className="w-full">
             <div className="grid grid-cols-2 gap-4 h-[500px] md:h-[600px]">
               {heroImpactCardsData.map((card, index) => {
@@ -334,13 +344,15 @@ const GrantsPageContent = () => {
         }
 
         if (data) {
+          // --- UPDATED DATA MAPPING ---
           const formattedData = data.map(grant => ({
               ...grant,
               foundationName: grant.foundation_name,
               fundingAmount: grant.funding_amount_text,
               dueDate: grant.due_date,
               dateAdded: grant.date_added,
-              grantType: grant.grant_type
+              grantType: grant.grant_type,
+              startDate: grant.start_date, // Process the new start_date field
           }));
           setGrants(formattedData);
         }

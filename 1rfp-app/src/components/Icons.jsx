@@ -56,6 +56,7 @@ export {
   Copy,
   LayoutGrid,
   ScatterChart,
-  UploadCloud, // ADDED THIS
-  PieChart     // AND THIS
+  UploadCloud,
+  PieChart,
+  PlusCircle // <-- ADD THIS ICON
 } from 'lucide-react';
