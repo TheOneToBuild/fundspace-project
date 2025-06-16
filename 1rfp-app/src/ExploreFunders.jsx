@@ -1,7 +1,8 @@
 // src/ExploreFunders.jsx
+import { Link } from 'react-router-dom';
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { supabase } from './supabaseClient.js';
-import { Search, MapPin, DollarSign, IconBriefcase, MessageSquare, ExternalLink, ChevronDown, Info, ClipboardList, Loader, XCircle, Calendar } from './components/Icons.jsx';
+import { Search, MapPin, DollarSign, IconBriefcase, MessageSquare, ExternalLink, ChevronDown, Info, ClipboardList, Loader, XCircle, Calendar, ArrowRight } from './components/Icons.jsx';
 import FilterBar from './components/FilterBar.jsx';
 import Pagination from './components/Pagination.jsx';
 import { formatDate, getPillClasses, parseMaxFundingAmount, parseMinFundingAmount } from './utils.js';
@@ -65,14 +66,12 @@ const FunderCard = ({ funder }) => {
         )}
       </div>
       <div className="mt-6">
-        <a
-          href={funder.website}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center justify-center w-full px-4 py-2.5 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-all duration-200 ease-in-out transform hover:scale-105"
-        >
-          Visit Funder Website <ExternalLink size={16} className="ml-2 opacity-80" />
-        </a>
+     <Link
+        to={`/funders/${funder.slug}`}
+        className="inline-flex items-center justify-center w-full px-4 py-2.5 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-all duration-200 ease-in-out transform hover:scale-105"
+      >
+        Learn More <ArrowRight size={16} className="ml-2" />
+      </Link>
       </div>
     </div>
   );
@@ -102,7 +101,7 @@ const ExploreFunders = () => {
             const { data, error } = await supabase
                 .from('funders')
                 .select('*');
-            
+
             if (error) throw error;
 
             if (data) {

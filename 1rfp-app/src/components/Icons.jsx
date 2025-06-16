@@ -58,5 +58,7 @@ export {
   ScatterChart,
   UploadCloud,
   PieChart,
+  ArrowLeft,
+  List,
   PlusCircle // <-- ADD THIS ICON
 } from 'lucide-react';

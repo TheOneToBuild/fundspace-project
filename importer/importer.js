@@ -1,4 +1,4 @@
-// src/importer.js
+// importer/importer.js
 
 // --- NEW: Load .env file from the parent directory ---
 const path = require('path');
@@ -34,6 +34,19 @@ const model    = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
 // --- Delay helper ---
 const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+
+// --- HELPER FUNCTION FOR SLUG GENERATION ---
+function generateSlug(name) {
+  if (!name) return null; // Return null if the name is missing
+  return name
+    .toLowerCase()
+    .replace(/&/g, 'and') // Best practice to replace ampersand
+    .replace(/[^\w\s-]/g, '') // Remove all non-word chars except spaces and hyphens
+    .trim() // Trim leading/trailing spaces
+    .replace(/[\s_]+/g, '-')   // Swap whitespace and underscores for a hyphen
+    .replace(/--+/g, '-');     // Replace multiple hyphens with a single one
+}
 
 
 // --- HELPER FUNCTIONS FOR URL TRACKING ---
@@ -80,9 +93,9 @@ async function getUrlsFromSitemap(baseUrl) {
 async function getTextFromPdf(pdfUrl) {
     try {
         console.log(`  -> Extracting text from PDF: ${pdfUrl}`);
-        const response = await axios.get(pdfUrl, { 
+        const response = await axios.get(pdfUrl, {
             responseType: 'arraybuffer',
-            timeout: 15000 
+            timeout: 15000
         });
         const pdfData = await pdf(response.data);
         return pdfData.text;
@@ -96,7 +109,7 @@ async function getTextFromPdf(pdfUrl) {
 // --- SMARTER CRAWLER FUNCTION (NOW WITH PLAYWRIGHT) ---
 async function crawlAndGetContent(initialUrl, maxPages = 7) {
     console.log(`  -> Starting smart crawl at: ${initialUrl}`);
-    
+
     // --- Playwright Setup ---
     const browser = await chromium.launch();
     const context = await browser.newContext({
@@ -123,18 +136,18 @@ async function crawlAndGetContent(initialUrl, maxPages = 7) {
         queue.push({ url: initialUrl, priority: 2 });
         visited.add(initialUrl);
     }
-    
+
     // --- UPDATED: Expanded Keywords ---
     const highPriorityKeywords = ['grant', 'funding', 'apply', 'rfp', 'guidelines', 'opportunities', 'our-work', 'eligibility', 'deadline', 'how-to-apply', 'for-grantees'];
-    const lowPriorityKeywords = ['about', 'mission', 'programs', 'priorities', 'nonprofits', 'what-we-fund', 'initiatives', 'news', 'blog', 'history', 'annual-report', 'contact'];
+    const lowPriorityKeywords = ['about', 'mission', 'programs', 'priorities', 'nonprofits', 'what-we-fund', 'initiatives', 'news', 'blog', 'history', 'annual-report', 'contact', 'team', 'staff'];
 
     while (queue.length > 0 && pagesCrawled < maxPages) {
         queue.sort((a, b) => b.priority - a.priority);
         const { url } = queue.shift();
-        
+
         pagesCrawled++;
         console.log(`  -> Fetching [${pagesCrawled}/${maxPages}]: ${url}`);
-        
+
         const page = await context.newPage();
         try {
             await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
@@ -175,7 +188,7 @@ async function crawlAndGetContent(initialUrl, maxPages = 7) {
                     } else if (lowPriorityKeywords.some(kw => absoluteUrl.toLowerCase().includes(kw) || linkText.includes(kw))) {
                         priority = 1; // Low priority
                     }
-                    
+
                     if (priority > 0) {
                         queue.push({ url: absoluteUrl, priority });
                     }
@@ -194,7 +207,7 @@ async function crawlAndGetContent(initialUrl, maxPages = 7) {
 }
 
 
-// --- EXTRACTION AND SAVING FUNCTIONS (UNCHANGED) ---
+// --- EXTRACTION AND SAVING FUNCTIONS ---
 async function extractGrantInfo(text) {
   const prompt = `
 Based on the following text from a foundation's website, which includes source markers like '---PAGE BREAK (Source: URL)---', extract each grant opportunity as an object with:
@@ -231,6 +244,7 @@ async function extractFunderInfo(text) {
   const prompt = `
 Based on the text from a foundation's website, extract a SINGLE object for the foundation with the following fields:
 - name: The official name of the foundation.
+- logo_url: The absolute URL to the foundation's logo image (e.g., .png, .svg). Look for it in headers or meta tags like 'og:image'. If not found, this field MUST be null.
 - description: A one-paragraph summary of the foundation's mission, values, and primary purpose.
 - location: The main geographic areas they serve (e.g., "San Francisco, CA", "Bay Area").
 - focus_areas: An array of up to 6 of the most prominent funding categories.
@@ -238,8 +252,10 @@ Based on the text from a foundation's website, extract a SINGLE object for the f
 - total_funding_annually: A string representing the total annual giving, if mentioned.
 - average_grant_size: A string for the typical or average grant amount, if mentioned.
 - grants_offered: An integer for the approximate number of grants given annually, if mentioned.
+- key_personnel: An array of objects, where each object has "name" and "title". Extract Program Officers, Program Directors, or other relevant grant-making staff. If no relevant staff are found, this field MUST be an empty array [].
+- application_process_summary: A concise, one-paragraph summary of the key steps in the application process. Note if they use an online portal, require a Letter of Intent (LOI), or are 'by invitation only'. If no process is described, this field MUST be null.
 
-**IMPORTANT**: Respond with *only* the raw JSON object—no markdown fences, comments,or other text.
+**IMPORTANT**: Respond with *only* the raw JSON object—no markdown fences, comments, or other text.
 
 ---
 ${text}
@@ -259,7 +275,8 @@ async function saveGrantsToSupabase(grants, url) {
         return;
     }
 
-    const requiredFields = ['title', 'foundation_name', 'description', 'eligibility'];
+    // --- THIS LINE HAS BEEN UPDATED ---
+    const requiredFields = ['title', 'foundation_name', 'description', 'eligibility', 'funding_amount_text'];
     const uniqueGrantsMap = new Map();
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -279,7 +296,7 @@ async function saveGrantsToSupabase(grants, url) {
             console.log(`  -> ❗ Skipping grant "${g.title}" due to generic or invitation-only eligibility text.`);
             continue;
         }
-        
+
         if (g.due_date) {
             const dueDate = new Date(g.due_date);
             if (dueDate < today) {
@@ -317,7 +334,7 @@ async function saveGrantsToSupabase(grants, url) {
         console.log('  -> No valid, current grants to save for', url);
         return;
     }
-    
+
     const { data, error } = await supabase.from('grants').upsert(dataToUpsert, { onConflict: 'title,foundation_name' }).select();
     if (error) console.error('  -> ❗ Supabase grant upsert error:', error.message);
     else console.log(`  -> ✅ Upserted ${data.length} grant(s) from ${url}`);
@@ -337,8 +354,13 @@ async function saveFunderToSupabase(funder, url) {
         return;
     }
 
+    const cleanedName = funder.name.replace(/^The\s/i, '').trim();
+    const funderSlug = generateSlug(cleanedName);
+
     const funderData = {
-        name: funder.name.replace(/^The\s/i, '').trim(),
+        name: cleanedName,
+        slug: funderSlug,
+        logo_url: funder.logo_url,
         description: funder.description,
         website: url,
         location: funder.location,
@@ -347,9 +369,11 @@ async function saveFunderToSupabase(funder, url) {
         total_funding_annually: funder.total_funding_annually,
         average_grant_size: funder.average_grant_size,
         grants_offered: funder.grants_offered,
+        key_personnel: funder.key_personnel || [],
+        application_process_summary: funder.application_process_summary,
         last_updated: new Date().toISOString().slice(0, 10)
     };
-    
+
     const { data, error } = await supabase.from('funders').upsert(funderData, { onConflict: 'name' }).select();
     if (error) console.error('  -> ❗ Supabase funder upsert error:', error.message);
     else console.log(`  -> ✅ Upserted funder: ${data[0].name}`);
@@ -360,10 +384,10 @@ async function saveFunderToSupabase(funder, url) {
   console.log('--- Starting 1RFP Crawler & Importer ---');
   const allUrls = fs.readFileSync(path.join(__dirname, 'urls.txt'), 'utf8').split(/\r?\n/).map(u => u.trim()).filter(u => u && /^https?:\/\//i.test(u));
   if (!allUrls.length) { console.error('No URLs found in urls.txt'); return; }
-  
+
   const processedUrlsMap = readProcessedUrls();
   const now = new Date();
-  
+
   const urlsToProcess = allUrls.filter(url => {
       if (!processedUrlsMap.has(url)) {
           console.log(`  -> New URL found: ${url}`);
@@ -382,38 +406,38 @@ async function saveFunderToSupabase(funder, url) {
       console.log('\n--- No new or outdated URLs to process. Done! ---');
       return;
   }
-  
+
   console.log(`\nFound ${urlsToProcess.length} URL(s) to process out of ${allUrls.length} total.`);
-  
+
   for (const url of urlsToProcess) {
     console.log('\nProcessing URL:', url);
     try {
       const combinedText = await crawlAndGetContent(url);
       if (combinedText.length > 50) { // Increased threshold to avoid processing empty/error pages
         console.log('  -> Extracting grant and funder info...');
-        const [grants, funder] = await Promise.all([ 
-            extractGrantInfo(combinedText), 
-            extractFunderInfo(combinedText) 
+        const [grants, funder] = await Promise.all([
+            extractGrantInfo(combinedText),
+            extractFunderInfo(combinedText)
         ]);
-        
+
         await sleep(1000); // Pause before DB operations
-        
+
         await saveGrantsToSupabase(grants, url);
         await saveFunderToSupabase(funder, url);
-        
+
         processedUrlsMap.set(url, now.toISOString());
       } else {
         console.log(`  -> No significant content found for ${url}, skipping.`);
         processedUrlsMap.set(url, now.toISOString());
       }
-    } catch (err) { 
+    } catch (err) {
         console.error('  -> ‼️  Critical error processing', url, err.message);
     }
-    
+
     console.log('  -> Pausing for 30 seconds before next URL...');
-    await sleep(30000); 
+    await sleep(30000);
   }
-  
+
   writeProcessedUrls(processedUrlsMap);
   console.log('\n--- All URLs processed. Done! ---');
 })();
