@@ -1,4 +1,4 @@
-// src/filtering.js
+// src/filtering.js - FIXED VERSION
 import { parseMinFundingAmount, parseMaxFundingAmount, parseNonprofitBudgetRange } from './utils.js';
 
 export const filterGrants = (grant, filters) => {
@@ -55,35 +55,93 @@ export const filterGrants = (grant, filters) => {
   return matchesSearch && matchesLocation && matchesCategory && matchesMinFunding && matchesMaxFunding && matchesGrantType && matchesGrantStatus;
 };
 
-// --- THIS FUNCTION IS UNCHANGED ---
+// FIXED: Updated to use correct field names and exact matching for filters
 export const filterFunders = (funder, filters) => {
-  const { searchTerm, locationFilter, focusAreaFilter, grantTypeFilter, minFunding, maxFunding } = filters;
+  const { searchTerm, locationFilter, focusAreaFilter, grantTypeFilter, annualGivingFilter, minFunding, maxFunding } = filters;
 
-  // FIX: Added checks `(funder.field || '')` to prevent errors on null values
+  console.log('Filtering funder:', funder.name, 'with filters:', filters);
+
+  // Search term filter - using correct field names
   const term = (searchTerm || '').toLowerCase();
-  const matchesSearch =
+  const matchesSearch = !term || 
     (funder.name || '').toLowerCase().includes(term) ||
     (funder.description || '').toLowerCase().includes(term) ||
-    (funder.focusAreas && funder.focusAreas.some(area => (area || '').toLowerCase().includes(term))) ||
-    (funder.grantTypes && funder.grantTypes.some(type => (type || '').toLowerCase().includes(term)));
+    (funder.focus_areas && funder.focus_areas.some(area => (area || '').toLowerCase().includes(term))) ||
+    (funder.grant_types && funder.grant_types.some(type => (type || '').toLowerCase().includes(term)));
 
+  // Location filter
   const locFilter = (locationFilter || '').toLowerCase();
-  const matchesLocation = !locFilter || (funder.location || '').toLowerCase().includes('all bay area counties') || (funder.location || '').toLowerCase().includes(locFilter);
+  const matchesLocation = !locFilter || 
+    (funder.location || '').toLowerCase().includes('all bay area counties') || 
+    (funder.location || '').toLowerCase().includes(locFilter);
 
-  const matchesFocusArea = !focusAreaFilter || (funder.focusAreas && funder.focusAreas.includes(focusAreaFilter));
-  const matchesGrantType = !grantTypeFilter || (funder.grantTypes && funder.grantTypes.includes(grantTypeFilter));
+  // Focus area filter - FIXED: use exact matching and correct field name
+  const matchesFocusArea = !focusAreaFilter || 
+    (funder.focus_areas && Array.isArray(funder.focus_areas) && 
+     funder.focus_areas.some(area => area === focusAreaFilter));
 
-  const funderMinAmount = parseMinFundingAmount(funder.totalFundingAnnually);
-  const funderMaxAmount = parseMaxFundingAmount(funder.totalFundingAnnually);
+  // Grant type filter - FIXED: use exact matching and correct field name  
+  const matchesGrantType = !grantTypeFilter || 
+    (funder.grant_types && Array.isArray(funder.grant_types) && 
+     funder.grant_types.some(type => type === grantTypeFilter));
+
+  // NEW: Annual giving filter
+  let matchesAnnualGiving = true;
+  if (annualGivingFilter) {
+    const [minRange, maxRange] = annualGivingFilter.split('-').map(Number);
+    const funderAmount = parseMinFundingAmount(funder.total_funding_annually) || 0;
+    
+    if (minRange && maxRange) {
+      matchesAnnualGiving = funderAmount >= minRange && funderAmount <= maxRange;
+    } else if (minRange) {
+      // For ranges like "100000000-999999999" (100M+)
+      matchesAnnualGiving = funderAmount >= minRange;
+    }
+  }
+
+  // Funding amount filters (existing)
+  const funderMinAmount = parseMinFundingAmount(funder.total_funding_annually);
+  const funderMaxAmount = parseMaxFundingAmount(funder.total_funding_annually);
   const minF = parseFloat(minFunding);
   const maxF = parseFloat(maxFunding);
   const matchesMinFunding = isNaN(minF) || funderMaxAmount >= minF;
   const matchesMaxFunding = isNaN(maxF) || funderMinAmount <= maxF;
 
-  return matchesSearch && matchesLocation && matchesFocusArea && matchesGrantType && matchesMinFunding && matchesMaxFunding;
+  const result = matchesSearch && matchesLocation && matchesFocusArea && matchesGrantType && matchesAnnualGiving && matchesMinFunding && matchesMaxFunding;
+  
+  console.log(`Funder ${funder.name}:`, {
+    matchesSearch,
+    matchesLocation, 
+    matchesFocusArea,
+    matchesGrantType,
+    matchesAnnualGiving,
+    matchesMinFunding,
+    matchesMaxFunding,
+    result,
+    focus_areas: funder.focus_areas,
+    grant_types: funder.grant_types,
+    total_funding_annually: funder.total_funding_annually
+  });
+
+  return result;
 };
 
-// --- THIS FUNCTION IS UNCHANGED ---
+// Array version of filterFunders for usePaginatedFilteredData compatibility
+export const filterFundersArray = (funders, filterConfig) => {
+  if (!Array.isArray(funders)) {
+    console.warn('filterFundersArray: funders is not an array:', funders);
+    return [];
+  }
+
+  console.log('Filtering funders array with config:', filterConfig);
+  console.log('Input funders count:', funders.length);
+
+  const filtered = funders.filter(funder => filterFunders(funder, filterConfig));
+  
+  console.log('Filtered funders count:', filtered.length);
+  return filtered;
+};
+
 export const filterNonprofits = (nonprofit, filters) => {
   const { searchTerm, locationFilter, focusAreaFilter, minBudget, maxBudget, minStaff, maxStaff } = filters;
 

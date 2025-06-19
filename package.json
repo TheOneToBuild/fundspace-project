@@ -6,6 +6,7 @@
     "dotenv": "^16.5.0",
     "pdf-parse": "^1.1.1",
     "playwright": "^1.53.0",
+    "react-select": "^5.10.1",
     "sitemap-xml-parser": "^0.0.2"
   },
   "scripts": {

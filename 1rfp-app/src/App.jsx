@@ -3,6 +3,7 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Link, NavLink } from 'react-router-dom';
 
 // --- Import all your page components ---
+import './components/skeleton-animations.css';
 import GrantsPageContent from './GrantsPageContent.jsx';
 import ExploreFunders from './ExploreFunders.jsx';
 import ExploreNonprofits from './ExploreNonprofits.jsx';
