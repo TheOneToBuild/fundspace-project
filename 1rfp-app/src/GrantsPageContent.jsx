@@ -14,7 +14,6 @@ import usePaginatedFilteredData from './hooks/usePaginatedFilteredData.js';
 import { sortGrants } from './sorting.js';
 
 
-// --- THIS IS THE FULLY CORRECTED AND VERIFIED FILTERING LOGIC ---
 const filterGrants = (grants, config) => {
   if (!Array.isArray(grants)) {
     return [];
@@ -65,7 +64,6 @@ const filterGrants = (grants, config) => {
 };
 
 
-// ... The rest of the component is identical to the last correct version ...
 const formatCurrency = (amount) => {
     if (amount >= 1000000) return `${(amount / 1000000).toFixed(1)}M+`;
     else if (amount >= 1000) return `${(amount / 1000).toFixed(0)}K+`;
@@ -125,6 +123,7 @@ const HeroImpactSection = ({ grants }) => {
     </section>
   );
 };
+
 const GrantsPageContent = () => {
   const [grants, setGrants] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -142,11 +141,13 @@ const GrantsPageContent = () => {
         const { data, error } = await supabase.rpc('get_grants_with_details');
         if (error) throw error;
         const grantsData = Array.isArray(data) ? data : [];
+        
+        // --- THIS IS THE CORRECTED MAPPING TO MATCH THE DATABASE FUNCTION ---
         const formattedData = grantsData.map(grant => ({
             ...grant,
             foundationName: grant.foundation_name,
-            fundingAmount: grant.funding_amount_text,
-            dueDate: grant.due_date,
+            fundingAmount: grant.funding_amount_text, // CORRECTED
+            dueDate: grant.due_date,                 // CORRECTED
             grantType: grant.grant_type,
         }));
         setGrants(formattedData);

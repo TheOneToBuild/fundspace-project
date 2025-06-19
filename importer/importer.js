@@ -60,7 +60,6 @@ async function getTextFromPdf(pdfUrl) {
     }
 }
 
-// NEW FUNCTION: Replace sitemapXmlParser
 async function parseSitemap(sitemapUrl, options = {}) {
   const { timeout = 7000, headers = { 'User-Agent': 'Mozilla/5.0' } } = options;
   
@@ -82,12 +81,17 @@ async function parseSitemap(sitemapUrl, options = {}) {
     
     const result = await parser.parseStringPromise(response.data);
     
-    // Handle both sitemap index and regular sitemap formats
     if (result.sitemapindex && result.sitemapindex.sitemap) {
-      // This is a sitemap index, we'd need to fetch each sitemap
-      // For now, we'll just log this case
-      console.log('  -> Found sitemap index, would need to fetch sub-sitemaps');
-      return [];
+      const sitemaps = Array.isArray(result.sitemapindex.sitemap) ? result.sitemapindex.sitemap : [result.sitemapindex.sitemap];
+      console.log(`  -> Found sitemap index. Fetching ${sitemaps.length} sub-sitemaps.`);
+      let allUrls = [];
+
+      for (const sitemap of sitemaps) {
+          const subSitemapUrls = await parseSitemap(sitemap.loc, options);
+          allUrls = allUrls.concat(subSitemapUrls);
+          await sleep(500);
+      }
+      return allUrls;
     }
     
     if (result.urlset && result.urlset.url) {
@@ -95,7 +99,6 @@ async function parseSitemap(sitemapUrl, options = {}) {
         ? result.urlset.url 
         : [result.urlset.url];
       
-      // Transform to match the expected format of the old library
       return urls.map(url => ({
         loc: [typeof url === 'string' ? url : url.loc],
         lastmod: url.lastmod ? [url.lastmod] : undefined,
@@ -111,18 +114,15 @@ async function parseSitemap(sitemapUrl, options = {}) {
   }
 }
 
-// --- UPDATED: This function now performs an exploratory crawl from a list of starting URLs ---
 async function crawlDomainAndGetContent(urlsForDomain, context, maxPages = 7) {
     const baseUrl = new URL(urlsForDomain[0]).origin;
     console.log(`  -> Starting crawl for domain: ${baseUrl}`);
     
     const visited = new Set();
-    const queue = urlsForDomain.map(url => ({ url, priority: 2 })); // Start with all provided URLs at high priority
+    const queue = urlsForDomain.map(url => ({ url, priority: 2 }));
     
-    // Add URLs from the sitemap to the queue with a lower priority
     try {
         const sitemapUrl = new URL('/sitemap.xml', baseUrl).href;
-        // UPDATED: Using new parseSitemap function
         const sitemapResults = await parseSitemap(sitemapUrl, { timeout: 7000, headers: { 'User-Agent': 'Mozilla/5.0' } });
         sitemapResults.forEach(item => {
             const sitemapUrl = item.loc[0];
@@ -188,29 +188,33 @@ async function crawlDomainAndGetContent(urlsForDomain, context, maxPages = 7) {
 async function extractGrantInfo(text) {
     if (!text || text.length < 100) return [];
     const prompt = `Analyze the following content and extract information about grants. For each distinct grant opportunity found, provide the following details in valid JSON format:
-    - title: Grant name (required)
-    - description: Brief description of the grant (required)
-    - eligibility: Who can apply (if mentioned)
-    - fundingAmount: Funding amount or range (if mentioned)
-    - deadline: Application deadline (if mentioned)
-    - applicationUrl: Application URL (if found)
-    - keywords: Array of relevant keywords
+    - title: Grant name (required).
+    - description: Brief description of the grant (required).
+    - eligibility: Who can apply (if mentioned).
+    - fundingAmount: Funding amount. If a range is given, use the maximum value. Extract ONLY the number, with no commas or symbols (e.g., for "$5,000 to $10,000", return 10000).
+    - deadline: Application deadline. Convert to a strict YYYY-MM-DD format. If the year isn't mentioned, assume the current year (2025). If the date has passed for the current year, assume the next year. Use the final closing date if multiple are mentioned.
+    - applicationUrl: The direct URL to the application or grant details page (if found).
     IMPORTANT: 
-    - Return ONLY a JSON array. No markdown, no explanations.
-    - Each grant must have at least a title and description.
-    - If no grants are found, return an empty array: []
-    - Ensure the JSON is valid and properly escaped.
+    - Return ONLY a valid JSON array. Do not include any markdown, explanations, or other text outside the JSON.
+    - Each object in the array must represent a unique grant opportunity.
+    - Every grant must have at least a "title" and a "description".
+    - If a specific field (like deadline or fundingAmount) cannot be found, set its value to null.
+    - If no grants are found at all, return an empty array: [].
+    - Ensure all strings within the JSON are properly escaped.
     Content to analyze:
-    ${text.substring(0, 60000)}`;
+    ${text.substring(0, 80000)}`;
     
     try {
         const result = await model.generateContent(prompt);
         const response = await result.response;
         let jsonText = response.text().trim();
-        jsonText = jsonText.replace(/```json\n?/g, '').replace(/```\n?/g, '');
+        if (jsonText.startsWith('```json')) {
+            jsonText = jsonText.substring(7, jsonText.length - 3).trim();
+        }
         return JSON.parse(jsonText) || [];
     } catch (error) {
         console.error('  -> ❗ Failed to extract grant info:', error.message);
+        console.error('  -> ❗ AI Response that caused error:', response.text());
         return [];
     }
 }
@@ -224,22 +228,27 @@ async function extractFunderInfo(text) {
     - location: Physical location or headquarters
     - focus_areas: Array of focus areas or priorities
     - grant_types: Array of types of grants offered
+    - total_funding_annually: Total funding awarded annually as a string (e.g., "$2.5M", "Over $10 million").
+    - average_grant_size: The average or typical grant size as a string (e.g., "$50,000", "$25k - $75k").
+    - key_personnel: An array of objects for key people, each with a "name" and "title" (e.g., [{"name": "Jane Doe", "title": "CEO"}]).
     - application_process_summary: Brief summary of how to apply
     - past_grantees: Information about past recipients (if mentioned)
     - notable_grant: Example of a notable grant (if mentioned)
     IMPORTANT:
     - Return ONLY a JSON object. No markdown, no explanations.
     - Must have at least name and description.
-    - If no funder info is found, return null.
+    - If a field is not found, its value should be null.
     - Ensure the JSON is valid and properly escaped.
     Content to analyze:
-    ${text.substring(0, 60000)}`;
+    ${text.substring(0, 80000)}`;
     
     try {
         const result = await model.generateContent(prompt);
         const response = await result.response;
         let jsonText = response.text().trim();
-        jsonText = jsonText.replace(/```json\n?/g, '').replace(/```\n?/g, '');
+        if (jsonText.startsWith('```json')) {
+            jsonText = jsonText.substring(7, jsonText.length - 3).trim();
+        }
         return JSON.parse(jsonText);
     } catch (error) {
         console.error('  -> ❗ Failed to extract funder info:', error.message);
@@ -247,50 +256,66 @@ async function extractFunderInfo(text) {
     }
 }
 
-async function saveGrantsToSupabase(grants, url) {
+async function saveGrantsToSupabase(grants, url, funderId) {
     if (!grants || !Array.isArray(grants) || grants.length === 0) return;
     console.log(`  -> Processing ${grants.length} grant(s)...`);
-    const { data: existingGrants } = await supabase.from('grants').select('title');
-    const existingTitles = new Set(existingGrants?.map(g => normalizeForDeduplication(g.title)) || []);
+    
+    const { data: existingGrants } = await supabase.from('grants').select('title, max_funding_amount, deadline');
+    
+    const existingFingerprints = new Set(existingGrants?.map(g => {
+        const normTitle = normalizeForDeduplication(g.title);
+        const deadl = g.deadline ? g.deadline.toString().slice(0, 10) : '';
+        return `${normTitle}|${g.max_funding_amount}|${deadl}`;
+    }) || []);
 
     for (const grant of grants) {
         if (!grant.title || !grant.description) continue;
+
         const normalizedTitle = normalizeForDeduplication(grant.title);
-        if (existingTitles.has(normalizedTitle)) {
-            console.log(`  -> ⏭️  Skipping duplicate grant: "${grant.title}"`);
+        const deadlineText = grant.deadline ? grant.deadline.toString().slice(0, 10) : '';
+        const fundingAmountValue = grant.fundingAmount || null;
+        const fingerprint = `${normalizedTitle}|${fundingAmountValue}|${deadlineText}`;
+
+        if (existingFingerprints.has(fingerprint)) {
+            console.log(`  -> ⏭️  Skipping duplicate grant (by fingerprint): "${grant.title}"`);
             continue;
         }
+
         const cleanedTitle = grant.title.replace(/^\d{4}\s/, '').trim();
         const grantData = {
             title: cleanedTitle,
             slug: generateSlug(cleanedTitle),
             description: grant.description,
             eligibility_criteria: grant.eligibility || null,
-            max_funding_amount: grant.fundingAmount || null,
-            deadline: grant.deadline || null,
+            max_funding_amount: fundingAmountValue,
+            deadline: grant.deadline,
             application_url: grant.applicationUrl || url,
-            keywords: grant.keywords || [],
             source_url: url,
             last_updated: new Date().toISOString().slice(0, 10),
             status: 'Open',
-            foundation_name: 'Unknown'
+            foundation_name: 'Unknown',
+            funder_id: funderId
         };
         const { data, error } = await supabase.from('grants').insert([grantData]).select();
-        if (error) console.error('  -> ❗ Grant insert error:', error.message);
-        else console.log(`  -> ✅ Added grant: ${data[0].title}`);
+        if (error) {
+            console.error('  -> ❗ Grant insert error:', error.message);
+        } else {
+            console.log(`  -> ✅ Added grant: ${data[0].title}`);
+            existingFingerprints.add(fingerprint); 
+        }
     }
 }
 
 async function saveFunderToSupabase(funder, url) {
     if (!funder || typeof funder !== 'object') {
         console.log('  -> No funder information extracted.');
-        return;
+        return null;
     }
     const requiredFields = ['name', 'description'];
     const missingFields = requiredFields.filter(field => !funder[field]);
     if (missingFields.length > 0) {
         console.log(`  -> ❗ Skipping funder "${funder.name || 'Unknown'}" due to missing required fields: ${missingFields.join(', ')}`);
-        return;
+        return null;
     }
     const cleanedName = funder.name.replace(/^The\s/i, '').trim();
     const funderData = {
@@ -302,14 +327,21 @@ async function saveFunderToSupabase(funder, url) {
         location: funder.location,
         focus_areas: funder.focus_areas || [],
         grant_types: funder.grant_types || [],
+        total_funding_annually: funder.total_funding_annually || null,
+        average_grant_size: funder.average_grant_size || null,
+        key_personnel: funder.key_personnel || null,
         application_process_summary: funder.application_process_summary,
         past_grantees: funder.past_grantees || null,
         notable_grant: funder.notable_grant || null,
         last_updated: new Date().toISOString().slice(0, 10)
     };
-    const { data, error } = await supabase.from('funders').upsert(funderData, { onConflict: 'name' }).select();
-    if (error) console.error('  -> ❗ Funder upsert error:', error.message);
-    else console.log(`  -> ✅ Upserted funder: ${data[0].name}`);
+    const { data, error } = await supabase.from('funders').upsert(funderData, { onConflict: 'name' }).select('id');
+    if (error) {
+        console.error('  -> ❗ Funder upsert error:', error.message);
+        return null;
+    }
+    console.log(`  -> ✅ Upserted funder: ${data[0].name}`);
+    return data[0].id;
 }
 
 (async function main() {
@@ -363,10 +395,11 @@ async function saveFunderToSupabase(funder, url) {
                 extractFunderInfo(combinedTextForDomain)
             ]);
             
-            await sleep(1000); // Small pause to avoid overwhelming any services
+            await sleep(1000);
 
-            await saveGrantsToSupabase(grants, primaryUrl);
-            await saveFunderToSupabase(funder, primaryUrl);
+            const funderId = await saveFunderToSupabase(funder, primaryUrl);
+
+            await saveGrantsToSupabase(grants, primaryUrl, funderId);
             
             processedUrlsMap.set(primaryUrl, now.toISOString());
         } else {
