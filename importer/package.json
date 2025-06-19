@@ -1,19 +1,23 @@
 {
   "name": "1rfp-data-importer",
   "version": "1.0.0",
-  "main": "index.js",
+  "main": "importer.js",
   "scripts": {
+    "start": "node importer.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "description": "",
+  "description": "Automated grant data importer for 1RFP",
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
     "@supabase/supabase-js": "^2.50.0",
     "axios": "^1.9.0",
     "cheerio": "^1.1.0",
+    "dotenv": "^16.5.0",
+    "pdf-parse": "^1.1.1",
+    "playwright": "^1.53.0",
     "xml2js": "^0.6.2"
   }
 }

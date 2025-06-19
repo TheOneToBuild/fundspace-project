@@ -8,7 +8,7 @@ const cheerio = require('cheerio');
 const { createClient } = require('@supabase/supabase-js');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { chromium } = require('playwright');
-const { sitemapXmlParser } = require('sitemap-xml-parser');
+const xml2js = require('xml2js');
 const pdf = require('pdf-parse');
 
 // --- CONFIGURATION ---
@@ -60,6 +60,57 @@ async function getTextFromPdf(pdfUrl) {
     }
 }
 
+// NEW FUNCTION: Replace sitemapXmlParser
+async function parseSitemap(sitemapUrl, options = {}) {
+  const { timeout = 7000, headers = { 'User-Agent': 'Mozilla/5.0' } } = options;
+  
+  try {
+    const response = await axios.get(sitemapUrl, {
+      timeout,
+      headers,
+      validateStatus: (status) => status < 500
+    });
+    
+    if (response.status !== 200) {
+      throw new Error(`Failed to fetch sitemap: ${response.status}`);
+    }
+    
+    const parser = new xml2js.Parser({
+      explicitArray: false,
+      ignoreAttrs: true
+    });
+    
+    const result = await parser.parseStringPromise(response.data);
+    
+    // Handle both sitemap index and regular sitemap formats
+    if (result.sitemapindex && result.sitemapindex.sitemap) {
+      // This is a sitemap index, we'd need to fetch each sitemap
+      // For now, we'll just log this case
+      console.log('  -> Found sitemap index, would need to fetch sub-sitemaps');
+      return [];
+    }
+    
+    if (result.urlset && result.urlset.url) {
+      const urls = Array.isArray(result.urlset.url) 
+        ? result.urlset.url 
+        : [result.urlset.url];
+      
+      // Transform to match the expected format of the old library
+      return urls.map(url => ({
+        loc: [typeof url === 'string' ? url : url.loc],
+        lastmod: url.lastmod ? [url.lastmod] : undefined,
+        changefreq: url.changefreq ? [url.changefreq] : undefined,
+        priority: url.priority ? [url.priority] : undefined
+      }));
+    }
+    
+    return [];
+  } catch (error) {
+    console.error(`Failed to parse sitemap ${sitemapUrl}:`, error.message);
+    return [];
+  }
+}
+
 // --- UPDATED: This function now performs an exploratory crawl from a list of starting URLs ---
 async function crawlDomainAndGetContent(urlsForDomain, context, maxPages = 7) {
     const baseUrl = new URL(urlsForDomain[0]).origin;
@@ -71,7 +122,8 @@ async function crawlDomainAndGetContent(urlsForDomain, context, maxPages = 7) {
     // Add URLs from the sitemap to the queue with a lower priority
     try {
         const sitemapUrl = new URL('/sitemap.xml', baseUrl).href;
-        const sitemapResults = await sitemapXmlParser(sitemapUrl, { timeout: 7000, headers: { 'User-Agent': 'Mozilla/5.0' } });
+        // UPDATED: Using new parseSitemap function
+        const sitemapResults = await parseSitemap(sitemapUrl, { timeout: 7000, headers: { 'User-Agent': 'Mozilla/5.0' } });
         sitemapResults.forEach(item => {
             const sitemapUrl = item.loc[0];
             if (!visited.has(sitemapUrl)) {
@@ -129,166 +181,109 @@ async function crawlDomainAndGetContent(urlsForDomain, context, maxPages = 7) {
             await page.close();
         }
     }
-    console.log(`  -> Crawl finished for ${baseUrl}. ${pagesCrawled} pages processed.`);
+    console.log(`  -> Crawl finished for ${baseUrl}. Total characters extracted: ${combinedText.length}`);
     return combinedText;
 }
 
-
 async function extractGrantInfo(text) {
-  const prompt = `
-Based on the text, extract grant opportunities as a JSON array of objects. Each object must have:
-- title: The official grant title.
-- foundation_name: The offering foundation.
-- description: A comprehensive, multi-sentence summary of the grant’s purpose, goals, and key activities.
-- eligibility: A comprehensive summary of all eligibility requirements (e.g., 501c3, geographic restrictions). If none, MUST be null.
-- funding_amount_text: Any currency pattern or range (e.g., "$15,000", "$10k-$25k"). If none, null.
-- due_date: Deadline in YYYY-MM-DD format. If rolling or none, null.
-- grant_url: The most direct URL to the grant guidelines, RFP, or application page. Prioritize this over a generic homepage. If none, null.
-- application_status: Determine if the grant application is "Open", "Invitation Only", or "Closed". If a clear application process is described, assume "Open". If it mentions contacting them first or being a past grantee, assume "Invitation Only". If the deadline has passed, assume "Closed".
-- locations: An array of strings of the California county names served, from this list: Alameda, Contra Costa, Marin, Napa, San Francisco, San Mateo, Santa Clara, Solano, Sonoma. If none, MUST be an empty array [].
-- categories: An array of strings for the grant's primary subject areas (e.g., "Housing", "Youth Development"). Identify up to 3. If none, MUST be an empty array [].
-- grant_type: The specific program name or track (e.g., "Arts Program").
-Respond with *only* a raw JSON array—no markdown fences.
----
-${text}
----
-`;
-  try {
-    const result = await model.generateContent(prompt);
-    const raw = (await result.response).text().replace(/^```json\s*|```$/g, '').trim();
-    return JSON.parse(raw.slice(raw.indexOf('['), raw.lastIndexOf(']') + 1));
-  } catch (err) {
-    console.error('❗ AI grant extraction error:', err);
-    return [];
-  }
+    if (!text || text.length < 100) return [];
+    const prompt = `Analyze the following content and extract information about grants. For each distinct grant opportunity found, provide the following details in valid JSON format:
+    - title: Grant name (required)
+    - description: Brief description of the grant (required)
+    - eligibility: Who can apply (if mentioned)
+    - fundingAmount: Funding amount or range (if mentioned)
+    - deadline: Application deadline (if mentioned)
+    - applicationUrl: Application URL (if found)
+    - keywords: Array of relevant keywords
+    IMPORTANT: 
+    - Return ONLY a JSON array. No markdown, no explanations.
+    - Each grant must have at least a title and description.
+    - If no grants are found, return an empty array: []
+    - Ensure the JSON is valid and properly escaped.
+    Content to analyze:
+    ${text.substring(0, 60000)}`;
+    
+    try {
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        let jsonText = response.text().trim();
+        jsonText = jsonText.replace(/```json\n?/g, '').replace(/```\n?/g, '');
+        return JSON.parse(jsonText) || [];
+    } catch (error) {
+        console.error('  -> ❗ Failed to extract grant info:', error.message);
+        return [];
+    }
 }
 
 async function extractFunderInfo(text) {
-  const prompt = `
-Based on the text from a foundation's website, extract a SINGLE object for the foundation with:
-- name: The official name.
-- logo_url: Absolute URL to the logo. If none, null.
-- description: A one-paragraph summary of the mission.
-- location: Main geographic areas served.
-- focus_areas: An array of up to 6 funding categories.
-- grant_types: An array of strings for types of grants they provide.
-- application_process_summary: A concise, one-paragraph summary of application steps. If none, null.
-- notable_grant: A single, one-sentence string describing a specific, impressive grant they have made. Find the best example. If none, MUST be null.
-- past_grantees: An array of up to 5 objects, where each object represents a past grantee and has a "name" and a "description" of the project funded. If none are mentioned, MUST be null.
-Respond with *only* the raw JSON object—no markdown.
----
-${text}
----
-`;
+    if (!text || text.length < 100) return null;
+    const prompt = `Analyze the following content and extract information about the funding organization. Provide details in valid JSON format:
+    - name: Organization name (required)
+    - description: Brief description of the organization (required)
+    - logo_url: URL to the organization's logo (if found)
+    - location: Physical location or headquarters
+    - focus_areas: Array of focus areas or priorities
+    - grant_types: Array of types of grants offered
+    - application_process_summary: Brief summary of how to apply
+    - past_grantees: Information about past recipients (if mentioned)
+    - notable_grant: Example of a notable grant (if mentioned)
+    IMPORTANT:
+    - Return ONLY a JSON object. No markdown, no explanations.
+    - Must have at least name and description.
+    - If no funder info is found, return null.
+    - Ensure the JSON is valid and properly escaped.
+    Content to analyze:
+    ${text.substring(0, 60000)}`;
+    
     try {
         const result = await model.generateContent(prompt);
-        let raw = await (await result.response).text();
-        raw = raw.replace(/^```json\s*/, '').replace(/```$/, '').trim();
-        return JSON.parse(raw.slice(raw.indexOf('{'), raw.lastIndexOf('}') + 1));
-    } catch (err) { console.error('❗ AI funder extraction error:', err); return null; }
+        const response = await result.response;
+        let jsonText = response.text().trim();
+        jsonText = jsonText.replace(/```json\n?/g, '').replace(/```\n?/g, '');
+        return JSON.parse(jsonText);
+    } catch (error) {
+        console.error('  -> ❗ Failed to extract funder info:', error.message);
+        return null;
+    }
 }
 
-async function saveGrantsToSupabase(grants, primaryUrl) {
-    if (!grants || !grants.length) {
-        console.log('  -> No grants extracted from this domain.');
-        return;
-    }
+async function saveGrantsToSupabase(grants, url) {
+    if (!grants || !Array.isArray(grants) || grants.length === 0) return;
+    console.log(`  -> Processing ${grants.length} grant(s)...`);
+    const { data: existingGrants } = await supabase.from('grants').select('title');
+    const existingTitles = new Set(existingGrants?.map(g => normalizeForDeduplication(g.title)) || []);
 
-    const { data: allLocations, error: locError } = await supabase.from('locations').select('id, name');
-    if (locError) {
-        console.error('  -> ❗ Could not fetch locations.', locError.message);
-        return;
-    }
-    const locationNameToIdMap = new Map(allLocations.map(loc => [loc.name.toLowerCase().trim(), loc.id]));
-
-    const requiredFields = ['title', 'foundation_name', 'description'];
-    const uniqueGrantsMap = new Map();
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    for (const g of grants) {
-        if (g.application_status !== 'Open') {
-            console.log(`  -> ⏭️  Skipping grant "${g.title}" because status is: ${g.application_status}`);
+    for (const grant of grants) {
+        if (!grant.title || !grant.description) continue;
+        const normalizedTitle = normalizeForDeduplication(grant.title);
+        if (existingTitles.has(normalizedTitle)) {
+            console.log(`  -> ⏭️  Skipping duplicate grant: "${grant.title}"`);
             continue;
         }
-        const missingFields = requiredFields.filter(field => !g[field]);
-        if (missingFields.length > 0) {
-            console.log(`  -> ❗ Skipping grant "${g.title || 'Untitled'}" due to missing required fields: ${missingFields.join(', ')}`);
-            continue;
-        }
-        if (g.due_date && new Date(g.due_date) < today) {
-            console.log(`  -> ⏭️  Skipping expired grant: "${g.title}"`);
-            continue;
-        }
-        const uniqueKey = `${normalizeForDeduplication(g.title)}|${normalizeForDeduplication(g.foundation_name)}`;
-        if (!uniqueGrantsMap.has(uniqueKey)) {
-            uniqueGrantsMap.set(uniqueKey, g);
-        }
-    }
-
-    const validGrants = Array.from(uniqueGrantsMap.values());
-    if (!validGrants.length) {
-        console.log('  -> No valid grants to save for this domain.');
-        return;
-    }
-
-    console.log(`  -> Processing ${validGrants.length} valid grants...`);
-
-    for (const grantData of validGrants) {
-        const grantPayload = {
-            title: grantData.title.trim(),
-            foundation_name: grantData.foundation_name.replace(/^The\s/i, '').trim(),
-            grant_type: grantData.grant_type,
-            description: grantData.description,
-            eligibility: grantData.eligibility,
-            funding_amount_text: grantData.funding_amount_text,
-            due_date: grantData.due_date,
-            url: grantData.grant_url || primaryUrl,
-            status: 'Open'
+        const cleanedTitle = grant.title.replace(/^\d{4}\s/, '').trim();
+        const grantData = {
+            title: cleanedTitle,
+            slug: generateSlug(cleanedTitle),
+            description: grant.description,
+            eligibility_criteria: grant.eligibility || null,
+            max_funding_amount: grant.fundingAmount || null,
+            deadline: grant.deadline || null,
+            application_url: grant.applicationUrl || url,
+            keywords: grant.keywords || [],
+            source_url: url,
+            last_updated: new Date().toISOString().slice(0, 10),
+            status: 'Open',
+            foundation_name: 'Unknown'
         };
-        
-        const { data: upsertedGrant, error: upsertError } = await supabase
-            .from('grants')
-            .upsert(grantPayload, { onConflict: 'title,foundation_name' })
-            .select('id')
-            .single();
-
-        if (upsertError) { console.error(`  -> ❗ Grant upsert error for "${grantPayload.title}":`, upsertError.message); continue; }
-        const grantId = upsertedGrant.id;
-
-        await supabase.from('grant_categories').delete().eq('grant_id', grantId);
-        const categoryNames = grantData.categories || [];
-        if (categoryNames.length > 0) {
-            const categoryObjects = categoryNames.map(name => ({ name: name.trim() }));
-            const { data: upsertedCategories, error: catUpsertError } = await supabase.from('categories').upsert(categoryObjects, { onConflict: 'name' }).select('id');
-            if (catUpsertError) {
-                console.error(`  -> ❗ Error upserting categories:`, catUpsertError.message);
-            } else if (upsertedCategories) {
-                const { error: catLinkError } = await supabase.from('grant_categories').insert(upsertedCategories.map(c => ({ grant_id: grantId, category_id: c.id })));
-                if (catLinkError) console.error(`  -> ❗ Error linking categories:`, catLinkError.message);
-            }
-        }
-        
-        await supabase.from('grant_locations').delete().eq('grant_id', grantId);
-        const locationIdsToLink = new Set();
-        if (grantData.locations && grantData.locations.length > 0) {
-            grantData.locations.forEach(locName => {
-                const locId = locationNameToIdMap.get(locName.toLowerCase().trim());
-                if (locId) locationIdsToLink.add(locId);
-            });
-        }
-        if (locationIdsToLink.size > 0) {
-            const { error: locLinkError } = await supabase.from('grant_locations').insert(Array.from(locationIdsToLink).map(locId => ({ grant_id: grantId, location_id: locId })));
-            if (locLinkError) console.error(`  -> ❗ Error linking locations:`, locLinkError.message);
-        }
-        
-        console.log(`  -> ✅ Processed grant: "${grantPayload.title}"`);
+        const { data, error } = await supabase.from('grants').insert([grantData]).select();
+        if (error) console.error('  -> ❗ Grant insert error:', error.message);
+        else console.log(`  -> ✅ Added grant: ${data[0].title}`);
     }
 }
 
 async function saveFunderToSupabase(funder, url) {
-    if (!funder) {
-        console.log('  -> ❗ No funder object provided.');
+    if (!funder || typeof funder !== 'object') {
+        console.log('  -> No funder information extracted.');
         return;
     }
     const requiredFields = ['name', 'description'];

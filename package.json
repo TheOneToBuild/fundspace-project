@@ -1,19 +1,17 @@
 {
   "name": "1rfp-project",
   "version": "1.0.0",
-  "main": "index.js",
-  "dependencies": {
-    "dotenv": "^16.5.0",
-    "pdf-parse": "^1.1.1",
-    "playwright": "^1.53.0",
-    "react-select": "^5.10.1",
-    "sitemap-xml-parser": "^0.0.2"
-  },
+  "private": true,
+  "description": "1RFP - Centralized grant discovery tool for Bay Area nonprofits",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "cd 1rfp-app && npm run dev",
+    "build": "cd 1rfp-app && npm run build",
+    "lint": "cd 1rfp-app && npm run lint",
+    "import": "cd importer && node importer.js",
+    "install:all": "npm install && cd 1rfp-app && npm install && cd ../importer && npm install",
+    "clean": "rm -rf node_modules package-lock.json && cd 1rfp-app && rm -rf node_modules package-lock.json && cd ../importer && rm -rf node_modules package-lock.json"
   },
-  "keywords": [],
+  "keywords": ["grants", "nonprofit", "bay-area"],
   "author": "",
-  "license": "ISC",
-  "description": ""
+  "license": "ISC"
 }
