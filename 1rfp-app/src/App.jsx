@@ -46,25 +46,41 @@ const AppNavLink = ({ to, children, activeClassName, ...props }) => {
 
 // Layout component to wrap all pages with the header and footer
 const AppLayout = ({ children }) => {
-  // State to manage the visibility of the mobile menu
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  // An array of navigation links to avoid repetition
-  const navLinks = [
+  // Define all navigation links in one place for easier management
+  const mainNavLinks = [
     { to: "/", text: "Find Grants", active: "text-blue-600 font-semibold" },
     { to: "/funders", text: "Explore Funders", active: "text-green-600 font-semibold" },
     { to: "/nonprofits", text: "Explore Nonprofits", active: "text-purple-600 font-semibold" },
     { to: "/spotlight", text: "Spotlight", active: "text-rose-600 font-semibold" },
   ];
 
-  // Prevent background scroll when mobile menu is open
+  const productLinks = [
+    { to: "/how-it-works", text: "How 1RFP Works" },
+    { to: "/for-nonprofits", text: "For Nonprofits" },
+    { to: "/for-funders", text: "For Funders" },
+  ];
+
+  const resourceLinks = [
+    { to: "/blog", text: "Blog" },
+    { to: "/grant-writing-tips", text: "Grant Writing Tips" },
+    { to: "/submit-grant", text: "Submit a Grant" },
+  ];
+
+  const companyLinks = [
+    { to: "/about", text: "About Us" },
+    { to: "/contact", text: "Contact Us" },
+    { to: "/roadmap", text: "Platform Roadmap" },
+    { to: "/faq", text: "FAQ" },
+  ];
+
   useEffect(() => {
     if (isMobileMenuOpen) {
       document.body.style.overflow = 'hidden';
     } else {
       document.body.style.overflow = 'unset';
     }
-    // Cleanup function to reset the style when the component unmounts
     return () => {
       document.body.style.overflow = 'unset';
     };
@@ -79,9 +95,8 @@ const AppLayout = ({ children }) => {
             <img src={headerLogoImage} alt="1RFP Logo" className="h-12 md:h-14 w-auto" />
           </Link>
           
-          {/* --- Desktop Navigation --- */}
           <nav className="hidden md:flex items-center space-x-4 md:space-x-6">
-            {navLinks.map(link => (
+            {mainNavLinks.map(link => (
               <AppNavLink key={link.to} to={link.to} activeClassName={link.active}>
                 <span className="text-sm md:text-base font-medium">{link.text}</span>
               </AppNavLink>
@@ -95,7 +110,6 @@ const AppLayout = ({ children }) => {
             </Link>
           </div>
           
-          {/* --- Mobile Menu Button --- */}
           <div className="md:hidden">
             <button
               onClick={() => setIsMobileMenuOpen(true)}
@@ -108,7 +122,7 @@ const AppLayout = ({ children }) => {
         </div>
       </header>
 
-      {/* --- Mobile Menu Panel --- */}
+      {/* --- UPDATED Mobile Menu Panel --- */}
       <div 
         className={`fixed inset-0 z-50 transition-transform transform ${isMobileMenuOpen ? 'translate-x-0' : 'translate-x-full'} md:hidden`}
       >
@@ -116,8 +130,8 @@ const AppLayout = ({ children }) => {
           className="absolute inset-0 bg-black/40" 
           onClick={() => setIsMobileMenuOpen(false)}
         ></div>
-        <div className="relative w-80 max-w-[80vw] h-full bg-white ml-auto p-6 shadow-xl flex flex-col">
-          <div className="flex items-center justify-between mb-8">
+        <div className="relative w-80 max-w-[80vw] h-full bg-white ml-auto shadow-xl flex flex-col">
+          <div className="flex items-center justify-between p-6 border-b border-slate-200">
             <span className="font-bold text-lg text-slate-800">Navigation</span>
             <button 
               onClick={() => setIsMobileMenuOpen(false)} 
@@ -127,14 +141,47 @@ const AppLayout = ({ children }) => {
               <X size={24} />
             </button>
           </div>
-          <nav className="flex flex-col space-y-4">
-            {navLinks.map(link => (
-              <AppNavLink key={link.to} to={link.to} activeClassName={link.active} onClick={() => setIsMobileMenuOpen(false)}>
-                <span className="text-lg font-medium">{link.text}</span>
-              </AppNavLink>
-            ))}
-          </nav>
-          <div className="mt-auto pt-6">
+          
+          <div className="flex-grow overflow-y-auto p-6">
+            <nav className="flex flex-col space-y-4">
+              {mainNavLinks.map(link => (
+                <AppNavLink key={link.to} to={link.to} activeClassName={link.active} onClick={() => setIsMobileMenuOpen(false)}>
+                  <span className="text-lg font-medium">{link.text}</span>
+                </AppNavLink>
+              ))}
+            </nav>
+
+            <div className="border-t border-slate-200 my-6"></div>
+
+            <div className="flex flex-col space-y-4">
+                <div>
+                    <h4 className="font-semibold text-slate-500 text-sm uppercase tracking-wider mb-3">Product</h4>
+                    {productLinks.map(link => (
+                        <AppNavLink key={link.to} to={link.to} activeClassName="font-bold text-blue-600" onClick={() => setIsMobileMenuOpen(false)}>
+                            <span className="block py-2 text-base font-medium text-slate-600 hover:text-blue-600">{link.text}</span>
+                        </AppNavLink>
+                    ))}
+                </div>
+                <div>
+                    <h4 className="font-semibold text-slate-500 text-sm uppercase tracking-wider mb-3">Resources</h4>
+                    {resourceLinks.map(link => (
+                        <AppNavLink key={link.to} to={link.to} activeClassName="font-bold text-blue-600" onClick={() => setIsMobileMenuOpen(false)}>
+                            <span className="block py-2 text-base font-medium text-slate-600 hover:text-blue-600">{link.text}</span>
+                        </AppNavLink>
+                    ))}
+                </div>
+                <div>
+                    <h4 className="font-semibold text-slate-500 text-sm uppercase tracking-wider mb-3">Company</h4>
+                    {companyLinks.map(link => (
+                        <AppNavLink key={link.to} to={link.to} activeClassName="font-bold text-blue-600" onClick={() => setIsMobileMenuOpen(false)}>
+                            <span className="block py-2 text-base font-medium text-slate-600 hover:text-blue-600">{link.text}</span>
+                        </AppNavLink>
+                    ))}
+                </div>
+            </div>
+          </div>
+
+          <div className="p-6 mt-auto border-t border-slate-200">
             <Link 
               to="/submit-grant" 
               onClick={() => setIsMobileMenuOpen(false)}
@@ -162,26 +209,25 @@ const AppLayout = ({ children }) => {
             <div>
               <h4 className="text-base font-bold text-black mb-3 tracking-wider uppercase">Product</h4>
               <ul className="space-y-2 text-base">
-                <li><Link to="/how-it-works" className="text-black hover:text-blue-600 transition-colors">How 1RFP Works</Link></li>
-                <li><Link to="/for-nonprofits" className="text-black hover:text-blue-600 transition-colors">For Nonprofits</Link></li>
-                <li><Link to="/for-funders" className="text-black hover:text-blue-600 transition-colors">For Funders</Link></li>
+                {productLinks.map(link => (
+                    <li key={link.to}><Link to={link.to} className="text-black hover:text-blue-600 transition-colors">{link.text}</Link></li>
+                ))}
               </ul>
             </div>
             <div>
               <h4 className="text-base font-bold text-black mb-3 tracking-wider uppercase">Resources</h4>
               <ul className="space-y-2 text-base">
-                 <li><Link to="/blog" className="text-black hover:text-blue-600 transition-colors">Blog</Link></li>
-                 <li><Link to="/grant-writing-tips" className="text-black hover:text-blue-600 transition-colors">Grant Writing Tips</Link></li>
-                 <li><Link to="/submit-grant" className="text-black hover:text-blue-600 transition-colors">Submit a Grant</Link></li>
+                 {resourceLinks.map(link => (
+                    <li key={link.to}><Link to={link.to} className="text-black hover:text-blue-600 transition-colors">{link.text}</Link></li>
+                 ))}
               </ul>
             </div>
              <div>
               <h4 className="text-base font-bold text-black mb-3 tracking-wider uppercase">Company</h4>
               <ul className="space-y-2 text-base">
-                <li><Link to="/about" className="text-black hover:text-blue-600 transition-colors">About Us</Link></li>
-                <li><Link to="/contact" className="text-black hover:text-blue-600 transition-colors">Contact Us</Link></li>
-                <li><Link to="/roadmap" className="text-black hover:text-blue-600 transition-colors">Platform Roadmap</Link></li>
-                <li><Link to="/faq" className="text-black hover:text-blue-600 transition-colors">FAQ</Link></li>
+                {companyLinks.map(link => (
+                    <li key={link.to}><Link to={link.to} className="text-black hover:text-blue-600 transition-colors">{link.text}</Link></li>
+                ))}
               </ul>
             </div>
           </div>
@@ -199,7 +245,7 @@ const AppLayout = ({ children }) => {
     </footer>
   </div>
 );
-} // This curly brace was moved to correctly close the AppLayout component.
+}
 
 // Main App Component with all the routes
 export default function App() {
