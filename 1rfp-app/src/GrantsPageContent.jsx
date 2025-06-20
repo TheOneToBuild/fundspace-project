@@ -1,4 +1,4 @@
-// src/GrantsPageContent.jsx - ENHANCED VERSION - With Focus Areas
+// src/GrantsPageContent.jsx
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { supabase } from './supabaseClient.js';
 import { Search, Users, MapPin, Calendar, DollarSign, Info, ChevronDown, ExternalLink, Zap, Clock, Target, IconBriefcase, BarChart3, ClipboardList, TrendingUp, Loader, XCircle, Heart, Bot } from './components/Icons.jsx';
@@ -13,7 +13,7 @@ import { GRANT_STATUSES } from './constants.js';
 import usePaginatedFilteredData from './hooks/usePaginatedFilteredData.js';
 import { sortGrants } from './sorting.js';
 
-// ENHANCED: Filtering logic with categories and locations
+// Filtering logic with categories and locations
 const filterGrants = (grants, config) => {
   if (!Array.isArray(grants)) {
     return [];
@@ -23,12 +23,10 @@ const filterGrants = (grants, config) => {
     if (config.searchTerm) {
       const searchTerm = config.searchTerm.toLowerCase();
       
-      // Get category names for searching
       const categoryNames = grant.categories && Array.isArray(grant.categories) 
         ? grant.categories.map(cat => cat.name || cat).join(' ')
         : '';
       
-      // Get location names for searching  
       const locationNames = grant.locations && Array.isArray(grant.locations)
         ? grant.locations.map(loc => loc.name || loc).join(' ')
         : '';
@@ -36,7 +34,7 @@ const filterGrants = (grants, config) => {
       const searchableText = [
         grant.title,
         grant.description,
-        grant.foundationName || grant.foundation_name,
+        grant.foundationName, // Use the already joined foundationName
         grant.grantType || grant.grant_type,
         categoryNames,
         locationNames
@@ -154,87 +152,46 @@ const GrantsPageContent = () => {
   const [selectedGrant, setSelectedGrant] = useState(null);
   const [isMobileFiltersVisible, setIsMobileFiltersVisible] = useState(false);
 
-  // ENHANCED: Fetch grants with categories and locations
   useEffect(() => {
     const fetchGrants = async () => {
       setLoading(true);
       try {
-        console.log('Fetching grants with categories and locations...');
-        
-        // Try RPC function first, fall back to direct query
-        let grantsData = [];
-        try {
-          const { data: rpcData, error: rpcError } = await supabase.rpc('get_grants_with_details');
-          if (rpcError) throw rpcError;
-          grantsData = Array.isArray(rpcData) ? rpcData : [];
-          console.log('Successfully fetched via RPC function');
-        } catch (rpcError) {
-          console.log('RPC function failed, falling back to direct query:', rpcError);
-          // Fallback to direct query
-          const { data: directData, error: directError } = await supabase
-            .from('grants')
-            .select('*')
-            .eq('status', 'Open')
-            .order('id', { ascending: false });
-          
-          if (directError) throw directError;
-          grantsData = Array.isArray(directData) ? directData : [];
-          console.log('Successfully fetched via direct query');
+        const { data, error } = await supabase
+          .from('grants')
+          .select(`
+            *,
+            funders (
+              name,
+              logo_url
+            ),
+            grant_categories (
+                categories (id, name)
+            ),
+            grant_locations (
+                locations (id, name)
+            )
+          `)
+          .eq('status', 'Open')
+          .order('id', { ascending: false });
+
+        if (error) {
+          throw error;
         }
-        
-        console.log('Raw grants data:', grantsData);
-        
-        // Enhanced data formatting with categories and locations
-        const formattedData = await Promise.all(grantsData.map(async (grant) => {
-          let categories = [];
-          let locations = [];
-          
-          // If we have categories from RPC, use them
-          if (grant.categories && Array.isArray(grant.categories)) {
-            categories = grant.categories;
-          } else {
-            // Otherwise fetch categories separately
-            try {
-              const { data: catData } = await supabase
-                .from('grant_categories')
-                .select('categories(name)')
-                .eq('grant_id', grant.id);
-              categories = catData ? catData.map(item => ({ name: item.categories?.name })).filter(cat => cat.name) : [];
-            } catch (error) {
-              console.log('Could not fetch categories for grant', grant.id);
-            }
-          }
 
-          // If we have locations from RPC, use them  
-          if (grant.locations && Array.isArray(grant.locations)) {
-            locations = grant.locations;
-          } else {
-            // Otherwise fetch locations separately
-            try {
-              const { data: locData } = await supabase
-                .from('grant_locations')
-                .select('locations(name)')
-                .eq('grant_id', grant.id);
-              locations = locData ? locData.map(item => ({ name: item.locations?.name })).filter(loc => loc.name) : [];
-            } catch (error) {
-              console.log('Could not fetch locations for grant', grant.id);
-            }
-          }
-
-          return {
+        const formattedData = data.map(grant => ({
             ...grant,
-            foundationName: grant.foundation_name,
+            foundationName: grant.funders?.name || 'Unknown Funder', 
+            funderLogoUrl: grant.funders?.logo_url || null,
             fundingAmount: grant.max_funding_amount ? `$${grant.max_funding_amount.toLocaleString()}` : 'Not specified',
             dueDate: grant.deadline,
             grantType: grant.grant_type,
-            categories: categories,
-            locations: locations
-          };
+            eligibility_criteria: grant.eligibility_criteria,
+            categories: grant.grant_categories.map(gc => gc.categories),
+            locations: grant.grant_locations.map(gl => gl.locations)
         }));
         
-        console.log('Enhanced grants data:', formattedData.length, 'grants');
-        console.log('Sample enhanced grant:', formattedData[0]);
         setGrants(formattedData);
+
       } catch (error) {
         console.error('Error fetching grants:', error);
         setGrants([]);
@@ -245,7 +202,6 @@ const GrantsPageContent = () => {
     fetchGrants();
   }, []);
 
-  // Enhanced unique values extraction
   const uniqueCategories = useMemo(() => {
     if (!grants) return [];
     const allCategories = new Set();
@@ -258,7 +214,6 @@ const GrantsPageContent = () => {
         }
     });
     const result = Array.from(allCategories).sort();
-    console.log('Unique categories found:', result);
     return result;
   }, [grants]);
 
@@ -276,7 +231,6 @@ const GrantsPageContent = () => {
         }
     });
     const result = Array.from(allLocations).sort();
-    console.log('Unique locations found:', result);
     return result;
   }, [grants]);
 
@@ -295,9 +249,7 @@ const GrantsPageContent = () => {
     setCurrentPage(1);
   }, []);
 
-  // ENHANCED: Handler for category filtering from grant cards
   const handleFilterByCategory = useCallback((categoryName) => {
-    console.log('Category filter clicked:', categoryName);
     setFilterConfig(prev => ({
       ...prev,
       categoryFilter: Array.isArray(prev.categoryFilter) 
