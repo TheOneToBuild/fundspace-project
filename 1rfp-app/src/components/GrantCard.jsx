@@ -1,7 +1,8 @@
 // src/components/GrantCard.jsx
 import React from 'react';
 import { IconBriefcase, MapPin, DollarSign, Calendar, ExternalLink, ShieldCheck } from './Icons.jsx';
-import { formatDate, getPillClasses, getGrantTypePillClasses } from '../utils.js';
+// Import the new formatting function
+import { formatDate, getPillClasses, getGrantTypePillClasses, formatFundingDisplay } from '../utils.js';
 
 const GrantCard = ({ grant, onOpenDetailModal, onFilterByCategory }) => {
     const today = new Date();
@@ -57,7 +58,7 @@ const GrantCard = ({ grant, onOpenDetailModal, onFilterByCategory }) => {
                     </div>
                 </div>
 
-                {/* UPDATED: Logic for logo with initials fallback */}
+                {/* Logic for logo with initials fallback */}
                 <div className="flex items-center mb-4">
                     {grantData.funderLogoUrl ? (
                         <img 
@@ -117,7 +118,9 @@ const GrantCard = ({ grant, onOpenDetailModal, onFilterByCategory }) => {
                         <DollarSign size={15} className="mr-2.5 text-green-500 flex-shrink-0" />
                         <div>
                             <span className="font-medium text-slate-600">Funding: </span>
-                            {grantData.fundingAmount}
+                            <span className="font-semibold text-green-600">
+                                {formatFundingDisplay(grantData.fundingAmount)}
+                            </span>
                         </div>
                     </div>
 

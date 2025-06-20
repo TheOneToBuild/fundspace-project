@@ -34,7 +34,7 @@ const filterGrants = (grants, config) => {
       const searchableText = [
         grant.title,
         grant.description,
-        grant.foundationName, // Use the already joined foundationName
+        grant.foundationName,
         grant.grantType || grant.grant_type,
         categoryNames,
         locationNames
@@ -98,7 +98,8 @@ const HeroImpactSection = ({ grants }) => {
   const totalAvailableFunding = useMemo(() => {
     if (!Array.isArray(grants)) return 0;
     return grants.reduce((sum, grant) => {
-      const amount = grant.fundingAmount || grant.max_funding_amount || '0';
+      // Use max_funding_amount for calculation
+      const amount = grant.max_funding_amount || '0';
       return sum + parseMaxFundingAmount(amount.toString());
     }, 0);
   }, [grants]);
@@ -182,7 +183,8 @@ const GrantsPageContent = () => {
             ...grant,
             foundationName: grant.funders?.name || 'Unknown Funder', 
             funderLogoUrl: grant.funders?.logo_url || null,
-            fundingAmount: grant.max_funding_amount ? `$${grant.max_funding_amount.toLocaleString()}` : 'Not specified',
+            // CORRECTED: Pass the raw numeric amount or the text string
+            fundingAmount: grant.max_funding_amount || grant.funding_amount_text || 'Not specified',
             dueDate: grant.deadline,
             grantType: grant.grant_type,
             eligibility_criteria: grant.eligibility_criteria,
@@ -239,7 +241,7 @@ const GrantsPageContent = () => {
   const totalFilteredFunding = useMemo(() => {
     if (!filteredAndSortedItems) return 0;
     return filteredAndSortedItems.reduce((sum, grant) => {
-      const amount = grant.fundingAmount || grant.max_funding_amount || '0';
+      const amount = grant.max_funding_amount || '0';
       return sum + parseMaxFundingAmount(amount.toString());
     }, 0);
   }, [filteredAndSortedItems]);
@@ -304,10 +306,7 @@ const GrantsPageContent = () => {
         <section id="funding-opportunity-intro" className="text-center pt-8 pb-12 md:pt-12 md:pb-16 mb-10 md:mb-12 scroll-mt-20 bg-white p-6 sm:p-8 md:p-10 rounded-xl shadow-lg border border-slate-200">
           <h2 className="text-3xl md:text-4xl font-bold text-slate-800 mb-3">Find Your Next Funding Opportunity</h2>
           <p className="text-md md:text-lg text-slate-600 mb-6 max-w-2xl mx-auto">Discover RFPs and grants tailored for nonprofits in the San Francisco Bay Area.</p>
-          <div className="text-xs text-slate-500 bg-slate-100 border border-slate-200 px-3 py-2 rounded-md inline-flex items-center gap-1.5">
-            <Info size={14} className="flex-shrink-0" />
-            <span>Connecting to live grant data.</span>
-          </div>
+          
           <div className="mt-8 md:hidden">
             <button onClick={() => setIsMobileFiltersVisible(!isMobileFiltersVisible)} className="w-full inline-flex items-center justify-center px-4 py-2 border border-slate-300 rounded-md shadow-sm text-sm font-medium text-slate-700 bg-white hover:bg-slate-50">
               {isMobileFiltersVisible ? 'Hide Filters' : 'Show Filters'}

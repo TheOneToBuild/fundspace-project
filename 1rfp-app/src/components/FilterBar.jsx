@@ -1,7 +1,7 @@
-// src/components/FilterBar.jsx - ENHANCED VERSION
+// src/components/FilterBar.jsx
 import React, { useMemo } from 'react';
 import Select from 'react-select';
-import { Search, MapPin, DollarSign, Filter, IconBriefcase, Info, ChevronDown, ListFilter, XCircle, Heart, Users as UsersIcon, Tag, TrendingUp } from '../components/Icons.jsx';
+import { Search, MapPin, DollarSign, Filter, IconBriefcase, Info, ChevronDown, ListFilter, XCircle, Heart, Users as UsersIcon, Tag, TrendingUp } from './Icons.jsx';
 import FilterPills from './FilterPills.jsx';
 import EnhancedSearchInput from './EnhancedSearchInput.jsx';
 
@@ -38,16 +38,19 @@ const FilterBar = ({
   activeFilters,
   onRemoveFilter,
   hideSearchInput = false,
-  // New props for enhanced search
   funders = [],
   onSuggestionSelect
 }) => {
   const isGrantsPage = pageType === 'grants';
   const isFundersPage = pageType === 'funders';
   
+  // Dynamically set labels and placeholders based on page type
+  const searchLabel = isGrantsPage ? 'Search Grants' : 'Search Funders';
+  const searchPlaceholder = isGrantsPage 
+    ? "Search by keyword, foundation, category..."
+    : "Search by name, focus area...";
+
   let accentColorClass = 'focus:ring-blue-500';
-  let searchPlaceholder = 'Search by keyword, foundation, or focus area...';
-  let searchIcon = <Search className="absolute left-3.5 top-1/2 transform -translate-y-1/2 text-slate-400 pointer-events-none" size={18} />;
   let sortOptions = (
     <>
       <option value="dueDate_asc">Due Date (Soonest)</option>
@@ -61,7 +64,6 @@ const FilterBar = ({
 
   if (isFundersPage) {
     accentColorClass = 'focus:ring-green-500';
-    searchPlaceholder = 'Search by name, focus area...';
     sortOptions = (
         <>
           <option value="name_asc">Name (A-Z)</option>
@@ -72,7 +74,6 @@ const FilterBar = ({
     );
   }
 
-  // Custom styles for react-select
   const customSelectStyles = {
     control: (base, state) => ({
       ...base,
@@ -117,38 +118,24 @@ const FilterBar = ({
 
   const handleLocationChange = (selectedOptions) => {
     const values = selectedOptions ? selectedOptions.map(opt => opt.value) : [];
-    if (Array.isArray(locationFilter)) {
-      setLocationFilter(values);
-    } else {
-      setLocationFilter(values.length > 0 ? values[0] : '');
-    }
+    setLocationFilter(values);
   };
   
   const handleCategoryChange = (selectedOptions) => {
     const values = selectedOptions ? selectedOptions.map(opt => opt.value) : [];
-    if (Array.isArray(categoryFilter)) {
-      setCategoryFilter(values);
-    } else {
-      setCategoryFilter(values.length > 0 ? values[0] : '');
-    }
+    setCategoryFilter(values);
   };
 
   const handleFocusAreaChange = (selectedOptions) => {
     const values = selectedOptions ? selectedOptions.map(opt => opt.value) : [];
-    if (Array.isArray(focusAreaFilter)) {
-      setFocusAreaFilter(values);
-    } else {
-      setFocusAreaFilter(values.length > 0 ? values[0] : '');
-    }
+    setFocusAreaFilter(values);
   };
 
-  // Handle both array and string values for filters
   const getSelectedValues = (filter, options) => {
     if (Array.isArray(filter)) {
       return options.filter(opt => filter.includes(opt.value));
-    } else {
-      return filter ? options.filter(opt => opt.value === filter) : [];
     }
+    return filter ? options.filter(opt => opt.value === filter) : [];
   };
 
   const selectedLocationValues = useMemo(() => getSelectedValues(locationFilter, locationOptions), [locationFilter, locationOptions]);
@@ -159,7 +146,6 @@ const FilterBar = ({
 
   return (
     <div className={containerClasses}>
-      {/* Header with Search */}
       <div className="mb-6">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center">
@@ -181,19 +167,18 @@ const FilterBar = ({
           )}
         </div>
 
-        {/* Search Bar and Sort - Inside the Filter Box */}
         {!hideSearchInput && (
           <div className="flex gap-4 items-end">
             <div className="flex-1">
               <label htmlFor="enhanced-search" className="block text-sm font-medium text-slate-700 mb-2">
-                Search Funders
+                {searchLabel}
               </label>
               <EnhancedSearchInput
                 searchTerm={searchTerm}
                 onSearchChange={setSearchTerm}
                 onSuggestionSelect={onSuggestionSelect}
                 funders={funders}
-                placeholder="Search funders, focus areas, locations..."
+                placeholder={searchPlaceholder}
                 className=""
               />
             </div>
@@ -218,7 +203,6 @@ const FilterBar = ({
         )}
       </div>
 
-      {/* Main Filters Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">        
         {isGrantsPage && (
           <>
@@ -348,7 +332,6 @@ const FilterBar = ({
               </select>
             </div>
 
-            {/* Annual Giving Filter */}
             <div className="relative">
               <label htmlFor="annual-giving-filter" className="block text-sm font-medium text-slate-700 mb-2">
                 <DollarSign size={16} className="inline mr-1" />
@@ -369,7 +352,6 @@ const FilterBar = ({
         )}
       </div>
 
-      {/* Active Filters */}
       {activeFilters && activeFilters.length > 0 && (
         <div className="mt-6 pt-6 border-t border-slate-200">
           <div className="flex flex-wrap items-center gap-3">

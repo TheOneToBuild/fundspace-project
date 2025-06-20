@@ -7,6 +7,33 @@ export const formatDate = (dateString) => {
   return new Date(dateString + 'T00:00:00').toLocaleDateString(undefined, options);
 };
 
+// NEW FUNCTION: Formats funding amounts for display
+export const formatFundingDisplay = (amountValue) => {
+  // Handles cases like "Not specified", "Varies", etc.
+  if (typeof amountValue === 'string' && isNaN(parseFloat(amountValue))) {
+    return amountValue;
+  }
+  
+  const amount = parseFloat(amountValue);
+  
+  // If the value is null, undefined, or not a number, return 'Not specified'
+  if (isNaN(amount)) {
+    return 'Not specified';
+  }
+
+  // If amount is 1 million or more, format as $X.XM
+  if (amount >= 1000000) {
+    const millions = amount / 1000000;
+    // Format to one decimal place, but remove .0 if it's a whole number (e.g., $5M not $5.0M)
+    const formattedMillions = millions.toFixed(1).replace(/\.0$/, '');
+    return `$${formattedMillions}M`;
+  }
+
+  // For amounts less than 1 million, format with commas
+  return `$${amount.toLocaleString()}`;
+};
+
+
 export const parseFundingAmount = (amountString) => {
   if (typeof amountString !== 'string') return 0;
   if (amountString.toLowerCase().includes('significant')) return Infinity;
@@ -101,7 +128,6 @@ export const getPillClasses = (category) => {
     return pillClassMap.default;
 };
 
-// --- NEW FUNCTION ADDED HERE ---
 export const getGrantTypePillClasses = (grantType) => {
     if (!grantType) return 'bg-gray-100 text-gray-800 border-gray-200';
     const typeLower = grantType.toLowerCase();
@@ -117,15 +143,6 @@ export const getGrantTypePillClasses = (grantType) => {
     return 'bg-gray-100 text-gray-800 border-gray-200';
 };
 
-// Add these functions to your existing src/utils.js file
-
-/**
- * Debounce function to limit the rate at which a function can fire
- * @param {Function} func - The function to debounce
- * @param {number} wait - The number of milliseconds to delay
- * @param {boolean} immediate - If true, trigger the function on the leading edge
- * @returns {Function} - The debounced function
- */
 export const debounce = (func, wait, immediate = false) => {
   let timeout;
   return function executedFunction(...args) {
@@ -140,12 +157,6 @@ export const debounce = (func, wait, immediate = false) => {
   };
 };
 
-/**
- * Generate initials from a name string
- * @param {string} name - The full name
- * @param {number} maxInitials - Maximum number of initials to return
- * @returns {string} - The initials
- */
 export const getInitials = (name, maxInitials = 2) => {
   if (!name || typeof name !== 'string') return '?';
   
@@ -158,11 +169,6 @@ export const getInitials = (name, maxInitials = 2) => {
   return initials || name.substring(0, maxInitials).toUpperCase();
 };
 
-/**
- * Calculate relative time (e.g., "2 days ago", "in 3 weeks")
- * @param {string|Date} date - The date to compare
- * @returns {string} - Human readable relative time
- */
 export const getRelativeTime = (date) => {
   if (!date) return 'No date';
   
@@ -190,9 +196,6 @@ export const getRelativeTime = (date) => {
   }
 };
 
-/**
- * Local storage helpers with error handling
- */
 export const storage = {
   get: (key, defaultValue = null) => {
     try {
@@ -225,19 +228,10 @@ export const storage = {
   }
 };
 
-/**
- * Check if user prefers reduced motion
- * @returns {boolean} - True if user prefers reduced motion
- */
 export const prefersReducedMotion = () => {
   return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 };
 
-/**
- * Scroll to element with smooth behavior (respecting user preferences)
- * @param {string|Element} element - Element selector or element to scroll to
- * @param {object} options - Scroll options
- */
 export const smoothScrollTo = (element, options = {}) => {
   const target = typeof element === 'string' ? document.querySelector(element) : element;
   if (!target) return;
