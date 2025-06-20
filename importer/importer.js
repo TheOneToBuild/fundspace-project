@@ -1,4 +1,4 @@
-// importer/importer.js
+// importer/importer.js - UPDATED VERSION
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '../.env') });
 
@@ -23,184 +23,140 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 const genAI    = new GoogleGenerativeAI(GEMINI_API_KEY);
 const model    = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
+// --- UTILITY FUNCTIONS ---
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 function generateSlug(name) {
   if (!name) return null;
-  return name.toLowerCase().replace(/&/g, 'and').replace(/[^\w\s-]/g, '').trim().replace(/[\s_]+/g, '-').replace(/--+/g, '-');
+  return name.toLowerCase().replace(/&/g, 'and').replace(/[^\\w\\s-]/g, '').trim().replace(/[\\s_]+/g, '-').replace(/--+/g, '-');
 }
 
 function readProcessedUrls() {
     try {
         if (fs.existsSync(PROCESSED_URLS_FILE)) {
-            return new Map(Object.entries(JSON.parse(fs.readFileSync(PROCESSED_URLS_FILE, 'utf8'))));
+            return new Map(Object.entries(JSON.parse(fs.readFileSync(PROCESSED_URLS_FILE, 'utf-8'))));
         }
-    } catch (error) { console.error("Error reading processed_urls.json.", error); }
+    } catch (error) {
+        console.error("Error reading processed URLs, starting fresh:", error);
+    }
     return new Map();
 }
 
-function writeProcessedUrls(processedMap) {
-    fs.writeFileSync(PROCESSED_URLS_FILE, JSON.stringify(Object.fromEntries(processedMap), null, 2), 'utf8');
+function writeProcessedUrls(data) {
+    fs.writeFileSync(PROCESSED_URLS_FILE, JSON.stringify(Object.fromEntries(data), null, 2));
 }
 
-function normalizeForDeduplication(text) {
-    if (!text) return '';
-    return text.toLowerCase().replace(/\b(the|a|an|for|of)\b/g, '').replace(/\b\d{4}\b/g, '').replace(/[^\w\s]/gi, '').replace(/\s+/g, ' ').trim();
-}
-
-async function getTextFromPdf(pdfUrl) {
+// Add missing utility functions that were referenced but not included
+async function getSitemapUrls(domain) {
     try {
-        console.log(`  -> Extracting text from PDF: ${pdfUrl}`);
-        const response = await axios.get(pdfUrl, { responseType: 'arraybuffer', timeout: 15000 });
-        const pdfData = await pdf(response.data);
-        return pdfData.text;
+        const sitemapUrl = `${domain}/sitemap.xml`;
+        const response = await axios.get(sitemapUrl);
+        const parser = new xml2js.Parser();
+        const result = await parser.parseStringPromise(response.data);
+        
+        const urls = [];
+        if (result.urlset && result.urlset.url) {
+            result.urlset.url.forEach(item => {
+                if (item.loc && item.loc[0]) {
+                    urls.push(item.loc[0]);
+                }
+            });
+        }
+        return urls;
     } catch (error) {
-        console.error(`  -> ❗ Failed to parse PDF ${pdfUrl}: ${error.message}`);
-        return '';
+        console.log(`  -> No sitemap found at ${domain}/sitemap.xml`);
+        return [];
     }
 }
 
-async function parseSitemap(sitemapUrl, options = {}) {
-  const { timeout = 7000, headers = { 'User-Agent': 'Mozilla/5.0' } } = options;
-  
-  try {
-    const response = await axios.get(sitemapUrl, {
-      timeout,
-      headers,
-      validateStatus: (status) => status < 500
-    });
-    
-    if (response.status !== 200) {
-      throw new Error(`Failed to fetch sitemap: ${response.status}`);
-    }
-    
-    const parser = new xml2js.Parser({
-      explicitArray: false,
-      ignoreAttrs: true
-    });
-    
-    const result = await parser.parseStringPromise(response.data);
-    
-    if (result.sitemapindex && result.sitemapindex.sitemap) {
-      const sitemaps = Array.isArray(result.sitemapindex.sitemap) ? result.sitemapindex.sitemap : [result.sitemapindex.sitemap];
-      console.log(`  -> Found sitemap index. Fetching ${sitemaps.length} sub-sitemaps.`);
-      let allUrls = [];
-
-      for (const sitemap of sitemaps) {
-          const subSitemapUrls = await parseSitemap(sitemap.loc, options);
-          allUrls = allUrls.concat(subSitemapUrls);
-          await sleep(500);
-      }
-      return allUrls;
-    }
-    
-    if (result.urlset && result.urlset.url) {
-      const urls = Array.isArray(result.urlset.url) 
-        ? result.urlset.url 
-        : [result.urlset.url];
-      
-      return urls.map(url => ({
-        loc: [typeof url === 'string' ? url : url.loc],
-        lastmod: url.lastmod ? [url.lastmod] : undefined,
-        changefreq: url.changefreq ? [url.changefreq] : undefined,
-        priority: url.priority ? [url.priority] : undefined
-      }));
-    }
-    
-    return [];
-  } catch (error) {
-    console.error(`Failed to parse sitemap ${sitemapUrl}:`, error.message);
-    return [];
-  }
-}
-
-async function crawlDomainAndGetContent(urlsForDomain, context, maxPages = 7) {
-    const baseUrl = new URL(urlsForDomain[0]).origin;
-    console.log(`  -> Starting crawl for domain: ${baseUrl}`);
-    
-    const visited = new Set();
-    const queue = urlsForDomain.map(url => ({ url, priority: 2 }));
-    
+async function getUrlsFromRobotsTxt(domain) {
     try {
-        const sitemapUrl = new URL('/sitemap.xml', baseUrl).href;
-        const sitemapResults = await parseSitemap(sitemapUrl, { timeout: 7000, headers: { 'User-Agent': 'Mozilla/5.0' } });
-        sitemapResults.forEach(item => {
-            const sitemapUrl = item.loc[0];
-            if (!visited.has(sitemapUrl)) {
-                queue.push({ url: sitemapUrl, priority: 1 });
+        const robotsUrl = `${domain}/robots.txt`;
+        const response = await axios.get(robotsUrl);
+        const lines = response.data.split('\n');
+        const sitemapUrls = [];
+        
+        lines.forEach(line => {
+            if (line.toLowerCase().startsWith('sitemap:')) {
+                const url = line.substring(8).trim();
+                if (url) sitemapUrls.push(url);
             }
         });
-        console.log(`  -> Found ${sitemapResults.length} URLs in sitemap.`);
-    } catch (error) {
-        console.log(`  -> No sitemap found or failed to parse for ${baseUrl}.`);
-    }
-
-    let pagesCrawled = 0;
-    let combinedText = '';
-    const highPriorityKeywords = ['grant', 'funding', 'apply', 'rfp', 'guidelines', 'opportunities', 'eligibility', 'deadline'];
-
-    while (queue.length > 0 && pagesCrawled < maxPages) {
-        queue.sort((a, b) => b.priority - a.priority || Math.random() - 0.5);
-        const { url } = queue.shift();
-
-        if (visited.has(url)) continue;
-        visited.add(url);
         
-        pagesCrawled++;
-        console.log(`    -> Fetching [${pagesCrawled}/${maxPages}]: ${url.substring(0, 80)}...`);
-        const page = await context.newPage();
+        return sitemapUrls;
+    } catch (error) {
+        console.log(`  -> No robots.txt found at ${domain}/robots.txt`);
+        return [];
+    }
+}
+
+async function crawlDomainAndGetContent(urls, context) {
+    let combinedText = '';
+    
+    for (const url of urls) {
         try {
-            await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
-            const mainContent = await page.evaluate(() => document.querySelector('main, article, #main, #content, .main, .post-content, [role="main"]')?.innerText || document.body.innerText);
-            combinedText += `\n\n---PAGE BREAK (Source: ${url})---\n\n` + mainContent.replace(/\s+/g, ' ').trim();
-            
-            const links = await page.$$eval('a', anchors => anchors.map(a => a.href));
-            for (const href of links) {
-                if (!href) continue;
-                try {
-                    const absoluteUrl = new URL(href, baseUrl).href;
-                    if (!absoluteUrl.startsWith(baseUrl) || visited.has(absoluteUrl)) continue;
-                    
-                    if (absoluteUrl.toLowerCase().endsWith('.pdf')) {
-                        if (visited.has(absoluteUrl)) continue;
-                        visited.add(absoluteUrl);
-                        const pdfText = await getTextFromPdf(absoluteUrl);
-                        if (pdfText) combinedText += `\n\n---PDF CONTENT (Source: ${absoluteUrl})---\n\n` + pdfText.replace(/\s+/g, ' ').trim();
-                    } else {
-                        let priority = 1;
-                        if (highPriorityKeywords.some(kw => absoluteUrl.toLowerCase().includes(kw))) {
-                            priority = 2;
-                        }
-                        queue.push({ url: absoluteUrl, priority });
-                    }
-                } catch (e) {}
+            console.log(`  -> Crawling: ${url}`);
+            const text = await getTextFromUrl(url, context);
+            if (text) {
+                combinedText += `\n\n--- Content from ${url} ---\n\n${text}`;
             }
+            await sleep(1000); // Be respectful to servers
         } catch (error) {
-            console.error(`    -> Failed to process page ${url}: ${error.message}`);
-        } finally {
-            await page.close();
+            console.error(`  -> Error crawling ${url}:`, error.message);
         }
     }
-    console.log(`  -> Crawl finished for ${baseUrl}. Total characters extracted: ${combinedText.length}`);
+    
     return combinedText;
 }
 
+async function getTextFromUrl(url, context) {
+    try {
+        const page = await context.newPage();
+        await page.goto(url, { waitUntil: 'networkidle' });
+        
+        // Wait for main content to load
+        await page.waitForTimeout(2000);
+        
+        // Extract text content
+        const text = await page.evaluate(() => {
+            // Remove script and style elements
+            const scripts = document.querySelectorAll('script, style');
+            scripts.forEach(el => el.remove());
+            
+            // Get text content
+            return document.body.innerText;
+        });
+        
+        await page.close();
+        return text;
+    } catch (error) {
+        console.error(`  -> Error getting text from ${url}:`, error.message);
+        return null;
+    }
+}
+
+// UPDATED: Extract grant info with categories and locations
 async function extractGrantInfo(text) {
     if (!text || text.length < 100) return [];
     const prompt = `Analyze the following content and extract information about grants. For each distinct grant opportunity found, provide the following details in valid JSON format:
     - title: Grant name (required).
     - description: Brief description of the grant (required).
-    - eligibility: Who can apply (if mentioned).
-    - fundingAmount: Funding amount. If a range is given, use the maximum value. Extract ONLY the number, with no commas or symbols (e.g., for "$5,000 to $10,000", return 10000).
-    - deadline: Application deadline. Convert to a strict YYYY-MM-DD format. If the year isn't mentioned, assume the current year (2025). If the date has passed for the current year, assume the next year. Use the final closing date if multiple are mentioned.
-    - applicationUrl: The direct URL to the application or grant details page (if found).
+    - eligibility_criteria: Who can apply and eligibility requirements (if mentioned).
+    - funding_amount: Maximum funding amount as a NUMBER (no commas or symbols). If a range like "$5,000 to $10,000", use 10000.
+    - funding_amount_text: The funding amount as displayed in the original text (e.g., "$5,000 - $10,000", "Up to $50,000").
+    - deadline: Application deadline in YYYY-MM-DD format. If year not mentioned, use 2025. If date has passed, use 2026.
+    - application_url: Direct URL to application or grant details page.
+    - grant_type: Type of grant (e.g., "General Operating Support", "Project Grant", "Capacity Building").
+    - categories: Array of focus areas or categories this grant supports (e.g., ["Education", "Arts & Culture", "Healthcare"]).
+    - locations: Array of eligible geographic locations (e.g., ["San Francisco", "Bay Area", "California"]).
+    
     IMPORTANT: 
-    - Return ONLY a valid JSON array. Do not include any markdown, explanations, or other text outside the JSON.
-    - Each object in the array must represent a unique grant opportunity.
-    - Every grant must have at least a "title" and a "description".
-    - If a specific field (like deadline or fundingAmount) cannot be found, set its value to null.
-    - If no grants are found at all, return an empty array: [].
-    - Ensure all strings within the JSON are properly escaped.
+    - Return ONLY a valid JSON array. No markdown or explanations.
+    - Each grant must have at least "title" and "description".
+    - If a field cannot be determined, set to null.
+    - If no grants found, return empty array: [].
+    - Ensure proper JSON escaping.
+    
     Content to analyze:
     ${text.substring(0, 80000)}`;
     
@@ -214,11 +170,11 @@ async function extractGrantInfo(text) {
         return JSON.parse(jsonText) || [];
     } catch (error) {
         console.error('  -> ❗ Failed to extract grant info:', error.message);
-        console.error('  -> ❗ AI Response that caused error:', response.text());
         return [];
     }
 }
 
+// PRESERVED: Your original extractFunderInfo function
 async function extractFunderInfo(text) {
     if (!text || text.length < 100) return null;
     const prompt = `Analyze the following content and extract information about the funding organization. Provide details in valid JSON format:
@@ -249,144 +205,288 @@ async function extractFunderInfo(text) {
         if (jsonText.startsWith('```json')) {
             jsonText = jsonText.substring(7, jsonText.length - 3).trim();
         }
-        return JSON.parse(jsonText);
+        return JSON.parse(jsonText) || null;
     } catch (error) {
         console.error('  -> ❗ Failed to extract funder info:', error.message);
+        const responseText = error.response ? error.response.text() : 'No response text available.';
+        console.error('  -> ❗ AI Response that caused error:', responseText);
         return null;
     }
 }
 
-async function saveGrantsToSupabase(grants, url, funderId) {
-    if (!grants || !Array.isArray(grants) || grants.length === 0) return;
-    console.log(`  -> Processing ${grants.length} grant(s)...`);
+// UPDATED: Get or create categories and locations
+async function getOrCreateCategory(categoryName) {
+    if (!categoryName) return null;
     
-    const { data: existingGrants } = await supabase.from('grants').select('title, max_funding_amount, deadline');
+    const { data: existing } = await supabase
+        .from('categories')
+        .select('id')
+        .eq('name', categoryName)
+        .single();
     
-    const existingFingerprints = new Set(existingGrants?.map(g => {
-        const normTitle = normalizeForDeduplication(g.title);
-        const deadl = g.deadline ? g.deadline.toString().slice(0, 10) : '';
-        return `${normTitle}|${g.max_funding_amount}|${deadl}`;
-    }) || []);
+    if (existing) return existing.id;
+    
+    const { data: newCategory } = await supabase
+        .from('categories')
+        .insert({ name: categoryName })
+        .select('id')
+        .single();
+    
+    return newCategory?.id;
+}
+
+async function getOrCreateLocation(locationName) {
+    if (!locationName) return null;
+    
+    const { data: existing } = await supabase
+        .from('locations')
+        .select('id')
+        .eq('name', locationName)
+        .single();
+    
+    if (existing) return existing.id;
+    
+    const { data: newLocation } = await supabase
+        .from('locations')
+        .insert({ name: locationName })
+        .select('id')
+        .single();
+    
+    return newLocation?.id;
+}
+
+// PRESERVED: Your original getOrCreateFunder function
+async function getOrCreateFunder(funderInfo, primaryUrl) {
+    if (!funderInfo || !funderInfo.name) {
+        console.error('  -> ‼️ Funder name could not be extracted. Cannot proceed.');
+        return null;
+    }
+    const { name, ...otherFunderDetails } = funderInfo;
+
+    // 1. Check if funder already exists by name
+    const { data: existingFunder, error: selectError } = await supabase
+        .from('funders')
+        .select('id')
+        .eq('name', name)
+        .single();
+
+    if (selectError && selectError.code !== 'PGRST116') { // 'PGRST116' means no row was found, which is fine.
+        console.error(`  -> Error checking for funder "${name}":`, selectError);
+        return null;
+    }
+
+    if (existingFunder) {
+        console.log(`  -> ✅ Funder "${name}" already exists.`);
+        return existingFunder.id;
+    }
+
+    // 2. If not found, create it with all the details from your prompt
+    console.log(`  -> Creating new funder: "${name}"`);
+    
+    // Only include fields that exist in the funders table
+    const funderToInsert = {
+        name,
+        slug: generateSlug(name),
+        website: primaryUrl,
+        description: otherFunderDetails.description || null,
+        location: otherFunderDetails.location || null,
+        focus_areas: otherFunderDetails.focus_areas || [],
+        grant_types: otherFunderDetails.grant_types || [],
+        total_funding_annually: otherFunderDetails.total_funding_annually || null,
+        average_grant_size: otherFunderDetails.average_grant_size || null,
+        key_personnel: otherFunderDetails.key_personnel || [],
+        application_process_summary: otherFunderDetails.application_process_summary || null,
+        past_grantees: otherFunderDetails.past_grantees || null,
+        notable_grant: otherFunderDetails.notable_grant || null,
+        logo_url: otherFunderDetails.logo_url || null
+    };
+
+    const { data: newFunder, error: insertError } = await supabase
+        .from('funders')
+        .insert(funderToInsert)
+        .select('id')
+        .single();
+    
+    if (insertError) {
+        console.error(`  -> ‼️ Error creating funder "${name}":`, insertError);
+        return null;
+    }
+    console.log(`  -> ✅ Created new funder: "${name}" (ID: ${newFunder.id})`);
+    return newFunder.id;
+}
+
+// UPDATED: Save grants with proper field mapping and relations
+async function saveGrantsToSupabase(grants, primaryUrl, funderId) {
+    if (!grants || grants.length === 0 || !funderId) {
+        console.log('  -> No grants to save or funderId missing.');
+        return;
+    }
 
     for (const grant of grants) {
-        if (!grant.title || !grant.description) continue;
-
-        const normalizedTitle = normalizeForDeduplication(grant.title);
-        const deadlineText = grant.deadline ? grant.deadline.toString().slice(0, 10) : '';
-        const fundingAmountValue = grant.fundingAmount || null;
-        const fingerprint = `${normalizedTitle}|${fundingAmountValue}|${deadlineText}`;
-
-        if (existingFingerprints.has(fingerprint)) {
-            console.log(`  -> ⏭️  Skipping duplicate grant (by fingerprint): "${grant.title}"`);
-            continue;
-        }
-
-        const cleanedTitle = grant.title.replace(/^\d{4}\s/, '').trim();
-        const grantData = {
-            title: cleanedTitle,
-            slug: generateSlug(cleanedTitle),
-            description: grant.description,
-            eligibility_criteria: grant.eligibility || null,
-            max_funding_amount: fundingAmountValue,
-            deadline: grant.deadline,
-            application_url: grant.applicationUrl || url,
-            source_url: url,
-            last_updated: new Date().toISOString().slice(0, 10),
-            status: 'Open',
-            foundation_name: 'Unknown',
-            funder_id: funderId
-        };
-        const { data, error } = await supabase.from('grants').insert([grantData]).select();
-        if (error) {
-            console.error('  -> ❗ Grant insert error:', error.message);
-        } else {
-            console.log(`  -> ✅ Added grant: ${data[0].title}`);
-            existingFingerprints.add(fingerprint); 
+        try {
+            // Use raw SQL to bypass schema cache completely
+            const { data: insertResult, error } = await supabase.rpc('insert_grant_directly', {
+                p_funder_id: funderId,
+                p_title: grant.title,
+                p_description: grant.description,
+                p_status: 'Open',
+                p_application_url: grant.application_url || primaryUrl,
+                p_max_funding_amount: grant.funding_amount || null,
+                p_funding_amount_text: grant.funding_amount_text || 
+                    (grant.funding_amount ? `${grant.funding_amount.toLocaleString()}` : null),
+                p_deadline: grant.deadline || null,
+                p_eligibility_criteria: grant.eligibility_criteria || null,
+                p_grant_type: grant.grant_type || null,
+                p_slug: generateSlug(grant.title)
+            });
+                
+            if (error) {
+                console.error(`  -> ‼️ Error inserting grant "${grant.title}":`, error.message);
+                console.error('Full error details:', error);
+                continue;
+            }
+            
+            // Handle the result - it might be an array or single object
+            const insertedGrant = Array.isArray(insertResult) ? insertResult[0] : insertResult;
+            const grantId = insertedGrant?.id || 'ID not returned';
+            console.log(`  -> ✅ Successfully inserted grant: "${grant.title}" (ID: ${grantId})`);
+            
+            // Debug: Log what categories and locations were extracted
+            console.log(`     Categories found: ${grant.categories ? grant.categories.join(', ') : 'None'}`);
+            console.log(`     Locations found: ${grant.locations ? grant.locations.join(', ') : 'None'}`);
+            
+            // Add categories
+            if (grant.categories && Array.isArray(grant.categories) && insertedGrant?.id) {
+                for (const categoryName of grant.categories) {
+                    console.log(`     -> Creating/finding category: "${categoryName}"`);
+                    const categoryId = await getOrCreateCategory(categoryName);
+                    if (categoryId) {
+                        const { error: catError } = await supabase
+                            .from('grant_categories')
+                            .insert({
+                                grant_id: insertedGrant.id,
+                                category_id: categoryId
+                            });
+                        if (catError) {
+                            console.error(`     -> Error linking category: ${catError.message}`);
+                        } else {
+                            console.log(`     -> Linked category "${categoryName}" to grant`);
+                        }
+                    }
+                }
+            }
+            
+            // Add locations
+            if (grant.locations && Array.isArray(grant.locations) && insertedGrant?.id) {
+                for (const locationName of grant.locations) {
+                    console.log(`     -> Creating/finding location: "${locationName}"`);
+                    const locationId = await getOrCreateLocation(locationName);
+                    if (locationId) {
+                        const { error: locError } = await supabase
+                            .from('grant_locations')
+                            .insert({
+                                grant_id: insertedGrant.id,
+                                location_id: locationId
+                            });
+                        if (locError) {
+                            console.error(`     -> Error linking location: ${locError.message}`);
+                        } else {
+                            console.log(`     -> Linked location "${locationName}" to grant`);
+                        }
+                    }
+                }
+            }
+            
+        } catch (err) {
+            console.error(`  -> ‼️ Error processing grant "${grant.title}":`, err.message);
         }
     }
 }
 
-async function saveFunderToSupabase(funder, url) {
-    if (!funder || typeof funder !== 'object') {
-        console.log('  -> No funder information extracted.');
-        return null;
-    }
-    const requiredFields = ['name', 'description'];
-    const missingFields = requiredFields.filter(field => !funder[field]);
-    if (missingFields.length > 0) {
-        console.log(`  -> ❗ Skipping funder "${funder.name || 'Unknown'}" due to missing required fields: ${missingFields.join(', ')}`);
-        return null;
-    }
-    const cleanedName = funder.name.replace(/^The\s/i, '').trim();
-    const funderData = {
-        name: cleanedName,
-        slug: generateSlug(cleanedName),
-        logo_url: funder.logo_url,
-        description: funder.description,
-        website: url,
-        location: funder.location,
-        focus_areas: funder.focus_areas || [],
-        grant_types: funder.grant_types || [],
-        total_funding_annually: funder.total_funding_annually || null,
-        average_grant_size: funder.average_grant_size || null,
-        key_personnel: funder.key_personnel || null,
-        application_process_summary: funder.application_process_summary,
-        past_grantees: funder.past_grantees || null,
-        notable_grant: funder.notable_grant || null,
-        last_updated: new Date().toISOString().slice(0, 10)
-    };
-    const { data, error } = await supabase.from('funders').upsert(funderData, { onConflict: 'name' }).select('id');
-    if (error) {
-        console.error('  -> ❗ Funder upsert error:', error.message);
-        return null;
-    }
-    console.log(`  -> ✅ Upserted funder: ${data[0].name}`);
-    return data[0].id;
-}
-
-(async function main() {
-  console.log('--- Starting 1RFP Crawler & Importer ---');
-  const allUrls = fs.readFileSync(path.join(__dirname, 'urls.txt'), 'utf8').split(/\r?\n/).filter(u => u && u.startsWith('http'));
-  if (!allUrls.length) { console.error('No URLs found in urls.txt'); return; }
-
+// UPDATED: Main function with funder name passing
+async function main() {
+  console.log('--- Starting Grant Importer ---');
   const processedUrlsMap = readProcessedUrls();
   const now = new Date();
   
-  const urlsByDomain = new Map();
-  for (const url of allUrls) {
-      try {
-        const domain = new URL(url).hostname.replace(/^www\./, '');
-        if (!urlsByDomain.has(domain)) {
-            urlsByDomain.set(domain, []);
-        }
-        urlsByDomain.get(domain).push(url);
-      } catch (e) {
-        console.warn(`  -> ⚠️  Skipping invalid URL: ${url}`);
-      }
+  // Read URLs from urls.txt file
+  let domainsToProcess = [];
+  try {
+    const urlsFilePath = path.join(__dirname, 'urls.txt');
+    const urlsContent = fs.readFileSync(urlsFilePath, 'utf-8');
+    // Parse URLs from file, filtering out comments and empty lines
+    domainsToProcess = urlsContent
+      .split('\n')
+      .map(line => line.trim())
+      .filter(line => line && !line.startsWith('//') && !line.startsWith('#'));
+    
+    console.log(`  -> Found ${domainsToProcess.length} URLs to process`);
+  } catch (error) {
+    console.error('  -> Error reading urls.txt:', error.message);
+    console.log('  -> Please create a urls.txt file with URLs to process');
+    return;
   }
 
-  const domainsToProcess = Array.from(urlsByDomain.keys()).filter(domain => {
-      const primaryUrl = urlsByDomain.get(domain)[0];
-      if (!processedUrlsMap.has(primaryUrl)) return true;
-      const lastProcessedTime = new Date(processedUrlsMap.get(primaryUrl));
-      return (now - lastProcessedTime) / (1000 * 60 * 60) > RESCAN_INTERVAL_HOURS;
+  if (domainsToProcess.length === 0) {
+    console.log('  -> No URLs found in urls.txt');
+    return;
+  }
+  
+  // Check which URLs need processing
+  const urlsToProcess = domainsToProcess.filter(url => {
+    const lastProcessed = processedUrlsMap.get(url);
+    if (!lastProcessed) return true;
+    
+    const lastProcessedDate = new Date(lastProcessed);
+    const hoursSinceProcessed = (now - lastProcessedDate) / (1000 * 60 * 60);
+    
+    if (hoursSinceProcessed > RESCAN_INTERVAL_HOURS) {
+      console.log(`  -> URL ${url} was last processed ${hoursSinceProcessed.toFixed(1)} hours ago, will reprocess`);
+      return true;
+    }
+    
+    console.log(`  -> Skipping ${url} - processed ${hoursSinceProcessed.toFixed(1)} hours ago`);
+    return false;
   });
 
-  if (!domainsToProcess.length) {
-      console.log('\n--- No new domains to process. All up to date. ---');
-      return;
+  if (urlsToProcess.length === 0) {
+    console.log('  -> All URLs have been recently processed');
+    return;
   }
-  console.log(`\nFound ${domainsToProcess.length} domain(s) to process.`);
 
   const browser = await chromium.launch();
-  const context = await browser.newContext({ userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36' });
+  const context = await browser.newContext({ 
+    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36' 
+  });
 
-  for (const domain of domainsToProcess) {
-    const urlsInDomain = urlsByDomain.get(domain);
-    const primaryUrl = urlsInDomain[0];
+  for (const url of urlsToProcess) {
+    console.log(`\n  -> Processing: ${url}`);
     
     try {
-        const combinedTextForDomain = await crawlDomainAndGetContent(urlsInDomain, context);
+        // For each URL, we might want to discover related pages
+        let urlsToScrape = [url];
+        
+        // Try to find additional pages from sitemap if it's a domain root
+        if (url.endsWith('/') || !url.includes('/', 8)) {
+          const sitemapUrls = await getSitemapUrls(url);
+          if (sitemapUrls.length > 0) {
+            console.log(`  -> Found ${sitemapUrls.length} URLs in sitemap`);
+            // Filter for grant-related pages
+            const grantRelatedUrls = sitemapUrls.filter(u => 
+              u.includes('grant') || 
+              u.includes('fund') || 
+              u.includes('apply') ||
+              u.includes('opportunity') ||
+              u.includes('program')
+            );
+            if (grantRelatedUrls.length > 0) {
+              urlsToScrape = [...new Set([...urlsToScrape, ...grantRelatedUrls])];
+              console.log(`  -> Will scrape ${urlsToScrape.length} grant-related pages`);
+            }
+          }
+        }
+
+        const combinedTextForDomain = await crawlDomainAndGetContent(urlsToScrape, context);
 
         if (combinedTextForDomain.length > 100) {
             console.log('  -> Extracting grant and funder info from combined text...');
@@ -397,23 +497,32 @@ async function saveFunderToSupabase(funder, url) {
             
             await sleep(1000);
 
-            const funderId = await saveFunderToSupabase(funder, primaryUrl);
+            console.log(`  -> Found ${grants.length} grants`);
+            console.log(`  -> Funder info: ${funder ? funder.name : 'Not found'}`);
 
-            await saveGrantsToSupabase(grants, primaryUrl, funderId);
+            const funderId = await getOrCreateFunder(funder, url);
+
+            if (funderId) {
+              await saveGrantsToSupabase(grants, url, funderId);
+            } else {
+              console.log('  -> Could not create/find funder, skipping grant save');
+            }
             
-            processedUrlsMap.set(primaryUrl, now.toISOString());
+            processedUrlsMap.set(url, now.toISOString());
         } else {
-            console.log(`  -> No significant content found for domain ${domain}.`);
+            console.log(`  -> No significant content found for ${url}`);
         }
     } catch (err) {
-        console.error(`  -> ‼️  Critical error processing domain ${domain}:`, err.message);
+        console.error(`  -> ‼️  Critical error processing ${url}:`, err.message);
     }
     
-    console.log(`  -> Pausing before next domain...`);
-    await sleep(15000);
+    console.log(`  -> Pausing before next URL...`);
+    await sleep(2000);
   }
-  
+
   await browser.close();
   writeProcessedUrls(processedUrlsMap);
-  console.log('\n--- All domains processed. ---');
-})();
+  console.log('\n--- Importer Finished ---');
+}
+
+main().catch(console.error);

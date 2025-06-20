@@ -60,5 +60,6 @@ export {
   PieChart,
   ArrowLeft,
   List,
-  PlusCircle // <-- ADD THIS ICON
+  PlusCircle,
+  Menu // <-- ADD THIS ICON
 } from 'lucide-react';

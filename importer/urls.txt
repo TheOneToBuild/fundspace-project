@@ -1,9 +1,6 @@
 // urls.txt
 https://farringtonfoundation.org/
 https://hewlett.org/
-https://hewlett.org/our-grants/
-https://hewlett.org/about-us/
-https://hewlett.org/making-progress-possible/
-https://hewlett.org/our-programs/
 https://www.sfbayrestore.org/restoration-authority-grants
-https://www.moore.org/programs/san-francisco-bay-area
+https://about.bankofamerica.com/en/making-an-impact/charitable-foundation-funding
+https://about.bankofamerica.com/en/making-an-impact/eligibility-criteria

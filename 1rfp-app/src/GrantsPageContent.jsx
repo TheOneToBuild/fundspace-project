@@ -1,4 +1,4 @@
-// src/GrantsPageContent.jsx
+// src/GrantsPageContent.jsx - ENHANCED VERSION - With Focus Areas
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { supabase } from './supabaseClient.js';
 import { Search, Users, MapPin, Calendar, DollarSign, Info, ChevronDown, ExternalLink, Zap, Clock, Target, IconBriefcase, BarChart3, ClipboardList, TrendingUp, Loader, XCircle, Heart, Bot } from './components/Icons.jsx';
@@ -13,29 +13,44 @@ import { GRANT_STATUSES } from './constants.js';
 import usePaginatedFilteredData from './hooks/usePaginatedFilteredData.js';
 import { sortGrants } from './sorting.js';
 
-
+// ENHANCED: Filtering logic with categories and locations
 const filterGrants = (grants, config) => {
   if (!Array.isArray(grants)) {
     return [];
   }
   return grants.filter(grant => {
-    // Search Term Filter (now without keywords)
+    // Enhanced Search Term Filter - includes categories and locations
     if (config.searchTerm) {
       const searchTerm = config.searchTerm.toLowerCase();
+      
+      // Get category names for searching
+      const categoryNames = grant.categories && Array.isArray(grant.categories) 
+        ? grant.categories.map(cat => cat.name || cat).join(' ')
+        : '';
+      
+      // Get location names for searching  
+      const locationNames = grant.locations && Array.isArray(grant.locations)
+        ? grant.locations.map(loc => loc.name || loc).join(' ')
+        : '';
+
       const searchableText = [
         grant.title,
         grant.description,
-        grant.foundationName
+        grant.foundationName || grant.foundation_name,
+        grant.grantType || grant.grant_type,
+        categoryNames,
+        locationNames
       ].join(' ').toLowerCase();
+      
       if (!searchableText.includes(searchTerm)) {
         return false;
       }
     }
 
     // Multi-Location Filter
-    if (config.locationFilter.length > 0) {
+    if (config.locationFilter && config.locationFilter.length > 0) {
       if (!grant.locations || grant.locations.length === 0) return false;
-      const grantLocationNames = grant.locations.map(l => l.name);
+      const grantLocationNames = grant.locations.map(l => l.name || l);
       const hasMatch = grantLocationNames.some(locName => config.locationFilter.includes(locName));
       if (!hasMatch) {
         return false;
@@ -43,9 +58,9 @@ const filterGrants = (grants, config) => {
     }
     
     // Multi-Category Filter
-    if (config.categoryFilter.length > 0) {
+    if (config.categoryFilter && config.categoryFilter.length > 0) {
       if (!grant.categories || grant.categories.length === 0) return false;
-      const grantCategoryNames = grant.categories.map(c => c.name);
+      const grantCategoryNames = grant.categories.map(c => c.name || c);
       const hasMatch = grantCategoryNames.some(catName => config.categoryFilter.includes(catName));
       if (!hasMatch) {
         return false;
@@ -54,7 +69,8 @@ const filterGrants = (grants, config) => {
     
     // Grant Type Filter
     if (config.grantTypeFilter) {
-      if (!grant.grantType || grant.grantType !== config.grantTypeFilter) {
+      const grantType = grant.grantType || grant.grant_type;
+      if (!grantType || grantType !== config.grantTypeFilter) {
         return false;
       }
     }
@@ -63,12 +79,12 @@ const filterGrants = (grants, config) => {
   });
 };
 
-
 const formatCurrency = (amount) => {
     if (amount >= 1000000) return `${(amount / 1000000).toFixed(1)}M+`;
     else if (amount >= 1000) return `${(amount / 1000).toFixed(0)}K+`;
     return `${amount}`;
 };
+
 const HeroImageCard = ({ card, layoutClass, initialDelay = 0 }) => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   useEffect(() => {
@@ -78,11 +94,15 @@ const HeroImageCard = ({ card, layoutClass, initialDelay = 0 }) => {
   }, [card.imageUrls, initialDelay]);
   return ( <div className={`rounded-xl shadow-lg overflow-hidden relative group ${layoutClass}`}><img src={card.imageUrls[currentImageIndex]} alt={card.imageAlt} className="w-full h-full object-cover object-center" loading="lazy" /></div> );
 };
+
 const HeroImpactSection = ({ grants }) => {
   const layoutClasses = [ 'col-span-1 row-span-2 h-full min-h-[300px] md:min-h-[400px]', 'col-span-1 row-span-1 h-full min-h-[140px] md:min-h-[190px]', 'col-span-1 row-span-1 h-full min-h-[140px] md:min-h-[190px]', 'col-span-1 row-span-1 h-full min-h-[140px] md:min-h-[190px]', 'col-span-1 row-span-1 h-full min-h-[140px] md:min-h-[190px]' ];
   const totalAvailableFunding = useMemo(() => {
     if (!Array.isArray(grants)) return 0;
-    return grants.reduce((sum, grant) => sum + parseMaxFundingAmount(grant.fundingAmount), 0);
+    return grants.reduce((sum, grant) => {
+      const amount = grant.fundingAmount || grant.max_funding_amount || '0';
+      return sum + parseMaxFundingAmount(amount.toString());
+    }, 0);
   }, [grants]);
   const totalGrantsAvailable = Array.isArray(grants) ? grants.length : 0;
   return (
@@ -134,22 +154,86 @@ const GrantsPageContent = () => {
   const [selectedGrant, setSelectedGrant] = useState(null);
   const [isMobileFiltersVisible, setIsMobileFiltersVisible] = useState(false);
 
+  // ENHANCED: Fetch grants with categories and locations
   useEffect(() => {
     const fetchGrants = async () => {
       setLoading(true);
       try {
-        const { data, error } = await supabase.rpc('get_grants_with_details');
-        if (error) throw error;
-        const grantsData = Array.isArray(data) ? data : [];
+        console.log('Fetching grants with categories and locations...');
         
-        // --- THIS IS THE CORRECTED MAPPING TO MATCH THE DATABASE FUNCTION ---
-        const formattedData = grantsData.map(grant => ({
+        // Try RPC function first, fall back to direct query
+        let grantsData = [];
+        try {
+          const { data: rpcData, error: rpcError } = await supabase.rpc('get_grants_with_details');
+          if (rpcError) throw rpcError;
+          grantsData = Array.isArray(rpcData) ? rpcData : [];
+          console.log('Successfully fetched via RPC function');
+        } catch (rpcError) {
+          console.log('RPC function failed, falling back to direct query:', rpcError);
+          // Fallback to direct query
+          const { data: directData, error: directError } = await supabase
+            .from('grants')
+            .select('*')
+            .eq('status', 'Open')
+            .order('id', { ascending: false });
+          
+          if (directError) throw directError;
+          grantsData = Array.isArray(directData) ? directData : [];
+          console.log('Successfully fetched via direct query');
+        }
+        
+        console.log('Raw grants data:', grantsData);
+        
+        // Enhanced data formatting with categories and locations
+        const formattedData = await Promise.all(grantsData.map(async (grant) => {
+          let categories = [];
+          let locations = [];
+          
+          // If we have categories from RPC, use them
+          if (grant.categories && Array.isArray(grant.categories)) {
+            categories = grant.categories;
+          } else {
+            // Otherwise fetch categories separately
+            try {
+              const { data: catData } = await supabase
+                .from('grant_categories')
+                .select('categories(name)')
+                .eq('grant_id', grant.id);
+              categories = catData ? catData.map(item => ({ name: item.categories?.name })).filter(cat => cat.name) : [];
+            } catch (error) {
+              console.log('Could not fetch categories for grant', grant.id);
+            }
+          }
+
+          // If we have locations from RPC, use them  
+          if (grant.locations && Array.isArray(grant.locations)) {
+            locations = grant.locations;
+          } else {
+            // Otherwise fetch locations separately
+            try {
+              const { data: locData } = await supabase
+                .from('grant_locations')
+                .select('locations(name)')
+                .eq('grant_id', grant.id);
+              locations = locData ? locData.map(item => ({ name: item.locations?.name })).filter(loc => loc.name) : [];
+            } catch (error) {
+              console.log('Could not fetch locations for grant', grant.id);
+            }
+          }
+
+          return {
             ...grant,
             foundationName: grant.foundation_name,
-            fundingAmount: grant.funding_amount_text, // CORRECTED
-            dueDate: grant.due_date,                 // CORRECTED
+            fundingAmount: grant.max_funding_amount ? `$${grant.max_funding_amount.toLocaleString()}` : 'Not specified',
+            dueDate: grant.deadline,
             grantType: grant.grant_type,
+            categories: categories,
+            locations: locations
+          };
         }));
+        
+        console.log('Enhanced grants data:', formattedData.length, 'grants');
+        console.log('Sample enhanced grant:', formattedData[0]);
         setGrants(formattedData);
       } catch (error) {
         console.error('Error fetching grants:', error);
@@ -161,39 +245,70 @@ const GrantsPageContent = () => {
     fetchGrants();
   }, []);
 
+  // Enhanced unique values extraction
   const uniqueCategories = useMemo(() => {
     if (!grants) return [];
     const allCategories = new Set();
     grants.forEach(grant => {
         if (grant.categories && Array.isArray(grant.categories)) {
-            grant.categories.forEach(cat => { if(cat.name) allCategories.add(cat.name); });
+            grant.categories.forEach(cat => { 
+              const categoryName = cat.name || cat;
+              if (categoryName) allCategories.add(categoryName); 
+            });
         }
     });
-    return Array.from(allCategories).sort();
+    const result = Array.from(allCategories).sort();
+    console.log('Unique categories found:', result);
+    return result;
   }, [grants]);
-  const uniqueGrantTypes = useMemo(() => Array.from(new Set(grants.map(g => g.grantType).filter(Boolean))).sort(), [grants]);
+
+  const uniqueGrantTypes = useMemo(() => Array.from(new Set(grants.map(g => g.grantType || g.grant_type).filter(Boolean))).sort(), [grants]);
+
   const uniqueLocations = useMemo(() => {
     if (!grants) return [];
     const allLocations = new Set();
     grants.forEach(grant => {
         if (grant.locations && Array.isArray(grant.locations)) {
-            grant.locations.forEach(loc => { if(loc.name) allLocations.add(loc.name); });
+            grant.locations.forEach(loc => { 
+              const locationName = loc.name || loc;
+              if (locationName) allLocations.add(locationName); 
+            });
         }
     });
-    return Array.from(allLocations).sort();
+    const result = Array.from(allLocations).sort();
+    console.log('Unique locations found:', result);
+    return result;
   }, [grants]);
 
   const grantsPerPageOptions = [6, 9, 12, 15, 21, 24, 30, 45, 60, 86];
   const { paginatedItems: currentList = [], totalPages, totalFilteredItems, filteredAndSortedItems } = usePaginatedFilteredData(grants, filterConfig, filterGrants, filterConfig.sortCriteria, sortGrants, currentPage, grantsPerPage);
   const totalFilteredFunding = useMemo(() => {
     if (!filteredAndSortedItems) return 0;
-    return filteredAndSortedItems.reduce((sum, grant) => sum + parseMaxFundingAmount(grant.fundingAmount), 0);
+    return filteredAndSortedItems.reduce((sum, grant) => {
+      const amount = grant.fundingAmount || grant.max_funding_amount || '0';
+      return sum + parseMaxFundingAmount(amount.toString());
+    }, 0);
   }, [filteredAndSortedItems]);
 
   const handleFilterChange = useCallback((key, value) => {
     setFilterConfig(prev => ({ ...prev, [key]: value }));
     setCurrentPage(1);
   }, []);
+
+  // ENHANCED: Handler for category filtering from grant cards
+  const handleFilterByCategory = useCallback((categoryName) => {
+    console.log('Category filter clicked:', categoryName);
+    setFilterConfig(prev => ({
+      ...prev,
+      categoryFilter: Array.isArray(prev.categoryFilter) 
+        ? (prev.categoryFilter.includes(categoryName) 
+            ? prev.categoryFilter.filter(cat => cat !== categoryName)
+            : [...prev.categoryFilter, categoryName])
+        : [categoryName]
+    }));
+    setCurrentPage(1);
+  }, []);
+
   const paginate = useCallback((page) => {
     if (page < 1 || (totalPages > 0 && page > totalPages)) return;
     setCurrentPage(page);
@@ -291,7 +406,14 @@ const GrantsPageContent = () => {
             </div>
           ) : currentList && currentList.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {currentList.map((grant) => (<GrantCard key={grant.id} grant={grant} onOpenDetailModal={openDetail} />))}
+              {currentList.map((grant) => (
+                <GrantCard 
+                  key={grant.id} 
+                  grant={grant} 
+                  onOpenDetailModal={openDetail}
+                  onFilterByCategory={handleFilterByCategory}
+                />
+              ))}
             </div>
           ) : (
             <div className="text-center text-slate-500 py-12 bg-white rounded-lg shadow-sm border border-slate-200">
