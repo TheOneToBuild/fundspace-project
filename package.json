@@ -11,7 +11,14 @@
     "install:all": "npm install && cd 1rfp-app && npm install && cd ../importer && npm install",
     "clean": "rm -rf node_modules package-lock.json && cd 1rfp-app && rm -rf node_modules package-lock.json && cd ../importer && rm -rf node_modules package-lock.json"
   },
-  "keywords": ["grants", "nonprofit", "bay-area"],
+  "keywords": [
+    "grants",
+    "nonprofit",
+    "bay-area"
+  ],
   "author": "",
-  "license": "ISC"
+  "license": "ISC",
+  "dependencies": {
+    "recharts": "^2.15.4"
+  }
 }

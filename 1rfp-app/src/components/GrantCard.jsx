@@ -1,7 +1,7 @@
 // src/components/GrantCard.jsx
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { IconBriefcase, MapPin, DollarSign, Calendar, ExternalLink, ShieldCheck } from './Icons.jsx';
-// Import the new formatting function
 import { formatDate, getPillClasses, getGrantTypePillClasses, formatFundingDisplay } from '../utils.js';
 
 const GrantCard = ({ grant, onOpenDetailModal, onFilterByCategory }) => {
@@ -19,15 +19,12 @@ const GrantCard = ({ grant, onOpenDetailModal, onFilterByCategory }) => {
 
     const grantData = grant;
 
-    // Helper function to get initials from the funder's name
     const getInitials = (name) => {
         if (!name) return '?';
         const words = name.split(' ');
         if (words.length > 1) {
-            // Take the first letter of the first two words
             return (words[0][0] + words[1][0]).toUpperCase();
         }
-        // If it's a single word, take the first two letters
         return name.substring(0, 2).toUpperCase();
     };
 
@@ -57,25 +54,29 @@ const GrantCard = ({ grant, onOpenDetailModal, onFilterByCategory }) => {
                         )}
                     </div>
                 </div>
-
-                {/* Logic for logo with initials fallback */}
-                <div className="flex items-center mb-4">
+                
+                {/* Wrapped the funder info in a Link component */}
+                <Link 
+                    to={`/funders/${grantData.funderSlug}`} 
+                    className="flex items-center mb-4 group"
+                    // Prevent the modal from opening when clicking the funder link
+                    onClick={(e) => e.stopPropagation()}
+                >
                     {grantData.funderLogoUrl ? (
                         <img 
                             src={grantData.funderLogoUrl} 
                             alt={`${grantData.foundationName} logo`}
                             className="h-6 w-6 mr-2 rounded-full object-contain border border-slate-200 flex-shrink-0"
-                            // If the image fails to load, this element will be hidden, and the fallback will appear.
                             onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.nextSibling.style.display = 'flex'; }}
                         />
                     ) : null }
-                     {/* This is the fallback div that is hidden by default if the logo exists */}
                     <div className={`h-6 w-6 mr-2 rounded-full bg-blue-100 text-blue-600 flex-shrink-0 items-center justify-center font-bold text-[10px] border border-blue-200 ${grantData.funderLogoUrl ? 'hidden' : 'flex'}`}>
                         {getInitials(grantData.foundationName)}
                     </div>
-                    <span className="text-sm text-slate-600 font-medium truncate">{grantData.foundationName}</span>
-                </div>
-
+                    <span className="text-sm text-slate-600 font-medium truncate group-hover:underline group-hover:text-blue-600 transition-colors">
+                        {grantData.foundationName}
+                    </span>
+                </Link>
 
                 {grantData.categories && grantData.categories.length > 0 && (
                     <div className="mb-4">
@@ -86,7 +87,10 @@ const GrantCard = ({ grant, onOpenDetailModal, onFilterByCategory }) => {
                                 return (
                                     <button 
                                         key={category.id || index} 
-                                        onClick={() => onFilterByCategory && onFilterByCategory(categoryName)}
+                                        onClick={(e) => {
+                                            e.stopPropagation(); // Prevent card click from triggering modal
+                                            onFilterByCategory(categoryName);
+                                        }}
                                         className={`text-xs font-semibold px-2.5 py-1 rounded-full transition-transform transform hover:scale-105 active:scale-95 ${getPillClasses(categoryName)}`}
                                         title={`Filter by: ${categoryName}`}
                                     >
@@ -103,7 +107,7 @@ const GrantCard = ({ grant, onOpenDetailModal, onFilterByCategory }) => {
                 </p>
 
                 <div className="space-y-2.5 text-sm mb-5">
-                    <div className="flex items-start text-slate-700">
+                   <div className="flex items-start text-slate-700">
                         <MapPin size={15} className="mr-2.5 mt-0.5 text-blue-500 flex-shrink-0" />
                         <div>
                             <span className="font-medium text-slate-600">Location: </span> 
@@ -138,9 +142,9 @@ const GrantCard = ({ grant, onOpenDetailModal, onFilterByCategory }) => {
                     {grantData.eligibility_criteria && (
                         <div className="flex items-start text-slate-700">
                             <ShieldCheck size={15} className="mr-2.5 mt-0.5 text-indigo-500 flex-shrink-0" />
-                            <div>
+                            <div className="line-clamp-4">
                                 <span className="font-medium text-slate-600">Eligibility: </span>
-                                <span className="line-clamp-2">{grantData.eligibility_criteria}</span>
+                                {grantData.eligibility_criteria}
                             </div>
                         </div>
                     )}

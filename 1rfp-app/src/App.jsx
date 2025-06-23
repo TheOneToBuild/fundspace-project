@@ -22,11 +22,13 @@ import BlogPage from './BlogPage.jsx';
 import GrantWritingTipsPage from './GrantWritingTipsPage.jsx';
 import SubmitGrantPage from './SubmitGrantPage.jsx';
 import FunderProfilePage from './FunderProfilePage.jsx';
+// --- ADDED: Import the new Nonprofit Profile Page component ---
+import NonprofitProfilePage from './NonprofitProfilePage.jsx';
+
 
 // --- Import your assets and icons ---
 import headerLogoImage from './assets/1rfp-logo.png';
 import footerLogoImage from './assets/1rfp-footer-logo.png';
-// Add Menu and X for the mobile navigation
 import { Facebook, Twitter, Linkedin, Youtube, Instagram, PlusCircle, Menu, X } from './components/Icons.jsx';
 
 // A helper component for navigation links to handle the active state styling
@@ -48,7 +50,6 @@ const AppNavLink = ({ to, children, activeClassName, ...props }) => {
 const AppLayout = ({ children }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  // Define all navigation links in one place for easier management
   const mainNavLinks = [
     { to: "/", text: "Find Grants", active: "text-blue-600 font-semibold" },
     { to: "/funders", text: "Explore Funders", active: "text-green-600 font-semibold" },
@@ -122,7 +123,6 @@ const AppLayout = ({ children }) => {
         </div>
       </header>
 
-      {/* --- UPDATED Mobile Menu Panel --- */}
       <div 
         className={`fixed inset-0 z-50 transition-transform transform ${isMobileMenuOpen ? 'translate-x-0' : 'translate-x-full'} md:hidden`}
       >
@@ -199,7 +199,6 @@ const AppLayout = ({ children }) => {
       </main>
 
       <footer className="text-black py-12">
-        {/* Footer content remains the same */}
         <div className="container mx-auto px-6">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
             <div>
@@ -270,6 +269,8 @@ export default function App() {
           <Route path="/submit-grant" element={<SubmitGrantPage />} />
           
           <Route path="/funders/:funderSlug" element={<FunderProfilePage />} />
+          {/* --- ADDED: The new route for individual nonprofit profiles --- */}
+          <Route path="/nonprofits/:slug" element={<NonprofitProfilePage />} />
 
         </Routes>
       </AppLayout>

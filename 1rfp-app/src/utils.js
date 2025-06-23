@@ -2,7 +2,7 @@
 
 export const formatDate = (dateString) => {
   if (!dateString) return 'N/A';
-  const options = { year: 'numeric', month: 'long', day: 'numeric' };
+  const options = { year: 'numeric', month: 'long', 'day': 'numeric' };
   // Add timeZone to ensure date is parsed correctly regardless of user's timezone
   return new Date(dateString + 'T00:00:00').toLocaleDateString(undefined, options);
 };
@@ -99,7 +99,9 @@ export const parseNonprofitBudgetRange = (budgetString) => {
   return { min: Math.min(...parsedNumbers), max: Math.max(...parsedNumbers) };
 };
 
+// --- UPDATED PILL CLASS MAP ---
 const pillClassMap = {
+    // Focus Areas
     'health': 'bg-green-100 text-green-800 border border-green-200',
     'education': 'bg-blue-100 text-blue-800 border border-blue-200',
     'environment': 'bg-teal-100 text-teal-800 border border-teal-200',
@@ -113,6 +115,18 @@ const pillClassMap = {
     'public health': 'bg-lime-100 text-lime-800 border border-lime-200',
     'homelessness': 'bg-orange-100 text-orange-800 border border-orange-200',
     'technology': 'bg-slate-200 text-slate-800 border border-slate-300',
+    // Geographic Scope Locations
+    'san francisco': 'bg-red-100 text-red-800 border border-red-200',
+    'alameda': 'bg-orange-100 text-orange-800 border border-orange-200',
+    'contra costa': 'bg-yellow-100 text-yellow-800 border border-yellow-200',
+    'san mateo': 'bg-lime-100 text-lime-800 border border-lime-200',
+    'santa clara': 'bg-sky-100 text-sky-800 border border-sky-200',
+    'marin': 'bg-emerald-100 text-emerald-800 border border-emerald-200',
+    'sonoma': 'bg-fuchsia-100 text-fuchsia-800 border border-fuchsia-200',
+    'solano': 'bg-violet-100 text-violet-800 border border-violet-200',
+    'napa': 'bg-stone-200 text-stone-800 border border-stone-300',
+    'bay area': 'bg-gray-200 text-gray-800 border border-gray-300', // For "San Francisco Bay Area"
+    // Default
     'default': 'bg-slate-100 text-slate-700 border border-slate-200'
 };
 
@@ -141,6 +155,18 @@ export const getGrantTypePillClasses = (grantType) => {
     if (typeLower.includes('research')) return 'bg-cyan-100 text-cyan-800 border-cyan-200';
     
     return 'bg-gray-100 text-gray-800 border-gray-200';
+};
+
+export const getFunderTypePillClasses = (funderType) => {
+    if (!funderType) return 'bg-slate-100 text-slate-700 border-slate-200';
+    const typeLower = funderType.toLowerCase();
+
+    if (typeLower.includes('private')) return 'bg-blue-100 text-blue-800 border-blue-200';
+    if (typeLower.includes('community')) return 'bg-green-100 text-green-800 border-green-200';
+    if (typeLower.includes('corporate')) return 'bg-indigo-100 text-indigo-800 border-indigo-200';
+    if (typeLower.includes('government')) return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+    
+    return 'bg-slate-100 text-slate-700 border-slate-200';
 };
 
 export const debounce = (func, wait, immediate = false) => {

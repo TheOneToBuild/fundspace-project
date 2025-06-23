@@ -13,66 +13,43 @@ import { GRANT_STATUSES } from './constants.js';
 import usePaginatedFilteredData from './hooks/usePaginatedFilteredData.js';
 import { sortGrants } from './sorting.js';
 
-// Filtering logic with categories and locations
 const filterGrants = (grants, config) => {
   if (!Array.isArray(grants)) {
     return [];
   }
   return grants.filter(grant => {
-    // Enhanced Search Term Filter - includes categories and locations
     if (config.searchTerm) {
       const searchTerm = config.searchTerm.toLowerCase();
-      
-      const categoryNames = grant.categories && Array.isArray(grant.categories) 
-        ? grant.categories.map(cat => cat.name || cat).join(' ')
-        : '';
-      
-      const locationNames = grant.locations && Array.isArray(grant.locations)
-        ? grant.locations.map(loc => loc.name || loc).join(' ')
-        : '';
-
-      const searchableText = [
-        grant.title,
-        grant.description,
-        grant.foundationName,
-        grant.grantType || grant.grant_type,
-        categoryNames,
-        locationNames
-      ].join(' ').toLowerCase();
-      
-      if (!searchableText.includes(searchTerm)) {
-        return false;
-      }
+      const categoryNames = grant.categories?.map(cat => cat.name || cat).join(' ') || '';
+      const locationNames = grant.locations?.map(loc => loc.name || loc).join(' ') || '';
+      const searchableText = [grant.title, grant.description, grant.foundationName, grant.grantType, categoryNames, locationNames].join(' ').toLowerCase();
+      if (!searchableText.includes(searchTerm)) return false;
     }
-
-    // Multi-Location Filter
-    if (config.locationFilter && config.locationFilter.length > 0) {
-      if (!grant.locations || grant.locations.length === 0) return false;
+    if (config.locationFilter?.length > 0) {
+      if (!grant.locations?.length) return false;
       const grantLocationNames = grant.locations.map(l => l.name || l);
-      const hasMatch = grantLocationNames.some(locName => config.locationFilter.includes(locName));
-      if (!hasMatch) {
-        return false;
-      }
+      if (!grantLocationNames.some(locName => config.locationFilter.includes(locName))) return false;
     }
-    
-    // Multi-Category Filter
-    if (config.categoryFilter && config.categoryFilter.length > 0) {
-      if (!grant.categories || grant.categories.length === 0) return false;
+    if (config.categoryFilter?.length > 0) {
+      if (!grant.categories?.length) return false;
       const grantCategoryNames = grant.categories.map(c => c.name || c);
-      const hasMatch = grantCategoryNames.some(catName => config.categoryFilter.includes(catName));
-      if (!hasMatch) {
-        return false;
+      if (!grantCategoryNames.some(catName => config.categoryFilter.includes(catName))) return false;
+    }
+    if (config.grantTypeFilter && grant.grantType !== config.grantTypeFilter) {
+      return false;
+    }
+    if (config.grantStatusFilter) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const dueDate = grant.dueDate ? new Date(grant.dueDate) : null;
+      if (config.grantStatusFilter === 'Open') {
+        if (dueDate && dueDate < today) return false;
+      } else if (config.grantStatusFilter === 'Rolling') {
+        if (dueDate) return false;
+      } else if (config.grantStatusFilter === 'Closed') {
+        if (!dueDate || dueDate >= today) return false;
       }
     }
-    
-    // Grant Type Filter
-    if (config.grantTypeFilter) {
-      const grantType = grant.grantType || grant.grant_type;
-      if (!grantType || grantType !== config.grantTypeFilter) {
-        return false;
-      }
-    }
-
     return true;
   });
 };
@@ -98,7 +75,6 @@ const HeroImpactSection = ({ grants }) => {
   const totalAvailableFunding = useMemo(() => {
     if (!Array.isArray(grants)) return 0;
     return grants.reduce((sum, grant) => {
-      // Use max_funding_amount for calculation
       const amount = grant.max_funding_amount || '0';
       return sum + parseMaxFundingAmount(amount.toString());
     }, 0);
@@ -146,7 +122,7 @@ const HeroImpactSection = ({ grants }) => {
 const GrantsPageContent = () => {
   const [grants, setGrants] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filterConfig, setFilterConfig] = useState({ searchTerm: '', locationFilter: [], categoryFilter: [], grantTypeFilter: '', sortCriteria: 'dueDate_asc' });
+  const [filterConfig, setFilterConfig] = useState({ searchTerm: '', locationFilter: [], categoryFilter: [], grantTypeFilter: '', grantStatusFilter: '', sortCriteria: 'dueDate_asc' });
   const [currentPage, setCurrentPage] = useState(1);
   const [grantsPerPage, setGrantsPerPage] = useState(12);
   const [isDetailModalOpen, setIsDetailModal] = useState(false);
@@ -157,33 +133,13 @@ const GrantsPageContent = () => {
     const fetchGrants = async () => {
       setLoading(true);
       try {
-        const { data, error } = await supabase
-          .from('grants')
-          .select(`
-            *,
-            funders (
-              name,
-              logo_url
-            ),
-            grant_categories (
-                categories (id, name)
-            ),
-            grant_locations (
-                locations (id, name)
-            )
-          `)
-          .eq('status', 'Open')
-          .order('id', { ascending: false });
-
-        if (error) {
-          throw error;
-        }
-
+        const { data, error } = await supabase.from('grants').select(`*, funders(name, logo_url, slug), grant_categories(categories(id, name)), grant_locations(locations(id, name))`).order('id', { ascending: false });
+        if (error) throw error;
         const formattedData = data.map(grant => ({
             ...grant,
             foundationName: grant.funders?.name || 'Unknown Funder', 
             funderLogoUrl: grant.funders?.logo_url || null,
-            // CORRECTED: Pass the raw numeric amount or the text string
+            funderSlug: grant.funders?.slug || null,
             fundingAmount: grant.max_funding_amount || grant.funding_amount_text || 'Not specified',
             dueDate: grant.deadline,
             grantType: grant.grant_type,
@@ -191,12 +147,9 @@ const GrantsPageContent = () => {
             categories: grant.grant_categories.map(gc => gc.categories),
             locations: grant.grant_locations.map(gl => gl.locations)
         }));
-        
         setGrants(formattedData);
-
       } catch (error) {
         console.error('Error fetching grants:', error);
-        setGrants([]);
       } finally {
         setLoading(false);
       }
@@ -204,38 +157,10 @@ const GrantsPageContent = () => {
     fetchGrants();
   }, []);
 
-  const uniqueCategories = useMemo(() => {
-    if (!grants) return [];
-    const allCategories = new Set();
-    grants.forEach(grant => {
-        if (grant.categories && Array.isArray(grant.categories)) {
-            grant.categories.forEach(cat => { 
-              const categoryName = cat.name || cat;
-              if (categoryName) allCategories.add(categoryName); 
-            });
-        }
-    });
-    const result = Array.from(allCategories).sort();
-    return result;
-  }, [grants]);
-
-  const uniqueGrantTypes = useMemo(() => Array.from(new Set(grants.map(g => g.grantType || g.grant_type).filter(Boolean))).sort(), [grants]);
-
-  const uniqueLocations = useMemo(() => {
-    if (!grants) return [];
-    const allLocations = new Set();
-    grants.forEach(grant => {
-        if (grant.locations && Array.isArray(grant.locations)) {
-            grant.locations.forEach(loc => { 
-              const locationName = loc.name || loc;
-              if (locationName) allLocations.add(locationName); 
-            });
-        }
-    });
-    const result = Array.from(allLocations).sort();
-    return result;
-  }, [grants]);
-
+  const uniqueCategories = useMemo(() => Array.from(new Set(grants.flatMap(g => g.categories?.map(c => c.name) || []).filter(Boolean))).sort(), [grants]);
+  const uniqueGrantTypes = useMemo(() => Array.from(new Set(grants.map(g => g.grantType).filter(Boolean))).sort(), [grants]);
+  const uniqueLocations = useMemo(() => Array.from(new Set(grants.flatMap(g => g.locations?.map(l => l.name) || []).filter(Boolean))).sort(), [grants]);
+  
   const grantsPerPageOptions = [6, 9, 12, 15, 21, 24, 30, 45, 60, 86];
   const { paginatedItems: currentList = [], totalPages, totalFilteredItems, filteredAndSortedItems } = usePaginatedFilteredData(grants, filterConfig, filterGrants, filterConfig.sortCriteria, sortGrants, currentPage, grantsPerPage);
   const totalFilteredFunding = useMemo(() => {
@@ -246,56 +171,76 @@ const GrantsPageContent = () => {
     }, 0);
   }, [filteredAndSortedItems]);
 
+  // CORRECTED: Moved handleFilterChange to be defined before it is used.
   const handleFilterChange = useCallback((key, value) => {
     setFilterConfig(prev => ({ ...prev, [key]: value }));
     setCurrentPage(1);
   }, []);
 
-  const handleFilterByCategory = useCallback((categoryName) => {
-    setFilterConfig(prev => ({
-      ...prev,
-      categoryFilter: Array.isArray(prev.categoryFilter) 
-        ? (prev.categoryFilter.includes(categoryName) 
-            ? prev.categoryFilter.filter(cat => cat !== categoryName)
-            : [...prev.categoryFilter, categoryName])
-        : [categoryName]
-    }));
+  const handleSearchAction = useCallback((suggestion) => {
+    const newConfig = { ...filterConfig, searchTerm: suggestion.text };
+    if (suggestion.type === 'category' && !filterConfig.categoryFilter.includes(suggestion.text)) {
+      newConfig.categoryFilter = [...filterConfig.categoryFilter, suggestion.text];
+    }
+    setFilterConfig(newConfig);
     setCurrentPage(1);
-  }, []);
+  }, [filterConfig]);
+
+  const handleFilterByCategory = useCallback((categoryName) => {
+    const categoryExists = filterConfig.categoryFilter.includes(categoryName);
+    const newCategoryFilter = categoryExists
+      ? filterConfig.categoryFilter.filter(cat => cat !== categoryName)
+      : [...filterConfig.categoryFilter, categoryName];
+    handleFilterChange('categoryFilter', newCategoryFilter);
+  }, [filterConfig.categoryFilter, handleFilterChange]);
 
   const paginate = useCallback((page) => {
     if (page < 1 || (totalPages > 0 && page > totalPages)) return;
     setCurrentPage(page);
     document.getElementById('grants')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }, [totalPages]);
+  
   const handlePerPageChange = useCallback((e) => {
     setGrantsPerPage(Number(e.target.value));
     setCurrentPage(1);
   }, []);
+  
   const openDetail = useCallback((grant) => {
     setSelectedGrant(grant);
     setIsDetailModal(true);
   }, []);
+  
   const closeDetail = useCallback(() => {
     setSelectedGrant(null);
     setIsDetailModal(false);
   }, []);
+  
   const handleClearFilters = useCallback(() => {
-    setFilterConfig({ searchTerm: '', locationFilter: [], categoryFilter: [], grantTypeFilter: '', sortCriteria: 'dueDate_asc' });
+    setFilterConfig({ searchTerm: '', locationFilter: [], categoryFilter: [], grantTypeFilter: '', grantStatusFilter: '', sortCriteria: 'dueDate_asc' });
     setCurrentPage(1);
   }, []);
-  const handleRemoveGrantFilter = useCallback((keyToRemove) => {
-    const value = keyToRemove === 'locationFilter' || keyToRemove === 'categoryFilter' ? [] : '';
-    handleFilterChange(keyToRemove, value);
-  }, [handleFilterChange]);
+
+  const handleRemoveGrantFilter = useCallback((keyToRemove, valueToRemove) => {
+    if (keyToRemove === 'categoryFilter' || keyToRemove === 'locationFilter') {
+      handleFilterChange(keyToRemove, filterConfig[keyToRemove].filter(item => item !== valueToRemove));
+    } else {
+      handleFilterChange(keyToRemove, '');
+    }
+  }, [filterConfig, handleFilterChange]);
+  
   useEffect(() => { document.title = '1RFP - Find Your Next Funding Opportunity'; }, []);
 
   const activeGrantFilters = useMemo(() => {
-    const filters = [];
+    let filters = [];
     if (filterConfig.searchTerm) filters.push({ key: 'searchTerm', label: `Search: "${filterConfig.searchTerm}"` });
-    if (filterConfig.locationFilter.length > 0) filters.push({ key: 'locationFilter', label: `Location: ${filterConfig.locationFilter.join(', ')}` });
-    if (filterConfig.categoryFilter.length > 0) filters.push({ key: 'categoryFilter', label: `Category: ${filterConfig.categoryFilter.join(', ')}` });
-    if (filterConfig.grantTypeFilter) filters.push({ key: 'grantTypeFilter', label: `Grant Type: ${filterConfig.grantTypeFilter}` });
+    if (filterConfig.locationFilter.length > 0) {
+      filters = filters.concat(filterConfig.locationFilter.map(loc => ({ key: 'locationFilter', label: `Location: ${loc}`, value: loc })));
+    }
+    if (filterConfig.categoryFilter.length > 0) {
+      filters = filters.concat(filterConfig.categoryFilter.map(cat => ({ key: 'categoryFilter', label: `Category: ${cat}`, value: cat })));
+    }
+    if (filterConfig.grantTypeFilter) filters.push({ key: 'grantTypeFilter', label: `Type: ${filterConfig.grantTypeFilter}` });
+    if (filterConfig.grantStatusFilter) filters.push({ key: 'grantStatusFilter', label: `Status: ${filterConfig.grantStatusFilter}` });
     return filters;
   }, [filterConfig]);
 
@@ -316,16 +261,22 @@ const GrantsPageContent = () => {
           <FilterBar
             isMobileVisible={isMobileFiltersVisible}
             searchTerm={filterConfig.searchTerm}
-            setSearchTerm={(value) => handleFilterChange('searchTerm', value)}
+            onSuggestionSelect={handleSearchAction}
+            onSearchChange={(value) => handleFilterChange('searchTerm', value)}
             locationFilter={filterConfig.locationFilter}
             setLocationFilter={(value) => handleFilterChange('locationFilter', value)}
             categoryFilter={filterConfig.categoryFilter}
             setCategoryFilter={(value) => handleFilterChange('categoryFilter', value)}
+            grantStatusFilter={filterConfig.grantStatusFilter}
+            setGrantStatusFilter={(value) => handleFilterChange('grantStatusFilter', value)}
+            grantTypeFilter={filterConfig.grantTypeFilter}
+            setGrantTypeFilter={(value) => handleFilterChange('grantTypeFilter', value)}
             sortCriteria={filterConfig.sortCriteria}
             setSortCriteria={(value) => handleFilterChange('sortCriteria', value)}
             uniqueCategories={uniqueCategories}
             uniqueLocations={uniqueLocations}
             uniqueGrantTypes={uniqueGrantTypes}
+            uniqueGrantStatuses={GRANT_STATUSES}
             pageType="grants"
             onClearFilters={handleClearFilters}
             activeFilters={activeGrantFilters}

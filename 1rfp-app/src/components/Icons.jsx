@@ -61,5 +61,6 @@ export {
   ArrowLeft,
   List,
   PlusCircle,
-  Menu // <-- ADD THIS ICON
+  Menu, 
+  ImageIcon
 } from 'lucide-react';

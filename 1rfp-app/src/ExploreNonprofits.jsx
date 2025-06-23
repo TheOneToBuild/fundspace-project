@@ -4,26 +4,30 @@ import { supabase } from './supabaseClient.js';
 import { Search, Users, Info, ChevronDown, Heart, Loader, XCircle } from './components/Icons.jsx';
 import FilterBar from './components/FilterBar.jsx';
 import Pagination from './components/Pagination.jsx';
-import NonprofitCard from './NonprofitCard.jsx';
+import NonprofitCard from './components/NonprofitCard.jsx';
 import { CATEGORIES, COMMON_LOCATIONS } from './constants.js';
 import usePaginatedFilteredData from './hooks/usePaginatedFilteredData.js';
 import { filterNonprofits } from './filtering.js';
 import { sortNonprofits } from './sorting.js';
+import { SearchResultsSkeleton } from './components/SkeletonLoader.jsx';
 
 const ExploreNonprofits = () => {
   const [nonprofits, setNonprofits] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isMobileFiltersVisible, setIsMobileFiltersVisible] = useState(false);
+  
+  // --- UPDATED: State now uses arrays for multi-select filters ---
   const [filterConfig, setFilterConfig] = useState({
     searchTerm: '',
-    locationFilter: '',
-    focusAreaFilter: '',
+    locationFilter: [],
+    focusAreaFilter: [],
     minBudget: '',
     maxBudget: '',
     minStaff: '',
     maxStaff: '',
     sortCriteria: 'name_asc'
   });
+
   const [currentPage, setCurrentPage] = useState(1);
   const [nonprofitsPerPage, setNonprofitsPerPage] = useState(12);
 
@@ -33,19 +37,18 @@ const ExploreNonprofits = () => {
       try {
         const { data, error } = await supabase
           .from('nonprofits')
-          .select('*');
+          .select('*, nonprofit_categories(categories(name))');
 
         if (error) throw error;
 
         if (data) {
           const formattedData = data.map(np => ({
             ...np,
-            focusAreas: np.focus_areas,
+            focusAreas: np.nonprofit_categories.map(npc => npc.categories.name),
             staffCount: np.staff_count,
             yearFounded: np.year_founded,
             impactMetric: np.impact_metric,
             imageUrl: np.image_url,
-            imageAlt: np.image_alt
           }));
           setNonprofits(formattedData);
         }
@@ -68,10 +71,10 @@ const ExploreNonprofits = () => {
     nonprofitsPerPage
   );
 
-  const handleFilterChange = (key, value) => {
+  const handleFilterChange = useCallback((key, value) => {
     setFilterConfig(prev => ({ ...prev, [key]: value }));
     setCurrentPage(1);
-  };
+  }, []);
 
   const paginate = useCallback((pageNumber) => {
     if (pageNumber < 1 || (totalPages > 0 && pageNumber > totalPages)) return;
@@ -87,8 +90,8 @@ const ExploreNonprofits = () => {
   const handleClearFilters = useCallback(() => {
     setFilterConfig({
       searchTerm: '',
-      locationFilter: '',
-      focusAreaFilter: '',
+      locationFilter: [],
+      focusAreaFilter: [],
       minBudget: '',
       maxBudget: '',
       minStaff: '',
@@ -98,9 +101,15 @@ const ExploreNonprofits = () => {
     setCurrentPage(1);
   }, []);
 
-  const handleRemoveNonprofitFilter = useCallback((keyToRemove) => {
-    handleFilterChange(keyToRemove, '');
-  }, []);
+  const handleRemoveNonprofitFilter = useCallback((keyToRemove, valueToRemove = null) => {
+    if (Array.isArray(filterConfig[keyToRemove]) && valueToRemove) {
+        const newValues = filterConfig[keyToRemove].filter(item => item !== valueToRemove);
+        handleFilterChange(keyToRemove, newValues);
+    } else {
+        handleFilterChange(keyToRemove, Array.isArray(filterConfig[keyToRemove]) ? [] : '');
+    }
+  }, [filterConfig, handleFilterChange]);
+
 
   useEffect(() => {
     document.title = '1RFP - Explore Nonprofits';
@@ -109,15 +118,30 @@ const ExploreNonprofits = () => {
   const activeNonprofitFilters = useMemo(() => {
     const filters = [];
     if (filterConfig.searchTerm) filters.push({ key: 'searchTerm', label: `Search: "${filterConfig.searchTerm}"` });
-    if (filterConfig.locationFilter) filters.push({ key: 'locationFilter', label: `Location: ${filterConfig.locationFilter}` });
-    if (filterConfig.focusAreaFilter) filters.push({ key: 'focusAreaFilter', label: `Focus Area: ${filterConfig.focusAreaFilter}` });
-    if (filterConfig.minBudget) filters.push({ key: 'minBudget', label: `Min Budget: $${parseInt(filterConfig.minBudget).toLocaleString()}` });
-    if (filterConfig.maxBudget) filters.push({ key: 'maxBudget', label: `Max Budget: $${parseInt(filterConfig.maxBudget).toLocaleString()}` });
+    
+    // Updated to handle arrays for active pills
+    if (Array.isArray(filterConfig.locationFilter)) {
+      filterConfig.locationFilter.forEach(loc => filters.push({ key: 'locationFilter', value: loc, label: `Location: ${loc}` }));
+    }
+    if (Array.isArray(filterConfig.focusAreaFilter)) {
+      filterConfig.focusAreaFilter.forEach(area => filters.push({ key: 'focusAreaFilter', value: area, label: `Focus: ${area}` }));
+    }
+    
+    if (filterConfig.minBudget && filterConfig.maxBudget) {
+        const budgetRanges = { '0-250000': 'Under $250K', '250000-500000': '$250K - $500K', '500000-1000000': '$500K - $1M', '1000000-2500000': '$1M - $2.5M', '2500000-5000000': '$2.5M - $5M', '5000000-999999999': '$5M+' };
+        const budgetKey = `${filterConfig.minBudget}-${filterConfig.maxBudget}`;
+        if(budgetRanges[budgetKey]) {
+            filters.push({ key: 'minBudget', label: `Budget: ${budgetRanges[budgetKey]}` });
+        }
+    }
+
     if (filterConfig.minStaff) filters.push({ key: 'minStaff', label: `Min Staff: ${filterConfig.minStaff}` });
     if (filterConfig.maxStaff) filters.push({ key: 'maxStaff', label: `Max Staff: ${filterConfig.maxStaff}` });
     return filters;
   }, [filterConfig]);
-
+  
+  const uniqueFocusAreas = useMemo(() => Array.from(new Set(nonprofits.flatMap(f => f.focusAreas || []))).sort(), [nonprofits]);
+  const uniqueLocations = useMemo(() => Array.from(new Set(nonprofits.map(f => f.location).filter(Boolean))).sort(), [nonprofits]);
 
   return (
     <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
@@ -128,10 +152,6 @@ const ExploreNonprofits = () => {
         <p className="text-md md:text-lg text-slate-600 mb-6 max-w-2xl mx-auto">
           Discover impactful nonprofit organizations making a difference in our local communities.
         </p>
-        <div className="text-xs text-slate-500 bg-slate-100 border border-slate-200 px-3 py-2 rounded-md inline-flex items-center gap-1.5">
-          <Info size={14} className="flex-shrink-0" />
-          <span>Connecting to live nonprofit database.</span>
-        </div>
 
         <div className="mt-8 md:hidden">
             <button
@@ -165,8 +185,8 @@ const ExploreNonprofits = () => {
           setMaxStaff={(value) => handleFilterChange('maxStaff', value)}
           sortCriteria={filterConfig.sortCriteria}
           setSortCriteria={(value) => handleFilterChange('sortCriteria', value)}
-          uniqueLocations={COMMON_LOCATIONS}
-          uniqueFocusAreas={CATEGORIES}
+          uniqueLocations={uniqueLocations}
+          uniqueFocusAreas={uniqueFocusAreas}
           pageType="nonprofits"
           onClearFilters={handleClearFilters}
           activeFilters={activeNonprofitFilters}
@@ -204,15 +224,15 @@ const ExploreNonprofits = () => {
         </div>
 
         {loading ? (
-            <div className="text-center text-slate-500 py-12 bg-white rounded-lg shadow-sm border border-slate-200">
-              <Loader size={40} className="mx-auto text-purple-400 mb-3 animate-spin" />
-              <p className="text-lg font-medium">Loading nonprofits...</p>
-              <p className="text-sm">Connecting to the database.</p>
-            </div>
+            <SearchResultsSkeleton count={nonprofitsPerPage} type="nonprofit" />
           ) : currentNonprofits.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {currentNonprofits.map((nonprofit) => (
-              <NonprofitCard key={nonprofit.id} nonprofit={nonprofit} />
+              <NonprofitCard 
+                key={nonprofit.id} 
+                nonprofit={nonprofit} 
+                handleFilterChange={handleFilterChange} 
+              />
             ))}
           </div>
         ) : (
@@ -222,7 +242,7 @@ const ExploreNonprofits = () => {
             <p className="text-sm mb-4">Try adjusting your search or filter criteria.</p>
             <button
               onClick={handleClearFilters}
-              className="inline-flex items-center px-4 py-2 border border-slate-300 rounded-md shadow-sm text-sm font-medium text-slate-700 bg-white hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
+              className="inline-flex items-center px-4 py-2 border border-slate-300 rounded-md shadow-sm text-sm font-medium text-slate-700 bg-white hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 transition-colors"
             >
               <XCircle size={16} className="mr-2" />
               Clear All Filters
