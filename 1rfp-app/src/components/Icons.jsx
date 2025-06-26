@@ -61,6 +61,8 @@ export {
   ArrowLeft,
   List,
   PlusCircle,
-  Menu, 
-  ImageIcon
+  Menu,
+  ImageIcon,
+  IdCard,
+  // The line with 'SimilarIcon' has been removed
 } from 'lucide-react';

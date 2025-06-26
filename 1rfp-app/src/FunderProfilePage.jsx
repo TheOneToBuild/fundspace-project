@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { supabase } from './supabaseClient.js';
-import { Loader, ArrowLeft, ArrowRight, ExternalLink, MapPin, DollarSign, IconBriefcase, MessageSquare, ClipboardList, Users, ClipboardCheck, List, Award, Users as SimilarIcon, Tag } from './components/Icons.jsx';
+import { Loader, ArrowLeft, ArrowRight, ExternalLink, MapPin, DollarSign, IconBriefcase, MessageSquare, ClipboardList, Users as SimilarIcon, ClipboardCheck, List, Award, Users, Tag, Lightbulb } from './components/Icons.jsx';
 import { getPillClasses, getGrantTypePillClasses, formatDate, getFunderTypePillClasses } from './utils.js';
 import GrantCard from './components/GrantCard.jsx';
 import GrantDetailModal from './GrantDetailModal.jsx';
@@ -71,26 +71,42 @@ const FunderProfilePage = () => {
       setError(null);
       
       try {
+        // --- CORRECTED AND RE-STRUCTURED DATA FETCHING LOGIC ---
+
+        // 1. First, get ONLY the main funder's ID. This is a fast query.
+        const { data: funderIdData, error: funderIdError } = await supabase
+            .from('funders')
+            .select('id')
+            .eq('slug', funderSlug)
+            .single();
+
+        if (funderIdError) throw funderIdError;
+        const funderId = funderIdData.id;
+        
+        // 2. Now, run the three main queries in parallel.
         const [funderRes, allFundersRes, grantsRes] = await Promise.all([
+            // Get the full details for the current funder using its ID
             supabase
               .from('funders')
               .select('*, funder_categories(categories(name)), funder_type:funder_type_id(name), funder_funding_locations(locations(id, name))')
-              .eq('slug', funderSlug)
+              .eq('id', funderId)
               .single(),
+            // Get all funders for the "similar" section
             supabase
               .from('funders')
               .select('*, funder_categories(categories(name)), funder_type:funder_type_id(name), funder_funding_locations(locations(id, name))'),
+            // Get all grants specifically for this funder using its ID
             supabase
               .from('grants')
               .select(`*, funders(name, logo_url, slug), grant_categories(categories(id, name)), grant_locations(locations(id, name))`)
-              .eq('funders.slug', funderSlug)
+              .eq('funder_id', funderId)
               .order('deadline', { ascending: true, nullsFirst: false })
         ]);
 
         if (funderRes.error) throw funderRes.error;
-        if (allFundersRes.error) console.warn("Could not fetch all funders for similarity check:", allFundersRes.error.message);
+        if (allFundersRes.error) console.warn("Could not fetch all funders:", allFundersRes.error.message);
         if (grantsRes.error) console.warn("Could not fetch grants for funder:", grantsRes.error.message);
-
+        
         const funderData = funderRes.data;
         if (funderData) {
             funderData.focus_areas = funderData.funder_categories.map(fc => fc.categories.name);
@@ -99,26 +115,12 @@ const FunderProfilePage = () => {
         setFunder(funderData);
 
         if (allFundersRes.data) {
-             const formattedAllFunders = allFundersRes.data.map(f => ({
-                ...f,
-                focus_areas: f.funder_categories.map(fc => fc.categories.name),
-                funding_locations: f.funder_funding_locations.map(ffl => ffl.locations.name)
-            }));
+             const formattedAllFunders = allFundersRes.data.map(f => ({ ...f, focus_areas: f.funder_categories.map(fc => fc.categories.name), funding_locations: f.funder_funding_locations.map(ffl => ffl.locations.name) }));
             setAllFunders(formattedAllFunders);
         }
-
-        const formattedGrants = (grantsRes.data || []).map(grant => ({
-            ...grant,
-            foundationName: grant.funders?.name || funderData.name, 
-            funderLogoUrl: grant.funders?.logo_url || funderData.logo_url,
-            funderSlug: grant.funders?.slug || funderData.slug,
-            fundingAmount: grant.max_funding_amount || grant.funding_amount_text || 'Not specified',
-            dueDate: grant.deadline,
-            grantType: grant.grant_type,
-            eligibility_criteria: grant.eligibility_criteria,
-            categories: grant.grant_categories.map(gc => gc.categories),
-            locations: grant.grant_locations.map(gl => gl.locations)
-        }));
+        
+        // Correctly format the grants data
+        const formattedGrants = (grantsRes.data || []).map(grant => ({ ...grant, foundationName: grant.funders?.name || funderData.name, funderLogoUrl: grant.funders?.logo_url || funderData.logo_url, funderSlug: grant.funders?.slug || funderData.slug, fundingAmount: grant.max_funding_amount || grant.funding_amount_text || 'Not specified', dueDate: grant.deadline, grantType: grant.grant_type, eligibility_criteria: grant.eligibility_criteria, categories: grant.grant_categories.map(gc => gc.categories), locations: grant.grant_locations.map(gl => gl.locations) }));
         setFunderGrants(formattedGrants);
 
       } catch (err) {
@@ -135,10 +137,7 @@ const FunderProfilePage = () => {
     if (!funder || !allFunders.length) return [];
     return allFunders
       .filter(f => f.id !== funder.id)
-      .map(otherFunder => ({
-        ...otherFunder,
-        similarityScore: otherFunder.focus_areas.filter(area => funder.focus_areas.includes(area)).length
-      }))
+      .map(otherFunder => ({ ...otherFunder, similarityScore: otherFunder.focus_areas.filter(area => funder.focus_areas.includes(area)).length }))
       .filter(f => f.similarityScore > 0)
       .sort((a, b) => b.similarityScore - a.similarityScore)
       .slice(0, 3);
@@ -171,9 +170,7 @@ const FunderProfilePage = () => {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 lg:gap-12">
-
             <div className="lg:col-span-2 space-y-8">
-
               <section className="bg-white p-8 rounded-xl border border-slate-200 shadow-lg">
                 <div className="flex flex-col sm:flex-row items-start gap-6">
                     <div className="flex-shrink-0">
@@ -197,7 +194,10 @@ const FunderProfilePage = () => {
               </section>
 
               <section>
-                 <h4 className="text-sm font-semibold uppercase tracking-wider mb-3 text-slate-600">Funding Philosophy</h4>
+                 <h4 className="text-lg font-bold text-slate-800 border-b border-slate-200 pb-3 mb-6 flex items-center">
+                    <Lightbulb size={20} className="mr-3 text-yellow-500" />
+                    Funding Philosophy
+                 </h4>
                  <div className="bg-white p-6 rounded-xl border border-slate-200 text-base text-slate-600 leading-relaxed">
                     {funder.description}
                  </div>
@@ -205,31 +205,57 @@ const FunderProfilePage = () => {
               
               {funder.application_process_summary && (
                    <section>
-                      <h4 className="text-sm font-semibold uppercase tracking-wider flex items-center mb-3 text-slate-600"><ClipboardCheck size={16} className="mr-2 opacity-70" />Application Process</h4>
+                      <h4 className="text-lg font-bold text-slate-800 border-b border-slate-200 pb-3 mb-6 flex items-center">
+                        <ClipboardCheck size={20} className="mr-3 text-blue-500" />
+                        Application Process
+                      </h4>
                       <p className="text-slate-600 leading-relaxed bg-white p-6 rounded-xl border border-slate-200">{funder.application_process_summary}</p>
                    </section>
               )}
               {funder.key_personnel && funder.key_personnel.length > 0 && (
-                  <section><h4 className="text-sm font-semibold uppercase tracking-wider flex items-center mb-4 text-slate-600"><Users size={16} className="mr-2 opacity-70" />Key Personnel</h4><div className="bg-white p-6 rounded-xl border border-slate-200 space-y-3">{funder.key_personnel.map((p, i) => (<div key={i} className="flex"><div className="font-semibold w-2/5">{p.name}</div><div className="text-slate-600 w-3/5">{p.title}</div></div>))}</div></section>
+                  <section>
+                    <h4 className="text-lg font-bold text-slate-800 border-b border-slate-200 pb-3 mb-6 flex items-center">
+                        <Users size={20} className="mr-3 text-indigo-500" />
+                        Key Personnel
+                    </h4>
+                    <div className="bg-white p-6 rounded-xl border border-slate-200 space-y-3">{funder.key_personnel.map((p, i) => (<div key={i} className="flex"><div className="font-semibold w-2/5">{p.name}</div><div className="text-slate-600 w-3/5">{p.title}</div></div>))}</div>
+                  </section>
               )}
               {funder.past_grantees && (
-                  <section><h4 className="text-sm font-semibold uppercase tracking-wider flex items-center mb-4 text-slate-600"><Award size={16} className="mr-2 opacity-70" />Spotlight on Past Grantees</h4><div className="bg-white border border-slate-200 p-6 rounded-xl"><p className="text-slate-600 leading-relaxed">{funder.past_grantees}</p></div></section>
+                  <section>
+                    <h4 className="text-lg font-bold text-slate-800 border-b border-slate-200 pb-3 mb-6 flex items-center">
+                        <Award size={20} className="mr-3 text-amber-500" />
+                        Spotlight on Past Grantees
+                    </h4>
+                    <div className="bg-white border border-slate-200 p-6 rounded-xl"><p className="text-slate-600 leading-relaxed">{funder.past_grantees}</p></div>
+                  </section>
               )}
               
               {funderGrants.length > 0 && (
-                  <section><h4 className="text-sm font-semibold uppercase tracking-wider flex items-center mb-4 text-slate-600"><List size={16} className="mr-2 opacity-70" />Recently Listed Grants from {funder.name}</h4><div className="grid grid-cols-1 sm:grid-cols-2 gap-6">{funderGrants.map(g => (<GrantCard key={g.id} grant={g} onOpenDetailModal={openDetail} />))}</div></section>
+                  <section>
+                    <h4 className="text-lg font-bold text-slate-800 border-b border-slate-200 pb-3 mb-6 flex items-center">
+                        <List size={20} className="mr-3 text-green-500" />
+                        Recently Listed Grants from {funder.name}
+                    </h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">{funderGrants.map(g => (<GrantCard key={g.id} grant={g} onOpenDetailModal={openDetail} />))}</div>
+                  </section>
               )}
               
               {similarFunders.length > 0 && (
-                <section><h4 className="text-sm font-semibold uppercase tracking-wider flex items-center mb-4 text-slate-600"><SimilarIcon size={16} className="mr-2 opacity-70" />Similar Foundations</h4><div className="grid grid-cols-1 md:grid-cols-2 gap-6">{similarFunders.map(sf => (<FunderCard key={sf.id} funder={sf} handleFilterChange={handleSimilarFunderFilterClick} />))}</div></section>
+                <section>
+                    <h4 className="text-lg font-bold text-slate-800 border-b border-slate-200 pb-3 mb-6 flex items-center">
+                        <SimilarIcon size={20} className="mr-3 text-purple-500" />
+                        Similar Foundations
+                    </h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">{similarFunders.map(sf => (<FunderCard key={sf.id} funder={sf} handleFilterChange={handleSimilarFunderFilterClick} />))}</div>
+                </section>
               )}
             </div>
 
             <div className="lg:col-span-1">
                 <div className="lg:sticky lg:top-8 space-y-8">
-                
                     <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-lg">
-                        <h4 className="text-sm font-semibold uppercase tracking-wider mb-4 text-slate-600">At a Glance</h4>
+                        <h4 className="text-lg font-bold text-slate-800 border-b border-slate-200 pb-3 mb-6">At a Glance</h4>
                         <div className="space-y-4 text-base">
                             <div className="flex items-start"><MapPin size={18} className="mr-3 mt-1 text-blue-500 flex-shrink-0" /><div><span className="font-semibold">Headquarters:</span> {funder.location || 'Not specified'}</div></div>
                             {funder.funding_locations && funder.funding_locations.length > 0 && (
@@ -249,18 +275,22 @@ const FunderProfilePage = () => {
                             {funder.notable_grant && (<div className="flex items-start"><Award size={18} className="mr-3 mt-1 text-amber-500 flex-shrink-0" /><div><span className="font-semibold">Notable Grant:</span> {funder.notable_grant}</div></div>)}
                         </div>
                     </div>
-                    
-                    {/* The Pie Chart section has been removed from here */}
-                    
+                                        
                     <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-lg space-y-6">
                         {funder.grant_types && funder.grant_types.length > 0 && (
                             <div>
-                                <h4 className="text-sm font-semibold uppercase tracking-wider mb-3 text-slate-600">Grant Types Offered</h4>
+                                <h4 className="text-lg font-bold text-slate-800 border-b border-slate-200 pb-3 mb-6">Grant Types Offered</h4>
                                 <div className="flex flex-wrap gap-2">{funder.grant_types.map(type => (<span key={type} className={`text-sm font-medium px-3 py-1.5 rounded-full border ${getGrantTypePillClasses(type)}`}>{type}</span>))}</div>
                             </div>
                         )}
                         {funder.focus_areas && funder.focus_areas.length > 0 && (
-                            <div><h4 className="text-sm font-semibold uppercase tracking-wider mb-3 text-slate-600"><Tag size={14} className="inline mr-1" />Focus Areas</h4><div className="flex flex-wrap gap-2">{funder.focus_areas.map(a => (<span key={a} className={`text-sm font-semibold px-3 py-1.5 rounded-full ${getPillClasses(a)}`}>{a}</span>))}</div></div>
+                            <div>
+                                <h4 className="text-lg font-bold text-slate-800 border-b border-slate-200 pb-3 mb-6 flex items-center">
+                                    <Tag size={18} className="mr-3 text-pink-500" />
+                                    Focus Areas
+                                </h4>
+                                <div className="flex flex-wrap gap-2">{funder.focus_areas.map(a => (<span key={a} className={`text-sm font-semibold px-3 py-1.5 rounded-full ${getPillClasses(a)}`}>{a}</span>))}</div>
+                            </div>
                         )}
                     </div>
                     <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-lg">

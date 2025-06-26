@@ -1,111 +1,312 @@
 // src/spotlightData.js
 
-export const communitySpotlightData = {
-  id: 'spotlight-2025-06',
-  month: 'June',
-  year: 2025,
-  communityName: 'Oakland',
-  countyName: 'Alameda County',
-  heroImage: 'https://placehold.co/1200x600/1a202c/FFFFFF?text=Oakland&font=inter',
-  tagline: "A vibrant hub of culture, innovation, and resilient communities.",
-  description: "Oakland stands as a testament to the Bay Area's rich diversity and history. From the bustling port to the serene redwood forests in the hills, the city is a microcosm of creativity and industry. While facing challenges in equity and housing, Oakland's spirit is defined by its strong neighborhood bonds, thriving arts scene, and a deep-rooted commitment to social justice, making it a focal point for impactful nonprofit work.",
-  stats: [
-    { label: 'Population', value: '433,823', icon: 'Users' },
-    { label: 'Median Income', value: '$86,971', icon: 'DollarSign' },
-    { label: 'Founded', value: '1852', icon: 'Calendar' }
-  ],
-  featuredNonprofits: [
-    {
-      id: 'np-spotlight-1',
-      name: 'Oakland Arts Collective',
-      imageUrl: 'https://placehold.co/600x400/805ad5/FFFFFF?text=Oakland+Arts+Collective&font=inter',
-      tagline: 'Empowering youth through creative expression.',
-      impactStory: "Last year, the Collective provided over 2,000 hours of free art instruction to Oakland youth, culminating in the 'Art for Oakland' mural project that revitalized three downtown public spaces.",
-      website: '#',
-      yearFounded: 2012,
-      keyPrograms: ['After-School Arts', 'Summer Mural Camp', 'Digital Media Lab'],
-      about: "Founded by local artists and educators, the Oakland Arts Collective provides a safe and inspiring space for young people to explore their creativity. Through hands-on workshops and mentorship, we help cultivate the next generation of Bay Area artists.",
-      mission: "To empower Oakland youth by providing accessible, high-quality arts education and a platform for creative self-expression that fosters confidence and community engagement."
-    },
-    {
-      id: 'np-spotlight-2',
-      name: 'East Bay Food Pantry',
-      imageUrl: 'https://placehold.co/600x400/dd6b20/FFFFFF?text=East+Bay+Food+Pantry&font=inter',
-      tagline: 'Nourishing communities, one meal at a time.',
-      impactStory: "By partnering with local farms, the Pantry rescued over 50 tons of fresh produce, providing healthy, nutritious meals to more than 500 families weekly across East Oakland.",
-      website: '#',
-      yearFounded: 1998,
-      keyPrograms: ['Weekly Grocery Distribution', 'Nutrition Workshops', 'Community Garden'],
-      about: "What began as a small neighborhood effort has grown into a cornerstone of the East Bay's food security network. We focus on providing nutritious food with dignity and respect to all who come through our doors.",
-      mission: "To eliminate hunger and promote health in our community through reliable access to nutritious food, education, and compassionate support."
-    },
-    {
-      id: 'np-spotlight-3',
-      name: 'Lake Merritt Stewards',
-      imageUrl: 'https://placehold.co/600x400/38a169/FFFFFF?text=Lake+Merritt+Stewards&font=inter',
-      tagline: "Preserving Oakland's natural crown jewel.",
-      impactStory: "Their weekly volunteer clean-ups removed over 5,000 pounds of trash from Lake Merritt's shores, significantly improving water quality and protecting the habitat of migratory birds.",
-      website: '#',
-      yearFounded: 2005,
-      keyPrograms: ['Weekly Clean-ups', 'Water Quality Testing', 'Educational Tours'],
-      about: "The Lake Merritt Stewards is a volunteer-led organization dedicated to the ecological health and public enjoyment of Lake Merritt. We believe that a healthy lake contributes to a healthy city.",
-      mission: "To protect and improve the ecosystem of Lake Merritt and its surrounding parklands through hands-on stewardship, community education, and advocacy."
-    }
-  ],
-  featuredFunders: [
-    {
-      id: 'funder-spotlight-1',
-      name: 'The Alameda Opportunity Fund',
-      logoUrl: 'https://placehold.co/100x100/EBF5FF/1E40AF?text=AOF&font=inter',
-      philosophy: 'Dedicated to closing the equity gap in Alameda County by investing in education and workforce development initiatives that create clear pathways to success.',
-      focusAreas: ['Youth Education', 'STEM', 'Job Training'],
-      website: '#',
-      grantmakingProcess: 'Accepts unsolicited proposals via online portal twice a year.',
-      notableGrant: 'Recently awarded $75,000 to Oakland Codes to expand their free coding bootcamps to two new high schools.',
-      // NEW FIELDS
-      funderType: 'Community Foundation',
-      geographicScope: 'Alameda & Contra Costa Counties',
-      annualGiving: 'Approx. $12M',
-      primaryContact: {
-        name: 'Elena Garcia',
-        title: 'Program Officer, Education'
-      }
-    },
-    {
-      id: 'funder-spotlight-2',
-      name: 'Bay Area Green Futures',
-      logoUrl: 'https://placehold.co/100x100/F0FFF4/22543D?text=BAG&font=inter',
-      philosophy: "Believes that environmental health is community health. We fund grassroots projects focused on conservation, sustainability, and climate resilience in urban areas.",
-      focusAreas: ['Urban Gardening', 'Conservation', 'Climate Justice'],
-      website: '#',
-      grantmakingProcess: 'By invitation only. LOIs are requested from partners identified by staff.',
-      notableGrant: 'Provided a three-year, $150,000 general operating grant to the West Oakland Environmental Indicators Project.',
-      // NEW FIELDS
-      funderType: 'Private Foundation',
-      geographicScope: 'All 9 Bay Area Counties',
-      annualGiving: 'Approx. $25M',
-      primaryContact: {
-        name: 'David Chen',
-        title: 'Program Officer, Environment'
-      }
-    },
-    {
-      id: 'funder-spotlight-3',
-      name: 'East Bay Arts & Culture Council',
-      logoUrl: 'https://placehold.co/100x100/FAF5FF/5B21B6?text=EBAC&font=inter',
-      philosophy: "We champion the artists and organizations that make the East Bay a vibrant, culturally rich place to live, with a focus on supporting underserved communities.",
-      focusAreas: ['Public Art', 'Arts Education', 'Cultural Programs'],
-      website: '#',
-      grantmakingProcess: 'Open application process with a rolling deadline for grants under $10,000.',
-      notableGrant: 'Funded the "Voices of the Town" public mural series, supporting 15 local artists.',
-      // NEW FIELDS
-      funderType: 'Public Charity',
-      geographicScope: 'Alameda & Contra Costa Counties',
-      annualGiving: 'Approx. $5M',
-      primaryContact: {
-        name: 'Maria Flores',
-        title: 'Grants Manager'
-      }
-    }
-  ]
+export const countySpotlightData = {
+  "alameda": {
+    communityName: "Alameda County",
+    tagline: "The cultural and commercial heart of the East Bay.",
+    description: "Home to Oakland and Berkeley, Alameda County is a diverse and dynamic region known for its vibrant arts scene, top-tier educational institutions, and a deep-rooted history of social and political activism.",
+    heroImage: "https://www.baaqmd.gov/~/media/dotgov/images/county-images/alameda-jpg.jpg?la=en&h=312&w=816&hash=A53B795709959FCE584F7F96AF2E6AF4",
+    stats: [
+      { label: "Population", value: "1.67M", icon: "Users" },
+      { label: "Median Income", value: "$112,000", icon: "DollarSign" },
+      { label: "Key Cities", value: "Oakland, Berkeley", icon: "MapPin" },
+    ],
+    featuredCities: [ { name: "Oakland", slug: "oakland" }, { name: "Berkeley", slug: "berkeley" }, { name: "Fremont", slug: "fremont" } ],
+  },
+  "contra-costa": {
+    communityName: "Contra Costa County",
+    tagline: "Suburban communities meet rolling hills and waterfront views.",
+    description: "Stretching from the inner East Bay to the Delta, Contra Costa County offers a mix of bustling suburban centers and beautiful natural landscapes, with a growing focus on healthcare and technology.",
+    heroImage: "https://www.contracosta.ca.gov/ImageRepository/Document?documentID=80881",
+    stats: [
+      { label: "Population", value: "1.16M", icon: "Users" },
+      { label: "Median Income", value: "$123,000", icon: "DollarSign" },
+      { label: "Key Cities", value: "Walnut Creek, Richmond", icon: "MapPin" },
+    ],
+    featuredCities: [ { name: "Walnut Creek", slug: "walnut-creek" }, { name: "Richmond", slug: "richmond" }, { name: "Concord", slug: "concord" } ],
+  },
+  "marin": {
+    communityName: "Marin County",
+    tagline: "Natural beauty, affluent communities, and environmental leadership.",
+    description: "Famous for the Golden Gate Bridge, Mount Tamalpais, and its stunning coastline, Marin County is a hub for outdoor recreation and environmental conservation efforts, boasting strong community engagement.",
+    heroImage: "https://media-production.lp-cdn.com/cdn-cgi/image/format=auto,quality=85,fit=scale-down,width=1280/https://media-production.lp-cdn.com/media/pfsjeo96fi7hlv4xculb",
+    stats: [
+      { label: "Population", value: "260,000", icon: "Users" },
+      { label: "Median Income", value: "$153,000", icon: "DollarSign" },
+      { label: "Key Cities", value: "Sausalito, San Rafael", icon: "MapPin" },
+    ],
+    featuredCities: [ { name: "Sausalito", slug: "sausalito" }, { name: "San Rafael", slug: "san-rafael" }, { name: "Mill Valley", slug: "mill-valley" } ],
+  },
+  "napa": {
+    communityName: "Napa County",
+    tagline: "World-renowned vineyards and a commitment to land preservation.",
+    description: "Globally recognized for its wine industry, Napa Valley is a region dedicated to agriculture, tourism, and the preservation of its scenic landscapes, with nonprofits focused on land stewardship and community health.",
+    heroImage: "https://dropinblog.net/34243665/files/featured/Napa_Valley_Wine_Region.jpg",
+    stats: [
+      { label: "Population", value: "136,000", icon: "Users" },
+      { label: "Median Income", value: "$105,000", icon: "DollarSign" },
+      { label: "Key Cities", value: "Napa, St. Helena", icon: "MapPin" },
+    ],
+    featuredCities: [ { name: "Napa", slug: "napa" }, { name: "St. Helena", slug: "st-helena" }, { name: "Calistoga", slug: "calistoga" } ],
+  },
+  "san-francisco": {
+    communityName: "San Francisco",
+    tagline: "The iconic center of innovation, culture, and diversity.",
+    description: "A global hub for technology and finance, San Francisco is also a city of distinct neighborhoods, progressive values, and immense creativity, with a nonprofit sector tackling complex issues like housing and homelessness.",
+    heroImage: "https://images.pexels.com/photos/208745/pexels-photo-208745.jpeg?auto=compress&cs=tinysrgb&w=1600",
+    stats: [ { label: "Population", value: "874,000", icon: "Users" }, { label: "Median Income", value: "$136,000", icon: "DollarSign" }, { label: "Key Cities", value: "San Francisco", icon: "MapPin" } ],
+    featuredCities: [],
+  },
+  "san-mateo": {
+    communityName: "San Mateo County",
+    tagline: "From tech campuses to coastal towns on the Peninsula.",
+    description: "Situated between San Francisco and Silicon Valley, San Mateo County is home to major tech companies, a diverse range of communities, and a beautiful coastline, with a focus on education and youth services.",
+    heroImage: "https://drupal-prod.visitcalifornia.com/sites/default/files/styles/fluid_1920/public/2022-06/VC_San-Mateo-County_Half-Moon-Bay_gty-595073410-RF_1280x640.jpg.webp?itok=s_Wc4F0E",
+    stats: [
+      { label: "Population", value: "766,000", icon: "Users" },
+      { label: "Median Income", value: "$149,000", icon: "DollarSign" },
+      { label: "Key Cities", value: "San Mateo, Redwood City", icon: "MapPin" },
+    ],
+    featuredCities: [ { name: "San Mateo", slug: "san-mateo" }, { name: "Redwood City", slug: "redwood-city" }, { name: "Daly City", slug: "daly-city" } ],
+  },
+  "santa-clara": {
+    communityName: "Santa Clara County",
+    tagline: "The heart of Silicon Valley and a global engine for innovation.",
+    description: "As the epicenter of the tech world, Santa Clara County is a place of immense economic output and innovation. Its nonprofit sector works to bridge equity gaps and support the diverse communities that power the valley.",
+    heroImage: "https://gilroydispatch.com/wp-content/uploads/sites/17/2024/06/santa-clara-county-neighborhood.jpg",
+    stats: [
+      { label: "Population", value: "1.93M", icon: "Users" },
+      { label: "Median Income", value: "$151,000", icon: "DollarSign" },
+      { label: "Key Cities", value: "San Jose, Palo Alto", icon: "MapPin" },
+    ],
+    featuredCities: [ { name: "San Jose", slug: "san-jose" }, { name: "Palo Alto", slug: "palo-alto" }, { name: "Santa Clara", slug: "santa-clara" }, { name: "Sunnyvale", slug: "sunnyvale" } ],
+  },
+  "solano": {
+    communityName: "Solano County",
+    tagline: "Affordable communities and a vital link between the Bay Area and Sacramento.",
+    description: "Offering a more affordable cost of living, Solano County is a crossroads of agriculture, industry, and military presence with a strong focus on community development and family services.",
+    heroImage: "https://californialocal.com/static/media/uploads/sacramento/articles/5688-city-silicon-valley-solano-county-planned-billionaires.jpg",
+    stats: [ { label: "Population", value: "450,000", icon: "Users" }, { label: "Median Income", value: "$96,000", icon: "DollarSign" }, { label: "Key Cities", value: "Vallejo, Fairfield", icon: "MapPin" } ],
+    featuredCities: [ { name: "Vallejo", slug: "vallejo" }, { name: "Fairfield", slug: "fairfield" }, { name: "Benicia", slug: "benicia" } ],
+  },
+  "sonoma": {
+    communityName: "Sonoma County",
+    tagline: "A celebrated wine region with a focus on sustainability and the arts.",
+    description: "Known for its world-class wineries, farm-to-table cuisine, and stunning natural landscapes, Sonoma County has a vibrant arts scene and a deep commitment to sustainable agriculture and environmental protection.",
+    heroImage: "https://www.travelandleisure.com/thmb/kG_GNTflwMUfgWTnzQLGeDTHny4=/1500x0/filters:no_upscale():max_bytes(150000):strip_icc()/TL_aerial-vineyards-sonoma-california_HERO_SONOMA1022-ec08a5d771164fc38fc6bcab295b2e94.jpg",
+    stats: [ { label: "Population", value: "494,000", icon: "Users" }, { label: "Median Income", value: "$98,000", icon: "DollarSign" }, { label: "Key Cities", value: "Santa Rosa, Sonoma", icon: "MapPin" } ],
+    featuredCities: [ { name: "Santa Rosa", slug: "santa-rosa" }, { name: "Sonoma", slug: "sonoma" }, { name: "Petaluma", slug: "petaluma" } ],
+  },
+};
+
+
+export const citySpotlightData = {
+  // Alameda County Cities
+  "oakland": {
+    communityName: "Oakland",
+    countyName: "Alameda County",
+    tagline: "A vibrant hub of culture, innovation, and resilient communities.",
+    description: "Oakland stands as a testament to the Bay Area's rich diversity and history. From the bustling port to the serene redwood forests in the hills, the city is a microcosm of creativity and industry. Its spirit is defined by its strong neighborhood bonds, thriving arts scene, and a deep-rooted commitment to social justice.",
+    heroImage: "https://images.pexels.com/photos/6969271/pexels-photo-6969271.jpeg?auto=compress&cs=tinysrgb&w=1600",
+    stats: [ { label: "Population", value: "433,823", icon: "Users" }, { label: "Median Income", value: "$86,971", icon: "DollarSign" }, { label: "Founded", value: "1852", icon: "Calendar" } ],
+  },
+  "berkeley": {
+    communityName: "Berkeley",
+    countyName: "Alameda County",
+    tagline: "A leader in progressive thought, education, and culinary arts.",
+    description: "Home to the University of California, Berkeley, this city is a powerhouse of intellectual curiosity, political activism, and cultural innovation. From its gourmet food scene to its historic theaters, Berkeley fosters a unique environment for nonprofits focused on education, sustainability, and social equity.",
+    heroImage: "https://images.pexels.com/photos/3184328/pexels-photo-3184328.jpeg?auto=compress&cs=tinysrgb&w=1600",
+    stats: [ { label: "Population", value: "124,321", icon: "Users" }, { label: "Median Income", value: "$108,558", icon: "DollarSign" }, { label: "Founded", value: "1878", icon: "Calendar" } ],
+  },
+  "fremont": {
+    communityName: "Fremont",
+    countyName: "Alameda County",
+    tagline: "A diverse suburban city with a strong manufacturing and tech presence.",
+    description: "As one of the largest cities in the Bay Area by land area, Fremont is a sprawling, diverse community known for its strong public schools, numerous parks, and a significant manufacturing and high-tech employment base.",
+    heroImage: "https://images.pexels.com/photos/280221/pexels-photo-280221.jpeg?auto=compress&cs=tinysrgb&w=1600",
+    stats: [ { label: "Population", value: "230,504", icon: "Users" }, { label: "Median Income", value: "$153,677", icon: "DollarSign" }, { label: "Founded", value: "1956", icon: "Calendar" } ],
+  },
+  // Santa Clara County Cities
+  "san-jose": {
+    communityName: "San Jose",
+    countyName: "Santa Clara County",
+    tagline: "The Capital of Silicon Valley.",
+    description: "As the largest city in the Bay Area, San Jose is a sprawling center of technology and innovation. It boasts a diverse population and a robust economy, with a nonprofit sector focused on education, housing, and immigrant support services.",
+    heroImage: "https://images.pexels.com/photos/3586966/pexels-photo-3586966.jpeg?auto=compress&cs=tinysrgb&w=1600",
+    stats: [ { label: "Population", value: "1.01M", icon: "Users" }, { label: "Median Income", value: "$133,900", icon: "DollarSign" }, { label: "Founded", value: "1777", icon: "Calendar" } ],
+  },
+  "palo-alto": {
+    communityName: "Palo Alto",
+    countyName: "Santa Clara County",
+    tagline: "The intellectual heart of Silicon Valley, home to Stanford University.",
+    description: "Palo Alto is synonymous with venture capital, startups, and technological breakthroughs. Centered around Stanford University, the city is a hub of intellectual and financial capital, with a philanthropic community that has a global reach.",
+    heroImage: "https://images.pexels.com/photos/356086/pexels-photo-356086.jpeg?auto=compress&cs=tinysrgb&w=1600",
+    stats: [ { label: "Population", value: "68,572", icon: "Users" }, { label: "Median Income", value: "$216,840", icon: "DollarSign" }, { label: "Founded", value: "1894", icon: "Calendar" } ],
+  },
+   "santa-clara": {
+    communityName: "Santa Clara",
+    countyName: "Santa Clara County",
+    tagline: "Mission history meets modern tech innovation.",
+    description: "Home to Santa Clara University, the historic Mission Santa Clara de Asís, and major tech campuses, the city of Santa Clara blends California's history with the fast-paced innovation of Silicon Valley.",
+    heroImage: "https://images.pexels.com/photos/3184418/pexels-photo-3184418.jpeg?auto=compress&cs=tinysrgb&w=1600",
+    stats: [ { label: "Population", value: "127,647", icon: "Users" }, { label: "Median Income", value: "$145,271", icon: "DollarSign" }, { label: "Founded", value: "1852", icon: "Calendar" } ],
+  },
+   "sunnyvale": {
+    communityName: "Sunnyvale",
+    countyName: "Santa Clara County",
+    tagline: "A key hub for aerospace and tech in a suburban setting.",
+    description: "One of the major cities in Silicon Valley, Sunnyvale is home to numerous tech and aerospace companies. It's known for its efficient city management and a community that supports local parks and services.",
+    heroImage: "https://images.pexels.com/photos/3184465/pexels-photo-3184465.jpeg?auto=compress&cs=tinysrgb&w=1600",
+    stats: [ { label: "Population", value: "155,805", icon: "Users" }, { label: "Median Income", value: "$161,670", icon: "DollarSign" }, { label: "Founded", value: "1912", icon: "Calendar" } ],
+  },
+  // Contra Costa County Cities
+  "walnut-creek": {
+    communityName: "Walnut Creek",
+    countyName: "Contra Costa County",
+    tagline: "A bustling downtown hub with a focus on arts and community.",
+    description: "Serving as a commercial and cultural hub for the central county, Walnut Creek boasts a vibrant downtown with high-end retail and a regional performing arts center. Nonprofits in the area focus on arts, senior services, and open space preservation.",
+    heroImage: "https://images.pexels.com/photos/3573382/pexels-photo-3573382.jpeg?auto=compress&cs=tinysrgb&w=1600",
+    stats: [ { label: "Population", value: "70,127", icon: "Users" }, { label: "Median Income", value: "$130,480", icon: "DollarSign" }, { label: "Founded", value: "1914", icon: "Calendar" } ],
+  },
+   "richmond": {
+    communityName: "Richmond",
+    countyName: "Contra Costa County",
+    tagline: "Industrial history and a focus on community-led revitalization.",
+    description: "With a rich industrial and WWII history, Richmond is undergoing significant community-led revitalization. The city's nonprofits are deeply engaged in youth development, environmental justice, and health equity.",
+    heroImage: "https://images.pexels.com/photos/2901209/pexels-photo-2901209.jpeg?auto=compress&cs=tinysrgb&w=1600",
+    stats: [ { label: "Population", value: "116,448", icon: "Users" }, { label: "Median Income", value: "$79,738", icon: "DollarSign" }, { label: "Founded", value: "1905", icon: "Calendar" } ],
+  },
+   "concord": {
+    communityName: "Concord",
+    countyName: "Contra Costa County",
+    tagline: "A family-oriented community with a diverse cultural scene.",
+    description: "As the largest city in Contra Costa County, Concord is a diverse, family-oriented community with a vibrant music and arts scene, hosting numerous festivals and events throughout the year.",
+    heroImage: "https://images.pexels.com/photos/1370704/pexels-photo-1370704.jpeg?auto=compress&cs=tinysrgb&w=1600",
+    stats: [ { label: "Population", value: "125,410", icon: "Users" }, { label: "Median Income", value: "$95,373", icon: "DollarSign" }, { label: "Founded", value: "1869", icon: "Calendar" } ],
+  },
+  // Marin County Cities
+  "sausalito": {
+    communityName: "Sausalito",
+    countyName: "Marin County",
+    tagline: "Picturesque waterfront community with an artistic soul.",
+    description: "Known for its stunning views of San Francisco and unique floating homes community, Sausalito has a long history as an artistic enclave and shipbuilding center, with a focus on marine and environmental conservation.",
+    heroImage: "https://images.pexels.com/photos/1032650/pexels-photo-1032650.jpeg?auto=compress&cs=tinysrgb&w=1600",
+    stats: [ { label: "Population", value: "7,269", icon: "Users" }, { label: "Median Income", value: "$152,708", icon: "DollarSign" }, { label: "Founded", value: "1893", icon: "Calendar" } ],
+  },
+   "san-rafael": {
+    communityName: "San Rafael",
+    countyName: "Marin County",
+    tagline: "Marin's oldest, largest, and most culturally diverse city.",
+    description: "As the county seat, San Rafael is the economic and cultural heart of Marin. It features a vibrant downtown, diverse neighborhoods, and a strong commitment to supporting arts, education, and social services.",
+    heroImage: "https://images.pexels.com/photos/421927/pexels-photo-421927.jpeg?auto=compress&cs=tinysrgb&w=1600",
+    stats: [ { label: "Population", value: "61,271", icon: "Users" }, { label: "Median Income", value: "$114,064", icon: "DollarSign" }, { label: "Founded", value: "1889", icon: "Calendar" } ],
+  },
+   "mill-valley": {
+    communityName: "Mill Valley",
+    countyName: "Marin County",
+    tagline: "A charming town nestled at the foot of Mount Tamalpais.",
+    description: "Known for its redwood groves, scenic beauty, and strong arts community, Mill Valley is a picturesque town with a focus on environmental preservation, arts education, and local community-building initiatives.",
+    heroImage: "https://images.pexels.com/photos/7919/pexels-photo.jpg?auto=compress&cs=tinysrgb&w=1600",
+    stats: [ { label: "Population", value: "14,231", icon: "Users" }, { label: "Median Income", value: "$214,848", icon: "DollarSign" }, { label: "Founded", value: "1900", icon: "Calendar" } ],
+  },
+  // San Mateo County Cities
+   "san-mateo": {
+    communityName: "San Mateo",
+    countyName: "San Mateo County",
+    tagline: "A central hub on the Peninsula with a lively downtown.",
+    description: "Centrally located on the San Francisco Peninsula, San Mateo features a vibrant downtown, diverse residential neighborhoods, and a growing tech presence. Its nonprofit sector is active in housing, healthcare, and youth services.",
+    heroImage: "https://images.pexels.com/photos/3889843/pexels-photo-3889843.jpeg?auto=compress&cs=tinysrgb&w=1600",
+    stats: [ { label: "Population", value: "105,661", icon: "Users" }, { label: "Median Income", value: "$135,170", icon: "DollarSign" }, { label: "Founded", value: "1894", icon: "Calendar" } ],
+  },
+   "redwood-city": {
+    communityName: "Redwood City",
+    countyName: "San Mateo County",
+    tagline: "Climate Best by Government Test.",
+    description: "As the county seat of San Mateo, Redwood City boasts a revitalized downtown, a deep-water port, and a growing number of tech and entertainment companies. Local philanthropy focuses on education, health, and civic engagement.",
+    heroImage: "https://images.pexels.com/photos/7031406/pexels-photo-7031406.jpeg?auto=compress&cs=tinysrgb&w=1600",
+    stats: [ { label: "Population", value: "84,292", icon: "Users" }, { label: "Median Income", value: "$136,855", icon: "DollarSign" }, { label: "Founded", value: "1867", icon: "Calendar" } ],
+  },
+   "daly-city": {
+    communityName: "Daly City",
+    countyName: "San Mateo County",
+    tagline: "Gateway to the Peninsula with a large and diverse community.",
+    description: "Immediately south of San Francisco, Daly City is one of the most diverse communities on the Peninsula. It serves as a major hub for retail and healthcare, with nonprofits focused on serving its large immigrant and working-class populations.",
+    heroImage: "https://images.pexels.com/photos/1546168/pexels-photo-1546168.jpeg?auto=compress&cs=tinysrgb&w=1600",
+    stats: [ { label: "Population", value: "104,901", icon: "Users" }, { label: "Median Income", value: "$106,822", icon: "DollarSign" }, { label: "Founded", value: "1911", icon: "Calendar" } ],
+  },
+  // Sonoma County Cities
+  "santa-rosa": {
+    communityName: "Santa Rosa",
+    countyName: "Sonoma County",
+    tagline: "The urban heart of wine country.",
+    description: "Santa Rosa is the largest city in Sonoma County, serving as a hub for technology, retail, and tourism. The community is resilient, with a strong focus on recovery efforts from recent wildfires and support for the arts and local agriculture.",
+    heroImage: "https://images.pexels.com/photos/5232649/pexels-photo-5232649.jpeg?auto=compress&cs=tinysrgb&w=1600",
+    stats: [ { label: "Population", value: "178,127", icon: "Users" }, { label: "Median Income", value: "$89,845", icon: "DollarSign" }, { label: "Founded", value: "1868", icon: "Calendar" } ],
+  },
+   "sonoma": {
+    communityName: "Sonoma",
+    countyName: "Sonoma County",
+    tagline: "The historic birthplace of the California wine industry.",
+    description: "With its historic central plaza and colonial-era landmarks, Sonoma is a world-famous destination. Its philanthropic efforts are often directed towards preserving its rich history, supporting the local agricultural community, and promoting the arts.",
+    heroImage: "https://images.pexels.com/photos/1123260/pexels-photo-1123260.jpeg?auto=compress&cs=tinysrgb&w=1600",
+    stats: [ { label: "Population", value: "10,739", icon: "Users" }, { label: "Median Income", value: "$96,050", icon: "DollarSign" }, { label: "Founded", value: "1883", icon: "Calendar" } ],
+  },
+   "petaluma": {
+    communityName: "Petaluma",
+    countyName: "Sonoma County",
+    tagline: "Historic riverfront charm meets modern maker culture.",
+    description: "Located on the Petaluma River, this city is known for its well-preserved historic downtown and strong agricultural roots. Today, it's also a hub for a vibrant community of artisans, food producers, and small businesses.",
+    heroImage: "https://images.pexels.com/photos/705075/pexels-photo-705075.jpeg?auto=compress&cs=tinysrgb&w=1600",
+    stats: [ { label: "Population", value: "59,776", icon: "Users" }, { label: "Median Income", value: "$106,798", icon: "DollarSign" }, { label: "Founded", value: "1858", icon: "Calendar" } ],
+  },
+  // Solano County Cities
+  "vallejo": {
+    communityName: "Vallejo",
+    countyName: "Solano County",
+    tagline: "A diverse waterfront city with a rich naval history.",
+    description: "One of the most diverse cities in the nation, Vallejo has a deep history as a naval center. It boasts a thriving artistic community and is undergoing significant economic and cultural revitalization.",
+    heroImage: "https://images.pexels.com/photos/258109/pexels-photo-258109.jpeg?auto=compress&cs=tinysrgb&w=1600",
+    stats: [ { label: "Population", value: "126,090", icon: "Users" }, { label: "Median Income", value: "$80,248", icon: "DollarSign" }, { label: "Founded", value: "1868", icon: "Calendar" } ],
+  },
+  "fairfield": {
+    communityName: "Fairfield",
+    countyName: "Solano County",
+    tagline: "The heart of Solano County, balancing industry and community.",
+    description: "As the county seat, Fairfield is a major center for commerce, government, and industry, including Travis Air Force Base. The community supports a wide range of family services and youth programs.",
+    heroImage: "https://images.pexels.com/photos/280193/pexels-photo-280193.jpeg?auto=compress&cs=tinysrgb&w=1600",
+    stats: [ { label: "Population", value: "119,881", icon: "Users" }, { label: "Median Income", value: "$95,735", icon: "DollarSign" }, { label: "Founded", value: "1859", icon: "Calendar" } ],
+  },
+  "benicia": {
+    communityName: "Benicia",
+    countyName: "Solano County",
+    tagline: "A historic waterfront city with a vibrant artist community.",
+    description: "A former state capital, Benicia is a charming waterfront city known for its rich history, thriving arts scene, and numerous antique shops. It maintains a small-town feel with strong community involvement.",
+    heroImage: "https://images.pexels.com/photos/273209/pexels-photo-273209.jpeg?auto=compress&cs=tinysrgb&w=1600",
+    stats: [ { label: "Population", value: "27,131", icon: "Users" }, { label: "Median Income", value: "$121,389", icon: "DollarSign" }, { label: "Founded", value: "1851", icon: "Calendar" } ],
+  },
+  // Napa County Cities
+  "napa": {
+    communityName: "Napa",
+    countyName: "Napa County",
+    tagline: "The gateway to the world-famous Napa Valley wine region.",
+    description: "As the largest city in Napa County, Napa serves as the primary business and cultural hub for the region. Its revitalized downtown riverfront is a center for dining, arts, and entertainment.",
+    heroImage: "https://images.pexels.com/photos/1024967/pexels-photo-1024967.jpeg?auto=compress&cs=tinysrgb&w=1600",
+    stats: [ { label: "Population", value: "79,246", icon: "Users" }, { label: "Median Income", value: "$104,138", icon: "DollarSign" }, { label: "Founded", value: "1872", icon: "Calendar" } ],
+  },
+  "st-helena": {
+    communityName: "St. Helena",
+    countyName: "Napa County",
+    tagline: "The heart of Napa Valley's celebrated wine and culinary scene.",
+    description: "St. Helena is a prestigious town in the center of Napa Valley, home to many of the region's most famous wineries and restaurants. The community is deeply invested in the wine industry and land preservation.",
+    heroImage: "https://images.pexels.com/photos/197088/pexels-photo-197088.jpeg?auto=compress&cs=tinysrgb&w=1600",
+    stats: [ { label: "Population", value: "6,167", icon: "Users" }, { label: "Median Income", value: "$120,430", icon: "DollarSign" }, { label: "Founded", value: "1876", icon: "Calendar" } ],
+  },
+  "calistoga": {
+    communityName: "Calistoga",
+    countyName: "Napa County",
+    tagline: "Relaxed charm, hot springs, and mud baths at the top of the valley.",
+    description: "Located at the northern end of Napa Valley, Calistoga is famous for its natural hot springs and spas. It maintains a relaxed, old-west atmosphere while being surrounded by world-class wineries.",
+    heroImage: "https://images.pexels.com/photos/3408744/pexels-photo-3408744.jpeg?auto=compress&cs=tinysrgb&w=1600",
+    stats: [ { label: "Population", value: "5,228", icon: "Users" }, { label: "Median Income", value: "$88,125", icon: "DollarSign" }, { label: "Founded", value: "1886", icon: "Calendar" } ],
+  },
 };

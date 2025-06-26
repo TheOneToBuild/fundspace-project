@@ -3,7 +3,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { supabase } from './supabaseClient.js';
 import { countySpotlightData } from './spotlightData.js';
-// --- ADDED Map and ArrowRight icons ---
 import { Users, DollarSign, MapPin, Loader, ExternalLink, Map, ArrowRight } from './components/Icons.jsx';
 import NonprofitCard from './components/NonprofitCard.jsx';
 import FunderCard from './components/FunderCard.jsx';
@@ -28,18 +27,27 @@ const CountySpotlightPage = () => {
     const fetchSpotlightData = async () => {
       setLoading(true);
       try {
-        const countyNameForQuery = spotlightData.communityName.split(' ')[0];
+        let citiesToQuery;
+        let countyNameForQuery = spotlight.communityName;
+
+        if (countySlug === 'san-francisco') {
+            citiesToQuery = ['San Francisco, CA'];
+        } else {
+            citiesToQuery = spotlight.featuredCities.map(city => `${city.name}, CA`);
+        }
 
         const [nonprofitRes, funderRes] = await Promise.all([
             supabase
               .from('nonprofits')
               .select('*, nonprofit_categories(categories(name))')
-              .ilike('location', `%${countyNameForQuery}%`)
+              .in('location', citiesToQuery)
               .limit(3),
+            
+            // --- UPDATED FUNDER QUERY STAGE 1: Look for county-specific funders first ---
             supabase
               .from('funders')
-              .select('*, funder_type:funder_type_id(name), funder_categories(categories(name)), funder_funding_locations(locations(name))')
-              .ilike('location', `%${countyNameForQuery}%`)
+              .select('*, funder_type:funder_type_id(name), funder_categories(categories(name)), funder_funding_locations!inner(locations!inner(name))')
+              .eq('funder_funding_locations.locations.name', countyNameForQuery)
               .limit(3)
         ]);
         
@@ -48,8 +56,30 @@ const CountySpotlightPage = () => {
         setNonprofits(formattedNonprofits);
 
         if (funderRes.error) throw funderRes.error;
-        const formattedFunders = (funderRes.data || []).map(f => ({ ...f, funderType: f.funder_type?.name, focus_areas: f.funder_categories.map(fc => fc.categories.name), funding_locations: f.funder_funding_locations.map(ffl => ffl.locations.name) }));
-        setFunders(formattedFunders);
+        let localFunders = (funderRes.data || []).map(f => ({ ...f, funderType: f.funder_type?.name, focus_areas: f.funder_categories.map(fc => fc.categories.name), funding_locations: [countyNameForQuery] }));
+        
+        // --- FUNDER QUERY STAGE 2: If we found less than 3 local funders, search for region-wide funders ---
+        let combinedFunders = [...localFunders];
+        if (localFunders.length < 3) {
+            const remainingLimit = 3 - localFunders.length;
+            const { data: regionalFundersData, error: regionalError } = await supabase
+                .from('funders')
+                .select('*, funder_type:funder_type_id(name), funder_categories(categories(name)), funder_funding_locations!inner(locations!inner(name))')
+                .eq('funder_funding_locations.locations.name', 'All Bay Area Counties')
+                .limit(remainingLimit);
+
+            if (regionalError) console.warn("Could not fetch regional funders:", regionalError);
+
+            if (regionalFundersData) {
+                const formattedRegionalFunders = regionalFundersData.map(f => ({ ...f, funderType: f.funder_type?.name, focus_areas: f.funder_categories.map(fc => fc.categories.name), funding_locations: ['All Bay Area Counties'] }));
+                // Add regional funders only if they are not already in the list
+                const existingIds = new Set(combinedFunders.map(f => f.id));
+                const uniqueRegionalFunders = formattedRegionalFunders.filter(f => !existingIds.has(f.id));
+                combinedFunders.push(...uniqueRegionalFunders);
+            }
+        }
+        
+        setFunders(combinedFunders.slice(0, 3)); // Ensure we only show a max of 3
 
       } catch (error) {
         console.error("Error fetching live spotlight data:", error);
@@ -58,8 +88,10 @@ const CountySpotlightPage = () => {
       }
     };
 
-    fetchSpotlightData();
-  }, [countySlug]);
+    if (spotlight) {
+      fetchSpotlightData();
+    }
+  }, [spotlight, countySlug]);
 
   const iconMap = {
     Users: <Users size={24} className="text-rose-500" />,
@@ -79,7 +111,7 @@ const CountySpotlightPage = () => {
 
   return (
     <div className="bg-gradient-to-br from-rose-50 via-orange-50 to-yellow-50">
-      {/* --- Hero Section --- */}
+      {/* Hero and Community Intro Sections remain the same */}
       <div className="relative h-[60vh] min-h-[400px] flex items-center justify-center text-white text-center px-4">
         <div className="absolute inset-0 bg-black opacity-50 z-10"></div>
         {spotlight && <img src={spotlight.heroImage} alt={`${spotlight.communityName} hero image`} className="absolute inset-0 w-full h-full object-cover" />}
@@ -88,8 +120,6 @@ const CountySpotlightPage = () => {
           <p className="text-xl md:text-2xl font-light text-slate-200 text-shadow-md">{spotlight?.tagline}</p>
         </div>
       </div>
-
-      {/* --- Community Intro Section --- */}
       <div className="container mx-auto -mt-20 relative z-30 px-4">
         <div className="bg-white rounded-xl shadow-2xl p-8 md:p-12 border border-slate-200">
           <p className="text-slate-600 text-lg leading-relaxed mb-8">{spotlight?.description}</p>
@@ -109,7 +139,7 @@ const CountySpotlightPage = () => {
         <div className="text-center py-20"><Loader size={40} className="mx-auto text-purple-400 animate-spin" /></div>
       ) : (
         <>
-          {/* --- Nonprofits Section --- */}
+          {/* Nonprofit and Funder sections remain the same, they will now receive correct data */}
           <section className="py-16 md:py-24">
             <div className="container mx-auto px-4">
               <div className="text-center mb-12">
@@ -123,7 +153,6 @@ const CountySpotlightPage = () => {
             </div>
           </section>
 
-          {/* --- Funders Section --- */}
           <section className="pb-16 md:pb-24">
             <div className="container mx-auto px-4">
               <div className="text-center mb-12">
@@ -137,7 +166,6 @@ const CountySpotlightPage = () => {
             </div>
           </section>
 
-          {/* --- NEW: Featured Cities Section --- */}
           {spotlight?.featuredCities && spotlight.featuredCities.length > 0 && (
             <section className="pb-16 md:pb-24 bg-slate-100 py-16">
               <div className="container mx-auto px-4">

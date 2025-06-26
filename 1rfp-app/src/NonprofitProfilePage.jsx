@@ -2,7 +2,8 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { supabase } from './supabaseClient.js';
-import { Loader, ArrowLeft, ArrowRight, ExternalLink, MapPin, DollarSign, Users, Calendar, Award, Users as SimilarIcon, Tag, Heart } from './components/Icons.jsx';
+// --- UPDATED: Added 'Info' icon ---
+import { Loader, ArrowLeft, ExternalLink, MapPin, DollarSign, Users, Calendar, Award, Tag, Heart, IdCard, Rocket, CheckCircle2, Info } from './components/Icons.jsx';
 import { getPillClasses } from './utils.js';
 import NonprofitCard from './components/NonprofitCard.jsx';
 
@@ -24,7 +25,7 @@ const NonprofitProfilePage = () => {
         const [nonprofitRes, allNonprofitsRes] = await Promise.all([
           supabase
             .from('nonprofits')
-            .select('*, nonprofit_categories(categories(name))')
+            .select('*, ein, notable_programs, nonprofit_categories(categories(name))')
             .eq('slug', slug)
             .single(),
           supabase
@@ -38,12 +39,14 @@ const NonprofitProfilePage = () => {
         const nonprofitData = nonprofitRes.data;
         if (nonprofitData) {
             nonprofitData.focusAreas = nonprofitData.nonprofit_categories.map(npc => npc.categories.name);
+            nonprofitData.imageUrl = nonprofitData.image_url;
         }
         setNonprofit(nonprofitData);
 
         if (allNonprofitsRes.data) {
              const formattedAllNonprofits = allNonprofitsRes.data.map(np => ({
                 ...np,
+                imageUrl: np.image_url,
                 focusAreas: np.nonprofit_categories.map(npc => npc.categories.name)
             }));
             setAllNonprofits(formattedAllNonprofits);
@@ -113,16 +116,38 @@ const NonprofitProfilePage = () => {
             </section>
 
             <section>
-               <h4 className="text-sm font-semibold uppercase tracking-wider mb-3 text-slate-600">About the Organization</h4>
+               {/* --- UPDATED: Added icon and flex properties --- */}
+               <h4 className="text-lg font-bold text-slate-800 border-b border-slate-200 pb-3 mb-6 flex items-center">
+                    <Info size={20} className="mr-3 text-cyan-500" />
+                    About the Organization
+               </h4>
                <div className="bg-white p-6 rounded-xl border border-slate-200 text-base text-slate-600 leading-relaxed">
                   {nonprofit.description}
                </div>
             </section>
             
+            {nonprofit.notable_programs && (
+              <section>
+                 <h4 className="text-lg font-bold text-slate-800 border-b border-slate-200 pb-3 mb-6 flex items-center">
+                    <Rocket size={20} className="mr-3 text-red-500" />
+                    Notable Programs & Initiatives
+                 </h4>
+                 <div className="bg-white p-6 rounded-xl border border-slate-200 space-y-4">
+                    {Array.isArray(nonprofit.notable_programs) && nonprofit.notable_programs.map((program, index) => (
+                        <div key={index} className="flex items-start p-4 bg-slate-50 rounded-lg">
+                            <CheckCircle2 size={20} className="mr-4 text-green-500 flex-shrink-0 mt-1" />
+                            <p className="text-slate-700">{program}</p>
+                        </div>
+                    ))}
+                 </div>
+              </section>
+            )}
+            
             {similarNonprofits.length > 0 && (
               <section>
-                <h4 className="text-sm font-semibold uppercase tracking-wider flex items-center mb-4 text-slate-600">
-                    <SimilarIcon size={16} className="mr-2 opacity-70" />
+                {/* --- UPDATED: Changed icon color --- */}
+                <h4 className="text-lg font-bold text-slate-800 border-b border-slate-200 pb-3 mb-6 flex items-center">
+                    <Users size={20} className="mr-3 text-purple-500" />
                     Similar Nonprofits
                 </h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -137,9 +162,10 @@ const NonprofitProfilePage = () => {
           <div className="lg:col-span-1">
             <div className="lg:sticky lg:top-8 space-y-8">
               <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-lg">
-                <h4 className="text-sm font-semibold uppercase tracking-wider mb-4 text-slate-600">At a Glance</h4>
+                <h4 className="text-lg font-bold text-slate-800 border-b border-slate-200 pb-3 mb-6">At a Glance</h4>
                 <div className="space-y-4 text-base">
                   <div className="flex items-start"><MapPin size={18} className="mr-3 mt-1 text-blue-500 flex-shrink-0" /><div><span className="font-semibold">Location:</span> {nonprofit.location || 'Not specified'}</div></div>
+                  <div className="flex items-start"><IdCard size={18} className="mr-3 mt-1 text-gray-500 flex-shrink-0" /><div><span className="font-semibold">EIN:</span> {nonprofit.ein || 'Not specified'}</div></div>
                   <div className="flex items-start"><DollarSign size={18} className="mr-3 mt-1 text-green-500 flex-shrink-0" /><div><span className="font-semibold">Annual Budget:</span> {nonprofit.budget || 'Not specified'}</div></div>
                   <div className="flex items-start"><Users size={18} className="mr-3 mt-1 text-indigo-500 flex-shrink-0" /><div><span className="font-semibold">Staff Count:</span> {nonprofit.staff_count || 'Not specified'}</div></div>
                   <div className="flex items-start"><Calendar size={18} className="mr-3 mt-1 text-teal-500 flex-shrink-0" /><div><span className="font-semibold">Year Founded:</span> {nonprofit.year_founded || 'Not specified'}</div></div>
@@ -149,7 +175,10 @@ const NonprofitProfilePage = () => {
               
               {nonprofit.focusAreas && nonprofit.focusAreas.length > 0 && (
                   <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-lg">
-                    <h4 className="text-sm font-semibold uppercase tracking-wider mb-3 text-slate-600"><Tag size={14} className="inline mr-2" />Focus Areas</h4>
+                    <h4 className="text-lg font-bold text-slate-800 border-b border-slate-200 pb-3 mb-6 flex items-center">
+                        <Tag size={18} className="mr-3 text-slate-500" />
+                        Focus Areas
+                    </h4>
                     <div className="flex flex-wrap gap-2">{nonprofit.focusAreas.map(a => (<span key={a} className={`text-sm font-semibold px-3 py-1.5 rounded-full ${getPillClasses(a)}`}>{a}</span>))}</div>
                   </div>
               )}
@@ -162,7 +191,7 @@ const NonprofitProfilePage = () => {
             </div>
           </div>
           
-        </div> {/* --- THIS WAS THE MISSING CLOSING TAG --- */}
+        </div>
         
       </div>
     </div>

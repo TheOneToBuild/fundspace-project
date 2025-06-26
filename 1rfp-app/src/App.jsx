@@ -1,16 +1,16 @@
 // src/App.jsx
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Link, NavLink } from 'react-router-dom';
-
-// --- Import your helper components ---
 import ScrollToTop from './components/ScrollToTop.jsx';
 
-// --- Import all your page components ---
+// --- Import your page components ---
 import './components/skeleton-animations.css';
 import GrantsPageContent from './GrantsPageContent.jsx';
 import ExploreFunders from './ExploreFunders.jsx';
 import ExploreNonprofits from './ExploreNonprofits.jsx';
-import CommunitySpotlightPage from './CommunitySpotlightPage.jsx';
+import SpotlightLandingPage from './SpotlightLandingPage.jsx';
+import CountySpotlightPage from './CountySpotlightPage.jsx'; 
+import CitySpotlightPage from './CitySpotlightPage.jsx'; // --- 1. IMPORT THE NEW CITY PAGE ---
 import AboutUsPage from './AboutUsPage.jsx';
 import ContactUsPage from './ContactUsPage.jsx';
 import HowItWorksPage from './HowItWorksPage.jsx';
@@ -22,16 +22,14 @@ import BlogPage from './BlogPage.jsx';
 import GrantWritingTipsPage from './GrantWritingTipsPage.jsx';
 import SubmitGrantPage from './SubmitGrantPage.jsx';
 import FunderProfilePage from './FunderProfilePage.jsx';
-// --- ADDED: Import the new Nonprofit Profile Page component ---
 import NonprofitProfilePage from './NonprofitProfilePage.jsx';
 
-
-// --- Import your assets and icons ---
+// --- Import assets and icons ---
 import headerLogoImage from './assets/1rfp-logo.png';
 import footerLogoImage from './assets/1rfp-footer-logo.png';
 import { Facebook, Twitter, Linkedin, Youtube, Instagram, PlusCircle, Menu, X } from './components/Icons.jsx';
 
-// A helper component for navigation links to handle the active state styling
+// ... (The AppNavLink and AppLayout components remain exactly the same) ...
 const AppNavLink = ({ to, children, activeClassName, ...props }) => {
   return (
     <NavLink
@@ -46,7 +44,6 @@ const AppNavLink = ({ to, children, activeClassName, ...props }) => {
   );
 };
 
-// Layout component to wrap all pages with the header and footer
 const AppLayout = ({ children }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -256,7 +253,10 @@ export default function App() {
           <Route path="/" element={<GrantsPageContent />} />
           <Route path="/funders" element={<ExploreFunders />} />
           <Route path="/nonprofits" element={<ExploreNonprofits />} />
-          <Route path="/spotlight" element={<CommunitySpotlightPage />} />
+          <Route path="/spotlight" element={<SpotlightLandingPage />} />
+          <Route path="/spotlight/:countySlug" element={<CountySpotlightPage />} />
+          {/* --- 2. ADD THE NEW DYNAMIC CITY ROUTE --- */}
+          <Route path="/spotlight/:countySlug/:citySlug" element={<CitySpotlightPage />} />
           <Route path="/about" element={<AboutUsPage />} />
           <Route path="/contact" element={<ContactUsPage />} />
           <Route path="/how-it-works" element={<HowItWorksPage />} />
@@ -269,7 +269,6 @@ export default function App() {
           <Route path="/submit-grant" element={<SubmitGrantPage />} />
           
           <Route path="/funders/:funderSlug" element={<FunderProfilePage />} />
-          {/* --- ADDED: The new route for individual nonprofit profiles --- */}
           <Route path="/nonprofits/:slug" element={<NonprofitProfilePage />} />
 
         </Routes>
