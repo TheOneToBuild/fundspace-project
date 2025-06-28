@@ -1,0 +1,2 @@
+// grant_urls.txt
+https://communityarts.zff.org/guidelines-and-eligibility/

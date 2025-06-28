@@ -1,128 +1,192 @@
-// src/ForNonprofitsPage.jsx
+// src/pages/ForNonprofitsPage.jsx
 import React from 'react';
-import { Search, Database, Filter, Briefcase, XCircle, CheckCircle2 } from './components/Icons.jsx';
+import { Link } from 'react-router-dom';
+import { motion } from 'framer-motion';
+import { Briefcase, CheckCircle, Search, Calendar, Bot, BarChart3, Users, Handshake, TrendingUp, Filter, ShieldCheck } from './components/Icons.jsx';
+import FunderCard from './components/FunderCard.jsx';
+import AnimatedShape from './components/AnimatedShape.jsx';
+import ScrollArrow from './components/ScrollArrow.jsx';
 
-const ForNonprofitsPage = () => {
-  return (
-    <div className="bg-gradient-to-br from-rose-50 via-orange-50 to-yellow-50">
-      {/* --- Hero Section --- */}
-      <div className="text-center py-20 md:py-28 px-4">
-        <div className="container mx-auto">
-          <h1 className="text-4xl md:text-5xl font-extrabold text-slate-900 mb-4">
-            Less Prospecting. <span className="text-blue-600">More Impact.</span>
-          </h1>
-          <p className="text-lg md:text-xl text-slate-600 max-w-3xl mx-auto">
-            1RFP was built to give you back your most valuable resource: time. Stop juggling dozens of websites and databases, and start focusing on what you do best—driving change in your community.
-          </p>
-          <div className="mt-8">
-             <a href="#" onClick={() => window.location.reload()} className="inline-flex items-center justify-center px-8 py-3.5 border border-transparent text-base font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 transition-all duration-200 ease-in-out shadow-md hover:shadow-lg transform hover:scale-105">
-                Explore Live Grants <Search className="ml-2" />
-              </a>
-          </div>
-        </div>
-      </div>
+// Kept all images exactly as you provided.
+const STATIC_IMAGES = {
+    heroIllustration: 'https://cdn.pixabay.com/photo/2017/08/01/20/52/happy-holidays-2567915_1280.jpg',
+    painIllustration: 'https://cdn.pixabay.com/photo/2022/04/08/18/15/woman-7120016_640.jpg',
+    circles: [
+        'https://cdn.pixabay.com/photo/2020/02/28/10/17/fishing-net-4887070_640.jpg',
+        'https://cdn.pixabay.com/photo/2015/07/17/22/43/student-849824_640.jpg',
+        'https://cdn.pixabay.com/photo/2016/11/29/07/59/architecture-1868265_640.jpg',
+        'https://cdn.pixabay.com/photo/2015/07/27/19/43/road-863298_640.jpg',
+        'https://cdn.pixabay.com/photo/2019/05/12/15/59/parasurfing-4198392_640.jpg',
+        'https://cdn.pixabay.com/photo/2023/05/21/20/30/sky-8009386_640.jpg', // Placeholder for potential new images
+        'https://cdn.pixabay.com/photo/2017/08/08/00/59/nature-2609858_640.jpg',
+    ],
+    funderLogos: [
+        'https://koret.org/wp-content/uploads/2018/01/twitter-koret-home.jpg', 
+        'https://headwatersfoundation.org/wp-content/uploads/2020/04/HFJ-Logo-Strong-Arctic-Blue.png',
+        'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTytwjH8xshAT4ATgsXQlXzE8hcpbuNGZLmpA&s',
+    ]
+};
 
-      {/* --- Pain / Solution Section --- */}
-      <div className="py-16 md:py-24">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-12 md:mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold text-slate-800">Focus on Your Mission, Not the Paperwork</h2>
-            <p className="text-lg text-slate-500 mt-2 max-w-2xl mx-auto">We understand the endless cycle of grantseeking. We built 1RFP to break it.</p>
-          </div>
-          <div className="grid md:grid-cols-2 gap-8 max-w-6xl mx-auto items-center">
-            {/* The Problem / Solution Columns */}
-            <div className="grid grid-cols-1 gap-8">
-                <div className="bg-rose-100/40 p-8 rounded-xl border border-rose-200">
-                  <h3 className="text-xl font-bold text-slate-800 mb-4">The Old Way</h3>
-                  <ul className="space-y-3">
-                    <li className="flex items-start"><XCircle className="h-6 w-6 text-red-500 mr-3 flex-shrink-0" /><span>Endless hours spent searching across dozens of siloed foundation websites.</span></li>
-                    <li className="flex items-start"><XCircle className="h-6 w-6 text-red-500 mr-3 flex-shrink-0" /><span>Missing deadlines because opportunities were buried in an inbox or old bookmark.</span></li>
-                    <li className="flex items-start"><XCircle className="h-6 w-6 text-red-500 mr-3 flex-shrink-0" /><span>Struggling to find new funders who align with your specific mission and location.</span></li>
-                    <li className="flex items-start"><XCircle className="h-6 w-6 text-red-500 mr-3 flex-shrink-0" /><span>Feeling like you're always one step behind the funding curve.</span></li>
-                  </ul>
-                </div>
-                <div className="bg-green-100/40 p-8 rounded-xl border border-green-200">
-                  <h3 className="text-xl font-bold text-slate-800 mb-4">The 1RFP Way</h3>
-                  <ul className="space-y-3">
-                    <li className="flex items-start"><CheckCircle2 className="h-6 w-6 text-green-600 mr-3 flex-shrink-0" /><span>One centralized platform with hundreds of Bay Area grants, updated continuously.</span></li>
-                    <li className="flex items-start"><CheckCircle2 className="h-6 w-6 text-green-600 mr-3 flex-shrink-0" /><span>Powerful, intuitive filters to find the perfect grant in minutes, not days.</span></li>
-                    <li className="flex items-start"><CheckCircle2 className="h-6 w-6 text-green-600 mr-3 flex-shrink-0" /><span>Discover new funders and understand their giving patterns to build a smarter pipeline.</span></li>
-                    <li className="flex items-start"><CheckCircle2 className="h-6 w-6 text-green-600 mr-3 flex-shrink-0" /><span>More time to focus on what truly matters: your programs and your community.</span></li>
-                  </ul>
-                </div>
-            </div>
-            {/* Image Column */}
-            <div className="md:order-first">
-              <img 
-                src="https://images.unsplash.com/photo-1521791136064-7986c2920216?q=80&w=2070&auto=format&fit=crop" 
-                alt="A diverse group of nonprofit professionals collaborating in a meeting" 
-                className="rounded-xl shadow-lg w-full h-full object-cover"
-              />
-            </div>
-          </div>
-        </div>
-      </div>
+const funderData = [
+    { 
+        slug: 'the-koret-foundation',
+        name: 'The Koret Foundation', 
+        description: 'A family foundation dedicated to supporting innovative projects in education, environmental conservation, and the arts across all nine Bay Area counties.',
+        focus_areas: ['Education', 'Environment', 'Arts & Culture'],
+        logo_url: STATIC_IMAGES.funderLogos[0],
+        funder_type: { name: 'Family Foundation' },
+        location: 'Palo Alto, CA',
+        funding_locations: ['Bay Area Wide'],
+        total_funding_annually: '$15M - $20M',
+        notable_grant: 'The "Tech for Teachers" classroom hardware initiative.',
+        average_grant_size: '$75,000 - $150,000',
+        grant_types: ['Project Support', 'Capacity Building'],
+    },
+    { 
+        slug: 'the-headwaters-foundation',
+        name: 'The Headwaters Foundation',
+        description: 'Focused on providing seed funding and capacity-building grants to early-stage nonprofits addressing issues of social and economic justice.',
+        focus_areas: ['Social Justice', 'Workforce Development', 'Poverty Relief'],
+        logo_url: STATIC_IMAGES.funderLogos[1],
+        funder_type: { name: 'Community Foundation' },
+        location: 'Oakland, CA',
+        funding_locations: ['Alameda County', 'Contra Costa County'],
+        total_funding_annually: '$5M - $10M',
+        notable_grant: 'The "First Step" entrepreneurship program for formerly incarcerated individuals.',
+        average_grant_size: '$25,000 - $75,000',
+        grant_types: ['General Operating', 'Seed Funding'],
+    },
+    { 
+        slug: 'the-zellerbach-family-foundation',
+        name: 'The Zellerbach Family Foundation',
+        description: 'A public trust that funds community clinics and organizations providing direct health and wellness services to underserved populations in San Francisco.',
+        focus_areas: ['Community Health', 'Mental Health', 'Housing'],
+        logo_url: STATIC_IMAGES.funderLogos[2],
+        funder_type: { name: 'Public Charity' },
+        location: 'San Francisco, CA',
+        funding_locations: ['San Francisco'],
+        total_funding_annually: '$12M+',
+        notable_grant: 'Funding for free mobile health clinics in the Tenderloin.',
+        average_grant_size: '$100,000 - $250,000',
+        grant_types: ['General Operating', 'Project Support', 'Capital Campaigns'],
+    },
+];
 
-      {/* --- Feature Breakdown Section with Collage --- */}
-      <div className="py-16 md:py-24">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-12 md:mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold text-slate-800">How We Help</h2>
-          </div>
-          {/* Feature Cards */}
-          <div className="grid md:grid-cols-3 gap-8 text-center max-w-6xl mx-auto">
-            <div className="bg-white p-8 rounded-xl shadow-lg border border-slate-200">
-              <div className="inline-block bg-blue-100 p-3 rounded-full mb-4">
-                <Database className="h-8 w-8 text-blue-600" />
-              </div>
-              <h3 className="text-xl font-bold mb-2">Comprehensive Database</h3>
-              <p className="text-slate-600">Our AI and community-powered engine gathers grant opportunities from across the Bay Area into one place.</p>
-            </div>
-            <div className="bg-white p-8 rounded-xl shadow-lg border border-slate-200">
-              <div className="inline-block bg-blue-100 p-3 rounded-full mb-4">
-                <Filter className="h-8 w-8 text-blue-600" />
-              </div>
-              <h3 className="text-xl font-bold mb-2">Powerful Filtering</h3>
-              <p className="text-slate-600">Zero in on your best-fit grants. Filter by focus area, location, funding amount, and grant type to save time.</p>
-            </div>
-            <div className="bg-white p-8 rounded-xl shadow-lg border border-slate-200">
-              <div className="inline-block bg-blue-100 p-3 rounded-full mb-4">
-                <Briefcase className="h-8 w-8 text-blue-600" />
-              </div>
-              <h3 className="text-xl font-bold mb-2">Strategic Insights</h3>
-              <p className="text-slate-600">Use our Funder and Nonprofit directories to understand the funding landscape and identify potential collaborators.</p>
-            </div>
-          </div>
-          
-          {/* Image Collage */}
-          <div className="mt-16 max-w-6xl mx-auto h-[600px] grid grid-cols-4 grid-rows-2 gap-4">
-              <div className="col-span-2 row-span-2">
-                  <img src="https://images.unsplash.com/photo-1531206715517-5c0ba140b2b8?q=80&w=2070&auto=format&fit=crop" alt="Community workshop" className="w-full h-full object-cover rounded-lg shadow-lg" />
-              </div>
-              <div className="col-span-2 row-span-1">
-                  <img src="https://images.unsplash.com/photo-1543269865-cbf427effbad?q=80&w=2070&auto=format&fit=crop" alt="People connecting at a community event" className="w-full h-full object-cover rounded-lg shadow-lg" />
-              </div>
-              <div className="col-span-1 row-span-1">
-                  <img src="https://images.unsplash.com/photo-1593113598332-cd288d649433?q=80&w=2070&auto=format&fit=crop" alt="Volunteers working together at a food drive" className="w-full h-full object-cover rounded-lg shadow-lg" />
-              </div>
-              <div className="col-span-1 row-span-1">
-                  <img src="https://images.unsplash.com/photo-1582213782179-e0d53f98f2ca?q=80&w=2070&auto=format&fit=crop" alt="Team putting hands together in a circle" className="w-full h-full object-cover rounded-lg shadow-lg" />
-              </div>
-          </div>
-        </div>
-      </div>
+// Reusable components
+// --- UPDATED: Reduced min-height for tighter scrolling ---
+const StorySection = ({ children, className = '' }) => ( <motion.div className={`min-h-[90vh] w-full flex flex-col justify-center items-center py-16 md:py-24 relative ${className}`} initial="hidden" whileInView="visible" viewport={{ once: true, amount: 0.4 }} transition={{ staggerChildren: 0.3 }}>{children}</motion.div>);
+const DrawingLine = ({ path, className, ...props }) => ( <motion.svg className={`absolute z-0 pointer-events-none ${className}`} width="100%" height="100%" viewBox="0 0 500 500" preserveAspectRatio="none" {...props}><motion.path d={path} fill="none" stroke="#A78BFA" strokeWidth="2" initial={{ pathLength: 0 }} whileInView={{ pathLength: 1 }} viewport={{ once: true, amount: 'all' }} transition={{ duration: 2, ease: "easeInOut" }} /></motion.svg>);
+const textFloatUp = { hidden: { opacity: 0, y: 30 }, visible: { opacity: 1, y: 0, transition: { duration: 0.8, ease: 'easeOut' } }};
+const animatedH1 = { hidden: {}, visible: { transition: { staggerChildren: 0.1 } } };
+const animatedWord = { hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: 'easeOut' } } };
 
-       {/* --- Pricing / Free Section --- */}
-      <div className="py-16 md:py-24">
-        <div className="container mx-auto px-4 text-center max-w-3xl">
-          <h2 className="text-3xl font-bold text-slate-800">Built for Nonprofits. Free, Forever.</h2>
-          <p className="text-lg text-slate-600 mt-4 leading-relaxed">
-            We are committed to empowering the Bay Area's nonprofit sector. Access to our grant search and discovery tools will always be free for registered 501(c)(3) organizations. No trials, no hidden fees. Just a powerful tool to help you succeed.
-          </p>
+// Main Page Component
+const ForNonprofitsPage = ({ navigateToPage }) => {
+    const handleDummyFilter = () => {};
+    
+    return (
+        <div className="bg-[#F8F3ED] text-[#333132] font-serif overflow-x-hidden">
+            <div className="container mx-auto px-6 max-w-7xl">
+
+                <StorySection>
+                    <AnimatedShape className="w-48 h-80 -top-5 left-[5%] z-0" initial={{ y: -15 }} animate={{ y: 15 }} imageUrl={STATIC_IMAGES.circles[0]} />
+                    <AnimatedShape className="w-30 h-40 top-10 right-[10%] z-0" initial={{ y: 10 }} animate={{ y: -10 }} imageUrl={STATIC_IMAGES.circles[1]} />
+                    <AnimatedShape className="w-54 h-44 bottom-5 left-[15%] z-0" initial={{ y: 0 }} animate={{ y: -20 }} imageUrl={STATIC_IMAGES.circles[2]} />
+                    <AnimatedShape className="w-55 h-40 bottom-[20%] right-[5%] z-0" initial={{ y: -10 }} animate={{ y: 10 }} imageUrl={STATIC_IMAGES.circles[3]} />
+                    
+                    <div className="text-center z-20 relative">
+                        <motion.div variants={textFloatUp}><div className="inline-block bg-blue-100 p-4 rounded-full shadow-lg"><Briefcase className="h-10 w-10 text-blue-600" /></div></motion.div>
+                        <motion.h1 variants={animatedH1} className="text-5xl md:text-6xl text-slate-800 mt-4 font-bold">
+                            {"Less Prospecting.".split(" ").map((word, i) => <motion.span key={i} variants={animatedWord} className="inline-block mr-3">{word}</motion.span>)}
+                            <br />
+                            <motion.span variants={animatedWord} className="inline-block text-blue-600">More Impact.</motion.span>
+                        </motion.h1>
+                        <motion.p variants={textFloatUp} className="font-sans text-xl text-slate-600 mt-6 max-w-2xl mx-auto leading-relaxed">
+                            Stop juggling dozens of websites. 1RFP centralizes Bay Area grant opportunities so you can focus on what matters most: your mission.
+                        </motion.p>
+                    </div>
+                    
+                    <DrawingLine path="M 250 400 C 250 500, 50 450, 50 500" className="w-[500px] h-[150px] bottom-0 left-[20%] z-0"/>
+                    <ScrollArrow className="bottom-4 left-1/2 -translate-x-1/2" />
+                </StorySection>
+
+                <StorySection>
+                    <AnimatedShape className="w-20 h-20 top-20 right-[20%] z-0" initial={{ y: -10 }} animate={{ y: 10 }} imageUrl={STATIC_IMAGES.circles[4]} />
+                    <DrawingLine path="M 450 0 C 450 50, 250 50, 250 100" className="w-[300px] h-[120px] top-0 right-1/4 z-0"/>
+                    <div className="flex flex-col md:flex-row-reverse items-center gap-12 max-w-6xl mx-auto z-20 relative">
+                        <motion.div variants={textFloatUp} className="md:w-1/2 text-left p-8">
+                            <h2 className="text-4xl md:text-5xl text-slate-800 font-bold">The Endless <span className="font-bold text-red-500">Search</span>.</h2>
+                            <p className="font-sans text-xl text-slate-600 mt-4 leading-relaxed">
+                                You know the drill. Countless hours lost to scattered foundation websites, outdated databases, and missed deadlines. It's a frustrating cycle that pulls you away from your actual work.
+                            </p>
+                        </motion.div>
+                        <motion.div variants={textFloatUp} className="md:w-1/2"><img src={STATIC_IMAGES.painIllustration} alt="Illustration of a person overwhelmed by paperwork" className="w-full h-full object-contain"/></motion.div>
+                    </div>
+                    <DrawingLine path="M 20 400 C 20 500, 250 480, 250 500" className="w-[300px] h-[150px] bottom-0 left-1/4 z-0"/>
+                    <ScrollArrow className="bottom-4 left-1/2 -translate-x-1/2" />
+                </StorySection>
+
+                <StorySection>
+                    <AnimatedShape className="w-56 h-56 top-10 right-[15%] z-0" initial={{ y: -15, scale: 1}} animate={{ y: 15, scale: 1.05}} imageUrl={STATIC_IMAGES.circles[5]} />
+                    <DrawingLine path="M 250 0 C 250 50, 450 20, 450 100" className="w-[300px] h-[120px] top-0 right-1/2 -translate-x-1/2 z-0"/>
+                    <motion.div variants={textFloatUp} className="text-center z-20 relative mb-12">
+                        <div className="inline-block bg-green-100 p-4 rounded-full shadow-lg"><CheckCircle className="h-10 w-10 text-green-600" /></div>
+                        <h2 className="text-4xl md:text-5xl text-slate-800 mt-4 font-bold">A <span className="font-bold text-green-600">Smarter</span> Way to Fundraise.</h2>
+                        <p className="font-sans text-xl text-slate-600 mt-4 leading-relaxed max-w-3xl mx-auto">
+                            We centralize hundreds of Bay Area RFPs and provide powerful tools to help you find the right opportunities in minutes, not weeks. Discover funders who care about the work you do.
+                        </p>
+                    </motion.div>
+                    <div className="grid md:grid-cols-3 gap-8 w-full max-w-7xl mx-auto z-20 relative">
+                        {funderData.map((funder, index) => ( 
+                            <motion.div variants={textFloatUp} key={funder.slug || index}>
+                                <FunderCard funder={funder} handleFilterChange={handleDummyFilter} />
+                            </motion.div> 
+                        ))}
+                    </div>
+                    <DrawingLine path="M 450 400 C 450 500, 250 480, 250 500" className="w-[300px] h-[150px] bottom-0 right-1/4 z-0"/>
+                    <ScrollArrow className="bottom-4 left-1/2 -translate-x-1/2" />
+                </StorySection>
+
+                <StorySection>
+                    <AnimatedShape className="w-28 h-28 bottom-20 left-[18%] z-0" initial={{ y: 15 }} animate={{ y: -15 }} imageUrl={STATIC_IMAGES.circles[6]} />
+                    <DrawingLine path="M 50 0 C 50 50, 250 50, 250 100" className="w-[300px] h-[120px] top-0 left-1/4 z-0"/>
+                    <div className="flex flex-col md:flex-row items-center gap-12 max-w-6xl mx-auto z-20 relative">
+                         <motion.div variants={textFloatUp} className="md:w-1/2 text-left p-8">
+                           <h2 className="text-4xl md:text-5xl text-slate-800 font-bold">Free, <span className="font-bold text-purple-600">Forever</span>. For Nonprofits.</h2>
+                           <p className="font-sans text-xl text-slate-600 mt-4 leading-relaxed">
+                               Our commitment is to the Bay Area's nonprofit sector. Access to our entire grant database and discovery tools will always be free for 501(c)(3) organizations. No trials, no tiers, no hidden fees.
+                           </p>
+                        </motion.div>
+                        <motion.div variants={textFloatUp} className="md:w-1/2"><img src={STATIC_IMAGES.heroIllustration} alt="Illustration of finding opportunities" className="w-full h-full object-contain"/></motion.div>
+                    </div>
+                     <DrawingLine path="M 250 400 C 250 500, 450 450, 450 500" className="w-[500px] h-[150px] bottom-0 left-1/2 -translate-x-1/2 z-0"/>
+                    <ScrollArrow className="bottom-4 left-1/2 -translate-x-1/2" />
+                </StorySection>
+                
+                <StorySection>
+                    <div className="text-center z-20 relative">
+                        <motion.h2 variants={textFloatUp} className="text-4xl md:text-5xl text-slate-800 font-bold">What's on the Horizon?</motion.h2>
+                        <motion.p variants={textFloatUp} className="font-sans text-xl text-slate-600 mt-4 leading-relaxed max-w-3xl mx-auto">
+                            We're building powerful new tools to give you an even greater advantage in your fundraising efforts.
+                        </motion.p>
+                    </div>
+                    {/* --- UPDATED: Replaced with nonprofit-specific upcoming features --- */}
+                    <motion.div variants={textFloatUp} className="bg-white p-8 md:p-12 mt-12 rounded-lg border border-slate-200 shadow-xl w-full max-w-4xl z-20 relative">
+                        <h3 className="text-2xl font-bold mb-6 text-center">Upcoming Tools for Nonprofits</h3>
+                        <div className="grid md:grid-cols-2 gap-x-8 gap-y-6 font-sans text-slate-600">
+                            <div className="flex items-start"><Calendar className="h-6 w-6 text-teal-500 mr-4 flex-shrink-0 mt-1" /><p><strong className="text-slate-700">Grant Tracking:</strong> Save grants and manage deadlines in a personalized dashboard.</p></div>
+                            <div className="flex items-start"><Bot className="h-6 w-6 text-sky-500 mr-4 flex-shrink-0 mt-1" /><p><strong className="text-slate-700">AI Proposal Assistant:</strong> Get help drafting and tailoring proposals to specific funders.</p></div>
+                            <div className="flex items-start"><TrendingUp className="h-6 w-6 text-green-500 mr-4 flex-shrink-0 mt-1" /><p><strong className="text-slate-700">Funder Trend Analysis:</strong> See a funder's historical giving patterns to improve your strategy.</p></div>
+                            <div className="flex items-start"><Filter className="h-6 w-6 text-orange-500 mr-4 flex-shrink-0 mt-1" /><p><strong className="text-slate-700">Saved Searches & Alerts:</strong> Get notified when new grants matching your criteria are posted.</p></div>
+                            <div className="flex items-start"><ShieldCheck className="h-6 w-6 text-red-500 mr-4 flex-shrink-0 mt-1" /><p><strong className="text-slate-700">Eligibility Verifier:</strong> Use AI to quickly check if your organization meets a grant's criteria.</p></div>
+                            <div className="flex items-start"><Users className="h-6 w-6 text-indigo-500 mr-4 flex-shrink-0 mt-1" /><p><strong className="text-slate-700">Collaboration Space:</strong> Find and connect with other nonprofits for joint applications.</p></div>
+                        </div>
+                    </motion.div>
+                </StorySection>
+
+            </div>
         </div>
-      </div>
-    </div>
-  );
+    );
 };
 
 export default ForNonprofitsPage;

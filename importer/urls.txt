@@ -1,8 +1,5 @@
 // urls.txt
-https://farringtonfoundation.org/
-https://hewlett.org/
-https://www.sfbayrestore.org/restoration-authority-grants
-https://sff.org/
-bayfoundation.org 
-ebcf.org
-haasjr.org
+https://communityarts.zff.org/guidelines-and-eligibility/
+https://haassr.org/we-initiative/#howtoapply
+https://first5sanmateo.org/funding-opportunities/
+https://resources.ca.gov/grants/environmental-enhancement-and-mitigation-eem

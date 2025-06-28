@@ -1,7 +1,7 @@
 // src/SpotlightLandingPage.jsx
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { countySpotlightData } from './spotlightData.js'; // Ensure this path is correct
+import { countySpotlightData } from './spotlightData.js'; 
 
 const CountyCard = ({ slug, county }) => (
   <Link 
@@ -27,7 +27,8 @@ const SpotlightLandingPage = () => {
   const countySlugs = Object.keys(countySpotlightData);
 
   return (
-    <div className="bg-slate-50">
+    // --- UPDATED: Gradient background applied here ---
+    <div className="bg-gradient-to-br from-rose-50 via-orange-50 to-yellow-50">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-16">
         <div className="text-center mb-12">
           <h1 className="text-4xl md:text-5xl font-extrabold text-slate-900 mb-3">Community Spotlights</h1>
@@ -44,8 +45,5 @@ const SpotlightLandingPage = () => {
     </div>
   );
 };
-
-// You might need to add this to your main App.jsx imports if it's not already there
-import { useEffect } from 'react';
 
 export default SpotlightLandingPage;

@@ -10,11 +10,13 @@ const GrantCard = ({ grant, onOpenDetailModal, onFilterByCategory }) => {
 
     let isEndingSoon = false;
     let daysUntilDue = null;
+    let isExpired = false;
 
     if (grant.dueDate) {
         const dueDate = new Date(grant.dueDate);
         daysUntilDue = Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 3600 * 24));
         isEndingSoon = daysUntilDue >= 0 && daysUntilDue <= 14;
+        isExpired = dueDate < today;
     }
 
     const grantData = grant;
@@ -30,7 +32,18 @@ const GrantCard = ({ grant, onOpenDetailModal, onFilterByCategory }) => {
 
     return (
         <div className="bg-white p-6 rounded-xl border border-slate-200 hover:shadow-xl transition-all duration-300 ease-in-out flex flex-col justify-between transform hover:-translate-y-1 relative overflow-hidden h-full">
-            {isEndingSoon && (
+            
+            {/* --- UPDATED: Overlays and Tags for Grant Status --- */}
+            {isExpired && (
+                <>
+                    <div className="absolute inset-0 bg-slate-50/70 z-10"></div>
+                    <span className="absolute top-0 right-[-1px] bg-slate-500 text-white text-[10px] font-bold px-3 py-1 rounded-bl-lg z-20 uppercase tracking-wider">
+                        EXPIRED
+                    </span>
+                </>
+            )}
+
+            {isEndingSoon && !isExpired && (
                 <span
                     className="absolute top-0 right-[-1px] bg-amber-500 text-white text-[10px] font-bold px-3 py-1 rounded-bl-lg z-10 uppercase tracking-wider shadow-sm"
                     title={`Due in ${daysUntilDue} day${daysUntilDue === 1 ? '' : 's'}`}
@@ -41,7 +54,7 @@ const GrantCard = ({ grant, onOpenDetailModal, onFilterByCategory }) => {
                 </span>
             )}
 
-            <div>
+            <div className="relative z-0">
                 <div className="flex justify-between items-start mb-3">
                     <h3 className="text-lg font-semibold text-slate-800 group-hover:text-blue-600 transition-colors duration-200 pr-4">
                         {grantData.title}
@@ -55,12 +68,10 @@ const GrantCard = ({ grant, onOpenDetailModal, onFilterByCategory }) => {
                     </div>
                 </div>
                 
-                {/* Wrapped the funder info in a Link component */}
                 <Link 
                     to={`/funders/${grantData.funderSlug}`} 
-                    className="flex items-center mb-4 group"
-                    // Prevent the modal from opening when clicking the funder link
-                    onClick={(e) => e.stopPropagation()}
+                    className={`flex items-center mb-4 group ${isExpired ? 'pointer-events-none' : ''}`}
+                    onClick={(e) => { if(isExpired) e.preventDefault(); e.stopPropagation(); }}
                 >
                     {grantData.funderLogoUrl ? (
                         <img 
@@ -87,11 +98,12 @@ const GrantCard = ({ grant, onOpenDetailModal, onFilterByCategory }) => {
                                 return (
                                     <button 
                                         key={category.id || index} 
+                                        disabled={isExpired}
                                         onClick={(e) => {
-                                            e.stopPropagation(); // Prevent card click from triggering modal
+                                            e.stopPropagation();
                                             onFilterByCategory(categoryName);
                                         }}
-                                        className={`text-xs font-semibold px-2.5 py-1 rounded-full transition-transform transform hover:scale-105 active:scale-95 ${getPillClasses(categoryName)}`}
+                                        className={`text-xs font-semibold px-2.5 py-1 rounded-full transition-transform transform hover:scale-105 active:scale-95 ${getPillClasses(categoryName)} ${isExpired ? 'cursor-not-allowed' : ''}`}
                                         title={`Filter by: ${categoryName}`}
                                     >
                                         {categoryName}
@@ -151,10 +163,11 @@ const GrantCard = ({ grant, onOpenDetailModal, onFilterByCategory }) => {
                 </div>
             </div>
 
-            <div className="mt-auto">
+            <div className="mt-auto relative z-0">
                 <button
                     onClick={() => onOpenDetailModal(grant)}
-                    className="inline-flex items-center justify-center w-full px-4 py-2.5 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200 ease-in-out transform hover:scale-105"
+                    disabled={isExpired}
+                    className="inline-flex items-center justify-center w-full px-4 py-2.5 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200 ease-in-out transform hover:scale-105 disabled:bg-slate-400 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none"
                 >
                     View Grant Details <ExternalLink size={16} className="ml-2" />
                 </button>

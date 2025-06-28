@@ -10,7 +10,7 @@ import ExploreFunders from './ExploreFunders.jsx';
 import ExploreNonprofits from './ExploreNonprofits.jsx';
 import SpotlightLandingPage from './SpotlightLandingPage.jsx';
 import CountySpotlightPage from './CountySpotlightPage.jsx'; 
-import CitySpotlightPage from './CitySpotlightPage.jsx'; // --- 1. IMPORT THE NEW CITY PAGE ---
+import CitySpotlightPage from './CitySpotlightPage.jsx';
 import AboutUsPage from './AboutUsPage.jsx';
 import ContactUsPage from './ContactUsPage.jsx';
 import HowItWorksPage from './HowItWorksPage.jsx';
@@ -18,8 +18,6 @@ import ForNonprofitsPage from './ForNonprofitsPage.jsx';
 import ForFundersPage from './ForFundersPage.jsx';
 import RoadmapPage from './RoadmapPage.jsx';
 import FaqPage from './FaqPage.jsx';
-import BlogPage from './BlogPage.jsx';
-import GrantWritingTipsPage from './GrantWritingTipsPage.jsx';
 import SubmitGrantPage from './SubmitGrantPage.jsx';
 import FunderProfilePage from './FunderProfilePage.jsx';
 import NonprofitProfilePage from './NonprofitProfilePage.jsx';
@@ -29,7 +27,6 @@ import headerLogoImage from './assets/1rfp-logo.png';
 import footerLogoImage from './assets/1rfp-footer-logo.png';
 import { Facebook, Twitter, Linkedin, Youtube, Instagram, PlusCircle, Menu, X } from './components/Icons.jsx';
 
-// ... (The AppNavLink and AppLayout components remain exactly the same) ...
 const AppNavLink = ({ to, children, activeClassName, ...props }) => {
   return (
     <NavLink
@@ -58,11 +55,6 @@ const AppLayout = ({ children }) => {
     { to: "/how-it-works", text: "How 1RFP Works" },
     { to: "/for-nonprofits", text: "For Nonprofits" },
     { to: "/for-funders", text: "For Funders" },
-  ];
-
-  const resourceLinks = [
-    { to: "/blog", text: "Blog" },
-    { to: "/grant-writing-tips", text: "Grant Writing Tips" },
     { to: "/submit-grant", text: "Submit a Grant" },
   ];
 
@@ -72,6 +64,20 @@ const AppLayout = ({ children }) => {
     { to: "/roadmap", text: "Platform Roadmap" },
     { to: "/faq", text: "FAQ" },
   ];
+
+  const spotlightLinks = [
+    { to: "/spotlight", text: "All Spotlights" },
+    { to: "/spotlight/san-francisco", text: "San Francisco" },
+    { to: "/spotlight/alameda", text: "Alameda" },
+    { to: "/spotlight/contra-costa", text: "Contra Costa" },
+    { to: "/spotlight/marin", text: "Marin" },
+    { to: "/spotlight/napa", text: "Napa" },
+    { to: "/spotlight/san-mateo", text: "San Mateo" },
+    { to: "/spotlight/santa-clara", text: "Santa Clara" },
+    { to: "/spotlight/solano", text: "Solano" },
+    { to: "/spotlight/sonoma", text: "Sonoma" },
+  ];
+
 
   useEffect(() => {
     if (isMobileMenuOpen) {
@@ -160,14 +166,6 @@ const AppLayout = ({ children }) => {
                     ))}
                 </div>
                 <div>
-                    <h4 className="font-semibold text-slate-500 text-sm uppercase tracking-wider mb-3">Resources</h4>
-                    {resourceLinks.map(link => (
-                        <AppNavLink key={link.to} to={link.to} activeClassName="font-bold text-blue-600" onClick={() => setIsMobileMenuOpen(false)}>
-                            <span className="block py-2 text-base font-medium text-slate-600 hover:text-blue-600">{link.text}</span>
-                        </AppNavLink>
-                    ))}
-                </div>
-                <div>
                     <h4 className="font-semibold text-slate-500 text-sm uppercase tracking-wider mb-3">Company</h4>
                     {companyLinks.map(link => (
                         <AppNavLink key={link.to} to={link.to} activeClassName="font-bold text-blue-600" onClick={() => setIsMobileMenuOpen(false)}>
@@ -195,46 +193,46 @@ const AppLayout = ({ children }) => {
         {children}
       </main>
 
-      <footer className="text-black py-12">
+      <footer className="py-12">
         <div className="container mx-auto px-6">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
             <div>
               <img src={footerLogoImage} alt="1RFP Logo" className="h-14 mb-4 w-auto" />
-              <p className="text-base">Streamlining grant discovery for a better Bay Area.</p>
+              <p className="text-slate-600">Streamlining grant discovery for a better Bay Area.</p>
             </div>
             <div>
-              <h4 className="text-base font-bold text-black mb-3 tracking-wider uppercase">Product</h4>
+              <h4 className="text-sm font-bold text-slate-800 mb-3 tracking-wider uppercase">Product</h4>
               <ul className="space-y-2 text-base">
                 {productLinks.map(link => (
-                    <li key={link.to}><Link to={link.to} className="text-black hover:text-blue-600 transition-colors">{link.text}</Link></li>
+                    <li key={link.to}><Link to={link.to} className="text-slate-600 hover:text-blue-600 transition-colors">{link.text}</Link></li>
                 ))}
               </ul>
             </div>
             <div>
-              <h4 className="text-base font-bold text-black mb-3 tracking-wider uppercase">Resources</h4>
+              <h4 className="text-sm font-bold text-slate-800 mb-3 tracking-wider uppercase">Spotlight</h4>
               <ul className="space-y-2 text-base">
-                 {resourceLinks.map(link => (
-                    <li key={link.to}><Link to={link.to} className="text-black hover:text-blue-600 transition-colors">{link.text}</Link></li>
+                 {spotlightLinks.map(link => (
+                    <li key={link.to}><Link to={link.to} className="text-slate-600 hover:text-rose-600 transition-colors">{link.text}</Link></li>
                  ))}
               </ul>
             </div>
              <div>
-              <h4 className="text-base font-bold text-black mb-3 tracking-wider uppercase">Company</h4>
+              <h4 className="text-sm font-bold text-slate-800 mb-3 tracking-wider uppercase">Company</h4>
               <ul className="space-y-2 text-base">
                 {companyLinks.map(link => (
-                    <li key={link.to}><Link to={link.to} className="text-black hover:text-blue-600 transition-colors">{link.text}</Link></li>
+                    <li key={link.to}><Link to={link.to} className="text-slate-600 hover:text-blue-600 transition-colors">{link.text}</Link></li>
                 ))}
               </ul>
             </div>
           </div>
-          <div className="pt-8 flex flex-col sm:flex-row justify-between items-center border-t border-black/20">
-            <p className="text-base mb-4 sm:mb-0">&copy; {new Date().getFullYear()} 1RFP. All rights reserved.</p>
-            <div className="flex space-x-4">
-              <a href="#" aria-label="Facebook" className="text-black hover:text-blue-600 transition-colors"><Facebook size={18} /></a>
-              <a href="#" aria-label="Twitter" className="text-black hover:text-blue-600 transition-colors"><Twitter size={18} /></a>
-              <a href="#" aria-label="LinkedIn" className="text-black hover:text-blue-600 transition-colors"><Linkedin size={18} /></a>
-              <a href="#" aria-label="Instagram" className="text-black hover:text-blue-600 transition-colors"><Instagram size={18} /></a>
-              <a href="#" aria-label="YouTube" className="text-black hover:text-blue-600 transition-colors"><Youtube size={18} /></a>
+          <div className="pt-8 flex flex-col sm:flex-row justify-between items-center border-t border-slate-200">
+            <p className="text-base text-slate-500 mb-4 sm:mb-0">&copy; {new Date().getFullYear()} 1RFP. All rights reserved.</p>
+            <div className="flex space-x-4 text-slate-500">
+              <a href="#" aria-label="Facebook" className="hover:text-blue-600 transition-colors"><Facebook size={18} /></a>
+              <a href="#" aria-label="Twitter" className="hover:text-blue-600 transition-colors"><Twitter size={18} /></a>
+              <a href="#" aria-label="LinkedIn" className="hover:text-blue-600 transition-colors"><Linkedin size={18} /></a>
+              <a href="#" aria-label="Instagram" className="hover:text-blue-600 transition-colors"><Instagram size={18} /></a>
+              <a href="#" aria-label="YouTube" className="hover:text-blue-600 transition-colors"><Youtube size={18} /></a>
             </div>
           </div>
       </div>
@@ -255,7 +253,6 @@ export default function App() {
           <Route path="/nonprofits" element={<ExploreNonprofits />} />
           <Route path="/spotlight" element={<SpotlightLandingPage />} />
           <Route path="/spotlight/:countySlug" element={<CountySpotlightPage />} />
-          {/* --- 2. ADD THE NEW DYNAMIC CITY ROUTE --- */}
           <Route path="/spotlight/:countySlug/:citySlug" element={<CitySpotlightPage />} />
           <Route path="/about" element={<AboutUsPage />} />
           <Route path="/contact" element={<ContactUsPage />} />
@@ -264,13 +261,10 @@ export default function App() {
           <Route path="/for-funders" element={<ForFundersPage />} />
           <Route path="/roadmap" element={<RoadmapPage />} />
           <Route path="/faq" element={<FaqPage />} />
-          <Route path="/blog" element={<BlogPage />} />
-          <Route path="/grant-writing-tips" element={<GrantWritingTipsPage />} />
           <Route path="/submit-grant" element={<SubmitGrantPage />} />
           
           <Route path="/funders/:funderSlug" element={<FunderProfilePage />} />
           <Route path="/nonprofits/:slug" element={<NonprofitProfilePage />} />
-
         </Routes>
       </AppLayout>
     </BrowserRouter>

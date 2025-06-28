@@ -64,5 +64,13 @@ export {
   Menu,
   ImageIcon,
   IdCard,
-  // The line with 'SimilarIcon' has been removed
+  ArrowDown,
+  Feather, 
+  CheckCircle,
+  UserPlus,
+  AlertTriangle,
+  Coffee,
+  Home,
+  Building
 } from 'lucide-react';
+

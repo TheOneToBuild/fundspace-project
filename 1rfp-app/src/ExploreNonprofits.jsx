@@ -16,7 +16,6 @@ const ExploreNonprofits = () => {
   const [loading, setLoading] = useState(true);
   const [isMobileFiltersVisible, setIsMobileFiltersVisible] = useState(false);
   
-  // --- UPDATED: State now uses arrays for multi-select filters ---
   const [filterConfig, setFilterConfig] = useState({
     searchTerm: '',
     locationFilter: [],
@@ -71,10 +70,59 @@ const ExploreNonprofits = () => {
     nonprofitsPerPage
   );
 
-  const handleFilterChange = useCallback((key, value) => {
-    setFilterConfig(prev => ({ ...prev, [key]: value }));
-    setCurrentPage(1);
+  // --- FIXED: This handler is now robust and can handle different data structures ---
+  const handleFilterChange = useCallback((keyOrSuggestion, value) => {
+    setCurrentPage(1); // Reset pagination on any filter change
+
+    // This handles standard filter changes like dropdowns, checkboxes, etc.
+    // Signature: handleFilterChange('locationFilter', ['San Francisco'])
+    if (typeof keyOrSuggestion === 'string') {
+      setFilterConfig(prev => ({
+        ...prev,
+        [keyOrSuggestion]: value,
+      }));
+      return;
+    }
+
+    // This handles rich suggestion objects from the EnhancedSearchInput component
+    // Signature: handleFilterChange({ text: 'walter', type: 'text' })
+    // OR: handleFilterChange({ text: 'Healthcare', type: 'focus_area', ... })
+    if (typeof keyOrSuggestion === 'object' && keyOrSuggestion !== null) {
+      const suggestion = keyOrSuggestion;
+
+      switch (suggestion.type) {
+        case 'text':
+          // A plain text search was performed
+          setFilterConfig(prev => ({ ...prev, searchTerm: suggestion.text || '' }));
+          break;
+        
+        case 'focus_area':
+          // User clicked a "focus area" suggestion. Add it to the filter and clear search.
+          setFilterConfig(prev => ({
+            ...prev,
+            searchTerm: '',
+            focusAreaFilter: [...new Set([...prev.focusAreaFilter, suggestion.text])],
+          }));
+          break;
+
+        case 'location':
+            // User clicked a "location" suggestion.
+            setFilterConfig(prev => ({
+                ...prev,
+                searchTerm: '',
+                locationFilter: [...new Set([...prev.locationFilter, suggestion.text])],
+            }));
+            break;
+        
+        // A catch-all for any other suggestion types we might add.
+        // It treats them as a text search by default.
+        default:
+          setFilterConfig(prev => ({ ...prev, searchTerm: suggestion.text || '' }));
+          break;
+      }
+    }
   }, []);
+
 
   const paginate = useCallback((pageNumber) => {
     if (pageNumber < 1 || (totalPages > 0 && pageNumber > totalPages)) return;
@@ -119,7 +167,6 @@ const ExploreNonprofits = () => {
     const filters = [];
     if (filterConfig.searchTerm) filters.push({ key: 'searchTerm', label: `Search: "${filterConfig.searchTerm}"` });
     
-    // Updated to handle arrays for active pills
     if (Array.isArray(filterConfig.locationFilter)) {
       filterConfig.locationFilter.forEach(loc => filters.push({ key: 'locationFilter', value: loc, label: `Location: ${loc}` }));
     }
@@ -170,6 +217,7 @@ const ExploreNonprofits = () => {
         <FilterBar
           isMobileVisible={isMobileFiltersVisible}
           searchTerm={filterConfig.searchTerm}
+          onSuggestionSelect={handleFilterChange}
           setSearchTerm={(value) => handleFilterChange('searchTerm', value)}
           locationFilter={filterConfig.locationFilter}
           setLocationFilter={(value) => handleFilterChange('locationFilter', value)}

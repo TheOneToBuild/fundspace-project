@@ -1,7 +1,8 @@
 // src/GrantsPageContent.jsx
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import { supabase } from './supabaseClient.js';
-import { Search, Users, MapPin, Calendar, DollarSign, Info, ChevronDown, ExternalLink, Zap, Clock, Target, IconBriefcase, BarChart3, ClipboardList, TrendingUp, Loader, XCircle, Heart, Bot } from './components/Icons.jsx';
+import { Search, Users, MapPin, Calendar, DollarSign, Info, ChevronDown, ExternalLink, Zap, Clock, Target, IconBriefcase, BarChart3, ClipboardList, TrendingUp, Loader, XCircle, Heart, Bot, Briefcase } from './components/Icons.jsx';
 import GrantCard from './components/GrantCard.jsx';
 import GrantDetailModal from './GrantDetailModal.jsx';
 import FilterBar from './components/FilterBar.jsx';
@@ -11,54 +12,56 @@ import { parseMaxFundingAmount } from './utils.js';
 import { heroImpactCardsData } from './data.jsx';
 import { GRANT_STATUSES } from './constants.js';
 import usePaginatedFilteredData from './hooks/usePaginatedFilteredData.js';
-import { sortGrants } from './sorting.js';
-
-const filterGrants = (grants, config) => {
-  if (!Array.isArray(grants)) {
-    return [];
-  }
-  return grants.filter(grant => {
-    if (config.searchTerm) {
-      const searchTerm = config.searchTerm.toLowerCase();
-      const categoryNames = grant.categories?.map(cat => cat.name || cat).join(' ') || '';
-      const locationNames = grant.locations?.map(loc => loc.name || loc).join(' ') || '';
-      const searchableText = [grant.title, grant.description, grant.foundationName, grant.grantType, categoryNames, locationNames].join(' ').toLowerCase();
-      if (!searchableText.includes(searchTerm)) return false;
-    }
-    if (config.locationFilter?.length > 0) {
-      if (!grant.locations?.length) return false;
-      const grantLocationNames = grant.locations.map(l => l.name || l);
-      if (!grantLocationNames.some(locName => config.locationFilter.includes(locName))) return false;
-    }
-    if (config.categoryFilter?.length > 0) {
-      if (!grant.categories?.length) return false;
-      const grantCategoryNames = grant.categories.map(c => c.name || c);
-      if (!grantCategoryNames.some(catName => config.categoryFilter.includes(catName))) return false;
-    }
-    if (config.grantTypeFilter && grant.grantType !== config.grantTypeFilter) {
-      return false;
-    }
-    if (config.grantStatusFilter) {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const dueDate = grant.dueDate ? new Date(grant.dueDate) : null;
-      if (config.grantStatusFilter === 'Open') {
-        if (dueDate && dueDate < today) return false;
-      } else if (config.grantStatusFilter === 'Rolling') {
-        if (dueDate) return false;
-      } else if (config.grantStatusFilter === 'Closed') {
-        if (!dueDate || dueDate >= today) return false;
-      }
-    }
-    return true;
-  });
-};
+// Removed the import for the original sortGrants since we are defining a new one.
+import { filterGrants } from './filtering.js';
+import { SearchResultsSkeleton } from './components/SkeletonLoader.jsx';
 
 const formatCurrency = (amount) => {
     if (amount >= 1000000) return `${(amount / 1000000).toFixed(1)}M+`;
     else if (amount >= 1000) return `${(amount / 1000).toFixed(0)}K+`;
     return `${amount}`;
 };
+
+// --- UPDATED: New Sorting Logic ---
+
+const isGrantActive = (grant) => {
+    if (!grant.dueDate) return true; // Grants with no due date are considered active.
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return new Date(grant.dueDate) >= today;
+};
+
+const sortGrants = (grants, sortCriteria) => {
+    return [...grants].sort((a, b) => {
+        const aIsActive = isGrantActive(a);
+        const bIsActive = isGrantActive(b);
+
+        // Primary sort: Active grants first
+        if (aIsActive && !bIsActive) return -1;
+        if (!aIsActive && bIsActive) return 1;
+
+        // Secondary sort: Based on user selection
+        switch (sortCriteria) {
+            case 'dueDate_asc': {
+                const dateA = a.dueDate ? new Date(a.dueDate) : new Date('9999-12-31');
+                const dateB = b.dueDate ? new Date(b.dueDate) : new Date('9999-12-31');
+                return dateA - dateB;
+            }
+            case 'dueDate_desc': {
+                const dateA = a.dueDate ? new Date(a.dueDate) : new Date('9999-12-31');
+                const dateB = b.dueDate ? new Date(b.dueDate) : new Date('9999-12-31');
+                return dateB - dateA;
+            }
+            case 'amount_desc':
+                return parseMaxFundingAmount(b.max_funding_amount) - parseMaxFundingAmount(a.max_funding_amount);
+            case 'amount_asc':
+                return parseMaxFundingAmount(a.max_funding_amount) - parseMaxFundingAmount(b.max_funding_amount);
+            default:
+                return 0;
+        }
+    });
+};
+
 
 const HeroImageCard = ({ card, layoutClass, initialDelay = 0 }) => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -74,12 +77,19 @@ const HeroImpactSection = ({ grants }) => {
   const layoutClasses = [ 'col-span-1 row-span-2 h-full min-h-[300px] md:min-h-[400px]', 'col-span-1 row-span-1 h-full min-h-[140px] md:min-h-[190px]', 'col-span-1 row-span-1 h-full min-h-[140px] md:min-h-[190px]', 'col-span-1 row-span-1 h-full min-h-[140px] md:min-h-[190px]', 'col-span-1 row-span-1 h-full min-h-[140px] md:min-h-[190px]' ];
   const totalAvailableFunding = useMemo(() => {
     if (!Array.isArray(grants)) return 0;
-    return grants.reduce((sum, grant) => {
+    // --- UPDATED: Filter for active grants before summing ---
+    return grants.filter(isGrantActive).reduce((sum, grant) => {
       const amount = grant.max_funding_amount || '0';
       return sum + parseMaxFundingAmount(amount.toString());
     }, 0);
   }, [grants]);
-  const totalGrantsAvailable = Array.isArray(grants) ? grants.length : 0;
+  
+  const totalGrantsAvailable = useMemo(() => {
+    if (!Array.isArray(grants)) return 0;
+    // --- UPDATED: Count only active grants ---
+    return grants.filter(isGrantActive).length;
+  }, [grants]);
+
   return (
     <section className="py-16 md:py-24 bg-white border-b border-slate-200">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
@@ -92,7 +102,7 @@ const HeroImpactSection = ({ grants }) => {
                     <ClipboardList size={32} className="text-purple-500" />
                     <AnimatedCounter targetValue={totalGrantsAvailable} duration={2500} step={1} className="text-purple-600 text-4xl md:text-5xl font-bold" />
                   </div>
-                  <p className="text-sm font-medium text-slate-500 mt-1 ml-1">Total Grants Available</p>
+                  <p className="text-sm font-medium text-slate-500 mt-1 ml-1">Active Grants Available</p>
                 </div>
               )}
               {totalAvailableFunding > 0 && (
@@ -101,15 +111,24 @@ const HeroImpactSection = ({ grants }) => {
                     <TrendingUp size={32} className="text-green-500" />
                     <AnimatedCounter targetValue={totalAvailableFunding} duration={2500} step={1} prefix="$" formatValue={formatCurrency} className="text-green-600 text-4xl md:text-5xl font-bold" />
                   </div>
-                  <p className="text-sm font-medium text-slate-500 mt-1 ml-1">Total Funding Opportunities</p>
+                  <p className="text-sm font-medium text-slate-500 mt-1 ml-1">Total Active Funding</p>
                 </div>
               )}
             </div>
             <h1 className="text-4xl sm:text-5xl lg:text-[3.5rem] font-extrabold text-slate-900 mb-4 leading-tight"> A Smarter Path to <span className="text-blue-600">Funding.</span></h1>
             <p className="text-lg text-slate-600 mb-6 max-w-xl mx-auto lg:mx-0 leading-relaxed">Our mission is to empower Bay Area nonprofits by transforming grant discovery. We combine AI-powered data aggregation with community-driven insights to create a single, comprehensive, and easy-to-use platform.</p>
             <p className="text-lg text-slate-600 mb-10 max-w-xl mx-auto lg:mx-0 leading-relaxed">Spend less time searching and more time making an impact.</p>
-            <div className="flex justify-center lg:justify-start">
-              <a href="#funding-opportunity-intro" className="inline-flex items-center justify-center px-8 py-3.5 border border-transparent text-base font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700">Explore Grants Now <Search size={20} className="ml-2.5" /></a>
+            
+            <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4">
+              <a href="#funding-opportunity-intro" className="inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 shadow-md hover:shadow-lg transition-transform hover:scale-105 w-full sm:w-auto">
+                  Explore Grants Now <Search size={20} className="ml-2" />
+              </a>
+              <Link to="/how-it-works" className="inline-flex items-center justify-center px-6 py-3 border border-purple-200 text-base font-medium rounded-lg text-purple-700 bg-purple-50 hover:bg-purple-100 shadow-sm hover:shadow-lg transition-all w-full sm:w-auto">
+                  How 1RFP Works <Zap size={18} className="ml-2 text-purple-500"/>
+              </Link>
+              <Link to="/about" className="inline-flex items-center justify-center px-6 py-3 border border-green-200 text-base font-medium rounded-lg text-green-700 bg-green-50 hover:bg-green-100 shadow-sm hover:shadow-lg transition-all w-full sm:w-auto">
+                  About Us <Users size={18} className="ml-2 text-green-500"/>
+              </Link>
             </div>
           </div>
           <div className="w-full"><div className="grid grid-cols-2 gap-4 h-[500px] md:h-[600px]">{heroImpactCardsData.map((card, index) => ( <HeroImageCard key={card.id} card={card} layoutClass={layoutClasses[index]} initialDelay={index * 300} /> ))}</div></div>
@@ -162,16 +181,19 @@ const GrantsPageContent = () => {
   const uniqueLocations = useMemo(() => Array.from(new Set(grants.flatMap(g => g.locations?.map(l => l.name) || []).filter(Boolean))).sort(), [grants]);
   
   const grantsPerPageOptions = [6, 9, 12, 15, 21, 24, 30, 45, 60, 86];
+  
+  // --- UPDATED: Pass our new sortGrants function to the hook ---
   const { paginatedItems: currentList = [], totalPages, totalFilteredItems, filteredAndSortedItems } = usePaginatedFilteredData(grants, filterConfig, filterGrants, filterConfig.sortCriteria, sortGrants, currentPage, grantsPerPage);
+  
   const totalFilteredFunding = useMemo(() => {
     if (!filteredAndSortedItems) return 0;
-    return filteredAndSortedItems.reduce((sum, grant) => {
+    // --- UPDATED: Filter for active grants before summing ---
+    return filteredAndSortedItems.filter(isGrantActive).reduce((sum, grant) => {
       const amount = grant.max_funding_amount || '0';
       return sum + parseMaxFundingAmount(amount.toString());
     }, 0);
   }, [filteredAndSortedItems]);
 
-  // CORRECTED: Moved handleFilterChange to be defined before it is used.
   const handleFilterChange = useCallback((key, value) => {
     setFilterConfig(prev => ({ ...prev, [key]: value }));
     setCurrentPage(1);
@@ -288,7 +310,7 @@ const GrantsPageContent = () => {
             <h2 className="text-2xl font-semibold text-slate-800 text-center md:text-left">
               <span>Available Grants </span><span className="text-blue-600">({totalFilteredItems})</span>
               {totalFilteredItems > 0 && !loading && (
-                <><span className="text-slate-300 mx-3" aria-hidden="true">·</span><span className="text-green-600">Total Funds (<AnimatedCounter targetValue={totalFilteredFunding} duration={1000} prefix="$" formatValue={formatCurrency}/>)</span></>
+                <><span className="text-slate-300 mx-3" aria-hidden="true">·</span><span className="text-green-600">Active Funds (<AnimatedCounter targetValue={totalFilteredFunding} duration={1000} prefix="$" formatValue={formatCurrency}/>)</span></>
               )}
             </h2>
             <div className="relative w-full sm:w-auto">
@@ -301,11 +323,7 @@ const GrantsPageContent = () => {
             </div>
           </div>
           {loading ? (
-            <div className="text-center text-slate-500 py-12 bg-white rounded-lg shadow-sm border border-slate-200">
-              <Loader size={40} className="mx-auto text-blue-400 mb-3 animate-spin" />
-              <p className="text-lg font-medium">Loading live grants...</p>
-              <p className="text-sm">Connecting to the grant database.</p>
-            </div>
+             <SearchResultsSkeleton count={grantsPerPage} type="grant" />
           ) : currentList && currentList.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {currentList.map((grant) => (
