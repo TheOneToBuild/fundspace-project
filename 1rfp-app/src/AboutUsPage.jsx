@@ -1,11 +1,12 @@
 // src/AboutUsPage.jsx
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Users, BarChart3, Briefcase, Heart, Home, AlertTriangle, Coffee, Building } from './components/Icons.jsx';
 import AnimatedCounter from './components/AnimatedCounter.jsx';
 import ScrollArrow from './components/ScrollArrow.jsx';
+// --- FIX: Corrected the import path ---
+import AdvisoryCard from './AdvisoryCard.jsx'; 
 
-// Using picsum.photos for reliable image loading with themed seeds
 const STATIC_MEDIA = {
     collage: [
         'https://cdn.pixabay.com/photo/2017/03/18/14/56/panorama-2154194_1280.jpg',
@@ -14,7 +15,7 @@ const STATIC_MEDIA = {
         'https://cdn.pixabay.com/photo/2021/11/06/00/32/volunteer-6772196_640.jpg',
         'https://cdn.pixabay.com/photo/2014/03/25/18/24/latin-297932_640.jpg',
     ],
-    map: 'https://cdn.pixabay.com/photo/2023/08/29/10/07/golden-gate-8220894_640.jpg', // Static map of 9 counties
+    map: 'https://cdn.pixabay.com/photo/2023/08/29/10/07/golden-gate-8220894_640.jpg',
     gradients: [
         'from-purple-200 to-indigo-200',
         'from-sky-200 to-blue-200',
@@ -64,8 +65,18 @@ const advisoryBoard = [
   }
 ];
 
-// Reusable components
-const StorySection = ({ children, className = '' }) => ( <motion.div className={`min-h-screen w-full flex flex-col justify-center items-center py-24 md:py-32 relative overflow-hidden ${className}`} initial="hidden" whileInView="visible" viewport={{ once: true, amount: 0.3 }} transition={{ staggerChildren: 0.3 }}>{children}</motion.div>);
+const StorySection = ({ children, className = '' }) => ( 
+    <motion.div 
+        className={`w-full flex flex-col justify-center items-center py-16 md:py-20 relative overflow-hidden ${className}`} 
+        initial="hidden" 
+        whileInView="visible" 
+        viewport={{ once: true, amount: 0.2 }} 
+        transition={{ staggerChildren: 0.3 }}
+    >
+        {children}
+    </motion.div>
+);
+
 const fadeIn = { hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { duration: 0.8 } } };
 
 const AnimatedGradientShape = ({ className, initial, animate, gradient }) => (
@@ -83,16 +94,17 @@ const AnimatedGradientShape = ({ className, initial, animate, gradient }) => (
 );
 
 const AboutUsPage = () => {
+  const [expandedIndex, setExpandedIndex] = useState(null);
+
   const formatCurrency = (amount) => `$${(amount / 1000000000).toFixed(0)}B+`;
   const formatNumber = (num) => num.toLocaleString() + '+';
   const formatPercentage = (num) => `${num}%`;
 
   return (
     <div className="bg-[#F8F3ED] text-[#333132] font-serif overflow-x-hidden">
-      <div className="container mx-auto px-6 max-w-7xl">
+      <div className="container mx-auto px-4 sm:px-6 max-w-7xl">
 
         <StorySection>
-          {/* --- UPDATED: Gradient balls are fully visible --- */}
           <AnimatedGradientShape className="w-48 h-48 top-20 left-16" initial={{ y: -15, x: 5 }} animate={{ y: 15, x: -5 }} gradient={STATIC_MEDIA.gradients[0]} />
           <AnimatedGradientShape className="w-24 h-24 bottom-24 right-20" initial={{ y: 10, x: -5 }} animate={{ y: -10, x: 5 }} gradient={STATIC_MEDIA.gradients[1]} />
           <div className="text-center z-20 relative">
@@ -105,52 +117,52 @@ const AboutUsPage = () => {
           </div>
           <motion.div 
             variants={{ hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.1, delayChildren: 0.5 } } }}
-            className="grid grid-cols-2 md:grid-cols-4 gap-x-8 gap-y-12 mt-20 w-full max-w-6xl z-10 font-sans text-center"
+            className="grid grid-cols-2 md:grid-cols-4 gap-x-4 sm:gap-x-8 gap-y-10 sm:gap-y-12 mt-20 w-full max-w-6xl z-10 font-sans text-center"
           >
             <motion.div variants={fadeIn}>
-              <Users className="h-10 w-10 mx-auto text-sky-500 mb-2" />
-              <AnimatedCounter targetValue={7700000} formatValue={formatNumber} className="text-4xl font-bold text-sky-600" />
-              <p className="text-sm font-medium text-slate-500 mt-1">Bay Area Residents</p>
+              <Users className="h-8 sm:h-10 w-8 sm:w-10 mx-auto text-sky-500 mb-2" />
+              <AnimatedCounter targetValue={7700000} formatValue={formatNumber} className="text-3xl sm:text-4xl font-bold text-sky-600" />
+              <p className="text-xs sm:text-sm font-medium text-slate-500 mt-1">Bay Area Residents</p>
             </motion.div>
             <motion.div variants={fadeIn}>
-              <Heart className="h-10 w-10 mx-auto text-rose-500 mb-2" />
-              <AnimatedCounter targetValue={33000} formatValue={formatNumber} className="text-4xl font-bold text-rose-600" />
-              <p className="text-sm font-medium text-slate-500 mt-1">Nonprofits</p>
+              <Heart className="h-8 sm:h-10 w-8 sm:w-10 mx-auto text-rose-500 mb-2" />
+              <AnimatedCounter targetValue={33000} formatValue={formatNumber} className="text-3xl sm:text-4xl font-bold text-rose-600" />
+              <p className="text-xs sm:text-sm font-medium text-slate-500 mt-1">Nonprofits</p>
             </motion.div>
             <motion.div variants={fadeIn}>
-              <Briefcase className="h-10 w-10 mx-auto text-amber-500 mb-2" />
-              <AnimatedCounter targetValue={8000} formatValue={formatNumber} className="text-4xl font-bold text-amber-600" />
-              <p className="text-sm font-medium text-slate-500 mt-1">Foundations</p>
+              <Briefcase className="h-8 sm:h-10 w-8 sm:w-10 mx-auto text-amber-500 mb-2" />
+              <AnimatedCounter targetValue={8000} formatValue={formatNumber} className="text-3xl sm:text-4xl font-bold text-amber-600" />
+              <p className="text-xs sm:text-sm font-medium text-slate-500 mt-1">Foundations</p>
             </motion.div>
             <motion.div variants={fadeIn}>
-               <BarChart3 className="h-10 w-10 mx-auto text-teal-500 mb-2" />
-              <AnimatedCounter targetValue={13000000000} duration={3000} formatValue={formatCurrency} className="text-4xl font-bold text-teal-600" />
-              <p className="text-sm font-medium text-slate-500 mt-1">Given Annually</p>
+               <BarChart3 className="h-8 sm:h-10 w-8 sm:w-10 mx-auto text-teal-500 mb-2" />
+              <AnimatedCounter targetValue={13000000000} duration={3000} formatValue={formatCurrency} className="text-3xl sm:text-4xl font-bold text-teal-600" />
+              <p className="text-xs sm:text-sm font-medium text-slate-500 mt-1">Given Annually</p>
             </motion.div>
             <motion.div variants={fadeIn}>
-                <Home className="h-10 w-10 mx-auto text-red-500" />
-                <AnimatedCounter targetValue={38000} formatValue={formatNumber} className="text-4xl font-bold text-red-600" />
-                <p className="text-sm font-medium text-slate-500 mt-1">People Experiencing Homelessness</p>
+                <Home className="h-8 sm:h-10 w-8 sm:w-10 mx-auto text-red-500" />
+                <AnimatedCounter targetValue={38000} formatValue={formatNumber} className="text-3xl sm:text-4xl font-bold text-red-600" />
+                <p className="text-xs sm:text-sm font-medium text-slate-500 mt-1">People Experiencing Homelessness</p>
             </motion.div>
             <motion.div variants={fadeIn}>
-                <AlertTriangle className="h-10 w-10 mx-auto text-orange-500" />
-                <AnimatedCounter targetValue={20} formatValue={formatPercentage} className="text-4xl font-bold text-orange-600" />
-                <p className="text-sm font-medium text-slate-500 mt-1">Residents Living in Poverty</p>
+                <AlertTriangle className="h-8 sm:h-10 w-8 sm:w-10 mx-auto text-orange-500" />
+                <AnimatedCounter targetValue={20} formatValue={formatPercentage} className="text-3xl sm:text-4xl font-bold text-orange-600" />
+                <p className="text-xs sm:text-sm font-medium text-slate-500 mt-1">Residents Living in Poverty</p>
             </motion.div>
             <motion.div variants={fadeIn}>
-                <Building className="h-10 w-10 mx-auto text-indigo-500" />
-                <AnimatedCounter targetValue={45} formatValue={formatPercentage} className="text-4xl font-bold text-indigo-600" />
-                <p className="text-sm font-medium text-slate-500 mt-1">Renters Who Are Rent-Burdened</p>
+                <Building className="h-8 sm:h-10 w-8 sm:w-10 mx-auto text-indigo-500" />
+                <AnimatedCounter targetValue={45} formatValue={formatPercentage} className="text-3xl sm:text-4xl font-bold text-indigo-600" />
+                <p className="text-xs sm:text-sm font-medium text-slate-500 mt-1">Renters Who Are Rent-Burdened</p>
             </motion.div>
              <motion.div variants={fadeIn}>
-                <Coffee className="h-10 w-10 mx-auto text-blue-500" />
-                <AnimatedCounter targetValue={25} formatValue={formatPercentage} className="text-4xl font-bold text-blue-600" />
-                <p className="text-sm font-medium text-slate-500 mt-1">Households Facing Food Insecurity</p>
+                <Coffee className="h-8 sm:h-10 w-8 sm:w-10 mx-auto text-blue-500" />
+                <AnimatedCounter targetValue={25} formatValue={formatPercentage} className="text-3xl sm:text-4xl font-bold text-blue-600" />
+                <p className="text-xs sm:text-sm font-medium text-slate-500 mt-1">Households Facing Food Insecurity</p>
             </motion.div>
           </motion.div>
-          <ScrollArrow className="bottom-4 left-1/2 -translate-x-1/2" />
+          <ScrollArrow className="absolute bottom-4 left-1/2 -translate-x-1/2" />
         </StorySection>
-
+        
         <StorySection>
             <AnimatedGradientShape className="w-56 h-56 bottom-16 left-10" initial={{ scale: 0.9 }} animate={{ scale: 1.1 }} gradient={STATIC_MEDIA.gradients[2]} />
             <div className="grid lg:grid-cols-2 gap-16 items-center">
@@ -181,21 +193,18 @@ const AboutUsPage = () => {
                 <motion.h2 variants={fadeIn} className="text-3xl md:text-4xl font-bold text-slate-800">A Bridge Built from Both Sides</motion.h2>
                 <motion.p variants={{...fadeIn, transition: {...fadeIn.transition, delay:0.2}}} className="font-sans text-lg text-slate-500 mt-2 max-w-2xl mx-auto">Our advisory board has direct experience from both sides of the funding table.</motion.p>
             </div>
+            
             <motion.div 
-              variants={{ hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.15, delayChildren: 0.4 } } }}
-              className="grid sm:grid-cols-2 lg:grid-cols-3 gap-8 w-full max-w-6xl z-10"
+              variants={{ hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.1, delayChildren: 0.4 } } }}
+              className="grid grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 w-full max-w-6xl z-10"
             >
                 {advisoryBoard.map((member, index) => (
-                <motion.div 
-                    key={index} 
-                    variants={{ hidden: { opacity: 0, y: 30, scale: 0.95 }, visible: { opacity: 1, y: 0, scale: 1 } }}
-                    className="bg-white/70 backdrop-blur-sm rounded-xl p-6 text-center border border-slate-200 shadow-lg flex flex-col items-center"
-                >
-                    <img className="mx-auto h-28 w-28 rounded-full mb-4 object-cover" src={member.imageUrl} alt={member.name} />
-                    <h3 className="text-xl font-bold text-slate-900">{member.name}</h3>
-                    <p className="font-sans font-semibold text-blue-600 mb-3 text-sm">{member.title}</p>
-                    <p className="font-sans text-slate-600 text-sm flex-grow">{member.bio}</p>
-                </motion.div>
+                    <AdvisoryCard 
+                        key={index}
+                        member={member}
+                        isExpanded={index === expandedIndex}
+                        onToggle={() => setExpandedIndex(expandedIndex === index ? null : index)}
+                    />
                 ))}
             </motion.div>
         </StorySection>

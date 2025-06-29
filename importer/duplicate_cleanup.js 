@@ -1,0 +1,180 @@
+// duplicate_cleanup.js - Script to find and remove duplicate funders
+const { createClient } = require('@supabase/supabase-js');
+require('dotenv').config({ path: path.join(__dirname, '../.env') });
+
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_KEY = process.env.SUPABASE_KEY;
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// Copy the enhanced normalization function
+function normalizeNameForDeduplication(name) {
+    if (!name || typeof name !== 'string') return '';
+    
+    let normalized = name.toLowerCase().trim();
+    
+    // Remove leading articles
+    normalized = normalized.replace(/^(the\s+|a\s+|an\s+)/i, '');
+    
+    // Remove trailing organizational suffixes
+    const suffixes = [
+        'foundation', 'fund', 'inc', 'incorporated', 'llc', 'ltd', 'limited',
+        'corp', 'corporation', 'company', 'co', 'trust', 'organization',
+        'org', 'institute', 'center', 'centre', 'society', 'association',
+        'nonprofit', 'non-profit'
+    ];
+    
+    const suffixPattern = new RegExp(`\\s+(${suffixes.join('|')})(\\.)?$`, 'i');
+    normalized = normalized.replace(suffixPattern, '');
+    
+    // Handle common abbreviations
+    normalized = normalized.replace(/\bcomm\b/g, 'community');
+    normalized = normalized.replace(/\bdev\b/g, 'development');
+    normalized = normalized.replace(/\benv\b/g, 'environmental');
+    normalized = normalized.replace(/\beduc\b/g, 'education');
+    normalized = normalized.replace(/\btech\b/g, 'technology');
+    normalized = normalized.replace(/\bsan fran\b/g, 'san francisco');
+    normalized = normalized.replace(/\bsf\b/g, 'san francisco');
+    normalized = normalized.replace(/\bsv\b/g, 'silicon valley');
+    normalized = normalized.replace(/&/g, 'and');
+    normalized = normalized.replace(/\+/g, 'and');
+    
+    // Handle specific foundation name variations
+    normalized = normalized.replace(/\bpackard\s+(foundation\s+)?for\s+children'?s?\s+health\b/g, 'packard');
+    normalized = normalized.replace(/\bdavid\s+and\s+lucile\s+packard\b/g, 'packard');
+    normalized = normalized.replace(/\blucile\s+packard\b/g, 'packard');
+    normalized = normalized.replace(/\bchildren'?s?\s+health\b/g, '');
+    normalized = normalized.replace(/\bfor\s+children\b/g, '');
+    
+    // Remove special characters and extra whitespace
+    normalized = normalized
+        .replace(/[^\w\s]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+    
+    return normalized;
+}
+
+async function findDuplicates() {
+    console.log('--- Finding Duplicate Funders ---');
+    
+    const { data: allFunders, error } = await supabase
+        .from('funders')
+        .select('id, name, created_at')
+        .order('created_at', { ascending: true });
+    
+    if (error) {
+        console.error('Error fetching funders:', error);
+        return;
+    }
+    
+    console.log(`Checking ${allFunders.length} funders for duplicates...`);
+    
+    const duplicateGroups = new Map();
+    const processedNormalizedNames = new Set();
+    
+    for (const funder of allFunders) {
+        const normalized = normalizeNameForDeduplication(funder.name);
+        
+        if (processedNormalizedNames.has(normalized)) {
+            // This is a duplicate
+            if (!duplicateGroups.has(normalized)) {
+                // Find the original
+                const original = allFunders.find(f => 
+                    normalizeNameForDeduplication(f.name) === normalized && 
+                    f.id !== funder.id
+                );
+                duplicateGroups.set(normalized, {
+                    normalized,
+                    original,
+                    duplicates: []
+                });
+            }
+            duplicateGroups.get(normalized).duplicates.push(funder);
+        } else {
+            processedNormalizedNames.add(normalized);
+        }
+    }
+    
+    if (duplicateGroups.size === 0) {
+        console.log('✅ No duplicates found!');
+        return;
+    }
+    
+    console.log(`\n🔍 Found ${duplicateGroups.size} groups of duplicates:\n`);
+    
+    for (const [normalized, group] of duplicateGroups) {
+        console.log(`📋 Normalized name: "${normalized}"`);
+        console.log(`   ✅ Keep: "${group.original.name}" (ID: ${group.original.id}) - Created: ${group.original.created_at}`);
+        
+        for (const duplicate of group.duplicates) {
+            console.log(`   ❌ Remove: "${duplicate.name}" (ID: ${duplicate.id}) - Created: ${duplicate.created_at}`);
+        }
+        console.log('');
+    }
+    
+    return duplicateGroups;
+}
+
+async function removeDuplicates(duplicateGroups, confirmRemoval = false) {
+    if (!duplicateGroups || duplicateGroups.size === 0) {
+        console.log('No duplicates to remove.');
+        return;
+    }
+    
+    console.log('--- Removing Duplicates ---');
+    
+    let totalRemoved = 0;
+    
+    for (const [normalized, group] of duplicateGroups) {
+        console.log(`\nProcessing duplicates for: "${normalized}"`);
+        console.log(`Keeping: "${group.original.name}" (ID: ${group.original.id})`);
+        
+        for (const duplicate of group.duplicates) {
+            if (confirmRemoval) {
+                console.log(`Removing: "${duplicate.name}" (ID: ${duplicate.id})`);
+                
+                // Remove from junction tables first
+                await supabase.from('funder_categories').delete().eq('funder_id', duplicate.id);
+                await supabase.from('funder_funding_locations').delete().eq('funder_id', duplicate.id);
+                
+                // Remove the funder
+                const { error } = await supabase.from('funders').delete().eq('id', duplicate.id);
+                
+                if (error) {
+                    console.error(`❌ Error removing "${duplicate.name}":`, error);
+                } else {
+                    console.log(`✅ Successfully removed "${duplicate.name}"`);
+                    totalRemoved++;
+                }
+            } else {
+                console.log(`Would remove: "${duplicate.name}" (ID: ${duplicate.id}) [DRY RUN]`);
+            }
+        }
+    }
+    
+    if (confirmRemoval) {
+        console.log(`\n🎉 Cleanup complete! Removed ${totalRemoved} duplicate funders.`);
+    } else {
+        console.log(`\n⚠️ DRY RUN: Would remove ${Array.from(duplicateGroups.values()).reduce((sum, group) => sum + group.duplicates.length, 0)} duplicate funders.`);
+        console.log('   Run with confirmRemoval=true to actually remove them.');
+    }
+}
+
+async function main() {
+    // First, just find and display duplicates
+    const duplicateGroups = await findDuplicates();
+    
+    if (duplicateGroups && duplicateGroups.size > 0) {
+        console.log('\n🤔 What would you like to do?');
+        console.log('1. This was just a preview. No funders were removed.');
+        console.log('2. To actually remove duplicates, uncomment the line below:');
+        console.log('// await removeDuplicates(duplicateGroups, true);');
+        
+        // Uncomment this line to actually remove duplicates:
+        // await removeDuplicates(duplicateGroups, true);
+    }
+}
+
+if (require.main === module) {
+    main();
+}
