@@ -1,10 +1,11 @@
 // src/components/GrantCard.jsx
 import React from 'react';
-import { Link } from 'react-router-dom';
-import { IconBriefcase, MapPin, DollarSign, Calendar, ExternalLink, ShieldCheck } from './Icons.jsx';
+import { Link, useNavigate } from 'react-router-dom';
+import { IconBriefcase, MapPin, DollarSign, Calendar, ExternalLink, ShieldCheck, Bookmark } from './Icons.jsx';
 import { formatDate, getPillClasses, getGrantTypePillClasses, formatFundingDisplay } from '../utils.js';
 
-const GrantCard = ({ grant, onOpenDetailModal, onFilterByCategory }) => {
+const GrantCard = ({ grant, onOpenDetailModal, onFilterByCategory, onSave, onUnsave, isSaved, session }) => {
+    const navigate = useNavigate();
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
@@ -30,10 +31,22 @@ const GrantCard = ({ grant, onOpenDetailModal, onFilterByCategory }) => {
         return name.substring(0, 2).toUpperCase();
     };
 
+    const handleSaveClick = (e) => {
+        e.stopPropagation();
+        if (!session) {
+          navigate('/login');
+          return;
+        }
+        if (isSaved) {
+            onUnsave(grant.id);
+        } else {
+            onSave(grant.id);
+        }
+    };
+
     return (
         <div className="bg-white p-6 rounded-xl border border-slate-200 hover:shadow-xl transition-all duration-300 ease-in-out flex flex-col justify-between transform hover:-translate-y-1 relative overflow-hidden h-full">
             
-            {/* --- UPDATED: Overlays and Tags for Grant Status --- */}
             {isExpired && (
                 <>
                     <div className="absolute inset-0 bg-slate-50/70 z-10"></div>
@@ -64,6 +77,15 @@ const GrantCard = ({ grant, onOpenDetailModal, onFilterByCategory }) => {
                             <span className={`text-xs font-medium px-3 py-1 rounded-full whitespace-nowrap ${getGrantTypePillClasses(grantData.grantType)}`}>
                                 {grantData.grantType}
                             </span>
+                        )}
+                        {grantData.save_count > 0 && (
+                            <div
+                                className="flex items-center gap-1 bg-indigo-50 text-indigo-700 rounded-full px-2 py-1"
+                                title={`${grantData.save_count} user${grantData.save_count === 1 ? '' : 's'} saved this grant`}
+                            >
+                                <Bookmark size={14} className="text-indigo-500" fill="currentColor"/>
+                                <span className="text-sm font-bold">{grantData.save_count}</span>
+                            </div>
                         )}
                     </div>
                 </div>
@@ -163,13 +185,25 @@ const GrantCard = ({ grant, onOpenDetailModal, onFilterByCategory }) => {
                 </div>
             </div>
 
-            <div className="mt-auto relative z-0">
+            <div className="mt-auto flex justify-between items-center relative z-0">
                 <button
                     onClick={() => onOpenDetailModal(grant)}
                     disabled={isExpired}
-                    className="inline-flex items-center justify-center w-full px-4 py-2.5 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200 ease-in-out transform hover:scale-105 disabled:bg-slate-400 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none"
+                    className="inline-flex items-center justify-center flex-grow px-4 py-2.5 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200 ease-in-out transform hover:scale-105 disabled:bg-slate-400 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none"
                 >
-                    View Grant Details <ExternalLink size={16} className="ml-2" />
+                    View Details
+                </button>
+                <button
+                    onClick={handleSaveClick}
+                    title={isSaved && session ? "Unsave this grant" : "Save this grant"}
+                    disabled={isExpired}
+                    className={`ml-2 p-2.5 rounded-lg transition-colors duration-200 disabled:opacity-50 ${
+                        isSaved && session
+                            ? 'bg-pink-100 text-pink-600 hover:bg-pink-200' 
+                            : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                    }`}
+                >
+                    <Bookmark size={18} fill={isSaved && session ? 'currentColor' : 'none'} />
                 </button>
             </div>
         </div>

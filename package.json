@@ -21,5 +21,8 @@
   "dependencies": {
     "framer-motion": "^12.19.2",
     "recharts": "^2.15.4"
+  },
+  "devDependencies": {
+    "supabase": "^2.26.9"
   }
 }

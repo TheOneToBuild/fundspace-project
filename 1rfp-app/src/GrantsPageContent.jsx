@@ -12,7 +12,6 @@ import { parseMaxFundingAmount } from './utils.js';
 import { heroImpactCardsData } from './data.jsx';
 import { GRANT_STATUSES } from './constants.js';
 import usePaginatedFilteredData from './hooks/usePaginatedFilteredData.js';
-// Removed the import for the original sortGrants since we are defining a new one.
 import { filterGrants } from './filtering.js';
 import { SearchResultsSkeleton } from './components/SkeletonLoader.jsx';
 
@@ -22,10 +21,8 @@ const formatCurrency = (amount) => {
     return `${amount}`;
 };
 
-// --- UPDATED: New Sorting Logic ---
-
 const isGrantActive = (grant) => {
-    if (!grant.dueDate) return true; // Grants with no due date are considered active.
+    if (!grant.dueDate) return true;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     return new Date(grant.dueDate) >= today;
@@ -35,12 +32,8 @@ const sortGrants = (grants, sortCriteria) => {
     return [...grants].sort((a, b) => {
         const aIsActive = isGrantActive(a);
         const bIsActive = isGrantActive(b);
-
-        // Primary sort: Active grants first
         if (aIsActive && !bIsActive) return -1;
         if (!aIsActive && bIsActive) return 1;
-
-        // Secondary sort: Based on user selection
         switch (sortCriteria) {
             case 'dueDate_asc': {
                 const dateA = a.dueDate ? new Date(a.dueDate) : new Date('9999-12-31');
@@ -62,7 +55,6 @@ const sortGrants = (grants, sortCriteria) => {
     });
 };
 
-
 const HeroImageCard = ({ card, layoutClass, initialDelay = 0 }) => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   useEffect(() => {
@@ -77,7 +69,6 @@ const HeroImpactSection = ({ grants }) => {
   const layoutClasses = [ 'col-span-1 row-span-2 h-full min-h-[300px] md:min-h-[400px]', 'col-span-1 row-span-1 h-full min-h-[140px] md:min-h-[190px]', 'col-span-1 row-span-1 h-full min-h-[140px] md:min-h-[190px]', 'col-span-1 row-span-1 h-full min-h-[140px] md:min-h-[190px]', 'col-span-1 row-span-1 h-full min-h-[140px] md:min-h-[190px]' ];
   const totalAvailableFunding = useMemo(() => {
     if (!Array.isArray(grants)) return 0;
-    // --- UPDATED: Filter for active grants before summing ---
     return grants.filter(isGrantActive).reduce((sum, grant) => {
       const amount = grant.max_funding_amount || '0';
       return sum + parseMaxFundingAmount(amount.toString());
@@ -86,7 +77,6 @@ const HeroImpactSection = ({ grants }) => {
   
   const totalGrantsAvailable = useMemo(() => {
     if (!Array.isArray(grants)) return 0;
-    // --- UPDATED: Count only active grants ---
     return grants.filter(isGrantActive).length;
   }, [grants]);
 
@@ -147,34 +137,123 @@ const GrantsPageContent = () => {
   const [isDetailModalOpen, setIsDetailModal] = useState(false);
   const [selectedGrant, setSelectedGrant] = useState(null);
   const [isMobileFiltersVisible, setIsMobileFiltersVisible] = useState(false);
+  const [session, setSession] = useState(null);
+  const [savedGrantIds, setSavedGrantIds] = useState(new Set());
 
   useEffect(() => {
-    const fetchGrants = async () => {
-      setLoading(true);
-      try {
-        const { data, error } = await supabase.from('grants').select(`*, funders(name, logo_url, slug), grant_categories(categories(id, name)), grant_locations(locations(id, name))`).order('id', { ascending: false });
-        if (error) throw error;
-        const formattedData = data.map(grant => ({
-            ...grant,
-            foundationName: grant.funders?.name || 'Unknown Funder', 
-            funderLogoUrl: grant.funders?.logo_url || null,
-            funderSlug: grant.funders?.slug || null,
-            fundingAmount: grant.max_funding_amount || grant.funding_amount_text || 'Not specified',
-            dueDate: grant.deadline,
-            grantType: grant.grant_type,
-            eligibility_criteria: grant.eligibility_criteria,
-            categories: grant.grant_categories.map(gc => gc.categories),
-            locations: grant.grant_locations.map(gl => gl.locations)
-        }));
-        setGrants(formattedData);
-      } catch (error) {
-        console.error('Error fetching grants:', error);
-      } finally {
+    const fetchInitialData = async () => {
+        setLoading(true);
+        const { data: { session } } = await supabase.auth.getSession();
+        setSession(session);
+
+        const { data: grantsData, error: grantsError } = await supabase
+            .from('grants')
+            .select(`
+                *, 
+                funders(name, logo_url, slug), 
+                grant_categories(categories(id, name)), 
+                grant_locations(locations(id, name))
+            `)
+            .order('id', { ascending: false });
+
+        if (grantsError) console.error('Error fetching grants:', grantsError);
+        else {
+            const formattedData = grantsData.map(grant => ({
+                ...grant,
+                foundationName: grant.funders?.name || 'Unknown Funder', 
+                funderLogoUrl: grant.funders?.logo_url || null,
+                funderSlug: grant.funders?.slug || null,
+                fundingAmount: grant.max_funding_amount || grant.funding_amount_text || 'Not specified',
+                dueDate: grant.deadline,
+                grantType: grant.grant_type,
+                eligibility_criteria: grant.eligibility_criteria,
+                categories: grant.grant_categories.map(gc => gc.categories),
+                locations: grant.grant_locations.map(gl => gl.locations),
+            }));
+            setGrants(formattedData);
+        }
+
+        if (session) {
+            const { data: savedData, error: savedError } = await supabase
+                .from('saved_grants')
+                .select('grant_id')
+                .eq('user_id', session.user.id);
+
+            if (savedError) console.error('Error fetching saved grants:', savedError);
+            else setSavedGrantIds(new Set(savedData.map(g => g.grant_id)));
+        }
         setLoading(false);
-      }
     };
-    fetchGrants();
+    fetchInitialData();
+
+    const { data: authListener } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        setSession(session);
+        if(session){
+            supabase.from('saved_grants').select('grant_id').eq('user_id', session.user.id)
+                .then(({ data, error }) => {
+                    if(!error) setSavedGrantIds(new Set(data.map(g => g.grant_id)))
+                })
+        } else {
+            setSavedGrantIds(new Set());
+        }
+      }
+    );
+
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
   }, []);
+
+  const handleSaveGrant = async (grantId) => {
+    if (!session) return;
+    setSavedGrantIds(prev => new Set(prev).add(grantId));
+    setGrants(prevGrants => prevGrants.map(g => 
+        g.id === grantId ? { ...g, save_count: g.save_count + 1 } : g
+    ));
+
+    const { error } = await supabase
+      .from('saved_grants')
+      .insert({ user_id: session.user.id, grant_id: grantId });
+    
+    if (error) {
+      console.error("Error saving grant:", error);
+      setSavedGrantIds(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(grantId);
+        return newSet;
+      });
+      setGrants(prevGrants => prevGrants.map(g => 
+        g.id === grantId ? { ...g, save_count: g.save_count - 1 } : g
+      ));
+    }
+  };
+
+  const handleUnsaveGrant = async (grantId) => {
+    if (!session) return;
+    setSavedGrantIds(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(grantId);
+        return newSet;
+    });
+    setGrants(prevGrants => prevGrants.map(g => 
+        g.id === grantId ? { ...g, save_count: Math.max(0, g.save_count - 1) } : g
+    ));
+
+    const { error } = await supabase
+      .from('saved_grants')
+      .delete()
+      .match({ user_id: session.user.id, grant_id: grantId });
+
+    if (error) {
+      console.error("Error unsaving grant:", error);
+      setSavedGrantIds(prev => new Set(prev).add(grantId));
+      setGrants(prevGrants => prevGrants.map(g => 
+        g.id === grantId ? { ...g, save_count: g.save_count + 1 } : g
+      ));
+    }
+  };
+
 
   const uniqueCategories = useMemo(() => Array.from(new Set(grants.flatMap(g => g.categories?.map(c => c.name) || []).filter(Boolean))).sort(), [grants]);
   const uniqueGrantTypes = useMemo(() => Array.from(new Set(grants.map(g => g.grantType).filter(Boolean))).sort(), [grants]);
@@ -182,12 +261,10 @@ const GrantsPageContent = () => {
   
   const grantsPerPageOptions = [6, 9, 12, 15, 21, 24, 30, 45, 60, 86];
   
-  // --- UPDATED: Pass our new sortGrants function to the hook ---
   const { paginatedItems: currentList = [], totalPages, totalFilteredItems, filteredAndSortedItems } = usePaginatedFilteredData(grants, filterConfig, filterGrants, filterConfig.sortCriteria, sortGrants, currentPage, grantsPerPage);
   
   const totalFilteredFunding = useMemo(() => {
     if (!filteredAndSortedItems) return 0;
-    // --- UPDATED: Filter for active grants before summing ---
     return filteredAndSortedItems.filter(isGrantActive).reduce((sum, grant) => {
       const amount = grant.max_funding_amount || '0';
       return sum + parseMaxFundingAmount(amount.toString());
@@ -330,6 +407,10 @@ const GrantsPageContent = () => {
                 <GrantCard 
                   key={grant.id} 
                   grant={grant} 
+                  session={session}
+                  isSaved={savedGrantIds.has(grant.id)}
+                  onSave={handleSaveGrant}
+                  onUnsave={handleUnsaveGrant}
                   onOpenDetailModal={openDetail}
                   onFilterByCategory={handleFilterByCategory}
                 />
