@@ -25,7 +25,10 @@ import LoginPage from './LoginPage.jsx';
 import ProfilePage from './ProfilePage.jsx';
 import SettingsPage from './SettingsPage.jsx';
 import SavedGrantsPage from './SavedGrantsPage.jsx';
-import DashboardContent from './components/DashboardContent.jsx'; // <-- Import the new content component
+import DashboardContent from './components/DashboardContent.jsx';
+import ExploreMembersPage from './ExploreMembersPage.jsx';
+import MemberProfilePage from './MemberProfilePage.jsx';
+
 
 // --- Import Shared Components ---
 import AuthButton from './components/AuthButton.jsx';
@@ -130,14 +133,16 @@ export default function App() {
         {/* Group 2: Standalone login page */}
         <Route path="/login" element={<LoginPage />} />
 
-        {/* Group 3: Nested Profile/Dashboard routes */}
-        {/* The ProfilePage component now acts as a layout for all its children */}
+        {/* Group 3: Protected routes with 3-column profile layout */}
         <Route path="/profile" element={<ProfilePage />}>
-          {/* The 'index' route is the default content shown at /profile */}
           <Route index element={<DashboardContent />} /> 
           <Route path="saved-grants" element={<SavedGrantsPage />} />
           <Route path="settings" element={<SettingsPage />} />
         </Route>
+        
+        {/* Group 4: NEW - Standalone protected routes */}
+        <Route path="/members" element={<ExploreMembersPage />} />
+        <Route path="/members/:profileId" element={<MemberProfilePage />} />
       </Routes>
     </BrowserRouter>
   );

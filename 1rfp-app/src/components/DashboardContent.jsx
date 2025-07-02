@@ -1,7 +1,7 @@
 // src/components/DashboardContent.jsx
 import React from 'react';
 import { useOutletContext, Link } from 'react-router-dom';
-import GrantCard from './GrantCard.jsx';
+import DashboardGrantCard from './DashboardGrantCard.jsx';
 import GrantDetailModal from '../GrantDetailModal.jsx'; 
 import { BookmarkIcon } from './Icons.jsx';
 
@@ -9,7 +9,7 @@ export default function DashboardContent() {
   // Get the profile data passed from the parent ProfilePage
   const { profile, savedGrants, session, handleUnsaveGrant, openDetail } = useOutletContext(); 
   
-  // A friendly greeting component
+  // A more friendly and styled greeting component
   const WelcomeHeader = ({ profile }) => {
     // Get the user's first name, or default to "there"
     const firstName = profile?.full_name?.split(' ')[0] || 'there';
@@ -19,9 +19,14 @@ export default function DashboardContent() {
     const dateString = today.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
 
     return (
-      <div className="bg-white p-6 rounded-xl shadow-md border border-slate-200">
-        <h2 className="text-2xl font-bold text-slate-800">Hi {firstName},</h2>
-        <p className="text-slate-500 mt-1">Happy {dateString}!</p>
+      <div className="bg-gradient-to-r from-blue-50 via-white to-indigo-50 p-6 rounded-xl shadow-md border border-slate-200/80">
+        <div className="flex items-center">
+            <span className="text-4xl mr-4" role="img" aria-label="Waving hand">👋</span>
+            <div>
+                <h2 className="text-2xl font-bold text-slate-800">Hi {firstName},</h2>
+                <p className="text-slate-500 mt-1">Happy {dateString}!</p>
+            </div>
+        </div>
       </div>
     );
   };
@@ -38,15 +43,11 @@ export default function DashboardContent() {
       {savedGrants && savedGrants.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {savedGrants.map((grant) => (
-                <GrantCard 
+                <DashboardGrantCard 
                     key={grant.id} 
                     grant={grant}
-                    session={session}
-                    isSaved={true}
-                    onSave={() => {}}
                     onUnsave={() => handleUnsaveGrant(grant.id)}
                     onOpenDetailModal={() => openDetail(grant)}
-                    onFilterByCategory={() => {}}
                 />
             ))}
         </div>
