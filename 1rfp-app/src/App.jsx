@@ -25,10 +25,9 @@ import LoginPage from './LoginPage.jsx';
 import ProfilePage from './ProfilePage.jsx';
 import SettingsPage from './SettingsPage.jsx';
 import SavedGrantsPage from './SavedGrantsPage.jsx';
-import DashboardContent from './components/DashboardContent.jsx';
 import ExploreMembersPage from './ExploreMembersPage.jsx';
 import MemberProfilePage from './MemberProfilePage.jsx';
-
+import DashboardHomePage from './components/DashboardHomePage.jsx';
 
 // --- Import Shared Components ---
 import AuthButton from './components/AuthButton.jsx';
@@ -58,7 +57,6 @@ const AppLayout = () => {
     { to: "/spotlight", text: "Spotlight", active: "text-rose-600 font-semibold" },
   ];
 
-  // Mobile menu logic
   useEffect(() => {
     if (isMobileMenuOpen) document.body.style.overflow = 'hidden';
     else document.body.style.overflow = 'unset';
@@ -112,7 +110,7 @@ export default function App() {
       <Routes>
         {/* Group 1: Public pages using the main AppLayout */}
         <Route element={<AppLayout />}>
-          <Route path="/" element={<GrantsPageContent />} />
+          <Route path="/" element={<GrantsPageContent />} /> 
           <Route path="/funders" element={<ExploreFunders />} />
           <Route path="/nonprofits" element={<ExploreNonprofits />} />
           <Route path="/spotlight" element={<SpotlightLandingPage />} />
@@ -133,16 +131,19 @@ export default function App() {
         {/* Group 2: Standalone login page */}
         <Route path="/login" element={<LoginPage />} />
 
-        {/* Group 3: Protected routes with 3-column profile layout */}
+        {/* Group 3: Protected routes with the 3-column profile layout */}
         <Route path="/profile" element={<ProfilePage />}>
-          <Route index element={<DashboardContent />} /> 
+          <Route index element={<DashboardHomePage />} />
+          
+          <Route path="grants" element={<GrantsPageContent hideHero={true} isProfileView={true} />} />
+          <Route path="funders" element={<ExploreFunders />} />
+          <Route path="nonprofits" element={<ExploreNonprofits />} />
+
+          <Route path="members" element={<ExploreMembersPage />} />
+          <Route path="members/:profileId" element={<MemberProfilePage />} />
           <Route path="saved-grants" element={<SavedGrantsPage />} />
           <Route path="settings" element={<SettingsPage />} />
         </Route>
-        
-        {/* Group 4: NEW - Standalone protected routes */}
-        <Route path="/members" element={<ExploreMembersPage />} />
-        <Route path="/members/:profileId" element={<MemberProfilePage />} />
       </Routes>
     </BrowserRouter>
   );

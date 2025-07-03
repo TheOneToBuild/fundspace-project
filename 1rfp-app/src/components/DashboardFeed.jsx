@@ -1,5 +1,8 @@
 // src/components/DashboardFeed.jsx
 import React, { useState } from 'react';
+import { useOutletContext } from 'react-router-dom';
+import WelcomeHeader from './WelcomeHeader.jsx';
+import CreatePost from './CreatePost.jsx';
 import GrantsPageContent from '../GrantsPageContent.jsx';
 import ExploreFunders from '../ExploreFunders.jsx';
 import ExploreNonprofits from '../ExploreNonprofits.jsx';
@@ -10,25 +13,8 @@ const TABS = [
   { name: 'Explore Nonprofits', component: ExploreNonprofits },
 ];
 
-const WelcomeHeader = ({ profile }) => {
-    const firstName = profile?.full_name?.split(' ')[0] || 'there';
-    const today = new Date();
-    const dateString = today.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
-
-    return (
-      <div className="bg-gradient-to-r from-blue-50 via-white to-indigo-50 p-6 rounded-xl shadow-sm border border-slate-200/80 mb-8">
-        <div className="flex items-center">
-            <span className="text-4xl mr-4" role="img" aria-label="Waving hand">👋</span>
-            <div>
-                <h2 className="text-2xl font-bold text-slate-800">Hi {firstName},</h2>
-                <p className="text-slate-500 mt-1">Happy {dateString}</p>
-            </div>
-        </div>
-      </div>
-    );
-};
-
-export default function DashboardFeed({ profile }) {
+export default function DashboardFeed() {
+    const { profile } = useOutletContext(); // Get profile from parent layout
     const [activeTab, setActiveTab] = useState(TABS[0].name);
 
     const ActiveComponent = TABS.find(tab => tab.name === activeTab)?.component;
@@ -36,6 +22,7 @@ export default function DashboardFeed({ profile }) {
     return (
         <div className="space-y-6">
             <WelcomeHeader profile={profile} />
+            <CreatePost profile={profile} />
             
             <div className="border-b border-slate-200">
                 <nav className="-mb-px flex space-x-6" aria-label="Tabs">

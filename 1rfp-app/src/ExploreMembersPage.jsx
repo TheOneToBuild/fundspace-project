@@ -1,45 +1,70 @@
 // src/ExploreMembersPage.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from './supabaseClient';
-import { Link, useNavigate } from 'react-router-dom';
-// REMOVED: The incorrect import for AppLayout
+import { Link, useOutletContext } from 'react-router-dom';
+import { UserPlus, UserCheck } from 'lucide-react';
 
-// A simple card component for each member
-const MemberCard = ({ member }) => {
+const MemberCard = ({ member, currentUserId, isFollowing, onFollow, onUnfollow }) => {
     const getInitials = (name) => name ? name.split(' ').map(n => n[0]).join('').substring(0,2).toUpperCase() : '?';
 
+    const handleFollowClick = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        isFollowing ? onUnfollow(member.id) : onFollow(member.id);
+    };
+
     return (
-        <Link to={`/members/${member.id}`} className="block bg-white p-5 rounded-xl border border-slate-200 hover:shadow-lg hover:-translate-y-1 transition-all">
-            <div className="flex items-center space-x-4">
+        <div className="bg-white p-5 rounded-xl border border-slate-200 hover:shadow-lg hover:-translate-y-1 transition-all flex items-center justify-between gap-4">
+            <Link to={`/profile/members/${member.id}`} className="flex items-center space-x-4 flex-grow min-w-0">
                 <div className="w-14 h-14 rounded-full bg-indigo-100 text-indigo-600 flex-shrink-0 flex items-center justify-center font-bold text-xl">
                     {getInitials(member.full_name)}
                 </div>
-                <div>
-                    <p className="font-bold text-lg text-slate-800">{member.full_name}</p>
-                    <p className="text-sm text-slate-500">{member.organization_name || member.role}</p>
+                <div className="min-w-0">
+                    <p className="font-bold text-lg text-slate-800 truncate">{member.full_name}</p>
+                    <p className="text-sm text-slate-500 truncate">{member.organization_name || member.role}</p>
                 </div>
-            </div>
-        </Link>
+            </Link>
+            
+            {/* Don't show follow button for the current user */}
+            {member.id !== currentUserId && (
+                <button
+                    onClick={handleFollowClick}
+                    className={`flex-shrink-0 inline-flex items-center justify-center px-4 py-2 border text-sm font-medium rounded-lg transition-colors ${
+                        isFollowing
+                            ? 'bg-slate-100 text-slate-700 border-slate-300 hover:bg-slate-200'
+                            : 'bg-blue-600 text-white border-transparent hover:bg-blue-700'
+                    }`}
+                >
+                    {isFollowing ? <UserCheck size={16} className="mr-2" /> : <UserPlus size={16} className="mr-2" />}
+                    {isFollowing ? 'Following' : 'Follow'}
+                </button>
+            )}
+        </div>
     );
 };
 
 export default function ExploreMembersPage() {
+    const { profile: currentUserProfile } = useOutletContext();
     const [members, setMembers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [roleFilter, setRoleFilter] = useState('');
-    const navigate = useNavigate();
+    const [followedIds, setFollowedIds] = useState(new Set());
 
-    useEffect(() => {
-        const checkSession = async () => {
-            const { data: { session } } = await supabase.auth.getSession();
-            if (!session) {
-                navigate('/login');
-            }
-        };
-        checkSession();
-    }, [navigate]);
-    
+    const fetchFollowedUsers = useCallback(async () => {
+        if (!currentUserProfile) return;
+        const { data, error } = await supabase
+            .from('followers')
+            .select('following_id')
+            .eq('follower_id', currentUserProfile.id);
+
+        if (error) {
+            console.error('Error fetching followed users:', error);
+        } else {
+            setFollowedIds(new Set(data.map(item => item.following_id)));
+        }
+    }, [currentUserProfile]);
+
     useEffect(() => {
         const fetchMembers = async () => {
             setLoading(true);
@@ -48,31 +73,63 @@ export default function ExploreMembersPage() {
                 filter_role: roleFilter
             });
             
-            if (error) {
-                console.error('Error searching profiles:', error);
-            } else {
-                setMembers(data);
-            }
+            if (error) console.error('Error searching profiles:', error);
+            else setMembers(data);
             setLoading(false);
         };
 
-        const timer = setTimeout(() => {
-            fetchMembers();
-        }, 300);
-
+        const timer = setTimeout(fetchMembers, 300);
         return () => clearTimeout(timer);
     }, [searchTerm, roleFilter]);
 
-    return (
-        <div className="min-h-screen bg-slate-50">
-            <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-12">
-                <div className="text-center mb-12">
-                    <h1 className="text-4xl font-extrabold text-slate-900">Meet the Community</h1>
-                    <p className="mt-4 text-lg text-slate-600">Discover and connect with funders and nonprofits across the Bay Area.</p>
-                </div>
+    useEffect(() => {
+        if (currentUserProfile) {
+            fetchFollowedUsers();
+        }
+    }, [currentUserProfile, fetchFollowedUsers]);
 
-                {/* Search and Filter Controls */}
-                <div className="mb-8 grid grid-cols-1 md:grid-cols-3 gap-4">
+    const handleFollow = async (profileIdToFollow) => {
+        if (!currentUserProfile) return;
+        setFollowedIds(prev => new Set(prev).add(profileIdToFollow));
+        const { error } = await supabase
+            .from('followers')
+            .insert({ follower_id: currentUserProfile.id, following_id: profileIdToFollow });
+        if (error) {
+            console.error('Error following user:', error);
+            // Revert optimistic update on error
+            setFollowedIds(prev => {
+                const newSet = new Set(prev);
+                newSet.delete(profileIdToFollow);
+                return newSet;
+            });
+        }
+    };
+
+    const handleUnfollow = async (profileIdToUnfollow) => {
+        if (!currentUserProfile) return;
+        setFollowedIds(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(profileIdToUnfollow);
+            return newSet;
+        });
+        const { error } = await supabase
+            .from('followers')
+            .delete()
+            .match({ follower_id: currentUserProfile.id, following_id: profileIdToUnfollow });
+        if (error) {
+            console.error('Error unfollowing user:', error);
+            // Revert optimistic update on error
+            setFollowedIds(prev => new Set(prev).add(profileIdToUnfollow));
+        }
+    };
+
+    return (
+        <div className="space-y-6">
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                <h2 className="text-2xl font-bold text-slate-800 mb-1">Explore Members</h2>
+                <p className="text-slate-500 mb-6">Discover and connect with funders and nonprofits.</p>
+                
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <input
                         type="text"
                         placeholder="Search by name or organization..."
@@ -91,25 +148,29 @@ export default function ExploreMembersPage() {
                         <option value="Community member">Community Members</option>
                     </select>
                 </div>
-
-                {/* Members Grid */}
-                {loading ? (
-                    <p className="text-center text-slate-500 py-16">Loading members...</p>
-                ) : (
-                    <>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {members.map(member => (
-                                <MemberCard key={member.id} member={member} />
-                            ))}
-                        </div>
-                        { !loading && members.length === 0 && (
-                            <div className="text-center py-16">
-                                <p className="text-slate-500">No members found. Try adjusting your search.</p>
-                            </div>
-                        )}
-                    </>
-                )}
             </div>
+
+            {loading ? (
+                <p className="text-center text-slate-500 py-16">Loading members...</p>
+            ) : (
+                <div className="space-y-4">
+                    {members.map(member => (
+                        <MemberCard 
+                            key={member.id} 
+                            member={member} 
+                            currentUserId={currentUserProfile?.id}
+                            isFollowing={followedIds.has(member.id)}
+                            onFollow={handleFollow}
+                            onUnfollow={handleUnfollow}
+                        />
+                    ))}
+                    { !loading && members.length === 0 && (
+                        <div className="text-center bg-white p-8 rounded-xl shadow-sm border border-slate-200">
+                            <p className="text-slate-500">No members found. Try adjusting your search.</p>
+                        </div>
+                    )}
+                </div>
+            )}
         </div>
     );
 }

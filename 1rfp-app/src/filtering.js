@@ -6,21 +6,25 @@ export const filterGrants = (grant, filters) => {
 
   const term = (searchTerm || '').toLowerCase();
   const matchesSearch =
+    !term ||
     (grant.title || '').toLowerCase().includes(term) ||
     (grant.description || '').toLowerCase().includes(term) ||
     (grant.foundationName || '').toLowerCase().includes(term) ||
     (grant.keywords && grant.keywords.some((k) => (k || '').toLowerCase().includes(term)));
 
+  // FIXED: Correctly checks the 'locations' array of objects
   const locFilterArray = Array.isArray(locationFilter) ? locationFilter.map(l => l.toLowerCase()) : [];
-  const grantLocs = (grant.location || '').toLowerCase().split(',').map(l => l.trim());
+  const grantLocs = Array.isArray(grant.locations) ? grant.locations.map(l => (l.name || '').toLowerCase()) : [];
   const matchesLocation =
     locFilterArray.length === 0 ||
-    locFilterArray.some(l => l === 'all bay area counties') ||
-    grantLocs.includes('all bay area counties') ||
-    locFilterArray.some(l => grantLocs.includes(l));
+    locFilterArray.some(filterLoc => grantLocs.includes(filterLoc));
 
-  const categoryFilterArray = Array.isArray(categoryFilter) ? categoryFilter : [];
-  const matchesCategory = categoryFilterArray.length === 0 || !categoryFilterArray[0] || categoryFilterArray.includes(grant.category);
+  // FIXED: Correctly checks the 'categories' array of objects
+  const categoryFilterArray = Array.isArray(categoryFilter) ? categoryFilter.map(c => c.toLowerCase()) : [];
+  const grantCats = Array.isArray(grant.categories) ? grant.categories.map(c => (c.name || '').toLowerCase()) : [];
+  const matchesCategory = 
+    categoryFilterArray.length === 0 || 
+    categoryFilterArray.some(filterCat => grantCats.includes(filterCat));
 
   const grantMinAmount = parseMinFundingAmount(grant.fundingAmount);
   const grantMaxAmount = parseMaxFundingAmount(grant.fundingAmount);
@@ -33,9 +37,7 @@ export const filterGrants = (grant, filters) => {
   if (grantStatusFilter) {
       const today = new Date();
       today.setHours(0, 0, 0, 0); 
-      
       const grantDueDateString = grant.dueDate;
-
       if (grantStatusFilter === 'Open') {
           matchesGrantStatus = !grantDueDateString || new Date(grantDueDateString) >= today;
       } else if (grantStatusFilter === 'Rolling') {
@@ -48,6 +50,7 @@ export const filterGrants = (grant, filters) => {
   return matchesSearch && matchesLocation && matchesCategory && matchesMinFunding && matchesMaxFunding && matchesGrantType && matchesGrantStatus;
 };
 
+// The rest of the file (filterFunders, filterNonprofits) remains the same
 export const filterFunders = (funder, filters) => {
   const { searchTerm, locationFilter, focusAreaFilter, grantTypeFilter, funderTypeFilter, geographicScopeFilter, annualGivingFilter, minFunding, maxFunding } = filters;
 
@@ -112,8 +115,6 @@ export const filterFundersArray = (funders, filterConfig) => {
   return filtered;
 };
 
-
-// --- THIS FUNCTION HAS BEEN UPDATED ---
 export const filterNonprofits = (nonprofit, filters) => {
   const { searchTerm, locationFilter, focusAreaFilter, minBudget, maxBudget, minStaff, maxStaff } = filters;
   const term = (searchTerm || '').toLowerCase();
@@ -124,11 +125,9 @@ export const filterNonprofits = (nonprofit, filters) => {
     (nonprofit.tagline || '').toLowerCase().includes(term) ||
     (nonprofit.focusAreas && nonprofit.focusAreas.some(area => (area || '').toLowerCase().includes(term)));
 
-  // Updated logic for location array
   const locFilterArray = Array.isArray(locationFilter) ? locationFilter.map(l => l.toLowerCase()) : [];
   const matchesLocation = locFilterArray.length === 0 || !locFilterArray[0] || locFilterArray.some(l => (nonprofit.location || '').toLowerCase().includes(l));
 
-  // Updated logic for focus area array
   const focusAreaFilterArray = Array.isArray(focusAreaFilter) ? focusAreaFilter : [];
   const matchesFocusArea = focusAreaFilterArray.length === 0 || !focusAreaFilterArray[0] || (nonprofit.focusAreas && focusAreaFilterArray.some(fa => nonprofit.focusAreas.includes(fa)));
 
