@@ -1,8 +1,9 @@
 // src/components/CommentSection.jsx
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../supabaseClient';
-import { Send } from 'lucide-react';
+import { Send, Trash2 } from 'lucide-react';
 
+// Helper functions (no changes needed)
 const timeAgo = (date) => {
     const seconds = Math.floor((new Date() - new Date(date)) / 1000);
     let interval = seconds / 31536000;
@@ -25,20 +26,26 @@ const getInitials = (name) => {
     return (words[0] || '').substring(0, 2).toUpperCase();
 };
 
-export default function CommentSection({ post, currentUserProfile }) {
+// MODIFIED: The component now expects onCommentAdded and onCommentDeleted props
+export default function CommentSection({ post, currentUserProfile, onCommentAdded, onCommentDeleted }) {
     const [comments, setComments] = useState([]);
     const [newComment, setNewComment] = useState('');
     const [loading, setLoading] = useState(true);
 
+    // Fetches comments when the component mounts
     const fetchComments = useCallback(async () => {
+        setLoading(true);
         const { data, error } = await supabase
             .from('post_comments')
-            .select('*, profiles(full_name, role)')
+            .select('*, profiles(id, full_name, role)') // Ensure profile `id` is selected
             .eq('post_id', post.id)
             .order('created_at', { ascending: true });
         
-        if (error) console.error("Error fetching comments:", error);
-        else setComments(data);
+        if (error) {
+            console.error("Error fetching comments:", error);
+        } else {
+            setComments(data || []);
+        }
         setLoading(false);
     }, [post.id]);
 
@@ -46,27 +53,62 @@ export default function CommentSection({ post, currentUserProfile }) {
         fetchComments();
     }, [fetchComments]);
 
+    // Handles submitting a new comment
     const handleCommentSubmit = async (e) => {
         e.preventDefault();
         if (!newComment.trim() || !currentUserProfile) return;
 
+        const content = newComment.trim();
+        setNewComment(''); // Clear input for better UX
+
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
 
-        const { error } = await supabase
+        // Insert the new comment and select it back to get the full object
+        const { data: createdComment, error } = await supabase
             .from('post_comments')
             .insert({
-                content: newComment.trim(),
+                content: content,
                 post_id: post.id,
                 profile_id: currentUserProfile.id,
                 user_id: user.id
-            });
+            })
+            .select()
+            .single();
 
         if (error) {
             console.error("Error posting comment:", error);
+            setNewComment(content); // Restore input if submission fails
         } else {
-            setNewComment('');
-            fetchComments(); // Refetch comments to show the new one
+            // Optimistically update the UI with the new comment
+            const commentWithProfile = { ...createdComment, profiles: currentUserProfile };
+            setComments(currentComments => [...currentComments, commentWithProfile]);
+            
+            // Notify the parent component that a comment was added
+            if (onCommentAdded) {
+                onCommentAdded();
+            }
+        }
+    };
+    
+    // Handles deleting a comment
+    const handleDeleteComment = async (commentId) => {
+        // Optimistically remove the comment from the UI
+        setComments(currentComments => currentComments.filter(c => c.id !== commentId));
+
+        const { error } = await supabase
+            .from('post_comments')
+            .delete()
+            .eq('id', commentId);
+
+        if (error) {
+            console.error("Error deleting comment:", error);
+            fetchComments(); // Re-fetch comments to correct the UI if delete fails
+        } else {
+            // Notify the parent component that a comment was deleted
+            if (onCommentDeleted) {
+                onCommentDeleted();
+            }
         }
     };
 
@@ -95,16 +137,24 @@ export default function CommentSection({ post, currentUserProfile }) {
             <div className="space-y-4">
                 {loading && <p className="text-sm text-slate-500">Loading comments...</p>}
                 {comments.map(comment => (
-                    <div key={comment.id} className="flex items-start space-x-3">
+                    <div key={comment.id} className="flex items-start space-x-3 group">
                         <div className="w-9 h-9 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-xs flex-shrink-0">
                             {getInitials(comment.profiles.full_name)}
                         </div>
                         <div className="flex-1 bg-slate-50 p-3 rounded-lg">
                             <div className="flex items-baseline justify-between">
                                 <p className="font-semibold text-sm text-slate-800">{comment.profiles.full_name}</p>
-                                <p className="text-xs text-slate-400">{timeAgo(comment.created_at)}</p>
+                                <div className="flex items-center space-x-2">
+                                     <p className="text-xs text-slate-400">{timeAgo(comment.created_at)}</p>
+                                     {/* Delete button only shows for the comment author */}
+                                     {comment.profiles.id === currentUserProfile?.id && (
+                                        <button onClick={() => handleDeleteComment(comment.id)} className="text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <Trash2 size={12} />
+                                        </button>
+                                     )}
+                                </div>
                             </div>
-                            <p className="text-sm text-slate-700 mt-1">{comment.content}</p>
+                            <p className="text-sm text-slate-700 mt-1 whitespace-pre-wrap">{comment.content}</p>
                         </div>
                     </div>
                 ))}

@@ -14,46 +14,37 @@ export default function ProfilePage() {
     const [isDetailModalOpen, setIsDetailModal] = useState(false);
     const [selectedGrant, setSelectedGrant] = useState(null);
     const [posts, setPosts] = useState([]);
-    const [followedIds, setFollowedIds] = useState(new Set());
     const [notifications, setNotifications] = useState([]);
     const [unreadCount, setUnreadCount] = useState(0);
-    const [realtimeChannel, setRealtimeChannel] = useState(null);
 
     const navigate = useNavigate();
 
     const fetchLayoutData = useCallback(async (userId) => {
         try {
             const [
-                profileRes, savedGrantsRes, trendingGrantsRes, 
-                notificationsRes, followedRes
+                profileRes, 
+                savedGrantsRes, 
+                trendingGrantsRes, 
+                notificationsRes,
+                postsRes 
             ] = await Promise.all([
                 supabase.from('profiles').select('*').eq('id', userId).single(),
                 supabase.from('saved_grants').select(`id, grant_id, grants(*, funders(name, logo_url, slug))`).eq('user_id', userId).order('created_at', { ascending: false }),
                 supabase.rpc('get_trending_grants'),
                 supabase.from('notifications').select('*, actor_id(*)', { count: 'exact' }).eq('user_id', userId).order('created_at', { ascending: false }),
-                supabase.from('followers').select('following_id').eq('follower_id', userId)
+                supabase.rpc('get_feed_posts', { user_id_param: userId })
             ]);
 
             if (profileRes.error) throw profileRes.error;
-            if (savedGrantsRes.error) throw savedGrantsRes.error;
 
             if (profileRes.data) setProfile(profileRes.data);
-            if (savedGrantsRes.data) {
-                setSavedGrants(savedGrantsRes.data.map(item => ({ ...item.grants, dueDate: item.grants.deadline, save_id: item.id })));
-            }
+            if (savedGrantsRes.data) setSavedGrants(savedGrantsRes.data.map(item => ({ ...item.grants, dueDate: item.grants.deadline, save_id: item.id })));
             if (trendingGrantsRes.data) setTrendingGrants(trendingGrantsRes.data);
             if (notificationsRes.data) {
                 setNotifications(notificationsRes.data);
                 setUnreadCount(notificationsRes.data.filter(n => !n.is_read).length);
             }
-            
-            const initialFollowedIds = new Set((followedRes.data || []).map(item => item.following_id));
-            const profileIdsToFetch = [userId, ...Array.from(initialFollowedIds)];
-            setFollowedIds(initialFollowedIds);
-
-            const { data: postsRes, error: postsError } = await supabase.from('posts').select(`*, profiles (*)`).in('profile_id', profileIdsToFetch).order('created_at', { ascending: false });
-            if (postsError) throw postsError;
-            if (postsRes) setPosts(postsRes);
+            if (postsRes.data) setPosts(postsRes.data);
 
         } catch (error) {
             console.error("Error fetching layout data:", error);
@@ -76,30 +67,17 @@ export default function ProfilePage() {
 
         const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
             setSession(session);
-            if (!session) {
-                navigate('/login');
-            }
+            if (!session) navigate('/login');
         });
         return () => subscription.unsubscribe();
     }, [navigate, fetchLayoutData]);
 
+    // This real-time listener is for notifications, which is still very useful.
     useEffect(() => {
         if (session) {
-            const channel = supabase.channel(`profile:${session.user.id}`);
+            const channel = supabase.channel(`profile-notifications:${session.user.id}`);
             channel
-                .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'posts' }, async (payload) => {
-                    const authorId = payload.new.profile_id;
-                    const relevantIds = new Set(followedIds);
-                    relevantIds.add(session.user.id);
-                    if (relevantIds.has(authorId) && authorId !== session.user.id) {
-                        const { data: profileData } = await supabase.from('profiles').select('*').eq('id', authorId).single();
-                        if (profileData) {
-                            const postWithProfile = { ...payload.new, profiles: profileData };
-                            setPosts(current => [postWithProfile, ...current]);
-                        }
-                    }
-                })
-                .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications' }, async (payload) => {
+                .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${session.user.id}` }, async (payload) => {
                      const { data: actor } = await supabase.from('profiles').select('*').eq('id', payload.new.actor_id).single();
                     if(actor){
                         const newNotification = { ...payload.new, actor_id: actor };
@@ -109,16 +87,21 @@ export default function ProfilePage() {
                 })
                 .subscribe();
 
-            setRealtimeChannel(channel);
-
             return () => {
                 supabase.removeChannel(channel);
             };
         }
-    }, [session, followedIds]);
+    }, [session]);
     
-    const handleNewPost = (newPost) => {
-        setPosts(current => [{ ...newPost, profiles: profile }, ...current]);
+    const handleNewPost = (newPostData) => {
+        const postWithProfileAndReactions = {
+            ...newPostData,
+            profiles: profile,
+            reactions: { summary: [], sample: [] },
+            likes_count: 0,
+            comments_count: 0
+        };
+        setPosts(current => [postWithProfileAndReactions, ...current]);
     };
 
     const handleDeletePost = (deletedPostId) => {
@@ -182,7 +165,7 @@ export default function ProfilePage() {
                 unreadCount={unreadCount}
                 onNotificationPanelToggle={markNotificationsAsRead}
             >
-                <Outlet context={{ profile, posts, handleNewPost, handleDeletePost, realtimeChannel, savedGrants, session, handleSaveGrant, handleUnsaveGrant, openDetail }} />
+                <Outlet context={{ profile, posts, handleNewPost, handleDeletePost, savedGrants, session, handleSaveGrant, handleUnsaveGrant, openDetail }} />
             </ProfileLayout>
             {isDetailModalOpen && <GrantDetailModal grant={selectedGrant} isOpen={isDetailModalOpen} onClose={closeDetail} session={session} isSaved={savedGrants.some(g => g.id === selectedGrant.id)} onSave={handleSaveGrant} onUnsave={handleUnsaveGrant}/>}
         </div>
