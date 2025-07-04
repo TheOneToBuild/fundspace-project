@@ -136,8 +136,8 @@ export default function App() {
           <Route index element={<DashboardHomePage />} />
           
           <Route path="grants" element={<GrantsPageContent hideHero={true} isProfileView={true} />} />
-          <Route path="funders" element={<ExploreFunders />} />
-          <Route path="nonprofits" element={<ExploreNonprofits />} />
+          <Route path="funders" element={<ExploreFunders isProfileView={true} />} />
+          <Route path="nonprofits" element={<ExploreNonprofits isProfileView={true} />} />
 
           <Route path="members" element={<ExploreMembersPage />} />
           <Route path="members/:profileId" element={<MemberProfilePage />} />

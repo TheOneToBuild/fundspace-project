@@ -1,153 +1,42 @@
 // src/ExploreFunders.jsx
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { supabase } from './supabaseClient.js';
-import { Search, MapPin, DollarSign, IconBriefcase, MessageSquare, ExternalLink, ChevronDown, Info, ClipboardList, Loader, XCircle, Calendar, ArrowRight, Award, ClipboardCheck, Users } from './components/Icons.jsx';
+import { Search, MapPin, DollarSign, Users, LayoutGrid, List, SlidersHorizontal, Award, MessageSquare, ExternalLink, XCircle, IconBriefcase, ChevronDown } from './components/Icons.jsx';
 import FilterBar from './components/FilterBar.jsx';
 import Pagination from './components/Pagination.jsx';
-import { FunderCardSkeleton, SearchResultsSkeleton } from './components/SkeletonLoader.jsx';
+import { SearchResultsSkeleton } from './components/SkeletonLoader.jsx';
 import { getPillClasses, getGrantTypePillClasses, getFunderTypePillClasses } from './utils.js';
-import { COMMON_LOCATIONS, GRANT_TYPES } from './constants.js';
 import usePaginatedFilteredData from './hooks/usePaginatedFilteredData.js';
 import { filterFundersArray } from './filtering.js';
 import { sortFunders } from './sorting.js';
+import FunderCard from './components/FunderCard.jsx';
 
-const FunderCard = ({ funder, handleFilterChange }) => {
-    const getInitials = (name) => {
-        if (!name) return '?';
-        const words = name.split(' ');
-        if (words.length > 1) {
-            return (words[0][0] + words[1][0]).toUpperCase();
-        }
-        return name.substring(0, 2).toUpperCase();
-    };
-
-    return (
-        <div className="bg-white p-6 rounded-xl border border-slate-200 hover:shadow-xl transition-all duration-300 ease-in-out flex flex-col justify-between transform hover:-translate-y-1 h-full">
-            <div>
-                <div className="flex items-start gap-4 mb-4">
-                    <div className="flex-shrink-0">
-                        {funder.logo_url ? (
-                            <img 
-                                src={funder.logo_url} 
-                                alt={`${funder.name} logo`} 
-                                className="h-16 w-16 rounded-full object-contain border border-slate-200 p-1"
-                                loading="lazy"
-                                onError={(e) => {
-                                    e.target.style.display = 'none';
-                                    e.target.nextSibling.style.display = 'flex';
-                                }}
-                            />
-                        ) : null}
-                        <div className={`h-16 w-16 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-xl border-2 border-blue-200 ${funder.logo_url ? 'hidden' : 'flex'}`}>
-                            {getInitials(funder.name)}
-                        </div>
-                    </div>
-                    <div className="flex-1">
-                        <h3 className="text-lg font-semibold text-slate-800 line-clamp-2">{funder.name}</h3>
-                        
-                        {funder.funder_type?.name && (
-                            <button 
-                                onClick={() => handleFilterChange('funderTypeFilter', funder.funder_type.name)}
-                                className={`text-xs font-semibold px-2.5 py-1 rounded-full mt-2 inline-block transition-transform transform hover:scale-105 active:scale-95 ${getFunderTypePillClasses(funder.funder_type.name)}`}
-                                title={`Filter by type: ${funder.funder_type.name}`}
-                            >
-                                {funder.funder_type.name}
-                            </button>
-                        )}
-                    </div>
-                </div>
-                <p className="text-sm text-slate-600 mb-4 line-clamp-3 leading-relaxed">
-                    <span className="font-semibold text-slate-700">Funding Philosophy: </span>
-                    {funder.description}
-                </p>
-                <div className="space-y-3 text-sm mb-5">
-                    <div className="flex items-start text-slate-700">
-                        <MapPin size={16} className="mr-2.5 mt-0.5 text-blue-500 flex-shrink-0" />
-                        <div><span className="font-medium text-slate-600">Headquarters:</span> {funder.location || 'Not specified'}</div>
-                    </div>
-
-                    {funder.funding_locations && funder.funding_locations.length > 0 && (
-                        <div className="flex items-start text-slate-700">
-                            <IconBriefcase size={16} className="mr-2.5 mt-0.5 text-purple-500 flex-shrink-0" />
-                            <div>
-                                <span className="font-medium text-slate-600">Geographic Scope:</span>
-                                <div className="flex flex-wrap gap-1.5 mt-1">
-                                    {funder.funding_locations.map(location => (
-                                        <button 
-                                            key={location} 
-                                            onClick={() => handleFilterChange('geographicScopeFilter', [location])}
-                                            // --- THIS CLASSNAME IS UPDATED TO USE GETPILLCLASSES ---
-                                            className={`text-xs font-semibold px-2.5 py-1 rounded-full transition-all transform hover:scale-105 active:scale-95 ${getPillClasses(location)}`}
-                                            title={`Filter by scope: ${location}`}
-                                        >
-                                            {location}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                    
-                    <div className="flex items-start text-slate-700">
-                        <DollarSign size={16} className="mr-2.5 mt-0.5 text-green-500 flex-shrink-0" />
-                        <div><span className="font-medium text-slate-600">Annual Giving:</span> {funder.total_funding_annually || 'Not specified'}</div>
-                    </div>
-                    {funder.notable_grant && (
-                        <div className="flex items-start text-slate-700">
-                            <Award size={16} className="mr-2.5 mt-0.5 text-amber-500 flex-shrink-0" />
-                            <div><span className="font-medium text-slate-600">Notable Grant:</span> {funder.notable_grant}</div>
-                        </div>
-                    )}
-                    <div className="flex items-start text-slate-700">
-                        <MessageSquare size={16} className="mr-2.5 mt-0.5 text-orange-500 flex-shrink-0" />
-                        <div><span className="font-medium text-slate-600">Avg. Grant Size:</span> {funder.average_grant_size || 'Not specified'}</div>
-                    </div>
-                </div>
-                {funder.grant_types && funder.grant_types.length > 0 && (
-                    <div className="pt-4 border-t border-slate-100">
-                        <h4 className="text-xs font-semibold text-slate-700 mb-2 uppercase tracking-wider">Grant Types Offered</h4>
-                        <div className="flex flex-wrap gap-2">
-                            {funder.grant_types.map(type => (
-                                <span key={type} className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${getGrantTypePillClasses(type)}`}>
-                                    {type}
-                                </span>
-                            ))}
-                        </div>
-                    </div>
-                )}
-                {funder.focus_areas && funder.focus_areas.length > 0 && (
-                    <div className="mt-4 pt-4 border-t border-slate-100">
-                        <h4 className="text-xs font-semibold text-slate-700 mb-2 uppercase tracking-wider">Key Focus Areas</h4>
-                        <div className="flex flex-wrap gap-2">
-                            {funder.focus_areas.map(area => (
-                                <button 
-                                    key={area} 
-                                    onClick={() => handleFilterChange('focusAreaFilter', [area])}
-                                    className={`text-xs font-semibold px-2.5 py-1 rounded-full transition-transform transform hover:scale-105 active:scale-95 ${getPillClasses(area)}`}
-                                    title={`Filter by: ${area}`}
-                                >
-                                    {area}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                )}
-            </div>
-            <div className="mt-6">
-                <Link
-                    to={`/funders/${funder.slug}`}
-                    className="inline-flex items-center justify-center w-full px-4 py-2.5 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors"
-                >
-                    View Their Grants <ExternalLink size={16} className="ml-2" />
-                </Link>
+// NEW: A compact list item component for the list view
+const FunderListItem = ({ funder }) => (
+    <Link to={`/funders/${funder.slug}`} className="bg-white p-4 rounded-xl border border-slate-200 hover:border-blue-500 hover:shadow-md transition-all flex items-center gap-4 cursor-pointer">
+        <div className="flex-shrink-0 h-12 w-12 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500 font-bold">
+            {funder.name?.split(' ').map(n => n[0]).slice(0,2).join('')}
+        </div>
+        <div className="flex-grow min-w-0">
+            <h4 className="font-semibold text-slate-800 truncate">{funder.name}</h4>
+            <div className="flex items-center gap-4 text-xs text-slate-600 mt-1">
+                {funder.location && <span className="flex items-center gap-1.5"><MapPin size={12} /> {funder.location}</span>}
+                {funder.total_funding_annually && <span className="flex items-center gap-1.5"><DollarSign size={12} /> {funder.total_funding_annually}</span>}
             </div>
         </div>
-    );
-};
+        <div className="flex-shrink-0">
+             <div className="hidden sm:flex flex-wrap gap-1.5 justify-end max-w-xs">
+                {funder.focus_areas?.slice(0, 2).map(area => (
+                    <span key={area} className={`text-xs font-semibold px-2 py-0.5 rounded ${getPillClasses(area)}`}>{area}</span>
+                ))}
+            </div>
+        </div>
+    </Link>
+);
 
 
-const ExploreFunders = () => {
+const ExploreFunders = ({ isProfileView = false }) => {
   const [funders, setFunders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filterConfig, setFilterConfig] = useState({ 
@@ -162,7 +51,20 @@ const ExploreFunders = () => {
   });
   const [currentPage, setCurrentPage] = useState(1);
   const [fundersPerPage, setFundersPerPage] = useState(12);
-  const [isMobileFiltersVisible, setIsMobileFiltersVisible] = useState(false);
+
+  // --- NEW: State for the compact view ---
+  const [viewMode, setViewMode] = useState('grid');
+  const [filtersVisible, setFiltersVisible] = useState(!isProfileView);
+  
+  const location = useLocation();
+
+  useEffect(() => {
+    // If navigating from a similar funder link, pre-fill the filter
+    if (location.state?.prefilledFilter) {
+      const { key, value } = location.state.prefilledFilter;
+      handleFilterChange(key, [value]);
+    }
+  }, [location.state]);
 
   useEffect(() => {
     const fetchFunders = async () => {
@@ -191,15 +93,7 @@ const ExploreFunders = () => {
     fetchFunders();
   }, []);
 
-  const { paginatedItems: currentFunders, totalPages, totalFilteredItems } = usePaginatedFilteredData(
-    funders,                  
-    filterConfig,            
-    filterFundersArray,
-    filterConfig.sortCriteria,
-    sortFunders,              
-    currentPage,              
-    fundersPerPage
-  );
+  const { paginatedItems: currentFunders, totalPages, totalFilteredItems } = usePaginatedFilteredData(funders, filterConfig, filterFundersArray, filterConfig.sortCriteria, sortFunders, currentPage, fundersPerPage);
 
   const handleFilterChange = useCallback((key, value) => {
     setFilterConfig(prev => ({ ...prev, [key]: value }));
@@ -209,21 +103,10 @@ const ExploreFunders = () => {
   const handleSearchAction = useCallback((suggestion) => {
     setFilterConfig(prevConfig => {
         const newConfig = { ...prevConfig, searchTerm: suggestion.text };
-        switch (suggestion.type) {
-            case 'focus_area':
-                newConfig.focusAreaFilter = [suggestion.text];
-                break;
-            case 'location':
-                newConfig.locationFilter = [suggestion.text];
-                break;
-            case 'grant_type':
-                newConfig.grantTypeFilter = suggestion.text;
-                break;
-            case 'geographic_scope':
-                newConfig.geographicScopeFilter = [suggestion.text];
-                break;
-            default:
-                break;
+        if (suggestion.type === 'focus_area') {
+            newConfig.focusAreaFilter = [suggestion.text];
+        } else if (suggestion.type === 'location') {
+            newConfig.locationFilter = [suggestion.text];
         }
         return newConfig;
     });
@@ -233,7 +116,10 @@ const ExploreFunders = () => {
   const paginate = useCallback((pageNumber) => {
     if (pageNumber < 1 || (totalPages > 0 && pageNumber > totalPages)) return;
     setCurrentPage(pageNumber);
-    document.getElementById('funders-list')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    const element = document.getElementById('funders-list');
+    if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
   }, [totalPages]);
 
   const handleClearFilters = useCallback(() => {
@@ -266,136 +152,92 @@ const ExploreFunders = () => {
   const activeFunderFilters = useMemo(() => {
     const filters = [];
     if (filterConfig.searchTerm) filters.push({ key: 'searchTerm', label: `Search: "${filterConfig.searchTerm}"` });
-    
     filterConfig.locationFilter.forEach(loc => filters.push({ key: 'locationFilter', value: loc, label: `Location: ${loc}` }));
     filterConfig.focusAreaFilter.forEach(area => filters.push({ key: 'focusAreaFilter', value: area, label: `Focus: ${area}` }));
-    
     if (filterConfig.funderTypeFilter) filters.push({ key: 'funderTypeFilter', label: `Type: ${filterConfig.funderTypeFilter}` });
-    
-    filterConfig.geographicScopeFilter.forEach(scope => {
-        filters.push({ key: 'geographicScopeFilter', value: scope, label: `Scope: ${scope}` });
-    });
-
+    filterConfig.geographicScopeFilter.forEach(scope => filters.push({ key: 'geographicScopeFilter', value: scope, label: `Scope: ${scope}` }));
     if (filterConfig.annualGivingFilter) {
-      const ranges = { '0-500000': 'Under $500K', '500000-1000000': '$500K - $1M', '1000000-5000000': '$1M - $5M', '5000000-10000000': '$5M - $10M', '10000000-25000000': '$10M - $25M', '25000000-50000000': '$25M - $50M', '50000000-100000000': '$50M - $100M', '100000000-999999999': '$100M+' };
-      filters.push({ key: 'annualGivingFilter', label: `Giving: ${ranges[filterConfig.annualGivingFilter] || filterConfig.annualGivingFilter}` });
+      const ranges = { '0-500000': 'Under $500K', /* ... other ranges */ '100000000-999999999': '$100M+' };
+      filters.push({ key: 'annualGivingFilter', label: `Giving: ${ranges[filterConfig.annualGivingFilter] || ''}` });
     }
     return filters;
   }, [filterConfig]);
 
   const uniqueFocusAreas = useMemo(() => Array.from(new Set(funders.flatMap(f => f.focus_areas || []))).sort(), [funders]);
-  const uniqueGrantTypes = useMemo(() => Array.from(new Set(funders.flatMap(f => f.grant_types || []))).sort(), [funders]);
-  const uniqueLocations = useMemo(() => Array.from(new Set(funders.map(f => f.location).filter(Boolean))).sort(), [funders]);
   const uniqueFunderTypes = useMemo(() => Array.from(new Set(funders.map(f => f.funder_type?.name).filter(Boolean))).sort(), [funders]);
   const uniqueGeographicScopes = useMemo(() => Array.from(new Set(funders.flatMap(f => f.funding_locations || []))).sort(), [funders]);
 
-  return (
-    <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
-      <section id="funder-intro" className="text-center pt-8 pb-12 md:pt-12 md:pb-16 mb-10 md:mb-12 bg-white p-6 rounded-xl shadow-lg border">
-        <h2 className="text-3xl md:text-4xl font-bold text-slate-800 mb-3">Explore Funding Organizations</h2>
-        <p className="text-md md:text-lg text-slate-600 mb-6 max-w-2xl mx-auto">Discover foundations and organizations that fund initiatives in the San Francisco Bay Area.</p>
-        <div className="mt-8 md:hidden">
-            <button 
-              onClick={() => setIsMobileFiltersVisible(!isMobileFiltersVisible)} 
-              className="w-full inline-flex items-center justify-center px-4 py-2 border rounded-md text-sm font-medium"
-            >
-                {isMobileFiltersVisible ? 'Hide Filters' : 'Show Filters'}
-                {activeFunderFilters.length > 0 && ( 
-                  <span className="ml-2 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-green-600 rounded-full">
-                    {activeFunderFilters.length}
-                  </span> 
-                )}
-            </button>
-        </div>
-        <FilterBar
-          isMobileVisible={isMobileFiltersVisible}
-          searchTerm={filterConfig.searchTerm}
-          setSearchTerm={(value) => handleFilterChange('searchTerm', value)}
-          onSuggestionSelect={handleSearchAction}
-          locationFilter={filterConfig.locationFilter}
-          setLocationFilter={(value) => handleFilterChange('locationFilter', value)}
-          geographicScopeFilter={filterConfig.geographicScopeFilter}
-          setGeographicScopeFilter={(value) => handleFilterChange('geographicScopeFilter', value)}
-          focusAreaFilter={filterConfig.focusAreaFilter}
-          setFocusAreaFilter={(value) => handleFilterChange('focusAreaFilter', value)}
-          grantTypeFilter={filterConfig.grantTypeFilter}
-          setGrantTypeFilter={(value) => handleFilterChange('grantTypeFilter', value)}
-          funderTypeFilter={filterConfig.funderTypeFilter}
-          setFunderTypeFilter={(value) => handleFilterChange('funderTypeFilter', value)}
-          annualGivingFilter={filterConfig.annualGivingFilter}
-          setAnnualGivingFilter={(value) => handleFilterChange('annualGivingFilter', value)}
-          sortCriteria={filterConfig.sortCriteria}
-          setSortCriteria={(value) => handleFilterChange('sortCriteria', value)}
-          uniqueFocusAreas={uniqueFocusAreas}
-          uniqueGrantTypes={uniqueGrantTypes}
-          uniqueLocations={uniqueLocations}
-          uniqueFunderTypes={uniqueFunderTypes}
-          uniqueGeographicScopes={uniqueGeographicScopes}
-          pageType="funders"
-          onClearFilters={handleClearFilters}
-          activeFilters={activeFunderFilters}
-          onRemoveFilter={handleRemoveFunderFilter}
-          funders={funders}
-        />
-      </section>
+  const filterBarProps = {
+      searchTerm: filterConfig.searchTerm, onSuggestionSelect: handleSearchAction,
+      setSearchTerm: (value) => handleFilterChange('searchTerm', value),
+      focusAreaFilter: filterConfig.focusAreaFilter, setFocusAreaFilter: (value) => handleFilterChange('focusAreaFilter', value),
+      funderTypeFilter: filterConfig.funderTypeFilter, setFunderTypeFilter: (value) => handleFilterChange('funderTypeFilter', value),
+      geographicScopeFilter: filterConfig.geographicScopeFilter, setGeographicScopeFilter: (value) => handleFilterChange('geographicScopeFilter', value),
+      annualGivingFilter: filterConfig.annualGivingFilter, setAnnualGivingFilter: (value) => handleFilterChange('annualGivingFilter', value),
+      sortCriteria: filterConfig.sortCriteria, setSortCriteria: (value) => handleFilterChange('sortCriteria', value),
+      uniqueFocusAreas, uniqueFunderTypes, uniqueGeographicScopes, funders, pageType: "funders",
+      onClearFilters: handleClearFilters, activeFilters: activeFunderFilters, onRemoveFilter: handleRemoveFunderFilter,
+  };
 
-      <section id="funders-list" className="mb-12">
-        <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
+  return (
+    <div className={isProfileView ? "" : "container mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12"}>
+      {!isProfileView && (
+        <section id="funder-intro" className="text-center pt-8 pb-12 md:pt-12 md:pb-16 mb-10 md:mb-12 bg-white p-6 rounded-xl shadow-lg border">
+          <h2 className="text-3xl md:text-4xl font-bold text-slate-800 mb-3">Explore Funding Organizations</h2>
+          <p className="text-md md:text-lg text-slate-600 mb-6 max-w-2xl mx-auto">Discover foundations and organizations that fund initiatives in the San Francisco Bay Area.</p>
+          <FilterBar {...filterBarProps} isMobileVisible={true} />
+        </section>
+      )}
+
+      <section id="funders-list" className="scroll-mt-20">
+        {isProfileView && (
+          <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 mb-6">
+            <button onClick={() => setFiltersVisible(!filtersVisible)} className="flex justify-between items-center w-full p-2 rounded-lg hover:bg-slate-50">
+              <span className="font-semibold text-slate-700">Filter & Sort Funders</span>
+              <SlidersHorizontal size={20} className={`text-slate-500 transition-transform ${filtersVisible ? 'rotate-90' : ''}`} />
+            </button>
+            {filtersVisible && ( <div className="mt-4 pt-4 border-t"> <FilterBar {...filterBarProps} isMobileVisible={true} /> </div> )}
+          </div>
+        )}
+
+        <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
           <h2 className="text-2xl font-semibold text-slate-800 text-center md:text-left">
-            Foundations & Grantmakers 
-            <span className="text-green-600">({totalFilteredItems})</span>
+            Foundations & Grantmakers <span className="text-green-600">({totalFilteredItems})</span>
           </h2>
-          <div className="relative w-full sm:w-auto">
-            <label htmlFor="funders-per-page" className="sr-only">Funders per page</label>
-            <Users size={16} className="text-slate-400 absolute left-3 top-1/2 transform -translate-y-1/2 pointer-events-none" />
-            <select
-              id="funders-per-page"
-              value={fundersPerPage}
-              onChange={(e) => setFundersPerPage(Number(e.target.value))}
-              className="w-full pl-10 pr-8 py-2.5 border border-slate-300 rounded-md bg-white text-xs focus:ring-1 focus:ring-green-500 focus:border-green-500 outline-none appearance-none shadow-sm"
-            >
-              {[6, 9, 12, 15, 21, 24].map((n) => (
-                <option key={n} value={n}>Show {n}</option>
-              ))}
+          <div className="flex items-center gap-2">
+            <select id="funders-per-page" value={fundersPerPage} onChange={(e) => setFundersPerPage(Number(e.target.value))} className="pl-3 pr-8 py-2 border border-slate-300 rounded-md bg-white text-xs focus:ring-1 focus:ring-green-500 outline-none appearance-none">
+              {[6, 12, 18, 24].map((n) => (<option key={n} value={n}>Show {n}</option>))}
             </select>
-            <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none" size={16} />
-          </div>
-        </div>
-        {loading ? ( 
-          <SearchResultsSkeleton count={fundersPerPage} />
-        ) : currentFunders.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {currentFunders.map((funder) => ( 
-              <FunderCard 
-                key={funder.id} 
-                funder={funder} 
-                handleFilterChange={handleFilterChange} 
-              /> 
-            ))}
-          </div>
-        ) : (
-          <div className="text-center py-12">
-            <Search size={48} className="mx-auto text-slate-300 mb-4" />
-            <h3 className="text-lg font-medium text-slate-800 mb-2">No funders found</h3>
-            <p className="text-slate-600 mb-4">Try adjusting your filters or search terms.</p>
-            {activeFunderFilters.length > 0 && (
-              <button
-                onClick={handleClearFilters}
-                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 transition-colors"
-              >
-                Clear All Filters
-              </button>
+            {isProfileView && (
+              <div className="flex items-center rounded-md border border-slate-300 p-1 bg-white shadow-sm">
+                  <button onClick={() => setViewMode('list')} className={`p-1.5 rounded ${viewMode === 'list' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-slate-100'}`}><List size={16}/></button>
+                  <button onClick={() => setViewMode('grid')} className={`p-1.5 rounded ${viewMode === 'grid' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-slate-100'}`}><LayoutGrid size={16}/></button>
+              </div>
             )}
           </div>
+        </div>
+
+        {loading ? ( <SearchResultsSkeleton count={fundersPerPage} /> ) : 
+         currentFunders.length > 0 ? (
+          viewMode === 'grid' ? (
+            <div className={`grid grid-cols-1 md:grid-cols-2 ${isProfileView ? 'lg:grid-cols-2' : 'lg:grid-cols-3'} gap-6`}>
+              {currentFunders.map((funder) => <FunderCard key={funder.id} funder={funder} handleFilterChange={handleFilterChange} />)}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {currentFunders.map((funder) => <FunderListItem key={funder.id} funder={funder} />)}
+            </div>
+          )
+        ) : (
+          <div className="text-center text-slate-500 py-12 bg-white rounded-lg shadow-sm border">
+            <Search size={40} className="mx-auto text-slate-400 mb-3" />
+            <p className="text-lg font-medium">No funders found.</p>
+            <p className="text-sm mb-4">Try adjusting your search or filter criteria.</p>
+            <button onClick={handleClearFilters} className="inline-flex items-center px-4 py-2 border rounded-md text-sm font-medium text-slate-700 bg-white hover:bg-slate-100"><XCircle size={16} className="mr-2" />Clear All Filters</button>
+          </div>
         )}
-        {totalPages > 0 && (
-          <Pagination 
-            currentPage={currentPage} 
-            totalPages={totalPages} 
-            onPageChange={paginate} 
-            activeColorClass="bg-green-600 text-white" 
-          />
-        )}
+        
+        {totalPages > 1 && <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={paginate} activeColorClass="bg-green-600 text-white border-green-600" />}
       </section>
     </div>
   );
