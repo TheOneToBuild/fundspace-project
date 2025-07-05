@@ -7,6 +7,8 @@ import FunderCard from './components/FunderCard.jsx';
 import AnimatedShape from './components/AnimatedShape.jsx';
 import ScrollArrow from './components/ScrollArrow.jsx';
 import AnimatedCounter from './components/AnimatedCounter.jsx';
+// MODIFIED: Import the PublicPageLayout component
+import PublicPageLayout from './components/PublicPageLayout.jsx';
 
 const STATIC_IMAGES = {
     heroIllustration: 'https://cdn.pixabay.com/photo/2017/08/01/20/52/happy-holidays-2567915_1280.jpg',
@@ -121,120 +123,124 @@ const animatedWord = { hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 
 const ForNonprofitsPage = () => {
     
     return (
-        <div className="bg-[#F8F3ED] text-[#333132] font-serif overflow-x-hidden">
-            <div className="container mx-auto px-4 sm:px-6 max-w-7xl">
+        // MODIFIED: Wrap the component in PublicPageLayout and provide the gradient class
+        <PublicPageLayout bgColor="bg-gradient-to-br from-rose-50 via-orange-50 to-yellow-50">
+            {/* MODIFIED: Removed the hardcoded background class from this div */}
+            <div className="text-[#333132] font-serif overflow-x-hidden">
+                <div className="container mx-auto px-4 sm:px-6 max-w-7xl">
 
-                <StorySection>
-                    <AnimatedShape className="w-48 h-80 -top-10 left-[5%] z-0" initial={{ y: -20 }} animate={{ y: 20 }} imageUrl={STATIC_IMAGES.circles[0]} />
-                    <AnimatedShape className="w-32 h-44 top-16 right-[10%] z-0" initial={{ y: 15 }} animate={{ y: -15 }} imageUrl={STATIC_IMAGES.circles[1]} />
-                    
-                    <div className="text-center z-20 relative">
-                        <motion.div variants={textFloatUp}><div className="inline-block bg-blue-100 p-4 rounded-full shadow-lg"><Briefcase className="h-8 sm:h-10 w-8 sm:h-10 text-blue-600" /></div></motion.div>
-                        <motion.h1 variants={animatedH1} className="text-4xl sm:text-5xl md:text-6xl text-slate-800 mt-4 font-bold">
-                           Find Your Funder. <br className="hidden sm:block" /> Fuel Your Mission.
-                        </motion.h1>
-                        <motion.p variants={textFloatUp} className="font-sans text-lg sm:text-xl text-slate-600 mt-6 max-w-2xl mx-auto leading-relaxed">
-                            Stop the endless search. 1RFP centralizes Bay Area grant opportunities so you can focus on what matters most.
-                        </motion.p>
-                    </div>
-
-                    <motion.div 
-                        variants={textFloatUp}
-                        className="mt-12 w-full max-w-5xl"
-                    >
-                        <h3 className="text-center font-sans text-sm font-semibold text-slate-500 uppercase tracking-widest mb-6">Funder Landscape by County</h3>
-                        <div className="grid grid-cols-3 gap-x-4 gap-y-8">
-                            {funderCountyData.map(county => (
-                                <div key={county.name} className="text-center">
-                                    <county.icon className={`h-7 w-7 mx-auto ${county.color} mb-1`} />
-                                    <AnimatedCounter targetValue={county.count} className="text-2xl sm:text-3xl font-bold text-slate-700" />
-                                    <p className="text-xs sm:text-sm font-medium text-slate-500 mt-1">{county.name}</p>
-                                </div>
-                            ))}
+                    <StorySection>
+                        <AnimatedShape className="w-48 h-80 -top-10 left-[5%] z-0" initial={{ y: -20 }} animate={{ y: 20 }} imageUrl={STATIC_IMAGES.circles[0]} />
+                        <AnimatedShape className="w-32 h-44 top-16 right-[10%] z-0" initial={{ y: 15 }} animate={{ y: -15 }} imageUrl={STATIC_IMAGES.circles[1]} />
+                        
+                        <div className="text-center z-20 relative">
+                            <motion.div variants={textFloatUp}><div className="inline-block bg-blue-100 p-4 rounded-full shadow-lg"><Briefcase className="h-8 sm:h-10 w-8 sm:h-10 text-blue-600" /></div></motion.div>
+                            <motion.h1 variants={animatedH1} className="text-4xl sm:text-5xl md:text-6xl text-slate-800 mt-4 font-bold">
+                            Find Your Funder. <br className="hidden sm:block" /> Fuel Your Mission.
+                            </motion.h1>
+                            <motion.p variants={textFloatUp} className="font-sans text-lg sm:text-xl text-slate-600 mt-6 max-w-2xl mx-auto leading-relaxed">
+                                Stop the endless search. 1RFP centralizes Bay Area grant opportunities so you can focus on what matters most.
+                            </motion.p>
                         </div>
-                    </motion.div>
-                    
-                    <ScrollArrow className="absolute bottom-4 left-1/2 -translate-x-1/2" />
-                </StorySection>
 
-                <StorySection>
-                    <AnimatedGradientShape className="w-72 h-72 top-10 right-10" initial={{ y: -20, rotate: 0 }} animate={{ y: 20, rotate: 60 }} gradient={STATIC_IMAGES.gradients[0]} />
-                    <AnimatedGradientShape className="w-40 h-40 bottom-20 left-16" initial={{ y: 20, rotate: 20 }} animate={{ y: -20, rotate: -40 }} gradient={STATIC_IMAGES.gradients[1]} />
-                    <div className="flex flex-col md:flex-row-reverse items-center gap-8 md:gap-12 max-w-6xl mx-auto z-20 relative">
-                        <motion.div variants={textFloatUp} className="md:w-1/2 text-center md:text-left">
-                            <h2 className="text-4xl md:text-5xl text-slate-800 font-bold">The Endless <span className="font-bold text-red-500">Search</span>.</h2>
-                            <p className="font-sans text-lg sm:text-xl text-slate-600 mt-4 leading-relaxed">
-                                You know the drill. Countless hours lost to scattered foundation websites, outdated databases, and missed deadlines. It's a frustrating cycle that pulls you away from your actual work.
+                        <motion.div 
+                            variants={textFloatUp}
+                            className="mt-12 w-full max-w-5xl"
+                        >
+                            <h3 className="text-center font-sans text-sm font-semibold text-slate-500 uppercase tracking-widest mb-6">Funder Landscape by County</h3>
+                            <div className="grid grid-cols-3 gap-x-4 gap-y-8">
+                                {funderCountyData.map(county => (
+                                    <div key={county.name} className="text-center">
+                                        <county.icon className={`h-7 w-7 mx-auto ${county.color} mb-1`} />
+                                        <AnimatedCounter targetValue={county.count} className="text-2xl sm:text-3xl font-bold text-slate-700" />
+                                        <p className="text-xs sm:text-sm font-medium text-slate-500 mt-1">{county.name}</p>
+                                    </div>
+                                ))}
+                            </div>
+                        </motion.div>
+                        
+                        <ScrollArrow className="absolute bottom-4 left-1/2 -translate-x-1/2" />
+                    </StorySection>
+
+                    <StorySection>
+                        <AnimatedGradientShape className="w-72 h-72 top-10 right-10" initial={{ y: -20, rotate: 0 }} animate={{ y: 20, rotate: 60 }} gradient={STATIC_IMAGES.gradients[0]} />
+                        <AnimatedGradientShape className="w-40 h-40 bottom-20 left-16" initial={{ y: 20, rotate: 20 }} animate={{ y: -20, rotate: -40 }} gradient={STATIC_IMAGES.gradients[1]} />
+                        <div className="flex flex-col md:flex-row-reverse items-center gap-8 md:gap-12 max-w-6xl mx-auto z-20 relative">
+                            <motion.div variants={textFloatUp} className="md:w-1/2 text-center md:text-left">
+                                <h2 className="text-4xl md:text-5xl text-slate-800 font-bold">The Endless <span className="font-bold text-red-500">Search</span>.</h2>
+                                <p className="font-sans text-lg sm:text-xl text-slate-600 mt-4 leading-relaxed">
+                                    You know the drill. Countless hours lost to scattered foundation websites, outdated databases, and missed deadlines. It's a frustrating cycle that pulls you away from your actual work.
+                                </p>
+                            </motion.div>
+                            <motion.div variants={textFloatUp} className="md:w-1/2 w-full mt-8 md:mt-0">
+                                <img src={STATIC_IMAGES.painIllustration} alt="Illustration of a person overwhelmed by paperwork" className="w-full h-auto object-contain rounded-lg shadow-xl"/>
+                            </motion.div>
+                        </div>
+                        <ScrollArrow className="absolute bottom-4 left-1/2 -translate-x-1/2" />
+                    </StorySection>
+
+                    <StorySection>
+                        <AnimatedGradientShape className="w-80 h-80 bottom-10 left-10" initial={{ y: 20, x: 15 }} animate={{ y: -20, x: -15 }} gradient={STATIC_IMAGES.gradients[1]} />
+                        <AnimatedGradientShape className="w-48 h-48 top-10 right-16" initial={{ scale: 0.9 }} animate={{ scale: 1.1 }} gradient={STATIC_IMAGES.gradients[3]} />
+                        <motion.div variants={textFloatUp} className="text-center z-20 relative mb-12">
+                            <div className="inline-block bg-green-100 p-4 rounded-full shadow-lg"><CheckCircle className="h-8 sm:h-10 w-8 sm:h-10 text-green-600" /></div>
+                            <h2 className="text-4xl md:text-5xl text-slate-800 mt-4 font-bold">A <span className="font-bold text-green-600">Smarter</span> Way to Fundraise.</h2>
+                            <p className="font-sans text-lg sm:text-xl text-slate-600 mt-4 leading-relaxed max-w-3xl mx-auto">
+                                We centralize hundreds of Bay Area RFPs and provide powerful tools to help you find the right opportunities in minutes, not weeks. Discover funders who care about the work you do.
                             </p>
                         </motion.div>
-                        <motion.div variants={textFloatUp} className="md:w-1/2 w-full mt-8 md:mt-0">
-                            <img src={STATIC_IMAGES.painIllustration} alt="Illustration of a person overwhelmed by paperwork" className="w-full h-auto object-contain rounded-lg shadow-xl"/>
-                        </motion.div>
-                    </div>
-                    <ScrollArrow className="absolute bottom-4 left-1/2 -translate-x-1/2" />
-                </StorySection>
-
-                <StorySection>
-                    <AnimatedGradientShape className="w-80 h-80 bottom-10 left-10" initial={{ y: 20, x: 15 }} animate={{ y: -20, x: -15 }} gradient={STATIC_IMAGES.gradients[1]} />
-                    <AnimatedGradientShape className="w-48 h-48 top-10 right-16" initial={{ scale: 0.9 }} animate={{ scale: 1.1 }} gradient={STATIC_IMAGES.gradients[3]} />
-                    <motion.div variants={textFloatUp} className="text-center z-20 relative mb-12">
-                        <div className="inline-block bg-green-100 p-4 rounded-full shadow-lg"><CheckCircle className="h-8 sm:h-10 w-8 sm:h-10 text-green-600" /></div>
-                        <h2 className="text-4xl md:text-5xl text-slate-800 mt-4 font-bold">A <span className="font-bold text-green-600">Smarter</span> Way to Fundraise.</h2>
-                        <p className="font-sans text-lg sm:text-xl text-slate-600 mt-4 leading-relaxed max-w-3xl mx-auto">
-                            We centralize hundreds of Bay Area RFPs and provide powerful tools to help you find the right opportunities in minutes, not weeks. Discover funders who care about the work you do.
-                        </p>
-                    </motion.div>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8 w-full max-w-7xl mx-auto z-20 relative">
-                        {funderData.map((funder, index) => ( 
-                            <motion.div variants={textFloatUp} key={funder.slug || index}>
-                                <FunderCard funder={funder} />
-                            </motion.div> 
-                        ))}
-                    </div>
-                    <ScrollArrow className="absolute bottom-4 left-1/2 -translate-x-1/2" />
-                </StorySection>
-
-                <StorySection>
-                    <AnimatedGradientShape className="w-64 h-64 top-20 right-20" initial={{ scale: 0.9, rotate: 45 }} animate={{ scale: 1.1, rotate: -45 }} gradient={STATIC_IMAGES.gradients[2]} />
-                    <AnimatedGradientShape className="w-32 h-32 bottom-16 left-24" initial={{ scale: 1.1 }} animate={{ scale: 0.9 }} gradient={STATIC_IMAGES.gradients[0]} />
-                    <div className="flex flex-col md:flex-row items-center gap-8 md:gap-12 max-w-6xl mx-auto z-20 relative">
-                         <motion.div variants={textFloatUp} className="md:w-1/2 text-center md:text-left">
-                           <h2 className="text-4xl md:text-5xl text-slate-800 font-bold">Free, <span className="font-bold text-purple-600">Forever</span>. For Nonprofits.</h2>
-                           <p className="font-sans text-lg sm:text-xl text-slate-600 mt-4 leading-relaxed">
-                               Our commitment is to the Bay Area's nonprofit sector. Access to our entire grant database and discovery tools will always be free for 501(c)(3) organizations. No trials, no tiers, no hidden fees.
-                           </p>
-                        </motion.div>
-                        <motion.div variants={textFloatUp} className="md:w-1/2 w-full mt-8 md:mt-0">
-                            <img src={STATIC_IMAGES.heroIllustration} alt="Illustration of finding opportunities" className="w-full h-auto object-contain rounded-lg shadow-xl"/>
-                        </motion.div>
-                    </div>
-                    <ScrollArrow className="absolute bottom-4 left-1/2 -translate-x-1/2" />
-                </StorySection>
-                
-                <StorySection>
-                    <AnimatedGradientShape className="w-72 h-72 -bottom-24 left-1/4" initial={{ x: -20 }} animate={{ x: 20 }} gradient={STATIC_IMAGES.gradients[3]} />
-                    <AnimatedGradientShape className="w-48 h-48 top-10 right-1/4" initial={{ y: 20 }} animate={{ y: -20 }} gradient={STATIC_IMAGES.gradients[4]} />
-                    <div className="text-center z-20 relative">
-                        <motion.h2 variants={textFloatUp} className="text-4xl md:text-5xl text-slate-800 font-bold">What's on the Horizon?</motion.h2>
-                        <motion.p variants={textFloatUp} className="font-sans text-lg sm:text-xl text-slate-600 mt-4 leading-relaxed max-w-3xl mx-auto">
-                            We're building powerful new tools to give you an even greater advantage in your fundraising efforts.
-                        </motion.p>
-                    </div>
-                    <motion.div variants={textFloatUp} className="bg-white p-6 sm:p-8 md:p-12 mt-12 rounded-lg border border-slate-200 shadow-xl w-full max-w-4xl z-20 relative">
-                        <h3 className="text-2xl font-bold mb-6 text-center">Upcoming Tools for Nonprofits</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6 font-sans text-slate-600">
-                            <div className="flex items-start"><Calendar className="h-6 w-6 text-teal-500 mr-4 flex-shrink-0 mt-1" /><p><strong className="text-slate-700">Grant Tracking:</strong> Save grants and manage deadlines in a personalized dashboard.</p></div>
-                            <div className="flex items-start"><Bot className="h-6 w-6 text-sky-500 mr-4 flex-shrink-0 mt-1" /><p><strong className="text-slate-700">AI Proposal Assistant:</strong> Get help drafting and tailoring proposals to specific funders.</p></div>
-                            <div className="flex items-start"><TrendingUp className="h-6 w-6 text-green-500 mr-4 flex-shrink-0 mt-1" /><p><strong className="text-slate-700">Funder Trend Analysis:</strong> See a funder's historical giving patterns to improve your strategy.</p></div>
-                            <div className="flex items-start"><Filter className="h-6 w-6 text-orange-500 mr-4 flex-shrink-0 mt-1" /><p><strong className="text-slate-700">Saved Searches & Alerts:</strong> Get notified when new grants matching your criteria are posted.</p></div>
-                            <div className="flex items-start"><ShieldCheck className="h-6 w-6 text-red-500 mr-4 flex-shrink-0 mt-1" /><p><strong className="text-slate-700">Eligibility Verifier:</strong> Use AI to quickly check if your organization meets a grant's criteria.</p></div>
-                            <div className="flex items-start"><Users className="h-6 w-6 text-indigo-500 mr-4 flex-shrink-0 mt-1" /><p><strong className="text-slate-700">Collaboration Space:</strong> Find and connect with other nonprofits for joint applications.</p></div>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 w-full max-w-7xl mx-auto z-20 relative">
+                            {funderData.map((funder, index) => ( 
+                                <motion.div variants={textFloatUp} key={funder.slug || index}>
+                                    <FunderCard funder={funder} />
+                                </motion.div> 
+                            ))}
                         </div>
-                    </motion.div>
-                </StorySection>
+                        <ScrollArrow className="absolute bottom-4 left-1/2 -translate-x-1/2" />
+                    </StorySection>
 
+                    <StorySection>
+                        <AnimatedGradientShape className="w-64 h-64 top-20 right-20" initial={{ scale: 0.9, rotate: 45 }} animate={{ scale: 1.1, rotate: -45 }} gradient={STATIC_IMAGES.gradients[2]} />
+                        <AnimatedGradientShape className="w-32 h-32 bottom-16 left-24" initial={{ scale: 1.1 }} animate={{ scale: 0.9 }} gradient={STATIC_IMAGES.gradients[0]} />
+                        <div className="flex flex-col md:flex-row items-center gap-8 md:gap-12 max-w-6xl mx-auto z-20 relative">
+                            <motion.div variants={textFloatUp} className="md:w-1/2 text-center md:text-left">
+                            <h2 className="text-4xl md:text-5xl text-slate-800 font-bold">Free, <span className="font-bold text-purple-600">Forever</span>. For Nonprofits.</h2>
+                            <p className="font-sans text-lg sm:text-xl text-slate-600 mt-4 leading-relaxed">
+                                Our commitment is to the Bay Area's nonprofit sector. Access to our entire grant database and discovery tools will always be free for 501(c)(3) organizations. No trials, no tiers, no hidden fees.
+                            </p>
+                            </motion.div>
+                            <motion.div variants={textFloatUp} className="md:w-1/2 w-full mt-8 md:mt-0">
+                                <img src={STATIC_IMAGES.heroIllustration} alt="Illustration of finding opportunities" className="w-full h-auto object-contain rounded-lg shadow-xl"/>
+                            </motion.div>
+                        </div>
+                        <ScrollArrow className="absolute bottom-4 left-1/2 -translate-x-1/2" />
+                    </StorySection>
+                    
+                    <StorySection>
+                        <AnimatedGradientShape className="w-72 h-72 -bottom-24 left-1/4" initial={{ x: -20 }} animate={{ x: 20 }} gradient={STATIC_IMAGES.gradients[3]} />
+                        <AnimatedGradientShape className="w-48 h-48 top-10 right-1/4" initial={{ y: 20 }} animate={{ y: -20 }} gradient={STATIC_IMAGES.gradients[4]} />
+                        <div className="text-center z-20 relative">
+                            <motion.h2 variants={textFloatUp} className="text-4xl md:text-5xl text-slate-800 font-bold">What's on the Horizon?</motion.h2>
+                            <motion.p variants={textFloatUp} className="font-sans text-lg sm:text-xl text-slate-600 mt-4 leading-relaxed max-w-3xl mx-auto">
+                                We're building powerful new tools to give you an even greater advantage in your fundraising efforts.
+                            </motion.p>
+                        </div>
+                        <motion.div variants={textFloatUp} className="bg-white p-6 sm:p-8 md:p-12 mt-12 rounded-lg border border-slate-200 shadow-xl w-full max-w-4xl z-20 relative">
+                            <h3 className="text-2xl font-bold mb-6 text-center">Upcoming Tools for Nonprofits</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6 font-sans text-slate-600">
+                                <div className="flex items-start"><Calendar className="h-6 w-6 text-teal-500 mr-4 flex-shrink-0 mt-1" /><p><strong className="text-slate-700">Grant Tracking:</strong> Save grants and manage deadlines in a personalized dashboard.</p></div>
+                                <div className="flex items-start"><Bot className="h-6 w-6 text-sky-500 mr-4 flex-shrink-0 mt-1" /><p><strong className="text-slate-700">AI Proposal Assistant:</strong> Get help drafting and tailoring proposals to specific funders.</p></div>
+                                <div className="flex items-start"><TrendingUp className="h-6 w-6 text-green-500 mr-4 flex-shrink-0 mt-1" /><p><strong className="text-slate-700">Funder Trend Analysis:</strong> See a funder's historical giving patterns to improve your strategy.</p></div>
+                                <div className="flex items-start"><Filter className="h-6 w-6 text-orange-500 mr-4 flex-shrink-0 mt-1" /><p><strong className="text-slate-700">Saved Searches & Alerts:</strong> Get notified when new grants matching your criteria are posted.</p></div>
+                                <div className="flex items-start"><ShieldCheck className="h-6 w-6 text-red-500 mr-4 flex-shrink-0 mt-1" /><p><strong className="text-slate-700">Eligibility Verifier:</strong> Use AI to quickly check if your organization meets a grant's criteria.</p></div>
+                                <div className="flex items-start"><Users className="h-6 w-6 text-indigo-500 mr-4 flex-shrink-0 mt-1" /><p><strong className="text-slate-700">Collaboration Space:</strong> Find and connect with other nonprofits for joint applications.</p></div>
+                            </div>
+                        </motion.div>
+                    </StorySection>
+
+                </div>
             </div>
-        </div>
+        </PublicPageLayout>
     );
 };
 

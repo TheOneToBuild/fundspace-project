@@ -1,7 +1,6 @@
 // src/components/ProfileLayout.jsx
 import React from 'react';
-import DashboardHeader from './DashboardHeader';
-import Footer from './Footer'; 
+// MODIFIED: Removed DashboardHeader and Footer imports
 import ProfileNav from './ProfileNav.jsx';
 import UpcomingDeadlines from './UpcomingDeadlines.jsx';
 import { FileText, Bell, BarChart3, TrendingUp } from './Icons.jsx';
@@ -55,46 +54,41 @@ export default function ProfileLayout({
   savedGrants,
   trendingGrants,
   handleTrendingGrantClick,
-  notifications,
-  unreadCount,
-  onNotificationPanelToggle
+  // MODIFIED: Notification props are no longer needed here as the header is gone.
+  // notifications,
+  // unreadCount,
+  // onNotificationPanelToggle
 }) {
-  // --- MODIFIED: Changed column spans for a wider main content area ---
   const columnSpans = { left: 'lg:col-span-2', main: 'lg:col-span-8', right: 'lg:col-span-2' };
 
   return (
-    <div className="flex flex-col">
-      <DashboardHeader 
-          notifications={notifications} 
-          unreadCount={unreadCount}
-          onPanelToggle={onNotificationPanelToggle}
-      />
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-grow">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          
-          <aside className={columnSpans.left}>
-            <div className="lg:sticky lg:top-24">
-              <ProfileNav user={user} profile={profile} />
-            </div>
-          </aside>
+    // MODIFIED: Removed the outer div and the DashboardHeader component.
+    // The main layout is now controlled by App.jsx
+    <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        
+        <aside className={columnSpans.left}>
+          <div className="lg:sticky lg:top-24">
+            <ProfileNav user={user} profile={profile} />
+          </div>
+        </aside>
 
-          <main className={columnSpans.main}>
-            {children}
-          </main>
+        <main className={columnSpans.main}>
+          {children}
+        </main>
 
-          <aside className={columnSpans.right}>
-             <div className="lg:sticky lg:top-24">
-              <RightSidebar 
-                savedGrants={savedGrants} 
-                trendingGrants={trendingGrants} 
-                handleTrendingGrantClick={handleTrendingGrantClick}
-              />
-            </div>
-          </aside>
+        <aside className={columnSpans.right}>
+           <div className="lg:sticky lg:top-24">
+            <RightSidebar 
+              savedGrants={savedGrants} 
+              trendingGrants={trendingGrants} 
+              handleTrendingGrantClick={handleTrendingGrantClick}
+            />
+          </div>
+        </aside>
 
-        </div>
       </div>
-      <Footer /> 
+       {/* MODIFIED: Removed the Footer component */}
     </div>
   );
 }

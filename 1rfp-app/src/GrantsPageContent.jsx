@@ -1,5 +1,5 @@
 // src/GrantsPageContent.jsx
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useContext } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from './supabaseClient.js';
 import { Search, Users, MapPin, Calendar, DollarSign, Info, ChevronDown, ExternalLink, Zap, Clock, Target, Briefcase as IconBriefcase, BarChart3, ClipboardList, TrendingUp, Loader, XCircle, Heart, Bot, Briefcase, LayoutGrid, List, SlidersHorizontal, Bookmark } from './components/Icons.jsx';
@@ -14,6 +14,7 @@ import { GRANT_STATUSES } from './constants.js';
 import usePaginatedFilteredData from './hooks/usePaginatedFilteredData.js';
 import { filterGrants } from './filtering.js';
 import { SearchResultsSkeleton } from './components/SkeletonLoader.jsx';
+import { LayoutContext } from './App.jsx';
 
 // --- Helper functions ---
 const formatCurrency = (amount) => {
@@ -152,6 +153,20 @@ const GrantListItem = ({ grant, onOpenDetailModal, isSaved, onSave, onUnsave, se
 };
 
 const GrantsPageContent = ({ hideHero = false, isProfileView = false }) => {
+  const { setPageBgColor } = useContext(LayoutContext);
+
+  useEffect(() => {
+    if (!isProfileView) {
+      // MODIFIED: Changed to the new gradient background
+      setPageBgColor('bg-gradient-to-br from-rose-50 via-orange-50 to-yellow-50');
+
+      return () => {
+          setPageBgColor('bg-white');
+      };
+    }
+  }, [isProfileView, setPageBgColor]);
+
+
   const [grants, setGrants] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filterConfig, setFilterConfig] = useState({ searchTerm: '', locationFilter: [], categoryFilter: [], grantTypeFilter: '', grantStatusFilter: '', sortCriteria: 'dueDate_asc' });
@@ -296,7 +311,7 @@ const GrantsPageContent = ({ hideHero = false, isProfileView = false }) => {
       
       <div className={isProfileView ? "" : "container mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12"}>
         {!isProfileView && (
-          <section id="funding-opportunity-intro" className="text-center pt-8 pb-12 md:pt-12 md:pb-16 mb-10 md:mb-12 scroll-mt-20 bg-white p-6 sm:p-8 md:p-10 rounded-xl shadow-lg border border-slate-200">
+          <section id="funding-opportunity-intro" className="text-center pt-8 pb-12 md:pt-12 md:pb-16 mb-10 md:mb-12 scroll-mt-20 bg-transparent p-6 sm:p-8 md:p-10 rounded-xl">
             <h2 className="text-3xl md:text-4xl font-bold text-slate-800 mb-3">Find Your Next Funding Opportunity</h2>
             <p className="text-md md:text-lg text-slate-600 mb-6 max-w-2xl mx-auto">Discover RFPs and grants tailored for nonprofits in the San Francisco Bay Area.</p>
             <div className="mt-8 md:hidden">
@@ -356,7 +371,7 @@ const GrantsPageContent = ({ hideHero = false, isProfileView = false }) => {
               </div>
             )
           ) : (
-            <div className="text-center text-slate-500 py-12 bg-white rounded-lg shadow-sm border border-slate-200">
+            <div className="text-center text-slate-500 py-12 bg-transparent rounded-lg">
               <Search size={40} className="mx-auto text-slate-400 mb-3" />
               <p className="text-lg font-medium">No grants found for your criteria.</p>
               <p className="text-sm mb-4">Try using a broader search term or removing a filter to see more results.</p>

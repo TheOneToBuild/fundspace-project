@@ -76,5 +76,6 @@ export {
   BookmarkIcon,
   Compass,
   BarChart,
+  LogOut,
 } from 'lucide-react';
 

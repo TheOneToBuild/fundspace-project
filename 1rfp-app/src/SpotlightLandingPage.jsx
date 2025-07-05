@@ -1,7 +1,9 @@
 // src/SpotlightLandingPage.jsx
 import React, { useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { countySpotlightData } from './spotlightData.js'; 
+import { countySpotlightData } from './spotlightData.js';
+// MODIFIED: Import the PublicPageLayout component
+import PublicPageLayout from './components/PublicPageLayout.jsx';
 
 const CountyCard = ({ slug, county }) => (
   <Link 
@@ -27,22 +29,25 @@ const SpotlightLandingPage = () => {
   const countySlugs = Object.keys(countySpotlightData);
 
   return (
-    // --- UPDATED: Gradient background applied here ---
-    <div className="bg-gradient-to-br from-rose-50 via-orange-50 to-yellow-50">
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        <div className="text-center mb-12">
-          <h1 className="text-4xl md:text-5xl font-extrabold text-slate-900 mb-3">Community Spotlights</h1>
-          <p className="text-lg md:text-xl text-slate-600 max-w-3xl mx-auto">
-            Explore the unique philanthropic landscapes of the 9 Bay Area counties. Discover the key organizations and foundations driving change in each community.
-          </p>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {countySlugs.map(slug => (
-            <CountyCard key={slug} slug={slug} county={countySpotlightData[slug]} />
-          ))}
+    // MODIFIED: Wrap the component in PublicPageLayout and provide the gradient class
+    <PublicPageLayout bgColor="bg-gradient-to-br from-rose-50 via-orange-50 to-yellow-50">
+      {/* MODIFIED: Removed the hardcoded background class from this div */}
+      <div>
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-16">
+          <div className="text-center mb-12">
+            <h1 className="text-4xl md:text-5xl font-extrabold text-slate-900 mb-3">Community Spotlights</h1>
+            <p className="text-lg md:text-xl text-slate-600 max-w-3xl mx-auto">
+              Explore the unique philanthropic landscapes of the 9 Bay Area counties. Discover the key organizations and foundations driving change in each community.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {countySlugs.map(slug => (
+              <CountyCard key={slug} slug={slug} county={countySpotlightData[slug]} />
+            ))}
+          </div>
         </div>
       </div>
-    </div>
+    </PublicPageLayout>
   );
 };
 

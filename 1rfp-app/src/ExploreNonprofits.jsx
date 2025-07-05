@@ -1,5 +1,6 @@
 // src/ExploreNonprofits.jsx
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+// MODIFIED: Import useContext and useEffect
+import React, { useState, useMemo, useEffect, useCallback, useContext } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { supabase } from './supabaseClient.js';
 import { Search, Users, Info, ChevronDown, Heart, Loader, XCircle, MapPin, DollarSign, LayoutGrid, List, SlidersHorizontal } from './components/Icons.jsx';
@@ -10,8 +11,10 @@ import usePaginatedFilteredData from './hooks/usePaginatedFilteredData.js';
 import { filterNonprofits } from './filtering.js';
 import { sortNonprofits } from './sorting.js';
 import { SearchResultsSkeleton } from './components/SkeletonLoader.jsx';
+// MODIFIED: Import LayoutContext
+import { LayoutContext } from './App.jsx';
 
-// NEW: A compact list item component for the list view
+// A compact list item component for the list view
 const NonprofitListItem = ({ nonprofit }) => (
     <Link to={`/nonprofits/${nonprofit.slug}`} className="bg-white p-4 rounded-xl border border-slate-200 hover:border-purple-500 hover:shadow-md transition-all flex items-center gap-4 cursor-pointer">
         <div className="flex-shrink-0 h-12 w-12 rounded-lg bg-slate-100 flex items-center justify-center">
@@ -36,6 +39,20 @@ const NonprofitListItem = ({ nonprofit }) => (
 
 
 const ExploreNonprofits = ({ isProfileView = false }) => {
+  // MODIFIED: Use context to set the page background color
+  const { setPageBgColor } = useContext(LayoutContext);
+
+  useEffect(() => {
+    // Only set the gradient background for the public-facing page
+    if (!isProfileView) {
+      setPageBgColor('bg-gradient-to-br from-rose-50 via-orange-50 to-yellow-50');
+      // Return a cleanup function that ONLY runs for the public page
+      return () => {
+          setPageBgColor('bg-white');
+      };
+    }
+  }, [isProfileView, setPageBgColor]);
+
   const [nonprofits, setNonprofits] = useState([]);
   const [loading, setLoading] = useState(true);
   
@@ -47,8 +64,6 @@ const ExploreNonprofits = ({ isProfileView = false }) => {
 
   const [currentPage, setCurrentPage] = useState(1);
   const [nonprofitsPerPage, setNonprofitsPerPage] = useState(12);
-
-  // --- NEW: State for the compact view ---
   const [viewMode, setViewMode] = useState('grid');
   const [filtersVisible, setFiltersVisible] = useState(!isProfileView);
 
@@ -135,7 +150,8 @@ const ExploreNonprofits = ({ isProfileView = false }) => {
   return (
     <div className={isProfileView ? "" : "container mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12"}>
       {!isProfileView && (
-        <section id="nonprofit-intro" className="text-center pt-8 pb-12 md:pt-12 md:pb-16 mb-10 md:mb-12 scroll-mt-20 bg-white p-6 rounded-xl shadow-lg border">
+        // MODIFIED: Removed bg-white, shadow, and border to make the section transparent
+        <section id="nonprofit-intro" className="text-center pt-8 pb-12 md:pt-12 md:pb-16 mb-10 md:mb-12 scroll-mt-20 p-6 rounded-xl">
           <h2 className="text-3xl md:text-4xl font-bold text-slate-800 mb-3">Explore Bay Area Nonprofits</h2>
           <p className="text-md md:text-lg text-slate-600 mb-6 max-w-2xl mx-auto">Discover impactful nonprofit organizations making a difference in our local communities.</p>
           <FilterBar {...filterBarProps} />

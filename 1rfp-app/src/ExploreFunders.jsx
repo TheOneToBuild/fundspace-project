@@ -1,18 +1,21 @@
 // src/ExploreFunders.jsx
 import { Link, useLocation } from 'react-router-dom';
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+// MODIFIED: Import useContext and useEffect
+import React, { useState, useMemo, useEffect, useCallback, useContext } from 'react';
 import { supabase } from './supabaseClient.js';
 import { Search, MapPin, DollarSign, Users, LayoutGrid, List, SlidersHorizontal, Award, MessageSquare, ExternalLink, XCircle, IconBriefcase, ChevronDown } from './components/Icons.jsx';
 import FilterBar from './components/FilterBar.jsx';
 import Pagination from './components/Pagination.jsx';
 import { SearchResultsSkeleton } from './components/SkeletonLoader.jsx';
-import { getPillClasses, getGrantTypePillClasses, getFunderTypePillClasses } from './utils.js';
+import { getPillClasses } from './utils.js';
 import usePaginatedFilteredData from './hooks/usePaginatedFilteredData.js';
 import { filterFundersArray } from './filtering.js';
 import { sortFunders } from './sorting.js';
 import FunderCard from './components/FunderCard.jsx';
+// MODIFIED: Import LayoutContext
+import { LayoutContext } from './App.jsx';
 
-// NEW: A compact list item component for the list view
+// A compact list item component for the list view
 const FunderListItem = ({ funder }) => (
     <Link to={`/funders/${funder.slug}`} className="bg-white p-4 rounded-xl border border-slate-200 hover:border-blue-500 hover:shadow-md transition-all flex items-center gap-4 cursor-pointer">
         <div className="flex-shrink-0 h-12 w-12 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500 font-bold">
@@ -37,6 +40,20 @@ const FunderListItem = ({ funder }) => (
 
 
 const ExploreFunders = ({ isProfileView = false }) => {
+  // MODIFIED: Use context to set the page background color
+  const { setPageBgColor } = useContext(LayoutContext);
+
+  useEffect(() => {
+    // Only set the gradient background for the public-facing page
+    if (!isProfileView) {
+      setPageBgColor('bg-gradient-to-br from-rose-50 via-orange-50 to-yellow-50');
+      // Return a cleanup function that ONLY runs for the public page
+      return () => {
+          setPageBgColor('bg-white');
+      };
+    }
+  }, [isProfileView, setPageBgColor]);
+
   const [funders, setFunders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filterConfig, setFilterConfig] = useState({ 
@@ -51,15 +68,12 @@ const ExploreFunders = ({ isProfileView = false }) => {
   });
   const [currentPage, setCurrentPage] = useState(1);
   const [fundersPerPage, setFundersPerPage] = useState(12);
-
-  // --- NEW: State for the compact view ---
   const [viewMode, setViewMode] = useState('grid');
   const [filtersVisible, setFiltersVisible] = useState(!isProfileView);
   
   const location = useLocation();
 
   useEffect(() => {
-    // If navigating from a similar funder link, pre-fill the filter
     if (location.state?.prefilledFilter) {
       const { key, value } = location.state.prefilledFilter;
       handleFilterChange(key, [value]);
@@ -157,7 +171,7 @@ const ExploreFunders = ({ isProfileView = false }) => {
     if (filterConfig.funderTypeFilter) filters.push({ key: 'funderTypeFilter', label: `Type: ${filterConfig.funderTypeFilter}` });
     filterConfig.geographicScopeFilter.forEach(scope => filters.push({ key: 'geographicScopeFilter', value: scope, label: `Scope: ${scope}` }));
     if (filterConfig.annualGivingFilter) {
-      const ranges = { '0-500000': 'Under $500K', /* ... other ranges */ '100000000-999999999': '$100M+' };
+      const ranges = { '0-500000': 'Under $500K', '100000000-999999999': '$100M+' };
       filters.push({ key: 'annualGivingFilter', label: `Giving: ${ranges[filterConfig.annualGivingFilter] || ''}` });
     }
     return filters;
@@ -182,7 +196,8 @@ const ExploreFunders = ({ isProfileView = false }) => {
   return (
     <div className={isProfileView ? "" : "container mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12"}>
       {!isProfileView && (
-        <section id="funder-intro" className="text-center pt-8 pb-12 md:pt-12 md:pb-16 mb-10 md:mb-12 bg-white p-6 rounded-xl shadow-lg border">
+        // MODIFIED: Removed bg-white, shadow, and border to make the section transparent
+        <section id="funder-intro" className="text-center pt-8 pb-12 md:pt-12 md:pb-16 mb-10 md:mb-12 p-6 rounded-xl">
           <h2 className="text-3xl md:text-4xl font-bold text-slate-800 mb-3">Explore Funding Organizations</h2>
           <p className="text-md md:text-lg text-slate-600 mb-6 max-w-2xl mx-auto">Discover foundations and organizations that fund initiatives in the San Francisco Bay Area.</p>
           <FilterBar {...filterBarProps} isMobileVisible={true} />

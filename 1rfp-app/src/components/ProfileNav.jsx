@@ -1,14 +1,9 @@
-// src/components/ProfileNav.jsx
 import React from 'react';
 import { NavLink } from 'react-router-dom';
+import Avatar from './Avatar.jsx'; // Import the new Avatar component
 
 export default function ProfileNav({ user, profile }) {
-    const getInitials = (name) => {
-        if (!name) return user?.email?.charAt(0).toUpperCase() || '?';
-        const words = name.split(' ');
-        if (words.length > 1 && words[1]) return (words[0][0] + words[1][0]).toUpperCase();
-        return (words[0] || '').substring(0, 2).toUpperCase();
-    };
+    // We can now remove the getInitials function from this file.
 
     const navLinkClass = ({ isActive }) => 
         `flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors ${
@@ -20,8 +15,9 @@ export default function ProfileNav({ user, profile }) {
     return (
         <div className="space-y-4">
             <div className="p-4 bg-white rounded-xl shadow-md border border-slate-200 text-center">
-                <div className="w-20 h-20 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-3xl mb-3 ring-4 ring-blue-200 mx-auto">
-                    {getInitials(profile?.full_name)}
+                {/* MODIFIED: Replaced the initials div with our new Avatar component */}
+                <div className="w-20 h-20 mx-auto mb-3 ring-4 ring-blue-200 rounded-full">
+                    <Avatar src={profile?.avatar_url} fullName={profile?.full_name} size="lg" />
                 </div>
                 <p className="font-bold text-lg text-slate-800 truncate w-full">{profile?.full_name || user?.email}</p>
                 <p className="text-sm text-slate-500">{profile?.organization_name || profile?.role || 'Community Member'}</p>

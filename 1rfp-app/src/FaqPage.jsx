@@ -1,6 +1,8 @@
 // src/FaqPage.jsx
 import React, { useState } from 'react';
 import { ChevronDown, HelpCircle } from './components/Icons.jsx';
+// MODIFIED: Import the PublicPageLayout component
+import PublicPageLayout from './components/PublicPageLayout.jsx';
 
 const faqData = {
   general: [
@@ -124,27 +126,31 @@ const FaqCategory = ({ title, faqs }) => {
 
 const FaqPage = () => {
   return (
-    <div className="bg-gradient-to-br from-rose-50 via-orange-50 to-yellow-50 py-16 md:py-24">
-      <div className="container mx-auto px-4">
-        <div className="text-center mb-12 md:mb-20">
-          <div className="inline-block bg-blue-100 p-3 rounded-full mb-4">
-            <HelpCircle className="h-8 w-8 text-blue-600" />
+    // MODIFIED: Wrap the component in PublicPageLayout and provide the gradient class
+    <PublicPageLayout bgColor="bg-gradient-to-br from-rose-50 via-orange-50 to-yellow-50">
+      {/* MODIFIED: Removed the hardcoded background class from this div */}
+      <div className="py-16 md:py-24">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-12 md:mb-20">
+            <div className="inline-block bg-blue-100 p-3 rounded-full mb-4">
+              <HelpCircle className="h-8 w-8 text-blue-600" />
+            </div>
+            <h1 className="text-4xl md:text-5xl font-extrabold text-slate-900 mb-4">
+              Frequently Asked Questions
+            </h1>
+            <p className="text-lg md:text-xl text-slate-600 max-w-3xl mx-auto font-sans">
+              Have questions? We've got answers. If you can't find what you're looking for, feel free to contact us.
+            </p>
           </div>
-          <h1 className="text-4xl md:text-5xl font-extrabold text-slate-900 mb-4">
-            Frequently Asked Questions
-          </h1>
-          <p className="text-lg md:text-xl text-slate-600 max-w-3xl mx-auto font-sans">
-            Have questions? We've got answers. If you can't find what you're looking for, feel free to contact us.
-          </p>
-        </div>
-        
-        <div className="max-w-4xl mx-auto">
-          <FaqCategory title="General Questions" faqs={faqData.general} />
-          <FaqCategory title="For Nonprofits" faqs={faqData.forNonprofits} />
-          <FaqCategory title="For Funders" faqs={faqData.forFunders} />
+          
+          <div className="max-w-4xl mx-auto">
+            <FaqCategory title="General Questions" faqs={faqData.general} />
+            <FaqCategory title="For Nonprofits" faqs={faqData.forNonprofits} />
+            <FaqCategory title="For Funders" faqs={faqData.forFunders} />
+          </div>
         </div>
       </div>
-    </div>
+    </PublicPageLayout>
   );
 };
 

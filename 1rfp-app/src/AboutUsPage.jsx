@@ -1,11 +1,12 @@
 // src/AboutUsPage.jsx
-import React, { useState } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { motion } from 'framer-motion';
 import { Users, BarChart3, Briefcase, Heart, Home, AlertTriangle, Coffee, Building } from './components/Icons.jsx';
 import AnimatedCounter from './components/AnimatedCounter.jsx';
 import ScrollArrow from './components/ScrollArrow.jsx';
-// --- FIX: Corrected the import path ---
-import AdvisoryCard from './AdvisoryCard.jsx'; 
+import AdvisoryCard from './AdvisoryCard.jsx';
+import { LayoutContext } from './App.jsx';
+import PublicPageLayout from './components/PublicPageLayout.jsx'; // MODIFIED: Import the new layout
 
 const STATIC_MEDIA = {
     collage: [
@@ -101,147 +102,151 @@ const AboutUsPage = () => {
   const formatPercentage = (num) => `${num}%`;
 
   return (
-    <div className="bg-[#F8F3ED] text-[#333132] font-serif overflow-x-hidden">
-      <div className="container mx-auto px-4 sm:px-6 max-w-7xl">
+    // MODIFIED: Wrap the entire page content in PublicPageLayout and pass the desired color.
+    <PublicPageLayout bgColor="bg-[#F8F3ED]">
+        {/* MODIFIED: The main div no longer needs a background color class. */}
+        <div className="text-[#333132] font-serif overflow-x-hidden">
+        <div className="container mx-auto px-4 sm:px-6 max-w-7xl">
 
-        <StorySection>
-          <AnimatedGradientShape className="w-48 h-48 top-20 left-16" initial={{ y: -15, x: 5 }} animate={{ y: 15, x: -5 }} gradient={STATIC_MEDIA.gradients[0]} />
-          <AnimatedGradientShape className="w-24 h-24 bottom-24 right-20" initial={{ y: 10, x: -5 }} animate={{ y: -10, x: 5 }} gradient={STATIC_MEDIA.gradients[1]} />
-          <div className="text-center z-20 relative">
-            <motion.h1 variants={fadeIn} className="text-4xl sm:text-5xl lg:text-6xl font-bold text-slate-800 mb-6 leading-tight">
-              A Region of Unmatched Potential.<br /> A Community with Unmet Needs.
-            </motion.h1>
-            <motion.p variants={{...fadeIn, transition: {...fadeIn.transition, delay: 0.2}}} className="font-sans text-lg md:text-xl text-slate-600 mt-6 max-w-4xl mx-auto leading-relaxed">
-              The San Francisco Bay Area is a global engine of innovation, fueled by incredible wealth and human capital. Yet, this prosperity exists alongside deep-seated community challenges. Our work begins by understanding the true scale of both the resources and the need.
-            </motion.p>
-          </div>
-          <motion.div 
-            variants={{ hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.1, delayChildren: 0.5 } } }}
-            className="grid grid-cols-2 md:grid-cols-4 gap-x-4 sm:gap-x-8 gap-y-10 sm:gap-y-12 mt-20 w-full max-w-6xl z-10 font-sans text-center"
-          >
-            <motion.div variants={fadeIn}>
-              <Users className="h-8 sm:h-10 w-8 sm:w-10 mx-auto text-sky-500 mb-2" />
-              <AnimatedCounter targetValue={7700000} formatValue={formatNumber} className="text-3xl sm:text-4xl font-bold text-sky-600" />
-              <p className="text-xs sm:text-sm font-medium text-slate-500 mt-1">Bay Area Residents</p>
-            </motion.div>
-            <motion.div variants={fadeIn}>
-              <Heart className="h-8 sm:h-10 w-8 sm:w-10 mx-auto text-rose-500 mb-2" />
-              <AnimatedCounter targetValue={33000} formatValue={formatNumber} className="text-3xl sm:text-4xl font-bold text-rose-600" />
-              <p className="text-xs sm:text-sm font-medium text-slate-500 mt-1">Nonprofits</p>
-            </motion.div>
-            <motion.div variants={fadeIn}>
-              <Briefcase className="h-8 sm:h-10 w-8 sm:w-10 mx-auto text-amber-500 mb-2" />
-              <AnimatedCounter targetValue={8000} formatValue={formatNumber} className="text-3xl sm:text-4xl font-bold text-amber-600" />
-              <p className="text-xs sm:text-sm font-medium text-slate-500 mt-1">Foundations</p>
-            </motion.div>
-            <motion.div variants={fadeIn}>
-               <BarChart3 className="h-8 sm:h-10 w-8 sm:w-10 mx-auto text-teal-500 mb-2" />
-              <AnimatedCounter targetValue={13000000000} duration={3000} formatValue={formatCurrency} className="text-3xl sm:text-4xl font-bold text-teal-600" />
-              <p className="text-xs sm:text-sm font-medium text-slate-500 mt-1">Given Annually</p>
-            </motion.div>
-            <motion.div variants={fadeIn}>
-                <Home className="h-8 sm:h-10 w-8 sm:w-10 mx-auto text-red-500" />
-                <AnimatedCounter targetValue={38000} formatValue={formatNumber} className="text-3xl sm:text-4xl font-bold text-red-600" />
-                <p className="text-xs sm:text-sm font-medium text-slate-500 mt-1">People Experiencing Homelessness</p>
-            </motion.div>
-            <motion.div variants={fadeIn}>
-                <AlertTriangle className="h-8 sm:h-10 w-8 sm:w-10 mx-auto text-orange-500" />
-                <AnimatedCounter targetValue={20} formatValue={formatPercentage} className="text-3xl sm:text-4xl font-bold text-orange-600" />
-                <p className="text-xs sm:text-sm font-medium text-slate-500 mt-1">Residents Living in Poverty</p>
-            </motion.div>
-            <motion.div variants={fadeIn}>
-                <Building className="h-8 sm:h-10 w-8 sm:w-10 mx-auto text-indigo-500" />
-                <AnimatedCounter targetValue={45} formatValue={formatPercentage} className="text-3xl sm:text-4xl font-bold text-indigo-600" />
-                <p className="text-xs sm:text-sm font-medium text-slate-500 mt-1">Renters Who Are Rent-Burdened</p>
-            </motion.div>
-             <motion.div variants={fadeIn}>
-                <Coffee className="h-8 sm:h-10 w-8 sm:w-10 mx-auto text-blue-500" />
-                <AnimatedCounter targetValue={25} formatValue={formatPercentage} className="text-3xl sm:text-4xl font-bold text-blue-600" />
-                <p className="text-xs sm:text-sm font-medium text-slate-500 mt-1">Households Facing Food Insecurity</p>
-            </motion.div>
-          </motion.div>
-          <ScrollArrow className="absolute bottom-4 left-1/2 -translate-x-1/2" />
-        </StorySection>
-        
-        <StorySection>
-            <AnimatedGradientShape className="w-56 h-56 bottom-16 left-10" initial={{ scale: 0.9 }} animate={{ scale: 1.1 }} gradient={STATIC_MEDIA.gradients[2]} />
-            <div className="grid lg:grid-cols-2 gap-16 items-center">
-                <motion.div variants={fadeIn} className="text-left z-10">
-                    <h2 className="text-4xl font-bold text-slate-800 leading-tight">From Complexity to Clarity</h2>
-                    <div className="font-sans text-lg text-slate-600 mt-6 space-y-4 leading-relaxed">
-                        <p>The numbers tell a story of a fractured landscape. Vital information is scattered across thousands of foundation websites, outdated databases, and word-of-mouth networks. For nonprofits, this means countless hours lost on prospecting instead of mission-driven work. For funders, it creates a blind spot, making it difficult to discover emerging organizations and new solutions.</p>
-                        <p className="text-slate-700 font-semibold">This inefficiency is a tax on progress. It slows down the very work that aims to uplift our communities.</p>
-                        <p>1RFP was created to solve this problem. Our mission is to build a centralized, intelligent, and equitable platform that serves as the connective tissue for the Bay Area's social impact sector. We use technology not as an end, but as a means to foster deeper human connection, build stronger partnerships, and accelerate the flow of resources to where they are needed most.</p>
-                    </div>
-                </motion.div>
-                <motion.div 
-                  variants={{ hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.1, delayChildren: 0.2 } } }}
-                  className="grid grid-cols-3 grid-rows-3 gap-3 aspect-[4/3] z-10"
-                >
-                    <motion.div variants={fadeIn} className="col-span-2 row-span-2 rounded-lg bg-cover bg-center shadow-lg" style={{backgroundImage: `url(${STATIC_MEDIA.collage[0]})`}}></motion.div>
-                    <motion.div variants={fadeIn} className="col-span-1 row-span-1 rounded-lg bg-cover bg-center shadow-lg" style={{backgroundImage: `url(${STATIC_MEDIA.collage[1]})`}}></motion.div>
-                    <motion.div variants={fadeIn} className="col-span-1 row-span-2 rounded-lg bg-cover bg-center shadow-lg" style={{backgroundImage: `url(${STATIC_MEDIA.collage[2]})`}}></motion.div>
-                    <motion.div variants={fadeIn} className="col-span-1 row-span-1 rounded-lg bg-cover bg-center shadow-lg" style={{backgroundImage: `url(${STATIC_MEDIA.collage[3]})`}}></motion.div>
-                    <motion.div variants={fadeIn} className="col-span-1 row-span-1 rounded-lg bg-cover bg-center shadow-lg" style={{backgroundImage: `url(${STATIC_MEDIA.collage[4]})`}}></motion.div>
-                </motion.div>
+            <StorySection>
+            <AnimatedGradientShape className="w-48 h-48 top-20 left-16" initial={{ y: -15, x: 5 }} animate={{ y: 15, x: -5 }} gradient={STATIC_MEDIA.gradients[0]} />
+            <AnimatedGradientShape className="w-24 h-24 bottom-24 right-20" initial={{ y: 10, x: -5 }} animate={{ y: -10, x: 5 }} gradient={STATIC_MEDIA.gradients[1]} />
+            <div className="text-center z-20 relative">
+                <motion.h1 variants={fadeIn} className="text-4xl sm:text-5xl lg:text-6xl font-bold text-slate-800 mb-6 leading-tight">
+                A Region of Unmatched Potential.<br /> A Community with Unmet Needs.
+                </motion.h1>
+                <motion.p variants={{...fadeIn, transition: {...fadeIn.transition, delay: 0.2}}} className="font-sans text-lg md:text-xl text-slate-600 mt-6 max-w-4xl mx-auto leading-relaxed">
+                The San Francisco Bay Area is a global engine of innovation, fueled by incredible wealth and human capital. Yet, this prosperity exists alongside deep-seated community challenges. Our work begins by understanding the true scale of both the resources and the need.
+                </motion.p>
             </div>
-        </StorySection>
-
-        <StorySection>
-            <AnimatedGradientShape className="w-40 h-40 top-16 right-16" initial={{ y: -15, rotate: 0 }} animate={{ y: 15, rotate: 90 }} gradient={STATIC_MEDIA.gradients[3]} />
-            <div className="text-center mb-12 md:mb-16 z-10">
-                <motion.h2 variants={fadeIn} className="text-3xl md:text-4xl font-bold text-slate-800">A Bridge Built from Both Sides</motion.h2>
-                <motion.p variants={{...fadeIn, transition: {...fadeIn.transition, delay:0.2}}} className="font-sans text-lg text-slate-500 mt-2 max-w-2xl mx-auto">Our advisory board has direct experience from both sides of the funding table.</motion.p>
-            </div>
-            
             <motion.div 
-              variants={{ hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.1, delayChildren: 0.4 } } }}
-              className="grid grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 w-full max-w-6xl z-10"
+                variants={{ hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.1, delayChildren: 0.5 } } }}
+                className="grid grid-cols-2 md:grid-cols-4 gap-x-4 sm:gap-x-8 gap-y-10 sm:gap-y-12 mt-20 w-full max-w-6xl z-10 font-sans text-center"
             >
-                {advisoryBoard.map((member, index) => (
-                    <AdvisoryCard 
-                        key={index}
-                        member={member}
-                        isExpanded={index === expandedIndex}
-                        onToggle={() => setExpandedIndex(expandedIndex === index ? null : index)}
-                    />
-                ))}
-            </motion.div>
-        </StorySection>
-
-        <StorySection>
-            <AnimatedGradientShape className="w-64 h-64 bottom-16 right-16" initial={{ y: 15, x: -10 }} animate={{ y: -15, x: 10 }} gradient={STATIC_MEDIA.gradients[4]} />
-            <div className="grid md:grid-cols-2 gap-12 lg:gap-20 items-center w-full max-w-6xl z-10">
                 <motion.div variants={fadeIn}>
-                    <img src={STATIC_MEDIA.map} alt="Map of the 9 Bay Area counties" className="w-full h-auto object-contain drop-shadow-xl" />
+                <Users className="h-8 sm:h-10 w-8 sm:w-10 mx-auto text-sky-500 mb-2" />
+                <AnimatedCounter targetValue={7700000} formatValue={formatNumber} className="text-3xl sm:text-4xl font-bold text-sky-600" />
+                <p className="text-xs sm:text-sm font-medium text-slate-500 mt-1">Bay Area Residents</p>
                 </motion.div>
-                <motion.div variants={{...fadeIn, transition: {...fadeIn.transition, delay:0.2}}}>
-                    <div className="inline-block bg-rose-100 p-3 rounded-full mb-4">
-                        <Heart className="h-8 w-8 text-rose-600" />
-                    </div>
-                    <h2 className="text-3xl font-bold text-slate-800">Committed to Home</h2>
-                    <p className="font-sans text-lg text-slate-600 mt-4 leading-relaxed">
-                        1RFP is exclusively for and about the 9-county San Francisco Bay Area. This local focus is our greatest strength. It allows us to build deeper relationships, provide more relevant data, and truly understand the nuanced challenges and opportunities our communities face. 
-                    </p>
-                     <div className="mt-6 font-sans border-t border-slate-200 pt-6">
-                        <p className="font-semibold text-slate-700 mb-3">Serving the counties of:</p>
-                        <ul className="grid grid-cols-2 gap-x-4 gap-y-2 text-slate-500">
-                            <li>Alameda</li>
-                            <li>Contra Costa</li>
-                            <li>Marin</li>
-                            <li>Napa</li>
-                            <li>San Francisco</li>
-                            <li>San Mateo</li>
-                            <li>Santa Clara</li>
-                            <li>Solano</li>
-                            <li>Sonoma</li>
-                        </ul>
-                    </div>
+                <motion.div variants={fadeIn}>
+                <Heart className="h-8 sm:h-10 w-8 sm:w-10 mx-auto text-rose-500 mb-2" />
+                <AnimatedCounter targetValue={33000} formatValue={formatNumber} className="text-3xl sm:text-4xl font-bold text-rose-600" />
+                <p className="text-xs sm:text-sm font-medium text-slate-500 mt-1">Nonprofits</p>
                 </motion.div>
-            </div>
-        </StorySection>
-      </div>
-    </div>
+                <motion.div variants={fadeIn}>
+                <Briefcase className="h-8 sm:h-10 w-8 sm:w-10 mx-auto text-amber-500 mb-2" />
+                <AnimatedCounter targetValue={8000} formatValue={formatNumber} className="text-3xl sm:text-4xl font-bold text-amber-600" />
+                <p className="text-xs sm:text-sm font-medium text-slate-500 mt-1">Foundations</p>
+                </motion.div>
+                <motion.div variants={fadeIn}>
+                <BarChart3 className="h-8 sm:h-10 w-8 sm:w-10 mx-auto text-teal-500 mb-2" />
+                <AnimatedCounter targetValue={13000000000} duration={3000} formatValue={formatCurrency} className="text-3xl sm:text-4xl font-bold text-teal-600" />
+                <p className="text-xs sm:text-sm font-medium text-slate-500 mt-1">Given Annually</p>
+                </motion.div>
+                <motion.div variants={fadeIn}>
+                    <Home className="h-8 sm:h-10 w-8 sm:w-10 mx-auto text-red-500" />
+                    <AnimatedCounter targetValue={38000} formatValue={formatNumber} className="text-3xl sm:text-4xl font-bold text-red-600" />
+                    <p className="text-xs sm:text-sm font-medium text-slate-500 mt-1">People Experiencing Homelessness</p>
+                </motion.div>
+                <motion.div variants={fadeIn}>
+                    <AlertTriangle className="h-8 sm:h-10 w-8 sm:w-10 mx-auto text-orange-500" />
+                    <AnimatedCounter targetValue={20} formatValue={formatPercentage} className="text-3xl sm:text-4xl font-bold text-orange-600" />
+                    <p className="text-xs sm:text-sm font-medium text-slate-500 mt-1">Residents Living in Poverty</p>
+                </motion.div>
+                <motion.div variants={fadeIn}>
+                    <Building className="h-8 sm:h-10 w-8 sm:w-10 mx-auto text-indigo-500" />
+                    <AnimatedCounter targetValue={45} formatValue={formatPercentage} className="text-3xl sm:text-4xl font-bold text-indigo-600" />
+                    <p className="text-xs sm:text-sm font-medium text-slate-500 mt-1">Renters Who Are Rent-Burdened</p>
+                </motion.div>
+                <motion.div variants={fadeIn}>
+                    <Coffee className="h-8 sm:h-10 w-8 sm:w-10 mx-auto text-blue-500" />
+                    <AnimatedCounter targetValue={25} formatValue={formatPercentage} className="text-3xl sm:text-4xl font-bold text-blue-600" />
+                    <p className="text-xs sm:text-sm font-medium text-slate-500 mt-1">Households Facing Food Insecurity</p>
+                </motion.div>
+            </motion.div>
+            <ScrollArrow className="absolute bottom-4 left-1/2 -translate-x-1/2" />
+            </StorySection>
+            
+            <StorySection>
+                <AnimatedGradientShape className="w-56 h-56 bottom-16 left-10" initial={{ scale: 0.9 }} animate={{ scale: 1.1 }} gradient={STATIC_MEDIA.gradients[2]} />
+                <div className="grid lg:grid-cols-2 gap-16 items-center">
+                    <motion.div variants={fadeIn} className="text-left z-10">
+                        <h2 className="text-4xl font-bold text-slate-800 leading-tight">From Complexity to Clarity</h2>
+                        <div className="font-sans text-lg text-slate-600 mt-6 space-y-4 leading-relaxed">
+                            <p>The numbers tell a story of a fractured landscape. Vital information is scattered across thousands of foundation websites, outdated databases, and word-of-mouth networks. For nonprofits, this means countless hours lost on prospecting instead of mission-driven work. For funders, it creates a blind spot, making it difficult to discover emerging organizations and new solutions.</p>
+                            <p className="text-slate-700 font-semibold">This inefficiency is a tax on progress. It slows down the very work that aims to uplift our communities.</p>
+                            <p>1RFP was created to solve this problem. Our mission is to build a centralized, intelligent, and equitable platform that serves as the connective tissue for the Bay Area's social impact sector. We use technology not as an end, but as a means to foster deeper human connection, build stronger partnerships, and accelerate the flow of resources to where they are needed most.</p>
+                        </div>
+                    </motion.div>
+                    <motion.div 
+                    variants={{ hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.1, delayChildren: 0.2 } } }}
+                    className="grid grid-cols-3 grid-rows-3 gap-3 aspect-[4/3] z-10"
+                    >
+                        <motion.div variants={fadeIn} className="col-span-2 row-span-2 rounded-lg bg-cover bg-center shadow-lg" style={{backgroundImage: `url(${STATIC_MEDIA.collage[0]})`}}></motion.div>
+                        <motion.div variants={fadeIn} className="col-span-1 row-span-1 rounded-lg bg-cover bg-center shadow-lg" style={{backgroundImage: `url(${STATIC_MEDIA.collage[1]})`}}></motion.div>
+                        <motion.div variants={fadeIn} className="col-span-1 row-span-2 rounded-lg bg-cover bg-center shadow-lg" style={{backgroundImage: `url(${STATIC_MEDIA.collage[2]})`}}></motion.div>
+                        <motion.div variants={fadeIn} className="col-span-1 row-span-1 rounded-lg bg-cover bg-center shadow-lg" style={{backgroundImage: `url(${STATIC_MEDIA.collage[3]})`}}></motion.div>
+                        <motion.div variants={fadeIn} className="col-span-1 row-span-1 rounded-lg bg-cover bg-center shadow-lg" style={{backgroundImage: `url(${STATIC_MEDIA.collage[4]})`}}></motion.div>
+                    </motion.div>
+                </div>
+            </StorySection>
+
+            <StorySection>
+                <AnimatedGradientShape className="w-40 h-40 top-16 right-16" initial={{ y: -15, rotate: 0 }} animate={{ y: 15, rotate: 90 }} gradient={STATIC_MEDIA.gradients[3]} />
+                <div className="text-center mb-12 md:mb-16 z-10">
+                    <motion.h2 variants={fadeIn} className="text-3xl md:text-4xl font-bold text-slate-800">A Bridge Built from Both Sides</motion.h2>
+                    <motion.p variants={{...fadeIn, transition: {...fadeIn.transition, delay:0.2}}} className="font-sans text-lg text-slate-500 mt-2 max-w-2xl mx-auto">Our advisory board has direct experience from both sides of the funding table.</motion.p>
+                </div>
+                
+                <motion.div 
+                variants={{ hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.1, delayChildren: 0.4 } } }}
+                className="grid grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 w-full max-w-6xl z-10"
+                >
+                    {advisoryBoard.map((member, index) => (
+                        <AdvisoryCard 
+                            key={index}
+                            member={member}
+                            isExpanded={index === expandedIndex}
+                            onToggle={() => setExpandedIndex(expandedIndex === index ? null : index)}
+                        />
+                    ))}
+                </motion.div>
+            </StorySection>
+
+            <StorySection>
+                <AnimatedGradientShape className="w-64 h-64 bottom-16 right-16" initial={{ y: 15, x: -10 }} animate={{ y: -15, x: 10 }} gradient={STATIC_MEDIA.gradients[4]} />
+                <div className="grid md:grid-cols-2 gap-12 lg:gap-20 items-center w-full max-w-6xl z-10">
+                    <motion.div variants={fadeIn}>
+                        <img src={STATIC_MEDIA.map} alt="Map of the 9 Bay Area counties" className="w-full h-auto object-contain drop-shadow-xl" />
+                    </motion.div>
+                    <motion.div variants={{...fadeIn, transition: {...fadeIn.transition, delay:0.2}}}>
+                        <div className="inline-block bg-rose-100 p-3 rounded-full mb-4">
+                            <Heart className="h-8 w-8 text-rose-600" />
+                        </div>
+                        <h2 className="text-3xl font-bold text-slate-800">Committed to Home</h2>
+                        <p className="font-sans text-lg text-slate-600 mt-4 leading-relaxed">
+                            1RFP is exclusively for and about the 9-county San Francisco Bay Area. This local focus is our greatest strength. It allows us to build deeper relationships, provide more relevant data, and truly understand the nuanced challenges and opportunities our communities face. 
+                        </p>
+                        <div className="mt-6 font-sans border-t border-slate-200 pt-6">
+                            <p className="font-semibold text-slate-700 mb-3">Serving the counties of:</p>
+                            <ul className="grid grid-cols-2 gap-x-4 gap-y-2 text-slate-500">
+                                <li>Alameda</li>
+                                <li>Contra Costa</li>
+                                <li>Marin</li>
+                                <li>Napa</li>
+                                <li>San Francisco</li>
+                                <li>San Mateo</li>
+                                <li>Santa Clara</li>
+                                <li>Solano</li>
+                                <li>Sonoma</li>
+                            </ul>
+                        </div>
+                    </motion.div>
+                </div>
+            </StorySection>
+        </div>
+        </div>
+    </PublicPageLayout>
   );
 };
 

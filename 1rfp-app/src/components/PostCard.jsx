@@ -4,6 +4,7 @@ import { supabase } from '../supabaseClient';
 import { useOutletContext } from 'react-router-dom';
 import { ThumbsUp, Heart, Lightbulb, PartyPopper, Share2, MoreHorizontal, Trash2, MessageSquare } from 'lucide-react';
 import CommentSection from './CommentSection.jsx';
+import Avatar from './Avatar.jsx';
 
 const reactions = [
     { type: 'like', Icon: ThumbsUp, color: 'bg-blue-500', label: 'Like' },
@@ -27,28 +28,24 @@ const timeAgo = (date) => {
     return Math.floor(seconds) + "s";
 };
 
-const getInitials = (name) => {
-    if (!name) return '?';
-    const words = name.split(' ');
-    if (words.length > 1 && words[1]) return (words[0][0] + words[1][0]).toUpperCase();
-    return (words[0] || '').substring(0, 2).toUpperCase();
-};
-
 const ReactorsText = ({ likeCount, sample }) => {
-    if (!likeCount) return null;
-    if (!sample || sample.length === 0) {
-        return <span className="ml-2 font-medium text-slate-600 hover:underline">{likeCount}</span>;
+    if (!likeCount || likeCount < 1) {
+        return null;
     }
-    
-    const firstName = sample[0].split(' ')[0];
+    const firstName = sample?.[0]?.split(' ')?.[0];
 
-    if (likeCount === 1) {
-        return <span className="ml-2 font-medium text-slate-600 hover:underline">{firstName}</span>;
+    let output;
+    if (likeCount === 1 && firstName) {
+        output = firstName;
+    } else if (likeCount > 1 && firstName) {
+        output = `${firstName} + ${likeCount - 1} others`;
+    } else {
+        output = likeCount;
     }
-    
+
     return (
         <span className="ml-2 font-medium text-slate-600 hover:underline">
-            {firstName} and {likeCount - 1} others
+            {output}
         </span>
     );
 };
@@ -113,10 +110,8 @@ export default function PostCard({ post, onDelete }) {
 
         if (reactionType === selectedReaction) {
             setSelectedReaction(null);
-            setLikeCount(prev => prev - 1);
             await supabase.from('post_likes').delete().match({ post_id: post.id, user_id: currentUserProfile.id });
         } else {
-            if (!selectedReaction) setLikeCount(prev => prev + 1);
             setSelectedReaction(reactionType);
             await supabase.from('post_likes').upsert({ post_id: post.id, user_id: currentUserProfile.id, reaction_type: reactionType }, { onConflict: 'post_id, user_id' });
         }
@@ -166,7 +161,7 @@ export default function PostCard({ post, onDelete }) {
         <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
             <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center space-x-3">
-                    <div className="w-11 h-11 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-lg flex-shrink-0">{getInitials(author.full_name)}</div>
+                    <Avatar src={author.avatar_url} fullName={author.full_name} size="md" />
                     <div>
                         <p className="font-bold text-slate-800">{author.full_name}</p>
                         <p className="text-xs text-slate-500">{author.organization_name || author.role}</p>

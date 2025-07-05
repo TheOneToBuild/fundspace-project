@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import footerLogoImage from '../assets/1rfp-footer-logo.png';
 import { Facebook, Twitter, Linkedin, Youtube, Instagram } from './Icons.jsx';
 
+// MODIFIED: Removed the "bgColor" prop.
 export default function Footer() {
   const productLinks = [
     { to: "/how-it-works", text: "How 1RFP Works" },
@@ -33,7 +34,7 @@ export default function Footer() {
   ];
 
   return (
-    // FIX: Removed the top border class to eliminate the line
+    // MODIFIED: Changed the background to be permanently transparent.
     <footer className="py-12 bg-transparent">
       <div className="container mx-auto px-6">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
@@ -66,7 +67,6 @@ export default function Footer() {
             </ul>
           </div>
         </div>
-        {/* FIX: Also removed the border from this internal separator */}
         <div className="pt-8 flex flex-col sm:flex-row justify-between items-center">
           <p className="text-base text-slate-500 mb-4 sm:mb-0">&copy; {new Date().getFullYear()} 1RFP. All rights reserved.</p>
           <div className="flex space-x-4 text-slate-500">

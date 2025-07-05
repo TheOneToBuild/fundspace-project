@@ -2,6 +2,8 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Map, CheckCircle2, Rocket, Users, Bot, BarChart3, Globe } from './components/Icons.jsx';
+// MODIFIED: Import the PublicPageLayout component
+import PublicPageLayout from './components/PublicPageLayout.jsx';
 
 const STATIC_MEDIA = {
     shapes: [
@@ -107,48 +109,52 @@ const RoadmapItem = ({ item, isLast }) => {
 
 const RoadmapPage = () => {
   return (
-    <div className="relative bg-gradient-to-br from-rose-50 via-orange-50 to-yellow-50 py-16 md:py-24 overflow-hidden">
-      <AnimatedShape className="w-64 h-64 top-1/4 left-10" imageUrl={STATIC_MEDIA.shapes[0]} />
-      <AnimatedShape className="w-80 h-80 top-1/2 right-[-100px]" imageUrl={STATIC_MEDIA.shapes[1]} />
-      <AnimatedShape className="w-48 h-48 bottom-1/4 left-[-50px]" imageUrl={STATIC_MEDIA.shapes[2]} />
+    // MODIFIED: Wrap the component in PublicPageLayout and provide the gradient class
+    <PublicPageLayout bgColor="bg-gradient-to-br from-rose-50 via-orange-50 to-yellow-50">
+      {/* MODIFIED: Removed the hardcoded background class from this div */}
+      <div className="relative py-16 md:py-24 overflow-hidden">
+        <AnimatedShape className="w-64 h-64 top-1/4 left-10" imageUrl={STATIC_MEDIA.shapes[0]} />
+        <AnimatedShape className="w-80 h-80 top-1/2 right-[-100px]" imageUrl={STATIC_MEDIA.shapes[1]} />
+        <AnimatedShape className="w-48 h-48 bottom-1/4 left-[-50px]" imageUrl={STATIC_MEDIA.shapes[2]} />
 
-      <div className="container mx-auto px-4 relative z-10">
-        <div className="text-center mb-12 md:mb-20">
-          <motion.div
-            initial={{ scale: 0.8, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ duration: 0.8, ease: 'easeOut' }}
-            className="inline-block bg-blue-100 p-3 rounded-full mb-4"
-          >
-            <Map className="h-8 w-8 text-blue-600" />
-          </motion.div>
-          <motion.h1 
-            initial={{ y: 20, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ duration: 0.8, delay: 0.2, ease: 'easeOut' }}
-            className="text-4xl md:text-5xl font-extrabold text-slate-900 mb-4"
-          >
-            Our Platform Roadmap
-          </motion.h1>
-          <motion.p 
-            initial={{ y: 20, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ duration: 0.8, delay: 0.4, ease: 'easeOut' }}
-            className="text-lg md:text-xl text-slate-600 max-w-3xl mx-auto font-sans"
-          >
-            We're building the future of grantseeking. Here's a look at our journey and what's next on the horizon.
-          </motion.p>
-        </div>
+        <div className="container mx-auto px-4 relative z-10">
+          <div className="text-center mb-12 md:mb-20">
+            <motion.div
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ duration: 0.8, ease: 'easeOut' }}
+              className="inline-block bg-blue-100 p-3 rounded-full mb-4"
+            >
+              <Map className="h-8 w-8 text-blue-600" />
+            </motion.div>
+            <motion.h1 
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ duration: 0.8, delay: 0.2, ease: 'easeOut' }}
+              className="text-4xl md:text-5xl font-extrabold text-slate-900 mb-4"
+            >
+              Our Platform Roadmap
+            </motion.h1>
+            <motion.p 
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ duration: 0.8, delay: 0.4, ease: 'easeOut' }}
+              className="text-lg md:text-xl text-slate-600 max-w-3xl mx-auto font-sans"
+            >
+              We're building the future of grantseeking. Here's a look at our journey and what's next on the horizon.
+            </motion.p>
+          </div>
 
-        <div className="max-w-3xl mx-auto">
-          <div className="space-y-8">
-            {roadmapData.map((item, index) => (
-              <RoadmapItem key={item.phase} item={item} isLast={index === roadmapData.length - 1} />
-            ))}
+          <div className="max-w-3xl mx-auto">
+            <div className="space-y-8">
+              {roadmapData.map((item, index) => (
+                <RoadmapItem key={item.phase} item={item} isLast={index === roadmapData.length - 1} />
+              ))}
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </PublicPageLayout>
   );
 };
 

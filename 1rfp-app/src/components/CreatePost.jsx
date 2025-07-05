@@ -1,21 +1,14 @@
-// src/components/CreatePost.jsx
 import React, { useState } from 'react';
 import { supabase } from '../supabaseClient';
 import { Camera, Video, Smile } from 'lucide-react';
+import Avatar from './Avatar.jsx'; // Import the new Avatar component
 
-// --- MODIFIED: Added onNewPost to the props ---
 export default function CreatePost({ profile, onNewPost }) {
     const [postText, setPostText] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
 
-    const getInitials = (name) => {
-        if (!name) return '?';
-        const words = name.split(' ');
-        if (words.length > 1 && words[1]) return (words[0][0] + words[1][0]).toUpperCase();
-        if (words.length > 0 && words[0]) return words[0].substring(0, 2).toUpperCase();
-        return '?';
-    };
+    // The getInitials function can now be removed from this file.
 
     const handlePostSubmit = async () => {
         if (!postText.trim() || !profile) return;
@@ -31,7 +24,6 @@ export default function CreatePost({ profile, onNewPost }) {
             return;
         }
 
-        // --- MODIFIED: Added .select() to get the new post data back ---
         const { data: newPost, error: postError } = await supabase
             .from('posts')
             .insert({
@@ -40,13 +32,12 @@ export default function CreatePost({ profile, onNewPost }) {
                 profile_id: profile.id
             })
             .select()
-            .single(); // Use .single() to get the object directly
+            .single();
 
         if (postError) {
             setError('Failed to create post. Please try again.');
             console.error('Error creating post:', postError);
         } else {
-            // --- MODIFIED: Call the onNewPost function from the parent ---
             if (onNewPost && newPost) {
                 onNewPost(newPost);
             }
@@ -58,9 +49,8 @@ export default function CreatePost({ profile, onNewPost }) {
     return (
         <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 mb-6">
             <div className="flex items-start space-x-3">
-                <div className="w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-sm flex-shrink-0">
-                    {getInitials(profile?.full_name)}
-                </div>
+                {/* MODIFIED: Use the Avatar component */}
+                <Avatar src={profile?.avatar_url} fullName={profile?.full_name} size="md" />
                 <div className="flex-1">
                     <textarea
                         placeholder={`What's on your mind, ${profile?.full_name?.split(' ')[0] || 'there'}?`}

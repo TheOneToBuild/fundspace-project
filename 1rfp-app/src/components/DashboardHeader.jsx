@@ -1,8 +1,8 @@
 // src/components/DashboardHeader.jsx
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, NavLink } from 'react-router-dom';
-import AuthButton from './AuthButton';
 import NotificationsPanel from './NotificationsPanel';
+import UserMenu from './UserMenu.jsx'; // Import the reusable UserMenu component
 import headerLogoImage from '../assets/1rfp-logo.png';
 import { Search, PlusCircle, Home, Building, FileText, ClipboardList, Bell } from './Icons';
 
@@ -17,9 +17,11 @@ const HeaderNavLink = ({ to, children, Icon }) => {
     return (<NavLink to={to} end className={navLinkClass}><Icon className="h-6 w-6" /><span className="text-xs font-medium">{children}</span></NavLink>);
 };
 
-export default function DashboardHeader({ notifications, unreadCount, onPanelToggle }) {
+export default function DashboardHeader({ profile, notifications, unreadCount, onPanelToggle }) {
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const panelRef = useRef(null);
+
+  // Note: All logic for the user dropdown has been moved to UserMenu.jsx
 
   const handlePanelToggle = () => {
     if (!isPanelOpen && unreadCount > 0) {
@@ -55,7 +57,7 @@ export default function DashboardHeader({ notifications, unreadCount, onPanelTog
             <HeaderNavLink to="/profile/funders" Icon={Building}>Funders</HeaderNavLink>
             <HeaderNavLink to="/profile/nonprofits" Icon={FileText}>Nonprofits</HeaderNavLink>
           </nav>
-          <div className="flex items-center space-x-4 flex-1 justify-end">
+          <div className="flex items-center space-x-2 sm:space-x-4 flex-1 justify-end">
             <Link to="/submit-grant" className="hidden sm:inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 shadow-sm">
               <PlusCircle size={16} className="mr-2" />
               Submit Grant
@@ -67,7 +69,9 @@ export default function DashboardHeader({ notifications, unreadCount, onPanelTog
                 </button>
                 {isPanelOpen && <NotificationsPanel notifications={notifications} onClose={() => setIsPanelOpen(false)} />}
             </div>
-            <AuthButton />
+            
+            {/* MODIFIED: Replaced all dropdown logic with the reusable UserMenu component */}
+            <UserMenu profile={profile} />
           </div>
         </div>
       </div>

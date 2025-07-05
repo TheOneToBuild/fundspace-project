@@ -1,97 +1,54 @@
 // src/ProfilePage.jsx
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useContext } from 'react';
 import { supabase } from './supabaseClient';
-import { useNavigate, Outlet } from 'react-router-dom';
+import { useNavigate, Outlet, useOutletContext } from 'react-router-dom';
 import ProfileLayout from './components/ProfileLayout.jsx';
 import GrantDetailModal from './GrantDetailModal.jsx';
+import { LayoutContext } from './App.jsx';
 
 export default function ProfilePage() {
-    const [session, setSession] = useState(null);
-    const [profile, setProfile] = useState(null);
-    const [loading, setLoading] = useState(true);
+    const { session, profile, loading, notifications, unreadCount, markNotificationsAsRead } = useOutletContext();
+    const navigate = useNavigate();
+    
+    const { setPageBgColor } = useContext(LayoutContext);
+
+    useEffect(() => {
+        // Set the grey background for all profile pages
+        setPageBgColor('bg-slate-50');
+        // Reset to a default when the user navigates away from the profile section
+        return () => setPageBgColor('bg-white');
+    }, [setPageBgColor]);
+
     const [trendingGrants, setTrendingGrants] = useState([]);
     const [savedGrants, setSavedGrants] = useState([]);
     const [isDetailModalOpen, setIsDetailModal] = useState(false);
     const [selectedGrant, setSelectedGrant] = useState(null);
     const [posts, setPosts] = useState([]);
-    const [notifications, setNotifications] = useState([]);
-    const [unreadCount, setUnreadCount] = useState(0);
 
-    const navigate = useNavigate();
-
-    const fetchLayoutData = useCallback(async (userId) => {
+    const fetchPageData = useCallback(async (userId) => {
         try {
-            const [
-                profileRes, 
-                savedGrantsRes, 
-                trendingGrantsRes, 
-                notificationsRes,
-                postsRes 
-            ] = await Promise.all([
-                supabase.from('profiles').select('*').eq('id', userId).single(),
+            const [savedGrantsRes, trendingGrantsRes, postsRes] = await Promise.all([
                 supabase.from('saved_grants').select(`id, grant_id, grants(*, funders(name, logo_url, slug))`).eq('user_id', userId).order('created_at', { ascending: false }),
                 supabase.rpc('get_trending_grants'),
-                supabase.from('notifications').select('*, actor_id(*)', { count: 'exact' }).eq('user_id', userId).order('created_at', { ascending: false }),
                 supabase.rpc('get_feed_posts', { user_id_param: userId })
             ]);
 
-            if (profileRes.error) throw profileRes.error;
-
-            if (profileRes.data) setProfile(profileRes.data);
             if (savedGrantsRes.data) setSavedGrants(savedGrantsRes.data.map(item => ({ ...item.grants, dueDate: item.grants.deadline, save_id: item.id })));
             if (trendingGrantsRes.data) setTrendingGrants(trendingGrantsRes.data);
-            if (notificationsRes.data) {
-                setNotifications(notificationsRes.data);
-                setUnreadCount(notificationsRes.data.filter(n => !n.is_read).length);
-            }
             if (postsRes.data) setPosts(postsRes.data);
-
         } catch (error) {
-            console.error("Error fetching layout data:", error);
-        } finally {
-            setLoading(false);
+            console.error("Error fetching profile page data:", error);
         }
     }, []);
     
     useEffect(() => {
-        const getSession = async () => {
-            const { data: { session } } = await supabase.auth.getSession();
-            setSession(session);
-            if (session) {
-                await fetchLayoutData(session.user.id);
-            } else {
-                navigate('/login');
-            }
-        };
-        getSession();
-
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-            setSession(session);
-            if (!session) navigate('/login');
-        });
-        return () => subscription.unsubscribe();
-    }, [navigate, fetchLayoutData]);
-
-    // This real-time listener is for notifications, which is still very useful.
-    useEffect(() => {
-        if (session) {
-            const channel = supabase.channel(`profile-notifications:${session.user.id}`);
-            channel
-                .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${session.user.id}` }, async (payload) => {
-                     const { data: actor } = await supabase.from('profiles').select('*').eq('id', payload.new.actor_id).single();
-                    if(actor){
-                        const newNotification = { ...payload.new, actor_id: actor };
-                        setNotifications(current => [newNotification, ...current]);
-                        setUnreadCount(current => current + 1);
-                    }
-                })
-                .subscribe();
-
-            return () => {
-                supabase.removeChannel(channel);
-            };
+        if (loading) return;
+        if (!session) {
+            navigate('/login');
+        } else {
+            fetchPageData(session.user.id);
         }
-    }, [session]);
+    }, [session, loading, navigate, fetchPageData]);
     
     const handleNewPost = (newPostData) => {
         const postWithProfileAndReactions = {
@@ -126,35 +83,24 @@ export default function ProfilePage() {
         }
     };
 
-    const markNotificationsAsRead = async () => {
-        if (unreadCount > 0 && session) {
-            const unreadIds = notifications.filter(n => !n.is_read).map(n => n.id);
-            if (unreadIds.length === 0) return;
-            await supabase.from('notifications').update({ is_read: true }).in('id', unreadIds);
-            setUnreadCount(0);
-            setNotifications(current => current.map(n => ({ ...n, is_read: true })));
-        }
-    };
-
     const handleSaveGrant = async (grantId) => {
         if (!session || !grantId) return;
         await supabase.from('saved_grants').insert({ user_id: session.user.id, grant_id: grantId });
-        fetchLayoutData(session.user.id);
+        fetchPageData(session.user.id);
     };
     
     const handleUnsaveGrant = async (grantId) => {
         if (!session || !grantId) return;
         await supabase.from('saved_grants').delete().match({ user_id: session.user.id, grant_id: grantId });
-        fetchLayoutData(session.user.id);
+        fetchPageData(session.user.id);
     };
-
 
     if (loading || !profile) {
         return <div className="min-h-screen bg-slate-50 flex items-center justify-center">Loading Profile...</div>;
     }
 
     return (
-        <div className="min-h-screen bg-slate-50">
+        <div className="">
             <ProfileLayout
                 profile={profile}
                 user={session?.user}

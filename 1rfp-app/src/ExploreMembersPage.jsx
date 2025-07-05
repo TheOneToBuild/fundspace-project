@@ -1,12 +1,11 @@
-// src/ExploreMembersPage.jsx
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from './supabaseClient';
 import { Link, useOutletContext } from 'react-router-dom';
 import { UserPlus, UserCheck } from 'lucide-react';
+import Avatar from './components/Avatar.jsx';
+import { Search } from './components/Icons.jsx';
 
 const MemberCard = ({ member, currentUserId, isFollowing, onFollow, onUnfollow }) => {
-    const getInitials = (name) => name ? name.split(' ').map(n => n[0]).join('').substring(0,2).toUpperCase() : '?';
-
     const handleFollowClick = (e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -16,16 +15,13 @@ const MemberCard = ({ member, currentUserId, isFollowing, onFollow, onUnfollow }
     return (
         <div className="bg-white p-5 rounded-xl border border-slate-200 hover:shadow-lg hover:-translate-y-1 transition-all flex items-center justify-between gap-4">
             <Link to={`/profile/members/${member.id}`} className="flex items-center space-x-4 flex-grow min-w-0">
-                <div className="w-14 h-14 rounded-full bg-indigo-100 text-indigo-600 flex-shrink-0 flex items-center justify-center font-bold text-xl">
-                    {getInitials(member.full_name)}
-                </div>
+                <Avatar src={member.avatar_url} fullName={member.full_name} size="lg" />
                 <div className="min-w-0">
                     <p className="font-bold text-lg text-slate-800 truncate">{member.full_name}</p>
                     <p className="text-sm text-slate-500 truncate">{member.organization_name || member.role}</p>
                 </div>
             </Link>
             
-            {/* Don't show follow button for the current user */}
             {member.id !== currentUserId && (
                 <button
                     onClick={handleFollowClick}
@@ -74,13 +70,13 @@ export default function ExploreMembersPage() {
             });
             
             if (error) console.error('Error searching profiles:', error);
-            else setMembers(data);
+            else setMembers(data.filter(m => m.id !== currentUserProfile.id));
             setLoading(false);
         };
 
         const timer = setTimeout(fetchMembers, 300);
         return () => clearTimeout(timer);
-    }, [searchTerm, roleFilter]);
+    }, [searchTerm, roleFilter, currentUserProfile.id]);
 
     useEffect(() => {
         if (currentUserProfile) {
@@ -91,12 +87,16 @@ export default function ExploreMembersPage() {
     const handleFollow = async (profileIdToFollow) => {
         if (!currentUserProfile) return;
         setFollowedIds(prev => new Set(prev).add(profileIdToFollow));
+
         const { error } = await supabase
             .from('followers')
-            .insert({ follower_id: currentUserProfile.id, following_id: profileIdToFollow });
+            .insert({ 
+                follower_id: currentUserProfile.id, 
+                following_id: profileIdToFollow 
+            });
+
         if (error) {
             console.error('Error following user:', error);
-            // Revert optimistic update on error
             setFollowedIds(prev => {
                 const newSet = new Set(prev);
                 newSet.delete(profileIdToFollow);
@@ -112,13 +112,17 @@ export default function ExploreMembersPage() {
             newSet.delete(profileIdToUnfollow);
             return newSet;
         });
+
         const { error } = await supabase
             .from('followers')
             .delete()
-            .match({ follower_id: currentUserProfile.id, following_id: profileIdToUnfollow });
+            .match({ 
+                follower_id: currentUserProfile.id, 
+                following_id: profileIdToUnfollow 
+            });
+
         if (error) {
             console.error('Error unfollowing user:', error);
-            // Revert optimistic update on error
             setFollowedIds(prev => new Set(prev).add(profileIdToUnfollow));
         }
     };
