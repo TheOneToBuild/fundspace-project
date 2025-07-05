@@ -7,6 +7,8 @@ import { getPillClasses, getGrantTypePillClasses, formatDate, getFunderTypePillC
 import GrantCard from './components/GrantCard.jsx';
 import GrantDetailModal from './GrantDetailModal.jsx';
 import FunderCard from './components/FunderCard.jsx';
+// MODIFIED: Import the PublicPageLayout component
+import PublicPageLayout from './components/PublicPageLayout.jsx';
 
 const FunderProfilePage = () => {
   const { funderSlug } = useParams();
@@ -71,9 +73,6 @@ const FunderProfilePage = () => {
       setError(null);
       
       try {
-        // --- CORRECTED AND RE-STRUCTURED DATA FETCHING LOGIC ---
-
-        // 1. First, get ONLY the main funder's ID. This is a fast query.
         const { data: funderIdData, error: funderIdError } = await supabase
             .from('funders')
             .select('id')
@@ -83,19 +82,15 @@ const FunderProfilePage = () => {
         if (funderIdError) throw funderIdError;
         const funderId = funderIdData.id;
         
-        // 2. Now, run the three main queries in parallel.
         const [funderRes, allFundersRes, grantsRes] = await Promise.all([
-            // Get the full details for the current funder using its ID
             supabase
               .from('funders')
               .select('*, funder_categories(categories(name)), funder_type:funder_type_id(name), funder_funding_locations(locations(id, name))')
               .eq('id', funderId)
               .single(),
-            // Get all funders for the "similar" section
             supabase
               .from('funders')
               .select('*, funder_categories(categories(name)), funder_type:funder_type_id(name), funder_funding_locations(locations(id, name))'),
-            // Get all grants specifically for this funder using its ID
             supabase
               .from('grants')
               .select(`*, funders(name, logo_url, slug), grant_categories(categories(id, name)), grant_locations(locations(id, name))`)
@@ -119,7 +114,6 @@ const FunderProfilePage = () => {
             setAllFunders(formattedAllFunders);
         }
         
-        // Correctly format the grants data
         const formattedGrants = (grantsRes.data || []).map(grant => ({ ...grant, foundationName: grant.funders?.name || funderData.name, funderLogoUrl: grant.funders?.logo_url || funderData.logo_url, funderSlug: grant.funders?.slug || funderData.slug, fundingAmount: grant.max_funding_amount || grant.funding_amount_text || 'Not specified', dueDate: grant.deadline, grantType: grant.grant_type, eligibility_criteria: grant.eligibility_criteria, categories: grant.grant_categories.map(gc => gc.categories), locations: grant.grant_locations.map(gl => gl.locations) }));
         setFunderGrants(formattedGrants);
 
@@ -155,7 +149,8 @@ const FunderProfilePage = () => {
   if (error || !funder) return ( <div className="text-center py-20"><p className="text-red-600">{error || "Funder not found."}</p><Link to="/funders" className="mt-4 inline-flex items-center text-blue-600 hover:underline"><ArrowLeft size={16} className="mr-1" />Back</Link></div> );
 
   return (
-    <>
+    // MODIFIED: Wrap the component in PublicPageLayout to apply the gradient background
+    <PublicPageLayout bgColor="bg-gradient-to-br from-rose-50 via-orange-50 to-yellow-50">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="max-w-8xl mx-auto">
           <div className="flex justify-between items-center mb-8">
@@ -303,7 +298,7 @@ const FunderProfilePage = () => {
         </div>
       </div>
       {isDetailModalOpen && selectedGrant && (<GrantDetailModal grant={selectedGrant} isOpen={isDetailModalOpen} onClose={closeDetail} />)}
-    </>
+    </PublicPageLayout>
   );
 };
 
