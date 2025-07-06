@@ -19,6 +19,8 @@ export default function EditOrganizationPage() {
     const [allLocations, setAllLocations] = useState([]);
     const [selectedLocationIds, setSelectedLocationIds] = useState([]);
     const [grantTypes, setGrantTypes] = useState([]);
+    const [allFunderTypes, setAllFunderTypes] = useState([]);
+    const [notablePrograms, setNotablePrograms] = useState([]);
 
     const orgType = profile.managed_nonprofit_id ? 'nonprofits' : 'funders';
     const orgId = profile.managed_nonprofit_id || profile.managed_funder_id;
@@ -57,9 +59,14 @@ export default function EditOrganizationPage() {
             .eq('id', orgId)
             .single();
         
-        // Fetch all categories (no need to fetch all locations since we're using predefined Bay Area counties)
-        const { data: allCatsData } = await supabase.from('categories').select('id, name').order('name');
-        if(allCatsData) setAllCategories(allCatsData);
+        // Fetch all categories and funder types (no need to fetch all locations since we're using predefined Bay Area counties)
+        const categoriesPromise = supabase.from('categories').select('id, name').order('name');
+        const funderTypesPromise = orgType === 'funders' ? supabase.from('funder_types').select('id, name').order('name') : Promise.resolve({ data: [] });
+        
+        const [categoriesRes, funderTypesRes] = await Promise.all([categoriesPromise, funderTypesPromise]);
+        
+        if (categoriesRes.data) setAllCategories(categoriesRes.data);
+        if (funderTypesRes.data) setAllFunderTypes(funderTypesRes.data);
 
         if (error) {
             setError('Failed to load organization data.');
@@ -83,6 +90,11 @@ export default function EditOrganizationPage() {
             // Set grant types (for funders only)
             if (orgType === 'funders' && data.grant_types) {
                 setGrantTypes(Array.isArray(data.grant_types) ? data.grant_types : []);
+            }
+            
+            // Set notable programs (for nonprofits only)
+            if (orgType === 'nonprofits' && data.notable_programs) {
+                setNotablePrograms(Array.isArray(data.notable_programs) ? data.notable_programs : []);
             }
         }
         setLoading(false);
@@ -227,6 +239,26 @@ export default function EditOrganizationPage() {
         const newGrantTypes = grantTypes.filter((_, i) => i !== index);
         setGrantTypes(newGrantTypes);
         setOrganization(prev => ({ ...prev, grant_types: newGrantTypes }));
+    };
+
+    // NEW: Handle notable programs array updates (for nonprofits)
+    const handleNotableProgramChange = (index, value) => {
+        const newNotablePrograms = [...notablePrograms];
+        newNotablePrograms[index] = value;
+        setNotablePrograms(newNotablePrograms);
+        setOrganization(prev => ({ ...prev, notable_programs: newNotablePrograms }));
+    };
+
+    const addNotableProgram = () => {
+        const newNotablePrograms = [...notablePrograms, ''];
+        setNotablePrograms(newNotablePrograms);
+        setOrganization(prev => ({ ...prev, notable_programs: newNotablePrograms }));
+    };
+
+    const removeNotableProgram = (index) => {
+        const newNotablePrograms = notablePrograms.filter((_, i) => i !== index);
+        setNotablePrograms(newNotablePrograms);
+        setOrganization(prev => ({ ...prev, notable_programs: newNotablePrograms }));
     };
 
     const handleSaveChanges = async (e) => {
@@ -374,6 +406,24 @@ export default function EditOrganizationPage() {
 
                     {orgType === 'funders' && (
                         <>
+                            {/* Funder Type */}
+                            <div className="pt-4">
+                                <label htmlFor="funder_type_id" className="text-sm font-medium text-slate-700 block mb-1">Funder Type</label>
+                                <select
+                                    id="funder_type_id"
+                                    name="funder_type_id"
+                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white"
+                                    value={organization.funder_type_id || ''}
+                                    onChange={handleInputChange}
+                                >
+                                    <option value="">Select funder type...</option>
+                                    {allFunderTypes.map(type => (
+                                        <option key={type.id} value={type.id}>{type.name}</option>
+                                    ))}
+                                </select>
+                                <p className="text-xs text-slate-500 mt-1">The type of funding organization you represent</p>
+                            </div>
+
                             {/* Geographic Scope - for funders only */}
                             <div className="pt-4">
                                 <label className="text-sm font-medium text-slate-700 block mb-2">Geographic Scope</label>
@@ -497,17 +547,102 @@ export default function EditOrganizationPage() {
                     )}
 
                     {orgType === 'nonprofits' && (
-                        <div className="pt-4">
-                            <label htmlFor="ein" className="text-sm font-medium text-slate-700 block mb-1">EIN (Tax ID)</label>
-                            <input
-                                id="ein"
-                                name="ein"
-                                className="w-full px-3 py-2 border border-slate-300 rounded-lg"
-                                type="text"
-                                value={organization.ein || ''}
-                                onChange={handleInputChange}
-                            />
-                        </div>
+                        <>
+                            {/* Annual Budget */}
+                            <div className="pt-4">
+                                <label htmlFor="budget" className="text-sm font-medium text-slate-700 block mb-1">Annual Budget</label>
+                                <input
+                                    id="budget"
+                                    name="budget"
+                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg"
+                                    type="text"
+                                    value={organization.budget || ''}
+                                    onChange={handleInputChange}
+                                    placeholder="e.g., $500K - $1M, $2.5M annually"
+                                />
+                                <p className="text-xs text-slate-500 mt-1">Your organization's approximate annual operating budget</p>
+                            </div>
+
+                            {/* Staff Count */}
+                            <div className="pt-4">
+                                <label htmlFor="staff_count" className="text-sm font-medium text-slate-700 block mb-1">Staff Count</label>
+                                <input
+                                    id="staff_count"
+                                    name="staff_count"
+                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg"
+                                    type="number"
+                                    value={organization.staff_count || ''}
+                                    onChange={handleInputChange}
+                                    placeholder="e.g., 25"
+                                />
+                                <p className="text-xs text-slate-500 mt-1">Total number of staff members (full-time and part-time)</p>
+                            </div>
+
+                            {/* Year Founded */}
+                            <div className="pt-4">
+                                <label htmlFor="year_founded" className="text-sm font-medium text-slate-700 block mb-1">Year Founded</label>
+                                <input
+                                    id="year_founded"
+                                    name="year_founded"
+                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg"
+                                    type="number"
+                                    min="1800"
+                                    max={new Date().getFullYear()}
+                                    value={organization.year_founded || ''}
+                                    onChange={handleInputChange}
+                                    placeholder="e.g., 1995"
+                                />
+                                <p className="text-xs text-slate-500 mt-1">The year your organization was established</p>
+                            </div>
+
+                            {/* Notable Programs & Initiatives */}
+                            <div className="pt-4">
+                                <label className="text-sm font-medium text-slate-700 block mb-2">Notable Programs & Initiatives</label>
+                                <div className="space-y-2">
+                                    <p className="text-xs text-slate-500">List your organization's key programs and initiatives</p>
+                                    {notablePrograms.map((program, index) => (
+                                        <div key={index} className="flex items-center space-x-2">
+                                            <input
+                                                type="text"
+                                                value={program}
+                                                onChange={(e) => handleNotableProgramChange(index, e.target.value)}
+                                                className="flex-1 px-3 py-2 border border-slate-300 rounded-lg"
+                                                placeholder="e.g., Community Health Program"
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => removeNotableProgram(index)}
+                                                className="px-3 py-2 text-red-600 hover:text-red-800 font-medium"
+                                            >
+                                                Remove
+                                            </button>
+                                        </div>
+                                    ))}
+                                    <button
+                                        type="button"
+                                        onClick={addNotableProgram}
+                                        className="inline-flex items-center px-3 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50"
+                                    >
+                                        + Add Program
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* EIN */}
+                            <div className="pt-4">
+                                <label htmlFor="ein" className="text-sm font-medium text-slate-700 block mb-1">EIN (Tax ID)</label>
+                                <input
+                                    id="ein"
+                                    name="ein"
+                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg"
+                                    type="text"
+                                    value={organization.ein || ''}
+                                    onChange={handleInputChange}
+                                    placeholder="e.g., 12-3456789"
+                                />
+                                <p className="text-xs text-slate-500 mt-1">Your organization's Employee Identification Number</p>
+                            </div>
+                        </>
                     )}
                 </div>
 

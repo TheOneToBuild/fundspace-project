@@ -1,4 +1,4 @@
-// src/App.jsx
+// src/App.jsx - EDITED
 import React, { useState, useEffect, createContext } from 'react';
 import { BrowserRouter, Routes, Route, Link, NavLink, Outlet, useOutletContext, useLocation } from 'react-router-dom';
 import ScrollToTop from './components/ScrollToTop.jsx';
@@ -28,8 +28,12 @@ import SavedGrantsPage from './SavedGrantsPage.jsx';
 import ExploreMembersPage from './ExploreMembersPage.jsx';
 import MemberProfilePage from './MemberProfilePage.jsx';
 import DashboardHomePage from './components/DashboardHomePage.jsx';
-import OrganizationSetupPage from './components/OrganizationSetupPage.jsx';
+// REMOVED: OrganizationSetupPage import (it's now handled by MyOrganizationPage)
 import AdminClaimsPage from './components/AdminClaimsPage.jsx';
+// --- NEW IMPORTS ---
+import MyOrganizationPage from './components/MyOrganizationPage.jsx';
+import EditOrganizationPage from './components/EditOrganizationPage.jsx';
+
 
 // --- Import Shared Components ---
 import AuthButton from './components/AuthButton.jsx';
@@ -233,7 +237,12 @@ export default function App() {
               <Route path="members/:profileId" element={<MemberProfilePage />} />
               <Route path="saved-grants" element={<SavedGrantsPage />} />
               <Route path="settings" element={<SettingsPage />} />
-              <Route path="my-organization" element={<OrganizationSetupPage />} />
+              
+              {/* --- EDITED AND ADDED ROUTES --- */}
+              {/* This route now correctly points to MyOrganizationPage, which handles the logic internally. */}
+              <Route path="my-organization" element={<MyOrganizationPage />} />
+              {/* This new route allows admins to access the organization edit page. */}
+              <Route path="my-organization/edit" element={<EditOrganizationPage />} />
             </Route>
           </Route>
         </Route>

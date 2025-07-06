@@ -1,30 +1,16 @@
-// src/components/OrganizationSetupPage.jsx
 import React, { useState, useEffect, useCallback } from 'react';
-import { useOutletContext, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
-import { Search, Building2, CheckCircle, PlusCircle } from 'lucide-react';
+import { Search, Building2, CheckCircle, PlusCircle, Users, Shield } from 'lucide-react';
 import CreateOrganizationModal from './CreateOrganizationModal.jsx';
-import EditOrganizationPage from './EditOrganizationPage.jsx'; // ADDED: Import the new Edit page
 
-export default function OrganizationSetupPage() {
-    const { profile, session } = useOutletContext(); // MODIFIED: Get session for profile refresh
-    const navigate = useNavigate();
-
+// EDITED: Now accepts onJoinSuccess as a prop
+export default function EnhancedOrganizationSetupPage({ onJoinSuccess }) {
     const [searchQuery, setSearchQuery] = useState('');
     const [results, setResults] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [message, setMessage] = useState('');
-    const [isLinked, setIsLinked] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
-
-    useEffect(() => {
-        if (profile?.managed_nonprofit_id || profile?.managed_funder_id) {
-            setIsLinked(true);
-        } else {
-            setIsLinked(false);
-        }
-    }, [profile]);
 
     const debouncedSearch = useCallback(
         debounce(async (query) => {
@@ -42,8 +28,6 @@ export default function OrganizationSetupPage() {
 
             if (nonprofitRes.error || funderRes.error) {
                 setError('Failed to fetch organizations.');
-                console.error(nonprofitRes.error || funderRes.error);
-                setResults([]);
             } else {
                 const nonprofits = nonprofitRes.data.map(item => ({ ...item, type: 'nonprofit' }));
                 const funders = funderRes.data.map(item => ({ ...item, type: 'funder' }));
@@ -56,10 +40,8 @@ export default function OrganizationSetupPage() {
     );
 
     useEffect(() => {
-        if (!isLinked) {
-           debouncedSearch(searchQuery);
-        }
-    }, [searchQuery, debouncedSearch, isLinked]);
+        debouncedSearch(searchQuery);
+    }, [searchQuery, debouncedSearch]);
   
     const handleClaim = async (orgId, orgType) => {
         setMessage('');
@@ -75,43 +57,67 @@ export default function OrganizationSetupPage() {
         } else {
             setMessage('Claim request submitted successfully! An admin will review it shortly.');
             setResults(currentResults => 
-                currentResults.map(r => r.id === orgId ? { ...r, requested: true } : r)
+                currentResults.map(r => r.id === orgId && r.type === orgType ? { ...r, claimRequested: true } : r)
             );
         }
     };
 
-    const handleCreationSuccess = (newOrg) => {
-        // This is a bit of a trick to force a profile refresh in the parent App.jsx
-        // A more robust solution might use a dedicated state management library.
-        supabase.auth.onAuthStateChange((event, session) => {
-            if (event === 'USER_UPDATED') {
-                // Now that the user is updated, we can set isLinked
-                setIsLinked(true); 
-            }
+    const handleJoin = async (orgId, orgType) => {
+        setMessage('');
+        setError('');
+        
+        const { error: joinError } = await supabase.rpc('join_organization', {
+            organization_id_param: orgId,
+            organization_type_param: orgType
         });
-        // Trigger a user update to fire the listener above
-        supabase.auth.updateUser({ data: { a: 1 }});
-    };
 
-    // MODIFIED: This now renders the EditOrganizationPage component when a user is linked.
-    if (isLinked) {
-      return <EditOrganizationPage />;
-    }
+        if (joinError) {
+            setError(`Error joining organization: ${joinError.message}`);
+        } else {
+            // EDITED: Call the success callback to trigger a soft refresh
+            if (onJoinSuccess) {
+                onJoinSuccess();
+            }
+        }
+    };
     
-    // The main setup UI for unlinked users
     return (
         <>
             <CreateOrganizationModal 
                 isOpen={isModalOpen}
                 onClose={() => setIsModalOpen(false)}
-                onSuccess={handleCreationSuccess}
+                onSuccess={() => {
+                    setIsModalOpen(false);
+                    if (onJoinSuccess) onJoinSuccess();
+                }}
             />
 
             <div className="bg-white p-6 sm:p-8 rounded-xl shadow-sm border border-slate-200">
-                <h1 className="text-2xl font-bold text-slate-800">Link Your Organization</h1>
+                 <h1 className="text-2xl font-bold text-slate-800">Join or Claim Your Organization</h1>
                 <p className="mt-2 text-slate-600">
-                    Search for your organization's existing profile to claim it. If you can't find it, you'll be able to create a new one.
+                    Search for your organization to join as a member or claim admin access. If you can't find it, you can create a new profile.
                 </p>
+
+                <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                        <div className="flex items-center mb-2">
+                            <Users className="w-5 h-5 text-blue-600 mr-2" />
+                            <h3 className="font-semibold text-blue-800">Join as Member</h3>
+                        </div>
+                        <p className="text-sm text-blue-700">
+                            Join your organization to connect with colleagues and be listed as a team member. No admin permissions.
+                        </p>
+                    </div>
+                    <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                        <div className="flex items-center mb-2">
+                            <Shield className="w-5 h-5 text-green-600 mr-2" />
+                            <h3 className="font-semibold text-green-800">Claim as Admin</h3>
+                        </div>
+                        <p className="text-sm text-green-700">
+                            Claim admin access to manage your organization's profile, edit details, and approve members. Requires approval.
+                        </p>
+                    </div>
+                </div>
 
                 {message && <div className="mt-4 p-3 bg-green-50 text-green-700 border border-green-200 rounded-lg">{message}</div>}
                 {error && <div className="mt-4 p-3 bg-red-50 text-red-700 border border-red-200 rounded-lg">{error}</div>}
@@ -137,26 +143,38 @@ export default function OrganizationSetupPage() {
                                 <div key={`${org.type}-${org.id}`} className="flex items-center justify-between p-4">
                                     <div className="flex items-center">
                                         <Building2 className="text-slate-500 mr-3 w-5 h-5"/>
-                                        <span className="font-medium text-slate-700">{org.name}</span>
-                                        <span className="text-xs text-slate-400 ml-2 capitalize">({org.type})</span>
+                                        <div>
+                                            <span className="font-medium text-slate-700">{org.name}</span>
+                                            <span className="text-xs text-slate-400 ml-2 capitalize">({org.type})</span>
+                                        </div>
                                     </div>
-                                    <div>
+                                    <div className="flex items-center space-x-2">
                                         {org.admin_profile_id ? (
-                                            <span className="inline-flex items-center text-xs font-semibold px-2.5 py-1 bg-slate-100 text-slate-600 rounded-full">
-                                                <CheckCircle className="mr-1.5 w-4 h-4" />
-                                                Claimed
-                                            </span>
-                                        ) : org.requested ? (
-                                            <span className="inline-flex items-center text-xs font-semibold px-2.5 py-1 bg-yellow-100 text-yellow-800 rounded-full">
-                                                Pending Review
-                                            </span>
+                                            <>
+                                                <span className="inline-flex items-center text-xs font-semibold px-2.5 py-1 bg-slate-100 text-slate-600 rounded-full">
+                                                    <CheckCircle className="mr-1.5 w-4 h-4" />
+                                                    Has Admin
+                                                </span>
+                                                <button onClick={() => handleJoin(org.id, org.type)} className="px-3 py-1.5 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 shadow-sm transition-colors">
+                                                    <Users className="w-4 h-4 mr-1 inline" /> Join
+                                                </button>
+                                            </>
+                                        ) : org.claimRequested ? (
+                                            <>
+                                                <span className="inline-flex items-center text-xs font-semibold px-2.5 py-1 bg-yellow-100 text-yellow-800 rounded-full">Claim Pending</span>
+                                                <button onClick={() => handleJoin(org.id, org.type)} className="px-3 py-1.5 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 shadow-sm transition-colors">
+                                                    <Users className="w-4 h-4 mr-1 inline" /> Join
+                                                </button>
+                                            </>
                                         ) : (
-                                            <button 
-                                                onClick={() => handleClaim(org.id, org.type)}
-                                                className="px-4 py-1.5 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 shadow-sm transition-colors"
-                                            >
-                                                Claim
-                                            </button>
+                                            <>
+                                                <button onClick={() => handleJoin(org.id, org.type)} className="px-3 py-1.5 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 shadow-sm transition-colors">
+                                                    <Users className="w-4 h-4 mr-1 inline" /> Join
+                                                </button>
+                                                <button onClick={() => handleClaim(org.id, org.type)} className="px-3 py-1.5 bg-green-600 text-white text-sm font-semibold rounded-lg hover:bg-green-700 shadow-sm transition-colors">
+                                                    <Shield className="w-4 h-4 mr-1 inline" /> Claim
+                                                </button>
+                                            </>
                                         )}
                                     </div>
                                 </div>
@@ -168,10 +186,7 @@ export default function OrganizationSetupPage() {
                         <div className="text-center py-8 bg-slate-50 rounded-lg">
                             <h3 className="text-lg font-semibold text-slate-700">No Match Found</h3>
                             <p className="text-slate-500 mt-1 max-w-sm mx-auto">No organizations were found matching your search. You can create a new profile for your organization.</p>
-                            <button 
-                                onClick={() => setIsModalOpen(true)}
-                                className="mt-4 inline-flex items-center px-5 py-2 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 shadow-sm transition-colors"
-                            >
+                            <button onClick={() => setIsModalOpen(true)} className="mt-4 inline-flex items-center px-5 py-2 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 shadow-sm transition-colors">
                                 <PlusCircle className="w-5 h-5 mr-2"/>
                                 Create New Organization Profile
                             </button>
@@ -183,7 +198,6 @@ export default function OrganizationSetupPage() {
     );
 }
 
-// Simple debounce helper function
 function debounce(fn, delay) {
     let timeoutId;
     return function(...args) {
