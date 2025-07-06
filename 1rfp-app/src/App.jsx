@@ -28,6 +28,8 @@ import SavedGrantsPage from './SavedGrantsPage.jsx';
 import ExploreMembersPage from './ExploreMembersPage.jsx';
 import MemberProfilePage from './MemberProfilePage.jsx';
 import DashboardHomePage from './components/DashboardHomePage.jsx';
+import OrganizationSetupPage from './components/OrganizationSetupPage.jsx';
+import AdminClaimsPage from './components/AdminClaimsPage.jsx';
 
 // --- Import Shared Components ---
 import AuthButton from './components/AuthButton.jsx';
@@ -201,6 +203,8 @@ export default function App() {
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         
+        <Route path="/admin/claims" element={<AdminClaimsPage />} />
+
         <Route element={<Outlet context={outletContext} />}>
           <Route path="/" element={<AppLayout />}>
             <Route index element={<GrantsPageContent />} />
@@ -216,7 +220,6 @@ export default function App() {
             <Route path="for-funders" element={<ForFundersPage />} />
             <Route path="faq" element={<FaqPage />} />
             <Route path="submit-grant" element={<SubmitGrantPage />} />
-            {/* MODIFIED: Moved RoadmapPage to be a public-facing route */}
             <Route path="roadmap" element={<RoadmapPage />} />
             <Route path="funders/:funderSlug" element={<FunderProfilePage />} />
             <Route path="nonprofits/:slug" element={<NonprofitProfilePage />} />
@@ -230,7 +233,7 @@ export default function App() {
               <Route path="members/:profileId" element={<MemberProfilePage />} />
               <Route path="saved-grants" element={<SavedGrantsPage />} />
               <Route path="settings" element={<SettingsPage />} />
-              {/* MODIFIED: Removed RoadmapPage from the profile routes */}
+              <Route path="my-organization" element={<OrganizationSetupPage />} />
             </Route>
           </Route>
         </Route>

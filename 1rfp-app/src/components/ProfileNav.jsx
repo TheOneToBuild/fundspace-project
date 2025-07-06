@@ -1,10 +1,9 @@
+// src/components/ProfileNav.jsx
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import Avatar from './Avatar.jsx'; // Import the new Avatar component
+import Avatar from './Avatar.jsx'; 
 
 export default function ProfileNav({ user, profile }) {
-    // We can now remove the getInitials function from this file.
-
     const navLinkClass = ({ isActive }) => 
         `flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors ${
             isActive 
@@ -15,7 +14,6 @@ export default function ProfileNav({ user, profile }) {
     return (
         <div className="space-y-4">
             <div className="p-4 bg-white rounded-xl shadow-md border border-slate-200 text-center">
-                {/* MODIFIED: Replaced the initials div with our new Avatar component */}
                 <div className="w-20 h-20 mx-auto mb-3 ring-4 ring-blue-200 rounded-full">
                     <Avatar src={profile?.avatar_url} fullName={profile?.full_name} size="lg" />
                 </div>
@@ -45,6 +43,7 @@ export default function ProfileNav({ user, profile }) {
                     <NavLink to="/profile" end className={navLinkClass}><span>🏠</span><span>Dashboard</span></NavLink>
                     <NavLink to="/profile/members" className={navLinkClass}><span>👥</span><span>Explore Members</span></NavLink>
                     <NavLink to="/profile/saved-grants" className={navLinkClass}><span>📑</span><span>Saved Grants</span></NavLink>
+                    <NavLink to="/profile/my-organization" className={navLinkClass}><span>🏢</span><span>My Organization</span></NavLink> {/* ADDED: The new link */}
                     <NavLink to="/profile/settings" className={navLinkClass}><span>⚙️</span><span>Settings</span></NavLink>
                 </nav>
             </div>
