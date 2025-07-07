@@ -7,8 +7,9 @@ import { getPillClasses, getGrantTypePillClasses, formatDate, getFunderTypePillC
 import GrantCard from './components/GrantCard.jsx';
 import GrantDetailModal from './GrantDetailModal.jsx';
 import FunderCard from './components/FunderCard.jsx';
-// MODIFIED: Import the PublicPageLayout component
+// MODIFIED: Import the PublicPageLayout and Avatar components
 import PublicPageLayout from './components/PublicPageLayout.jsx';
+import Avatar from './components/Avatar.jsx';
 
 const FunderProfilePage = () => {
   const { funderSlug } = useParams();
@@ -20,6 +21,8 @@ const FunderProfilePage = () => {
   const [error, setError] = useState(null);
   const [isDetailModalOpen, setIsDetailModal] = useState(false);
   const [selectedGrant, setSelectedGrant] = useState(null);
+  // NEW: State to hold team members
+  const [teamMembers, setTeamMembers] = useState([]);
 
   const openDetail = useCallback((grant) => {
     const fetchFullGrantData = async () => {
@@ -82,7 +85,8 @@ const FunderProfilePage = () => {
         if (funderIdError) throw funderIdError;
         const funderId = funderIdData.id;
         
-        const [funderRes, allFundersRes, grantsRes] = await Promise.all([
+        // MODIFIED: Fetch team members along with other funder data
+        const [funderRes, allFundersRes, grantsRes, membersRes] = await Promise.all([
             supabase
               .from('funders')
               .select('*, funder_categories(categories(name)), funder_type:funder_type_id(name), funder_funding_locations(locations(id, name))')
@@ -95,12 +99,18 @@ const FunderProfilePage = () => {
               .from('grants')
               .select(`*, funders(name, logo_url, slug), grant_categories(categories(id, name)), grant_locations(locations(id, name))`)
               .eq('funder_id', funderId)
-              .order('deadline', { ascending: true, nullsFirst: false })
+              .order('deadline', { ascending: true, nullsFirst: false }),
+            // NEW: Fetch organization members
+            supabase.rpc('get_organization_members', {
+                organization_id_param: funderId,
+                organization_type_param: 'funder'
+            })
         ]);
 
         if (funderRes.error) throw funderRes.error;
         if (allFundersRes.error) console.warn("Could not fetch all funders:", allFundersRes.error.message);
         if (grantsRes.error) console.warn("Could not fetch grants for funder:", grantsRes.error.message);
+        if (membersRes.error) console.warn("Could not fetch team members:", membersRes.error.message);
         
         const funderData = funderRes.data;
         if (funderData) {
@@ -108,6 +118,8 @@ const FunderProfilePage = () => {
             funderData.funding_locations = funderData.funder_funding_locations.map(ffl => ffl.locations.name);
         }
         setFunder(funderData);
+        // NEW: Set team members state
+        if (membersRes.data) setTeamMembers(membersRes.data);
 
         if (allFundersRes.data) {
              const formattedAllFunders = allFundersRes.data.map(f => ({ ...f, focus_areas: f.funder_categories.map(fc => fc.categories.name), funding_locations: f.funder_funding_locations.map(ffl => ffl.locations.name) }));
@@ -207,13 +219,24 @@ const FunderProfilePage = () => {
                       <p className="text-slate-600 leading-relaxed bg-white p-6 rounded-xl border border-slate-200">{funder.application_process_summary}</p>
                    </section>
               )}
-              {funder.key_personnel && funder.key_personnel.length > 0 && (
+              {/* --- MODIFIED: "Key Personnel" section is now "Our Team" and uses dynamic data --- */}
+              {teamMembers.length > 0 && (
                   <section>
                     <h4 className="text-lg font-bold text-slate-800 border-b border-slate-200 pb-3 mb-6 flex items-center">
                         <Users size={20} className="mr-3 text-indigo-500" />
-                        Key Personnel
+                        Our Team
                     </h4>
-                    <div className="bg-white p-6 rounded-xl border border-slate-200 space-y-3">{funder.key_personnel.map((p, i) => (<div key={i} className="flex"><div className="font-semibold w-2/5">{p.name}</div><div className="text-slate-600 w-3/5">{p.title}</div></div>))}</div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {teamMembers.map((member) => (
+                        <div key={member.id} className="flex items-center space-x-4 p-4 bg-white rounded-xl border border-slate-200">
+                            <Avatar src={member.avatar_url} fullName={member.full_name} size="md" />
+                            <div>
+                                <p className="font-bold text-slate-800">{member.full_name || 'Team Member'}</p>
+                                <p className="text-sm text-slate-500">{member.title || 'Role not specified'}</p>
+                            </div>
+                        </div>
+                      ))}
+                    </div>
                   </section>
               )}
               {funder.past_grantees && (

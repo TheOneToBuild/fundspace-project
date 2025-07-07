@@ -5,8 +5,9 @@ import { supabase } from './supabaseClient.js';
 import { Loader, ArrowLeft, ExternalLink, MapPin, DollarSign, Users, Calendar, Award, Tag, Heart, IdCard, Rocket, CheckCircle2, Info } from './components/Icons.jsx';
 import { getPillClasses } from './utils.js';
 import NonprofitCard from './components/NonprofitCard.jsx';
-// MODIFIED: Import the PublicPageLayout component
+// MODIFIED: Import the PublicPageLayout and Avatar components
 import PublicPageLayout from './components/PublicPageLayout.jsx';
+import Avatar from './components/Avatar.jsx';
 
 const NonprofitProfilePage = () => {
   const { slug } = useParams();
@@ -15,6 +16,8 @@ const NonprofitProfilePage = () => {
   const [allNonprofits, setAllNonprofits] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  // NEW: State to hold team members
+  const [teamMembers, setTeamMembers] = useState([]);
 
   useEffect(() => {
     const fetchNonprofitData = async () => {
@@ -23,6 +26,7 @@ const NonprofitProfilePage = () => {
       setError(null);
       
       try {
+        // MODIFIED: Fetch team members along with other nonprofit data
         const [nonprofitRes, allNonprofitsRes] = await Promise.all([
           supabase
             .from('nonprofits')
@@ -41,6 +45,15 @@ const NonprofitProfilePage = () => {
         if (nonprofitData) {
             nonprofitData.focusAreas = nonprofitData.nonprofit_categories.map(npc => npc.categories.name);
             nonprofitData.imageUrl = nonprofitData.image_url;
+            
+            // NEW: Fetch and set team members
+            const { data: membersData, error: membersError } = await supabase.rpc('get_organization_members', {
+                organization_id_param: nonprofitData.id,
+                organization_type_param: 'nonprofit'
+            });
+
+            if (membersError) console.warn("Could not fetch team members:", membersError.message);
+            else setTeamMembers(membersData || []);
         }
         setNonprofit(nonprofitData);
 
@@ -145,6 +158,27 @@ const NonprofitProfilePage = () => {
                 </section>
               )}
               
+              {/* --- NEW: "Our Team" section --- */}
+              {teamMembers.length > 0 && (
+                <section>
+                  <h4 className="text-lg font-bold text-slate-800 border-b border-slate-200 pb-3 mb-6 flex items-center">
+                      <Users size={20} className="mr-3 text-indigo-500" />
+                      Our Team
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {teamMembers.map((member) => (
+                        <div key={member.id} className="flex items-center space-x-4 p-4 bg-white rounded-xl border border-slate-200">
+                           <Avatar src={member.avatar_url} fullName={member.full_name} size="md" />
+                           <div>
+                               <p className="font-bold text-slate-800">{member.full_name || 'Team Member'}</p>
+                               <p className="text-sm text-slate-500">{member.title || 'Role not specified'}</p>
+                           </div>
+                       </div>
+                    ))}
+                  </div>
+                </section>
+              )}
+
               {similarNonprofits.length > 0 && (
                 <section>
                   <h4 className="text-lg font-bold text-slate-800 border-b border-slate-200 pb-3 mb-6 flex items-center">

@@ -1,4 +1,4 @@
-// src/App.jsx - EDITED
+// src/App.jsx - UPDATED WITH OMEGA ADMIN FUNCTIONALITY
 import React, { useState, useEffect, createContext } from 'react';
 import { BrowserRouter, Routes, Route, Link, NavLink, Outlet, useOutletContext, useLocation } from 'react-router-dom';
 import ScrollToTop from './components/ScrollToTop.jsx';
@@ -28,12 +28,13 @@ import SavedGrantsPage from './SavedGrantsPage.jsx';
 import ExploreMembersPage from './ExploreMembersPage.jsx';
 import MemberProfilePage from './MemberProfilePage.jsx';
 import DashboardHomePage from './components/DashboardHomePage.jsx';
-// REMOVED: OrganizationSetupPage import (it's now handled by MyOrganizationPage)
+// --- OMEGA ADMIN IMPORTS ---
+import OmegaAdminDashboard from './components/OmegaAdminDashboard.jsx';
+import OmegaAdminAnalytics from './components/OmegaAdminAnalytics.jsx';
 import AdminClaimsPage from './components/AdminClaimsPage.jsx';
-// --- NEW IMPORTS ---
+// --- ORGANIZATION IMPORTS ---
 import MyOrganizationPage from './components/MyOrganizationPage.jsx';
 import EditOrganizationPage from './components/EditOrganizationPage.jsx';
-
 
 // --- Import Shared Components ---
 import AuthButton from './components/AuthButton.jsx';
@@ -124,7 +125,6 @@ const AppLayout = () => {
     );
 };
 
-
 // --- Main App Component with Final Routing Structure ---
 export default function App() {
   const [session, setSession] = useState(null);
@@ -206,8 +206,6 @@ export default function App() {
       <ScrollToTop />
       <Routes>
         <Route path="/login" element={<LoginPage />} />
-        
-        <Route path="/admin/claims" element={<AdminClaimsPage />} />
 
         <Route element={<Outlet context={outletContext} />}>
           <Route path="/" element={<AppLayout />}>
@@ -238,11 +236,14 @@ export default function App() {
               <Route path="saved-grants" element={<SavedGrantsPage />} />
               <Route path="settings" element={<SettingsPage />} />
               
-              {/* --- EDITED AND ADDED ROUTES --- */}
-              {/* This route now correctly points to MyOrganizationPage, which handles the logic internally. */}
+              {/* --- ORGANIZATION ROUTES --- */}
               <Route path="my-organization" element={<MyOrganizationPage />} />
-              {/* This new route allows admins to access the organization edit page. */}
               <Route path="my-organization/edit" element={<EditOrganizationPage />} />
+              
+              {/* --- OMEGA ADMIN ROUTES --- */}
+              <Route path="omega-admin" element={<OmegaAdminDashboard />} />
+              <Route path="omega-admin/analytics" element={<OmegaAdminAnalytics />} />
+              <Route path="omega-admin/claims" element={<AdminClaimsPage />} />
             </Route>
           </Route>
         </Route>

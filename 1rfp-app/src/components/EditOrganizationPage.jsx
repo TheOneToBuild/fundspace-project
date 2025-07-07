@@ -1,10 +1,11 @@
-// Fixed version of EditOrganizationPage.jsx with improved category handling
+// Updated EditOrganizationPage.jsx with permission system - based on your current code
 import React, { useState, useEffect, useCallback } from 'react';
 import { useOutletContext, Link } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
-import { Save, ExternalLink } from 'lucide-react';
+import { Save, ExternalLink, AlertTriangle } from 'lucide-react';
 import ImageUploader from './ImageUploader.jsx';
 import FocusAreaEditor from './FocusAreaEditor.jsx';
+import { hasPermission, PERMISSIONS, ROLES } from '../utils/permissions.js';
 
 export default function EditOrganizationPage() {
     const { profile } = useOutletContext();
@@ -21,15 +22,61 @@ export default function EditOrganizationPage() {
     const [grantTypes, setGrantTypes] = useState([]);
     const [allFunderTypes, setAllFunderTypes] = useState([]);
     const [notablePrograms, setNotablePrograms] = useState([]);
+    
+    // NEW: Permission checking state
+    const [userMembership, setUserMembership] = useState(null);
+    const [hasEditPermission, setHasEditPermission] = useState(false);
 
-    const orgType = profile.managed_nonprofit_id ? 'nonprofits' : 'funders';
-    const orgId = profile.managed_nonprofit_id || profile.managed_funder_id;
+    // NEW: Permission checking function
+    const checkPermissions = useCallback(async () => {
+        if (!profile) return;
+        
+        let membership = null;
+        
+        // Check legacy admin system first (backwards compatibility)
+        if (profile.managed_nonprofit_id || profile.managed_funder_id) {
+            membership = {
+                role: 'super_admin',
+                organization_id: profile.managed_nonprofit_id || profile.managed_funder_id,
+                organization_type: profile.managed_nonprofit_id ? 'nonprofit' : 'funder'
+            };
+        } else {
+            // Check new system
+            const { data: memberships } = await supabase
+                .from('organization_memberships')
+                .select('*')
+                .eq('profile_id', profile.id)
+                .limit(1);
+                
+            if (memberships && memberships.length > 0) {
+                membership = memberships[0];
+            }
+        }
+        
+        setUserMembership(membership);
+        
+        // Only super admins can edit organizations
+        const canEdit = membership && hasPermission(membership.role, PERMISSIONS.EDIT_ORGANIZATION);
+        setHasEditPermission(canEdit);
+        
+        if (!canEdit) {
+            setError('You do not have permission to edit this organization. Only Super Admins can edit organization details.');
+        }
+    }, [profile]);
+
+    // Use membership info for organization data (backwards compatible)
+    const orgType = userMembership?.organization_type === 'nonprofit' ? 'nonprofits' : 
+                   profile.managed_nonprofit_id ? 'nonprofits' : 'funders';
+    const orgId = userMembership?.organization_id || 
+                  profile.managed_nonprofit_id || 
+                  profile.managed_funder_id;
+    
     const categoryJoinTable = orgType === 'nonprofits' ? 'nonprofit_categories' : 'funder_categories';
     const locationJoinTable = orgType === 'funders' ? 'funder_funding_locations' : null;
     const orgIdColumn = orgType === 'nonprofits' ? 'nonprofit_id' : 'funder_id';
     const locationOrgIdColumn = 'funder_id';
 
-    // NEW: Define Bay Area counties only
+    // Define Bay Area counties
     const BAY_AREA_COUNTIES = [
         { id: 'alameda', name: 'Alameda County' },
         { id: 'contra_costa', name: 'Contra Costa County' },
@@ -44,7 +91,11 @@ export default function EditOrganizationPage() {
     ];
 
     const fetchOrganizationData = useCallback(async () => {
-        if (!orgId) return;
+        if (!orgId || !hasEditPermission) {
+            setLoading(false);
+            return;
+        }
+        
         setLoading(true);
 
         // Build query based on organization type
@@ -59,7 +110,7 @@ export default function EditOrganizationPage() {
             .eq('id', orgId)
             .single();
         
-        // Fetch all categories and funder types (no need to fetch all locations since we're using predefined Bay Area counties)
+        // Fetch all categories and funder types
         const categoriesPromise = supabase.from('categories').select('id, name').order('name');
         const funderTypesPromise = orgType === 'funders' ? supabase.from('funder_types').select('id, name').order('name') : Promise.resolve({ data: [] });
         
@@ -78,7 +129,7 @@ export default function EditOrganizationPage() {
             const currentCategoryIds = data[categoryJoinTable]?.map(join => join.categories.id) || [];
             setSelectedCategoryIds(currentCategoryIds);
             
-            // Set current location IDs (for funders only) - map from location names to our predefined list
+            // Set current location IDs (for funders only)
             if (orgType === 'funders' && data[locationJoinTable]) {
                 const currentLocationNames = data[locationJoinTable]?.map(join => join.locations.name) || [];
                 const currentLocationIds = BAY_AREA_COUNTIES
@@ -98,11 +149,18 @@ export default function EditOrganizationPage() {
             }
         }
         setLoading(false);
-    }, [orgId, orgType, categoryJoinTable, locationJoinTable]);
+    }, [orgId, orgType, categoryJoinTable, locationJoinTable, hasEditPermission]);
+
+    // NEW: Add permission check useEffect
+    useEffect(() => {
+        checkPermissions();
+    }, [checkPermissions]);
 
     useEffect(() => {
-        fetchOrganizationData();
-    }, [fetchOrganizationData]);
+        if (hasEditPermission) {
+            fetchOrganizationData();
+        }
+    }, [fetchOrganizationData, hasEditPermission]);
 
     const handleInputChange = (e) => {
         const { name, value } = e.target;
@@ -117,7 +175,7 @@ export default function EditOrganizationPage() {
         setAllCategories(current => [...current, newCategory]);
     };
 
-    // IMPROVED: Better category update handling with proper error handling and transactions
+    // Category update handling
     const updateCategories = async (orgId, selectedCategoryIds) => {
         try {
             // First, delete existing category associations
@@ -153,7 +211,7 @@ export default function EditOrganizationPage() {
         }
     };
 
-    // NEW: Handle location updates for funders (using predefined Bay Area counties)
+    // Handle location updates for funders
     const updateLocations = async (orgId, selectedLocationIds) => {
         if (orgType !== 'funders') return { success: true };
         
@@ -168,7 +226,7 @@ export default function EditOrganizationPage() {
                 throw new Error(`Failed to delete existing locations: ${deleteError.message}`);
             }
 
-            // Insert new location associations (need to find/create location IDs from names)
+            // Insert new location associations
             if (selectedLocationIds.length > 0) {
                 const selectedCounties = BAY_AREA_COUNTIES.filter(county => 
                     selectedLocationIds.includes(county.id)
@@ -221,7 +279,7 @@ export default function EditOrganizationPage() {
         }
     };
 
-    // NEW: Handle grant types array updates
+    // Handle grant types array updates
     const handleGrantTypeChange = (index, value) => {
         const newGrantTypes = [...grantTypes];
         newGrantTypes[index] = value;
@@ -241,7 +299,7 @@ export default function EditOrganizationPage() {
         setOrganization(prev => ({ ...prev, grant_types: newGrantTypes }));
     };
 
-    // NEW: Handle notable programs array updates (for nonprofits)
+    // Handle notable programs array updates (for nonprofits)
     const handleNotableProgramChange = (index, value) => {
         const newNotablePrograms = [...notablePrograms];
         newNotablePrograms[index] = value;
@@ -358,22 +416,59 @@ export default function EditOrganizationPage() {
     };
 
     if (loading) return <div className="p-6 text-center">Loading organization editor...</div>;
+
+    // NEW: Permission check - show access denied if user doesn't have permission
+    if (!hasEditPermission) {
+        return (
+            <div className="min-h-screen bg-slate-50 p-4 sm:p-8">
+                <div className="max-w-4xl mx-auto">
+                    <div className="bg-white p-8 rounded-xl shadow-sm border border-slate-200 text-center">
+                        <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <AlertTriangle className="w-8 h-8 text-red-600" />
+                        </div>
+                        <h1 className="text-2xl font-bold text-slate-800 mb-2">Access Restricted</h1>
+                        <p className="text-slate-600 mb-6">
+                            You need Super Admin privileges to edit organization details. 
+                            Only Super Admins can modify the organization page.
+                        </p>
+                        <Link 
+                            to="/profile/my-organization"
+                            className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                        >
+                            ← Back to Organization
+                        </Link>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
     if (error && !organization) return <div className="p-4 bg-red-100 text-red-700 rounded-lg">{error}</div>;
     if (!organization) return null;
 
     return (
         <div className="bg-white p-6 sm:p-8 rounded-xl shadow-sm border border-slate-200">
-            <div className="pb-6 border-b border-slate-200 flex justify-between items-center">
-                <div>
-                    <h1 className="text-2xl font-bold text-slate-800">Edit Your Organization's Profile</h1>
-                    <p className="mt-2 text-slate-600">This information will be publicly visible on the platform.</p>
+            <div className="pb-6 border-b border-slate-200">
+                <div className="flex justify-between items-center">
+                    <div>
+                        <h1 className="text-2xl font-bold text-slate-800">Edit Your Organization's Profile</h1>
+                        <p className="mt-2 text-slate-600">This information will be publicly visible on the platform.</p>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                        <Link 
+                            to="/profile/my-organization"
+                            className="inline-flex items-center px-4 py-2 border border-slate-300 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50"
+                        >
+                            ← Back to Organization
+                        </Link>
+                        {organization.slug && (
+                             <Link to={`/${orgType}/${organization.slug}`} target="_blank" rel="noopener noreferrer"
+                                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 shadow-sm">
+                                <ExternalLink size={16} className="mr-2" /> View Profile
+                            </Link>
+                        )}
+                    </div>
                 </div>
-                {organization.slug && (
-                     <Link to={`/${orgType}/${organization.slug}`} target="_blank" rel="noopener noreferrer"
-                        className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 shadow-sm">
-                        <ExternalLink size={16} className="mr-2" /> View Profile
-                    </Link>
-                )}
             </div>
 
             {message && <div className="my-4 p-3 bg-green-50 text-green-700 border border-green-200 rounded-lg">{message}</div>}
@@ -514,7 +609,7 @@ export default function EditOrganizationPage() {
                                 <p className="text-xs text-slate-500 mt-1">Brief summary of your grant application process</p>
                             </div>
 
-                            {/* Average Grant Size - moved here for better organization */}
+                            {/* Average Grant Size */}
                             <div className="pt-4">
                                 <label htmlFor="average_grant_size" className="text-sm font-medium text-slate-700 block mb-1">Average Grant Size</label>
                                 <input
