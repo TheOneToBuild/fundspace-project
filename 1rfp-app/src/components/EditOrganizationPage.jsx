@@ -1,4 +1,4 @@
-// Updated EditOrganizationPage.jsx with permission system - based on your current code
+// Updated EditOrganizationPage.jsx with proper Omega Admin support
 import React, { useState, useEffect, useCallback } from 'react';
 import { useOutletContext, Link } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
@@ -23,13 +23,20 @@ export default function EditOrganizationPage() {
     const [allFunderTypes, setAllFunderTypes] = useState([]);
     const [notablePrograms, setNotablePrograms] = useState([]);
     
-    // NEW: Permission checking state
+    // Permission checking state
     const [userMembership, setUserMembership] = useState(null);
     const [hasEditPermission, setHasEditPermission] = useState(false);
 
-    // NEW: Permission checking function
+    // FIXED: Permission checking function with proper Omega Admin support
     const checkPermissions = useCallback(async () => {
         if (!profile) return;
+        
+        // Check if user is Omega Admin first - they have access to everything
+        const isOmegaAdmin = profile.is_omega_admin === true;
+        if (isOmegaAdmin) {
+            setHasEditPermission(true);
+            return;
+        }
         
         let membership = null;
         
@@ -55,21 +62,40 @@ export default function EditOrganizationPage() {
         
         setUserMembership(membership);
         
-        // Only super admins can edit organizations
-        const canEdit = membership && hasPermission(membership.role, PERMISSIONS.EDIT_ORGANIZATION);
+        // FIXED: Pass isOmegaAdmin to hasPermission function
+        const canEdit = membership && hasPermission(membership.role, PERMISSIONS.EDIT_ORGANIZATION, isOmegaAdmin);
         setHasEditPermission(canEdit);
         
         if (!canEdit) {
-            setError('You do not have permission to edit this organization. Only Super Admins can edit organization details.');
+            setError('You do not have permission to edit this organization. Only Super Admins and Omega Admins can edit organization details.');
         }
     }, [profile]);
 
-    // Use membership info for organization data (backwards compatible)
-    const orgType = userMembership?.organization_type === 'nonprofit' ? 'nonprofits' : 
-                   profile.managed_nonprofit_id ? 'nonprofits' : 'funders';
-    const orgId = userMembership?.organization_id || 
-                  profile.managed_nonprofit_id || 
-                  profile.managed_funder_id;
+    // FIXED: Use membership info for organization data (backwards compatible + Omega Admin support)
+    const getOrgInfo = useCallback(() => {
+        // For Omega Admins, check if there's a selected organization in sessionStorage
+        if (profile?.is_omega_admin) {
+            const storedOrg = sessionStorage.getItem('omegaAdminEditOrg');
+            if (storedOrg) {
+                const parsedOrg = JSON.parse(storedOrg);
+                return {
+                    orgType: parsedOrg.type === 'nonprofit' ? 'nonprofits' : 'funders',
+                    orgId: parsedOrg.id
+                };
+            }
+        }
+        
+        // Fallback to membership or legacy admin
+        const orgType = userMembership?.organization_type === 'nonprofit' ? 'nonprofits' : 
+                       profile.managed_nonprofit_id ? 'nonprofits' : 'funders';
+        const orgId = userMembership?.organization_id || 
+                      profile.managed_nonprofit_id || 
+                      profile.managed_funder_id;
+        
+        return { orgType, orgId };
+    }, [userMembership, profile]);
+
+    const { orgType, orgId } = getOrgInfo();
     
     const categoryJoinTable = orgType === 'nonprofits' ? 'nonprofit_categories' : 'funder_categories';
     const locationJoinTable = orgType === 'funders' ? 'funder_funding_locations' : null;
@@ -91,7 +117,20 @@ export default function EditOrganizationPage() {
     ];
 
     const fetchOrganizationData = useCallback(async () => {
-        if (!orgId || !hasEditPermission) {
+        if (!hasEditPermission) {
+            setLoading(false);
+            return;
+        }
+        
+        // FIXED: For Omega Admins without orgId, we need to determine which org to edit
+        // This could be from URL params or they need to select an organization
+        if (!orgId && profile?.is_omega_admin) {
+            setError('As an Omega Admin, you need to specify which organization to edit. Please access the edit page from the organization\'s profile page.');
+            setLoading(false);
+            return;
+        }
+        
+        if (!orgId) {
             setLoading(false);
             return;
         }
@@ -151,7 +190,7 @@ export default function EditOrganizationPage() {
         setLoading(false);
     }, [orgId, orgType, categoryJoinTable, locationJoinTable, hasEditPermission]);
 
-    // NEW: Add permission check useEffect
+    // Add permission check useEffect
     useEffect(() => {
         checkPermissions();
     }, [checkPermissions]);
@@ -417,7 +456,7 @@ export default function EditOrganizationPage() {
 
     if (loading) return <div className="p-6 text-center">Loading organization editor...</div>;
 
-    // NEW: Permission check - show access denied if user doesn't have permission
+    // Permission check - show access denied if user doesn't have permission
     if (!hasEditPermission) {
         return (
             <div className="min-h-screen bg-slate-50 p-4 sm:p-8">
@@ -428,8 +467,8 @@ export default function EditOrganizationPage() {
                         </div>
                         <h1 className="text-2xl font-bold text-slate-800 mb-2">Access Restricted</h1>
                         <p className="text-slate-600 mb-6">
-                            You need Super Admin privileges to edit organization details. 
-                            Only Super Admins can modify the organization page.
+                            You need Super Admin or Omega Admin privileges to edit organization details. 
+                            Only Super Admins and Omega Admins can modify the organization page.
                         </p>
                         <Link 
                             to="/profile/my-organization"
@@ -452,7 +491,10 @@ export default function EditOrganizationPage() {
                 <div className="flex justify-between items-center">
                     <div>
                         <h1 className="text-2xl font-bold text-slate-800">Edit Your Organization's Profile</h1>
-                        <p className="mt-2 text-slate-600">This information will be publicly visible on the platform.</p>
+                        <p className="mt-2 text-slate-600">
+                            This information will be publicly visible on the platform.
+                            {profile?.is_omega_admin && <span className="ml-2 text-purple-600 font-medium">(Omega Admin Access)</span>}
+                        </p>
                     </div>
                     <div className="flex items-center space-x-3">
                         <Link 
@@ -477,27 +519,101 @@ export default function EditOrganizationPage() {
             <form onSubmit={handleSaveChanges} className="space-y-8 divide-y divide-slate-200">
                 {/* General Information Section */}
                 <div className="pt-8 space-y-4">
-                     <h3 className="text-lg font-semibold text-slate-700">General Information</h3>
-                    <div><label htmlFor="name" className="text-sm font-medium text-slate-700 block mb-1">Organization Name *</label><input id="name" name="name" required className="w-full px-3 py-2 border border-slate-300 rounded-lg" type="text" value={organization.name || ''} onChange={handleInputChange} /></div>
-                    {organization.hasOwnProperty('tagline') && ( <div><label htmlFor="tagline" className="text-sm font-medium text-slate-700 block mb-1">Tagline</label><input id="tagline" name="tagline" className="w-full px-3 py-2 border border-slate-300 rounded-lg" type="text" value={organization.tagline || ''} onChange={handleInputChange} /></div>)}
-                    <div><label htmlFor="website" className="text-sm font-medium text-slate-700 block mb-1">Website</label><input id="website" name="website" className="w-full px-3 py-2 border border-slate-300 rounded-lg" type="url" value={organization.website || ''} onChange={handleInputChange} placeholder="https://..." /></div>
-                    <div><label htmlFor="location" className="text-sm font-medium text-slate-700 block mb-1">Headquarters Location</label><input id="location" name="location" className="w-full px-3 py-2 border border-slate-300 rounded-lg" type="text" value={organization.location || ''} onChange={handleInputChange} placeholder="e.g., San Francisco, CA" /></div>
-                    <div><label htmlFor="description" className="text-sm font-medium text-slate-700 block mb-1">About Us & Mission</label><textarea id="description" name="description" className="w-full px-3 py-2 border border-slate-300 rounded-lg" rows="5" value={organization.description || ''} onChange={handleInputChange}></textarea></div>
+                    <h3 className="text-lg font-semibold text-slate-700">General Information</h3>
+                    <div>
+                        <label htmlFor="name" className="text-sm font-medium text-slate-700 block mb-1">Organization Name *</label>
+                        <input 
+                            id="name" 
+                            name="name" 
+                            required 
+                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
+                            type="text" 
+                            value={organization.name || ''} 
+                            onChange={handleInputChange} 
+                        />
+                    </div>
+                    {organization.hasOwnProperty('tagline') && (
+                        <div>
+                            <label htmlFor="tagline" className="text-sm font-medium text-slate-700 block mb-1">Tagline</label>
+                            <input 
+                                id="tagline" 
+                                name="tagline" 
+                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
+                                type="text" 
+                                value={organization.tagline || ''} 
+                                onChange={handleInputChange} 
+                            />
+                        </div>
+                    )}
+                    <div>
+                        <label htmlFor="website" className="text-sm font-medium text-slate-700 block mb-1">Website</label>
+                        <input 
+                            id="website" 
+                            name="website" 
+                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
+                            type="url" 
+                            value={organization.website || ''} 
+                            onChange={handleInputChange} 
+                            placeholder="https://..." 
+                        />
+                    </div>
+                    <div>
+                        <label htmlFor="location" className="text-sm font-medium text-slate-700 block mb-1">Headquarters Location</label>
+                        <input 
+                            id="location" 
+                            name="location" 
+                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
+                            type="text" 
+                            value={organization.location || ''} 
+                            onChange={handleInputChange} 
+                            placeholder="e.g., San Francisco, CA" 
+                        />
+                    </div>
+                    <div>
+                        <label htmlFor="description" className="text-sm font-medium text-slate-700 block mb-1">About Us & Mission</label>
+                        <textarea 
+                            id="description" 
+                            name="description" 
+                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
+                            rows="5" 
+                            value={organization.description || ''} 
+                            onChange={handleInputChange}
+                        />
+                    </div>
                 </div>
 
                 {/* Branding & Images Section */}
                 <div className="pt-8 space-y-4">
                     <h3 className="text-lg font-semibold text-slate-700">Branding & Images</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div><label className="text-sm font-medium text-slate-700 block mb-2">Logo</label><ImageUploader bucket="avatars" currentImageUrl={organization.logo_url} onUploadSuccess={(url) => handleImageUploadSuccess('logo_url', url)} /></div>
-                        <div><label className="text-sm font-medium text-slate-700 block mb-2">Header Image (for profile page)</label><ImageUploader bucket="avatars" currentImageUrl={organization.image_url} onUploadSuccess={(url) => handleImageUploadSuccess('image_url', url)} /></div>
+                        <div>
+                            <label className="text-sm font-medium text-slate-700 block mb-2">Logo</label>
+                            <ImageUploader 
+                                bucket="avatars" 
+                                currentImageUrl={organization.logo_url} 
+                                onUploadSuccess={(url) => handleImageUploadSuccess('logo_url', url)} 
+                            />
+                        </div>
+                        <div>
+                            <label className="text-sm font-medium text-slate-700 block mb-2">Header Image (for profile page)</label>
+                            <ImageUploader 
+                                bucket="avatars" 
+                                currentImageUrl={organization.image_url} 
+                                onUploadSuccess={(url) => handleImageUploadSuccess('image_url', url)} 
+                            />
+                        </div>
                     </div>
                 </div>
                 
                 {/* Organization Details Section */}
                 <div className="pt-8 space-y-4">
                     <h3 className="text-lg font-semibold text-slate-700">Organization Details</h3>
-                    <FocusAreaEditor allCategories={allCategories} selectedIds={selectedCategoryIds} onChange={setSelectedCategoryIds} onCategoryAdded={handleCategoryAdded} />
+                    <FocusAreaEditor 
+                        allCategories={allCategories} 
+                        selectedIds={selectedCategoryIds} 
+                        onChange={setSelectedCategoryIds} 
+                        onCategoryAdded={handleCategoryAdded} 
+                    />
 
                     {orgType === 'funders' && (
                         <>
@@ -507,7 +623,7 @@ export default function EditOrganizationPage() {
                                 <select
                                     id="funder_type_id"
                                     name="funder_type_id"
-                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white"
+                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                     value={organization.funder_type_id || ''}
                                     onChange={handleInputChange}
                                 >
@@ -546,6 +662,63 @@ export default function EditOrganizationPage() {
                                 </div>
                             </div>
 
+                            {/* Additional funder fields */}
+                            <div className="pt-4">
+                                <label htmlFor="total_funding_annually" className="text-sm font-medium text-slate-700 block mb-1">Annual Giving</label>
+                                <input
+                                    id="total_funding_annually"
+                                    name="total_funding_annually"
+                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    type="text"
+                                    value={organization.total_funding_annually || ''}
+                                    onChange={handleInputChange}
+                                    placeholder="e.g., $2.5M annually, $500K - $1M per year"
+                                />
+                                <p className="text-xs text-slate-500 mt-1">Approximate total annual giving amount or range</p>
+                            </div>
+
+                            <div className="pt-4">
+                                <label htmlFor="average_grant_size" className="text-sm font-medium text-slate-700 block mb-1">Average Grant Size</label>
+                                <input
+                                    id="average_grant_size"
+                                    name="average_grant_size"
+                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    type="text"
+                                    value={organization.average_grant_size || ''}
+                                    onChange={handleInputChange}
+                                    placeholder="e.g., $5,000 - $25,000, Up to $50,000"
+                                />
+                                <p className="text-xs text-slate-500 mt-1">Typical grant size or range</p>
+                            </div>
+
+                            <div className="pt-4">
+                                <label htmlFor="application_process_summary" className="text-sm font-medium text-slate-700 block mb-1">Application Process Summary</label>
+                                <textarea
+                                    id="application_process_summary"
+                                    name="application_process_summary"
+                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    rows="4"
+                                    value={organization.application_process_summary || ''}
+                                    onChange={handleInputChange}
+                                    placeholder="Describe how organizations can apply for funding..."
+                                />
+                                <p className="text-xs text-slate-500 mt-1">Brief summary of your grant application process</p>
+                            </div>
+
+                            <div className="pt-4">
+                                <label htmlFor="notable_grant" className="text-sm font-medium text-slate-700 block mb-1">Notable Grants</label>
+                                <textarea
+                                    id="notable_grant"
+                                    name="notable_grant"
+                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    rows="3"
+                                    value={organization.notable_grant || ''}
+                                    onChange={handleInputChange}
+                                    placeholder="Describe a recent notable grant or highlight significant funding initiatives..."
+                                />
+                                <p className="text-xs text-slate-500 mt-1">Highlight recent significant grants or funding achievements</p>
+                            </div>
+
                             {/* Grant Types Offered */}
                             <div className="pt-4">
                                 <label className="text-sm font-medium text-slate-700 block mb-2">Grant Types Offered</label>
@@ -557,7 +730,7 @@ export default function EditOrganizationPage() {
                                                 type="text"
                                                 value={grantType}
                                                 onChange={(e) => handleGrantTypeChange(index, e.target.value)}
-                                                className="flex-1 px-3 py-2 border border-slate-300 rounded-lg"
+                                                className="flex-1 px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                                 placeholder="e.g., General Operating Support"
                                             />
                                             <button
@@ -578,66 +751,6 @@ export default function EditOrganizationPage() {
                                     </button>
                                 </div>
                             </div>
-
-                            {/* Annual Giving */}
-                            <div className="pt-4">
-                                <label htmlFor="total_funding_annually" className="text-sm font-medium text-slate-700 block mb-1">Annual Giving</label>
-                                <input
-                                    id="total_funding_annually"
-                                    name="total_funding_annually"
-                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg"
-                                    type="text"
-                                    value={organization.total_funding_annually || ''}
-                                    onChange={handleInputChange}
-                                    placeholder="e.g., $2.5M annually, $500K - $1M per year"
-                                />
-                                <p className="text-xs text-slate-500 mt-1">Approximate total annual giving amount or range</p>
-                            </div>
-
-                            {/* Application Process */}
-                            <div className="pt-4">
-                                <label htmlFor="application_process_summary" className="text-sm font-medium text-slate-700 block mb-1">Application Process Summary</label>
-                                <textarea
-                                    id="application_process_summary"
-                                    name="application_process_summary"
-                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg"
-                                    rows="4"
-                                    value={organization.application_process_summary || ''}
-                                    onChange={handleInputChange}
-                                    placeholder="Describe how organizations can apply for funding, including deadlines, requirements, and process steps..."
-                                ></textarea>
-                                <p className="text-xs text-slate-500 mt-1">Brief summary of your grant application process</p>
-                            </div>
-
-                            {/* Average Grant Size */}
-                            <div className="pt-4">
-                                <label htmlFor="average_grant_size" className="text-sm font-medium text-slate-700 block mb-1">Average Grant Size</label>
-                                <input
-                                    id="average_grant_size"
-                                    name="average_grant_size"
-                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg"
-                                    type="text"
-                                    value={organization.average_grant_size || ''}
-                                    onChange={handleInputChange}
-                                    placeholder="e.g., $5,000 - $25,000, Up to $50,000"
-                                />
-                                <p className="text-xs text-slate-500 mt-1">Typical grant size or range</p>
-                            </div>
-
-                            {/* Notable Grants */}
-                            <div className="pt-4">
-                                <label htmlFor="notable_grant" className="text-sm font-medium text-slate-700 block mb-1">Notable Grants</label>
-                                <textarea
-                                    id="notable_grant"
-                                    name="notable_grant"
-                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg"
-                                    rows="3"
-                                    value={organization.notable_grant || ''}
-                                    onChange={handleInputChange}
-                                    placeholder="Describe a recent notable grant or highlight significant funding initiatives..."
-                                ></textarea>
-                                <p className="text-xs text-slate-500 mt-1">Highlight recent significant grants or funding achievements</p>
-                            </div>
                         </>
                     )}
 
@@ -649,7 +762,7 @@ export default function EditOrganizationPage() {
                                 <input
                                     id="budget"
                                     name="budget"
-                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg"
+                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                     type="text"
                                     value={organization.budget || ''}
                                     onChange={handleInputChange}
@@ -664,7 +777,7 @@ export default function EditOrganizationPage() {
                                 <input
                                     id="staff_count"
                                     name="staff_count"
-                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg"
+                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                     type="number"
                                     value={organization.staff_count || ''}
                                     onChange={handleInputChange}
@@ -679,7 +792,7 @@ export default function EditOrganizationPage() {
                                 <input
                                     id="year_founded"
                                     name="year_founded"
-                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg"
+                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                     type="number"
                                     min="1800"
                                     max={new Date().getFullYear()}
@@ -688,6 +801,51 @@ export default function EditOrganizationPage() {
                                     placeholder="e.g., 1995"
                                 />
                                 <p className="text-xs text-slate-500 mt-1">The year your organization was established</p>
+                            </div>
+
+                            {/* Impact Metric */}
+                            <div className="pt-4">
+                                <label htmlFor="impact_metric" className="text-sm font-medium text-slate-700 block mb-1">Impact Metric</label>
+                                <input
+                                    id="impact_metric"
+                                    name="impact_metric"
+                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    type="text"
+                                    value={organization.impact_metric || ''}
+                                    onChange={handleInputChange}
+                                    placeholder="e.g., Served 1,000+ families, Planted 5,000 trees"
+                                />
+                                <p className="text-xs text-slate-500 mt-1">A key metric that demonstrates your organization's impact</p>
+                            </div>
+
+                            {/* EIN */}
+                            <div className="pt-4">
+                                <label htmlFor="ein" className="text-sm font-medium text-slate-700 block mb-1">EIN (Tax ID)</label>
+                                <input
+                                    id="ein"
+                                    name="ein"
+                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    type="text"
+                                    value={organization.ein || ''}
+                                    onChange={handleInputChange}
+                                    placeholder="e.g., 12-3456789"
+                                />
+                                <p className="text-xs text-slate-500 mt-1">Your organization's Employee Identification Number</p>
+                            </div>
+
+                            {/* Contact Email */}
+                            <div className="pt-4">
+                                <label htmlFor="contact_email" className="text-sm font-medium text-slate-700 block mb-1">Contact Email</label>
+                                <input
+                                    id="contact_email"
+                                    name="contact_email"
+                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    type="email"
+                                    value={organization.contact_email || ''}
+                                    onChange={handleInputChange}
+                                    placeholder="contact@organization.com"
+                                />
+                                <p className="text-xs text-slate-500 mt-1">Primary contact email for your organization</p>
                             </div>
 
                             {/* Notable Programs & Initiatives */}
@@ -701,7 +859,7 @@ export default function EditOrganizationPage() {
                                                 type="text"
                                                 value={program}
                                                 onChange={(e) => handleNotableProgramChange(index, e.target.value)}
-                                                className="flex-1 px-3 py-2 border border-slate-300 rounded-lg"
+                                                className="flex-1 px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                                 placeholder="e.g., Community Health Program"
                                             />
                                             <button
@@ -722,27 +880,16 @@ export default function EditOrganizationPage() {
                                     </button>
                                 </div>
                             </div>
-
-                            {/* EIN */}
-                            <div className="pt-4">
-                                <label htmlFor="ein" className="text-sm font-medium text-slate-700 block mb-1">EIN (Tax ID)</label>
-                                <input
-                                    id="ein"
-                                    name="ein"
-                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg"
-                                    type="text"
-                                    value={organization.ein || ''}
-                                    onChange={handleInputChange}
-                                    placeholder="e.g., 12-3456789"
-                                />
-                                <p className="text-xs text-slate-500 mt-1">Your organization's Employee Identification Number</p>
-                            </div>
                         </>
                     )}
                 </div>
 
                 <div className="pt-6 flex justify-end">
-                    <button type="submit" disabled={saving} className="inline-flex items-center px-6 py-2.5 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 disabled:bg-blue-400 shadow-sm">
+                    <button 
+                        type="submit" 
+                        disabled={saving} 
+                        className="inline-flex items-center px-6 py-2.5 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 disabled:bg-blue-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                    >
                         <Save className="w-5 h-5 mr-2" />
                         {saving ? 'Saving...' : 'Save All Changes'}
                     </button>

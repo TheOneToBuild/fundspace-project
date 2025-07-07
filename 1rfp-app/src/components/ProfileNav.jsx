@@ -1,4 +1,4 @@
-// Updated ProfileNav.jsx with Omega Admin section
+// Updated ProfileNav.jsx - Fixed for Omega Admins
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { Star } from 'lucide-react';
@@ -56,13 +56,33 @@ export default function ProfileNav({ user, profile }) {
                     </div>
                 </div>
             </div>
+            
+            {/* Regular Navigation - Hide "My Organization" for Omega Admins */}
             <div className="p-4 bg-white rounded-xl shadow-md border border-slate-200">
                 <nav className="space-y-1">
-                    <NavLink to="/profile" end className={navLinkClass}><span>🏠</span><span>Dashboard</span></NavLink>
-                    <NavLink to="/profile/members" className={navLinkClass}><span>👥</span><span>Explore Members</span></NavLink>
-                    <NavLink to="/profile/saved-grants" className={navLinkClass}><span>📑</span><span>Saved Grants</span></NavLink>
-                    <NavLink to="/profile/my-organization" className={navLinkClass}><span>🏢</span><span>My Organization</span></NavLink>
-                    <NavLink to="/profile/settings" className={navLinkClass}><span>⚙️</span><span>Settings</span></NavLink>
+                    <NavLink to="/profile" end className={navLinkClass}>
+                        <span>🏠</span>
+                        <span>Dashboard</span>
+                    </NavLink>
+                    <NavLink to="/profile/members" className={navLinkClass}>
+                        <span>👥</span>
+                        <span>Explore Members</span>
+                    </NavLink>
+                    <NavLink to="/profile/saved-grants" className={navLinkClass}>
+                        <span>📑</span>
+                        <span>Saved Grants</span>
+                    </NavLink>
+                    {/* Hide "My Organization" for Omega Admins since they manage all organizations */}
+                    {!isOmegaAdmin && (
+                        <NavLink to="/profile/my-organization" className={navLinkClass}>
+                            <span>🏢</span>
+                            <span>My Organization</span>
+                        </NavLink>
+                    )}
+                    <NavLink to="/profile/settings" className={navLinkClass}>
+                        <span>⚙️</span>
+                        <span>Settings</span>
+                    </NavLink>
                 </nav>
             </div>
             
@@ -88,9 +108,13 @@ export default function ProfileNav({ user, profile }) {
                             <span>📊</span>
                             <span>Platform Analytics</span>
                         </NavLink>
+                        <NavLink to="/profile/omega-admin/organizations" className={omegaNavLinkClass}>
+                            <span>🏢</span>
+                            <span>Manage Organizations</span>
+                        </NavLink>
                     </nav>
                 </div>
             )}
         </div>
     );
-};
+}

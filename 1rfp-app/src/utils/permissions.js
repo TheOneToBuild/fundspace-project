@@ -1,4 +1,4 @@
-// src/utils/permissions.js
+// src/utils/permissions.js - Updated with enhanced Omega Admin support
 
 export const ROLES = {
   OMEGA_ADMIN: 'omega_admin',
@@ -28,8 +28,8 @@ export const PERMISSIONS = {
  * @returns {boolean} - Whether the user has the permission
  */
 export function hasPermission(userRole, permission, isOmegaAdmin = false) {
-  // Omega admins have all permissions
-  if (isOmegaAdmin) {
+  // FIXED: Omega admins have all permissions - check this first
+  if (isOmegaAdmin === true) {
     return true;
   }
 
@@ -61,7 +61,7 @@ export function hasPermission(userRole, permission, isOmegaAdmin = false) {
  */
 export function canManageUser(currentUserRole, targetUserRole, isOmegaAdmin = false) {
   // Omega admins can manage everyone
-  if (isOmegaAdmin) {
+  if (isOmegaAdmin === true) {
     return true;
   }
 
@@ -85,7 +85,7 @@ export function canManageUser(currentUserRole, targetUserRole, isOmegaAdmin = fa
  * @returns {string} - Human readable role name
  */
 export function getRoleDisplayName(role, isOmegaAdmin = false) {
-  if (isOmegaAdmin) {
+  if (isOmegaAdmin === true) {
     return 'Omega Admin';
   }
 
@@ -105,7 +105,7 @@ export function getRoleDisplayName(role, isOmegaAdmin = false) {
  * @returns {string} - CSS classes for styling the role badge
  */
 export function getRoleBadgeColor(role, isOmegaAdmin = false) {
-  if (isOmegaAdmin) {
+  if (isOmegaAdmin === true) {
     return 'bg-gradient-to-r from-purple-500 to-pink-500 text-white';
   }
 
@@ -125,7 +125,7 @@ export function getRoleBadgeColor(role, isOmegaAdmin = false) {
  * @returns {string} - Icon name
  */
 export function getRoleIcon(role, isOmegaAdmin = false) {
-  if (isOmegaAdmin) {
+  if (isOmegaAdmin === true) {
     return 'Star';
   }
 
@@ -144,5 +144,23 @@ export function getRoleIcon(role, isOmegaAdmin = false) {
  * @returns {boolean} - Whether the user can access platform admin features
  */
 export function isPlatformAdmin(isOmegaAdmin) {
+  return isOmegaAdmin === true;
+}
+
+/**
+ * Check if user can edit any organization (not just their own)
+ * @param {boolean} isOmegaAdmin - Whether the user is an omega admin
+ * @returns {boolean} - Whether the user can edit any organization
+ */
+export function canEditAnyOrganization(isOmegaAdmin) {
+  return isOmegaAdmin === true;
+}
+
+/**
+ * Check if user can access organization claim management
+ * @param {boolean} isOmegaAdmin - Whether the user is an omega admin
+ * @returns {boolean} - Whether the user can manage organization claims
+ */
+export function canManageOrganizationClaims(isOmegaAdmin) {
   return isOmegaAdmin === true;
 }

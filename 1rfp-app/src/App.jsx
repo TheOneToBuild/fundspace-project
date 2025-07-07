@@ -32,6 +32,8 @@ import DashboardHomePage from './components/DashboardHomePage.jsx';
 import OmegaAdminDashboard from './components/OmegaAdminDashboard.jsx';
 import OmegaAdminAnalytics from './components/OmegaAdminAnalytics.jsx';
 import AdminClaimsPage from './components/AdminClaimsPage.jsx';
+import OmegaAdminOrgSelector from './components/OmegaAdminOrgSelector.jsx';
+import OmegaAdminEditOrg from './components/OmegaAdminEditOrg.jsx';
 // --- ORGANIZATION IMPORTS ---
 import MyOrganizationPage from './components/MyOrganizationPage.jsx';
 import EditOrganizationPage from './components/EditOrganizationPage.jsx';
@@ -244,6 +246,8 @@ export default function App() {
               <Route path="omega-admin" element={<OmegaAdminDashboard />} />
               <Route path="omega-admin/analytics" element={<OmegaAdminAnalytics />} />
               <Route path="omega-admin/claims" element={<AdminClaimsPage />} />
+              <Route path="omega-admin/organizations" element={<OmegaAdminOrgSelector />} />
+              <Route path="omega-admin/organizations/edit/:orgType/:orgId" element={<OmegaAdminEditOrg />} />
             </Route>
           </Route>
         </Route>
