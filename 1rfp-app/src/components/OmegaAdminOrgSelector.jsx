@@ -1,4 +1,4 @@
-// src/components/OmegaAdminOrgSelector.jsx
+// src/components/OmegaAdminOrgSelector.jsx - FIXED with correct column names
 import React, { useState, useEffect } from 'react';
 import { useOutletContext, Link } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
@@ -9,7 +9,9 @@ import {
     AlertTriangle,
     ExternalLink,
     Eye,
-    Edit
+    Edit,
+    Users,
+    UserCheck
 } from 'lucide-react';
 import { isPlatformAdmin } from '../utils/permissions.js';
 
@@ -22,6 +24,7 @@ export default function OmegaAdminOrgSelector() {
     const [error, setError] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
     const [totalOrgs, setTotalOrgs] = useState(0);
+    const [memberCounts, setMemberCounts] = useState({});
     
     const ITEMS_PER_PAGE = 100;
 
@@ -74,8 +77,9 @@ export default function OmegaAdminOrgSelector() {
     const fetchOrganizations = async () => {
         try {
             setLoading(true);
+            setError('');
             
-            // Fetch both nonprofits and funders with images
+            // FIXED: Use correct column names for each table
             const [nonprofitsRes, fundersRes] = await Promise.all([
                 supabase.from('nonprofits').select('id, name, location, slug, image_url').order('name'),
                 supabase.from('funders').select('id, name, location, slug, logo_url').order('name')
@@ -84,7 +88,7 @@ export default function OmegaAdminOrgSelector() {
             if (nonprofitsRes.error) throw nonprofitsRes.error;
             if (fundersRes.error) throw fundersRes.error;
 
-            // Combine and mark type
+            // Combine and mark type - FIXED: Map to consistent imageUrl property
             const allOrganizations = [
                 ...nonprofitsRes.data.map(org => ({ 
                     ...org, 
@@ -103,15 +107,41 @@ export default function OmegaAdminOrgSelector() {
 
             setOrganizations(allOrganizations);
             
+            // Fetch member counts for each organization
+            await fetchMemberCounts(allOrganizations);
+            
             // Set initial pagination
             const initialDisplay = allOrganizations.slice(0, ITEMS_PER_PAGE);
             setFilteredOrgs(initialDisplay);
             setTotalOrgs(allOrganizations.length);
         } catch (err) {
             console.error('Error fetching organizations:', err);
-            setError('Failed to load organizations');
+            setError('Failed to load organizations: ' + err.message);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const fetchMemberCounts = async (orgs) => {
+        try {
+            const counts = {};
+            
+            // Fetch member counts for each organization
+            await Promise.all(orgs.map(async (org) => {
+                const { count, error } = await supabase
+                    .from('organization_memberships')
+                    .select('id', { count: 'exact', head: true })
+                    .eq('organization_id', org.id)
+                    .eq('organization_type', org.type);
+                
+                if (!error) {
+                    counts[`${org.type}-${org.id}`] = count || 0;
+                }
+            }));
+            
+            setMemberCounts(counts);
+        } catch (err) {
+            console.error('Error fetching member counts:', err);
         }
     };
 
@@ -155,6 +185,37 @@ export default function OmegaAdminOrgSelector() {
                     <span>{error}</span>
                 </div>
             )}
+
+            {/* Quick Stats - MOVED TO TOP */}
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                <h3 className="text-lg font-semibold text-slate-800 mb-4">Quick Stats</h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="text-center">
+                        <div className="text-2xl font-bold text-purple-600">
+                            {organizations.length}
+                        </div>
+                        <div className="text-sm text-slate-600">Total Organizations</div>
+                    </div>
+                    <div className="text-center">
+                        <div className="text-2xl font-bold text-blue-600">
+                            {organizations.filter(org => org.type === 'nonprofit').length}
+                        </div>
+                        <div className="text-sm text-slate-600">Nonprofits</div>
+                    </div>
+                    <div className="text-center">
+                        <div className="text-2xl font-bold text-green-600">
+                            {organizations.filter(org => org.type === 'funder').length}
+                        </div>
+                        <div className="text-sm text-slate-600">Funders</div>
+                    </div>
+                    <div className="text-center">
+                        <div className="text-2xl font-bold text-slate-600">
+                            {Object.values(memberCounts).reduce((sum, count) => sum + count, 0)}
+                        </div>
+                        <div className="text-sm text-slate-600">Total Members</div>
+                    </div>
+                </div>
+            </div>
 
             {/* Search */}
             <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
@@ -214,77 +275,94 @@ export default function OmegaAdminOrgSelector() {
 
                 {!loading && filteredOrgs.length > 0 && (
                     <div className="divide-y divide-slate-200">
-                        {filteredOrgs.map((org) => (
-                            <div key={`${org.type}-${org.id}`} className="p-4 hover:bg-slate-50 transition-colors">
-                                <div className="flex items-center justify-between gap-4">
-                                    <div className="flex items-center space-x-4 min-w-0 flex-1">
-                                        <div className="w-12 h-12 bg-slate-100 rounded-lg flex items-center justify-center overflow-hidden flex-shrink-0">
-                                            {org.imageUrl ? (
-                                                <img 
-                                                    src={org.imageUrl} 
-                                                    alt={`${org.name} logo`}
-                                                    className="w-full h-full object-cover"
-                                                    onError={(e) => {
-                                                        e.target.style.display = 'none';
-                                                        e.target.nextSibling.style.display = 'block';
-                                                    }}
+                        {filteredOrgs.map((org) => {
+                            const memberCount = memberCounts[`${org.type}-${org.id}`] || 0;
+                            
+                            return (
+                                <div key={`${org.type}-${org.id}`} className="p-4 hover:bg-slate-50 transition-colors">
+                                    <div className="flex items-center justify-between gap-4">
+                                        <div className="flex items-center space-x-4 min-w-0 flex-1">
+                                            <div className="w-12 h-12 bg-slate-100 rounded-lg flex items-center justify-center overflow-hidden flex-shrink-0">
+                                                {org.imageUrl ? (
+                                                    <img 
+                                                        src={org.imageUrl} 
+                                                        alt={`${org.name} logo`}
+                                                        className="w-full h-full object-cover"
+                                                        onError={(e) => {
+                                                            e.target.style.display = 'none';
+                                                            e.target.nextSibling.style.display = 'block';
+                                                        }}
+                                                    />
+                                                ) : null}
+                                                <Building2 
+                                                    className={`w-6 h-6 text-slate-500 ${org.imageUrl ? 'hidden' : 'block'}`}
                                                 />
-                                            ) : null}
-                                            <Building2 
-                                                className={`w-6 h-6 text-slate-500 ${org.imageUrl ? 'hidden' : 'block'}`}
-                                            />
-                                        </div>
-                                        <div className="min-w-0 flex-1">
-                                            <h3 className="font-semibold text-slate-800 mb-1 truncate" title={org.name}>
-                                                {org.name}
-                                            </h3>
-                                            <div className="flex items-center space-x-3 text-sm text-slate-500">
-                                                <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium flex-shrink-0 ${
-                                                    org.type === 'nonprofit' 
-                                                        ? 'bg-blue-100 text-blue-800' 
-                                                        : 'bg-green-100 text-green-800'
-                                                }`}>
-                                                    {org.type === 'nonprofit' ? 'Nonprofit' : 'Funder'}
-                                                </span>
-                                                {org.location && (
-                                                    <span className="truncate">{org.location}</span>
-                                                )}
+                                            </div>
+                                            <div className="min-w-0 flex-1">
+                                                <h3 className="font-semibold text-slate-800 mb-1 truncate" title={org.name}>
+                                                    {org.name}
+                                                </h3>
+                                                <div className="flex items-center space-x-3 text-sm text-slate-500">
+                                                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium flex-shrink-0 ${
+                                                        org.type === 'nonprofit' 
+                                                            ? 'bg-blue-100 text-blue-800' 
+                                                            : 'bg-green-100 text-green-800'
+                                                    }`}>
+                                                        {org.type === 'nonprofit' ? 'Nonprofit' : 'Funder'}
+                                                    </span>
+                                                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-600 flex-shrink-0">
+                                                        <Users className="w-3 h-3 mr-1" />
+                                                        {memberCount} member{memberCount !== 1 ? 's' : ''}
+                                                    </span>
+                                                    {org.location && (
+                                                        <span className="truncate">{org.location}</span>
+                                                    )}
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
-                                    
-                                    <div className="flex items-center space-x-2 flex-shrink-0">
-                                        {/* View Profile Button */}
-                                        {org.slug ? (
-                                            <a
-                                                href={`/${org.type === 'nonprofit' ? 'nonprofits' : 'funders'}/${org.slug}`}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="inline-flex items-center px-3 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 bg-white hover:bg-slate-50 transition-colors whitespace-nowrap"
-                                            >
-                                                <Eye className="w-4 h-4 mr-2" />
-                                                View Profile
-                                                <ExternalLink className="w-3 h-3 ml-1" />
-                                            </a>
-                                        ) : (
-                                            <span className="inline-flex items-center px-3 py-2 border border-slate-300 rounded-lg text-sm text-slate-400 bg-slate-50 cursor-not-allowed whitespace-nowrap">
-                                                <Eye className="w-4 h-4 mr-2" />
-                                                No Profile
-                                            </span>
-                                        )}
                                         
-                                        {/* Edit Organization Button */}
-                                        <Link
-                                            to={`/profile/omega-admin/organizations/edit/${org.type}/${org.id}`}
-                                            className="inline-flex items-center px-3 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 transition-colors whitespace-nowrap"
-                                        >
-                                            <Edit className="w-4 h-4 mr-2" />
-                                            Edit Organization
-                                        </Link>
+                                        <div className="flex items-center space-x-2 flex-shrink-0">
+                                            {/* Manage Members Button - Primary Action */}
+                                            <Link
+                                                to={`/profile/omega-admin/organizations/members/${org.type}/${org.id}`}
+                                                className="inline-flex items-center px-3 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 transition-colors whitespace-nowrap"
+                                            >
+                                                <UserCheck className="w-4 h-4 mr-2" />
+                                                Manage Members
+                                            </Link>
+                                            
+                                            {/* Edit Organization Button */}
+                                            <Link
+                                                to={`/profile/omega-admin/organizations/edit/${org.type}/${org.id}`}
+                                                className="inline-flex items-center px-3 py-2 bg-slate-600 text-white rounded-lg text-sm font-medium hover:bg-slate-700 transition-colors whitespace-nowrap"
+                                            >
+                                                <Edit className="w-4 h-4 mr-2" />
+                                                Edit Details
+                                            </Link>
+                                            
+                                            {/* View Profile Button */}
+                                            {org.slug ? (
+                                                <a
+                                                    href={`/${org.type === 'nonprofit' ? 'nonprofits' : 'funders'}/${org.slug}`}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="inline-flex items-center px-3 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 bg-white hover:bg-slate-50 transition-colors whitespace-nowrap"
+                                                >
+                                                    <Eye className="w-4 h-4 mr-2" />
+                                                    View Profile
+                                                    <ExternalLink className="w-3 h-3 ml-1" />
+                                                </a>
+                                            ) : (
+                                                <span className="inline-flex items-center px-3 py-2 border border-slate-300 rounded-lg text-sm text-slate-400 bg-slate-50 cursor-not-allowed whitespace-nowrap">
+                                                    <Eye className="w-4 h-4 mr-2" />
+                                                    No Profile
+                                                </span>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 )}
 

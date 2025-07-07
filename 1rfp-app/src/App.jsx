@@ -1,4 +1,4 @@
-// src/App.jsx - UPDATED WITH OMEGA ADMIN FUNCTIONALITY
+// src/App.jsx - FIXED WITH OMEGA ADMIN FUNCTIONALITY
 import React, { useState, useEffect, createContext } from 'react';
 import { BrowserRouter, Routes, Route, Link, NavLink, Outlet, useOutletContext, useLocation } from 'react-router-dom';
 import ScrollToTop from './components/ScrollToTop.jsx';
@@ -34,6 +34,7 @@ import OmegaAdminAnalytics from './components/OmegaAdminAnalytics.jsx';
 import AdminClaimsPage from './components/AdminClaimsPage.jsx';
 import OmegaAdminOrgSelector from './components/OmegaAdminOrgSelector.jsx';
 import OmegaAdminEditOrg from './components/OmegaAdminEditOrg.jsx';
+import OmegaAdminManageMembers from './components/OmegaAdminManageMembers.jsx';
 // --- ORGANIZATION IMPORTS ---
 import MyOrganizationPage from './components/MyOrganizationPage.jsx';
 import EditOrganizationPage from './components/EditOrganizationPage.jsx';
@@ -248,6 +249,8 @@ export default function App() {
               <Route path="omega-admin/claims" element={<AdminClaimsPage />} />
               <Route path="omega-admin/organizations" element={<OmegaAdminOrgSelector />} />
               <Route path="omega-admin/organizations/edit/:orgType/:orgId" element={<OmegaAdminEditOrg />} />
+              {/* NEW: Manage Members Route */}
+              <Route path="omega-admin/organizations/members/:orgType/:orgId" element={<OmegaAdminManageMembers />} />
             </Route>
           </Route>
         </Route>
