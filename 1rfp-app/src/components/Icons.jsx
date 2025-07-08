@@ -1,4 +1,4 @@
-// src/components/Icons.jsx
+// Add this to your existing src/components/Icons.jsx exports:
 export {
   Search,
   Users,
@@ -25,7 +25,7 @@ export {
   Briefcase as IconBriefcase,
   Briefcase,
   BarChart3,
-  X,
+  X, // <- Add this line if it's not already there
   Tag,
   Heart,
   ArrowRight,
@@ -78,4 +78,3 @@ export {
   BarChart,
   LogOut,
 } from 'lucide-react';
-

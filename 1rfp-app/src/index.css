@@ -3,6 +3,8 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+@import './styles/mobile.css';
+
 
 /* Custom Scrollbar for Modals and long content */
 .custom-scrollbar::-webkit-scrollbar {

@@ -1,0 +1,289 @@
+/* Add this to your main CSS file or create src/styles/mobile.css */
+
+/* Mobile-first responsive improvements */
+@media (max-width: 768px) {
+  /* Better mobile spacing */
+  .mobile-px {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+  
+  .mobile-py {
+    padding-top: 0.75rem;
+    padding-bottom: 0.75rem;
+  }
+
+  /* Mobile menu animations */
+  .mobile-menu-enter {
+    transform: translateX(100%);
+  }
+  
+  .mobile-menu-enter-active {
+    transform: translateX(0);
+    transition: transform 300ms ease-in-out;
+  }
+  
+  .mobile-menu-exit {
+    transform: translateX(0);
+  }
+  
+  .mobile-menu-exit-active {
+    transform: translateX(100%);
+    transition: transform 250ms ease-in-out;
+  }
+
+  /* Better mobile form layouts */
+  .mobile-form-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  /* Mobile-friendly cards */
+  .mobile-card {
+    margin-left: -1rem;
+    margin-right: -1rem;
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+  }
+
+  /* Mobile search improvements */
+  .mobile-search-full {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    background: white;
+    border-bottom: 1px solid #e2e8f0;
+  }
+}
+
+/* Touch-friendly button sizes */
+@media (max-width: 768px) {
+  .btn-touch {
+    min-height: 44px;
+    padding: 0.75rem 1rem;
+  }
+  
+  .btn-touch-sm {
+    min-height: 36px;
+    padding: 0.5rem 0.75rem;
+  }
+}
+
+/* Better mobile typography */
+@media (max-width: 640px) {
+  .mobile-text-sm {
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+  }
+  
+  .mobile-heading {
+    font-size: 1.5rem;
+    line-height: 2rem;
+    font-weight: 700;
+  }
+  
+  .mobile-subheading {
+    font-size: 1.125rem;
+    line-height: 1.75rem;
+    font-weight: 600;
+  }
+}
+
+/* Mobile navigation improvements */
+.mobile-nav-item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  text-align: left;
+  border: none;
+  background: none;
+  transition: background-color 0.2s ease;
+}
+
+.mobile-nav-item:hover {
+  background-color: #f8fafc;
+}
+
+.mobile-nav-item.active {
+  background-color: #eff6ff;
+  color: #2563eb;
+  border-right: 2px solid #2563eb;
+}
+
+/* Improved mobile overlay */
+.mobile-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 40;
+  opacity: 0;
+  transition: opacity 300ms ease;
+}
+
+.mobile-overlay.active {
+  opacity: 1;
+}
+
+/* Mobile slide-out panel */
+.mobile-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 320px;
+  max-width: calc(100vw - 2rem);
+  background: white;
+  box-shadow: -10px 0 25px -5px rgba(0, 0, 0, 0.1);
+  transform: translateX(100%);
+  transition: transform 300ms ease-in-out;
+  z-index: 50;
+}
+
+.mobile-panel.active {
+  transform: translateX(0);
+}
+
+/* Mobile-friendly tables */
+@media (max-width: 768px) {
+  .mobile-table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+  
+  .mobile-stack-table {
+    display: block;
+  }
+  
+  .mobile-stack-table thead {
+    display: none;
+  }
+  
+  .mobile-stack-table tbody,
+  .mobile-stack-table tr,
+  .mobile-stack-table td {
+    display: block;
+  }
+  
+  .mobile-stack-table tr {
+    border: 1px solid #e2e8f0;
+    border-radius: 0.5rem;
+    margin-bottom: 1rem;
+    padding: 1rem;
+  }
+  
+  .mobile-stack-table td {
+    border: none;
+    padding: 0.25rem 0;
+  }
+  
+  .mobile-stack-table td:before {
+    content: attr(data-label) ": ";
+    font-weight: 600;
+    color: #475569;
+  }
+}
+
+/* Mobile-optimized grid layouts */
+@media (max-width: 640px) {
+  .mobile-grid-1 {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .mobile-grid-2 {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Scrollable horizontal lists on mobile */
+.mobile-scroll-x {
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.mobile-scroll-x::-webkit-scrollbar {
+  display: none;
+}
+
+.mobile-scroll-x > * {
+  flex-shrink: 0;
+  scroll-snap-align: start;
+}
+
+/* Mobile-friendly modals */
+@media (max-width: 640px) {
+  .mobile-modal {
+    position: fixed;
+    inset: 0;
+    margin: 0;
+    border-radius: 0;
+    max-height: none;
+    max-width: none;
+  }
+  
+  .mobile-modal-bottom {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    top: auto;
+    border-radius: 1rem 1rem 0 0;
+    transform: translateY(100%);
+    transition: transform 300ms ease-out;
+  }
+  
+  .mobile-modal-bottom.active {
+    transform: translateY(0);
+  }
+}
+
+/* Safe area adjustments for mobile devices */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .mobile-safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  
+  .mobile-safe-top {
+    padding-top: env(safe-area-inset-top);
+  }
+}
+
+/* Accessibility improvements for mobile */
+@media (max-width: 768px) {
+  /* Larger touch targets */
+  .mobile-touch-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  /* Better focus indicators on mobile */
+  .mobile-focus:focus {
+    outline: 2px solid #3b82f6;
+    outline-offset: 2px;
+  }
+}
+
+/* Performance optimizations for mobile */
+@media (max-width: 768px) {
+  /* Reduce animations on slower devices */
+  @media (prefers-reduced-motion: reduce) {
+    .mobile-panel,
+    .mobile-overlay,
+    .mobile-modal-bottom {
+      transition: none;
+    }
+  }
+  
+  /* Hide decorative elements on mobile to improve performance */
+  .mobile-hide-decorative {
+    display: none;
+  }
+}

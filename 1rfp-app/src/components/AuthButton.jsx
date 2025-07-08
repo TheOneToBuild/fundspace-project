@@ -1,90 +1,143 @@
-// src/components/AuthButton.jsx
-import React, { useState, useEffect, useRef } from 'react';
+// Update your existing src/components/AuthButton.jsx
+import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
+import Avatar from './Avatar.jsx';
+import { LogOut, User } from './Icons.jsx';
 
-const UserAvatar = ({ email }) => {
-  const initial = email ? email.charAt(0).toUpperCase() : '?';
-  return (
-    <div className="w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-base ring-2 ring-offset-2 ring-blue-500">
-      {initial}
-    </div>
-  );
-};
+export default function AuthButton({ mobile = false, onClose }) {
+    const [session, setSession] = useState(null);
+    const [profile, setProfile] = useState(null);
+    const [loading, setLoading] = useState(true);
 
-export default function AuthButton() {
-  const [session, setSession] = useState(null);
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const dropdownRef = useRef(null);
-  const navigate = useNavigate();
+    useEffect(() => {
+        // Get initial session
+        supabase.auth.getSession().then(({ data: { session } }) => {
+            setSession(session);
+            if (session?.user) {
+                fetchProfile(session.user.id);
+            } else {
+                setLoading(false);
+            }
+        });
 
-  // Close dropdown if clicked outside
-  useEffect(() => {
-    function handleClickOutside(event) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        setIsDropdownOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
+        // Listen for auth changes
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+            setSession(session);
+            if (session?.user) {
+                fetchProfile(session.user.id);
+            } else {
+                setProfile(null);
+                setLoading(false);
+            }
+        });
+
+        return () => subscription.unsubscribe();
+    }, []);
+
+    const fetchProfile = async (userId) => {
+        try {
+            const { data, error } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', userId)
+                .single();
+
+            if (error) throw error;
+            setProfile(data);
+        } catch (error) {
+            console.error('Error fetching profile:', error);
+        } finally {
+            setLoading(false);
+        }
     };
-  }, [dropdownRef]);
 
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-    });
+    const handleSignOut = async () => {
+        await supabase.auth.signOut();
+        if (onClose) onClose(); // Close mobile menu if provided
+    };
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-    });
+    const handleLinkClick = () => {
+        if (onClose) onClose(); // Close mobile menu when navigating
+    };
 
-    return () => subscription.unsubscribe();
-  }, []);
+    if (loading) {
+        return mobile ? (
+            <div className="w-full px-4 py-3 bg-slate-100 rounded-lg animate-pulse">
+                <div className="h-4 bg-slate-300 rounded"></div>
+            </div>
+        ) : (
+            <div className="px-4 py-2 bg-slate-100 rounded-lg animate-pulse">
+                <div className="h-4 w-16 bg-slate-300 rounded"></div>
+            </div>
+        );
+    }
 
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    setIsDropdownOpen(false);
-    navigate('/'); // Ensure user is on a public page after logout
-  };
+    // If user is logged in
+    if (session && profile) {
+        return mobile ? (
+            <div className="space-y-3">
+                {/* User Info */}
+                <div className="flex items-center space-x-3 px-4 py-3 bg-slate-50 rounded-lg">
+                    <Avatar src={profile.avatar_url} fullName={profile.full_name} size="sm" />
+                    <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-slate-900 truncate">
+                            {profile.full_name || 'User'}
+                        </p>
+                        <p className="text-xs text-slate-500 truncate">
+                            {session.user.email}
+                        </p>
+                    </div>
+                </div>
+                
+                {/* Quick Actions */}
+                <div className="space-y-2">
+                    <Link 
+                        to="/profile"
+                        onClick={handleLinkClick}
+                        className="flex items-center w-full px-4 py-2 text-sm text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
+                    >
+                        <User size={16} className="mr-3" />
+                        View Profile
+                    </Link>
+                    
+                    <button 
+                        onClick={handleSignOut}
+                        className="flex items-center w-full px-4 py-2 text-sm text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
+                    >
+                        <LogOut size={16} className="mr-3" />
+                        Sign Out
+                    </button>
+                </div>
+            </div>
+        ) : (
+            <div className="flex items-center space-x-3">
+                <Avatar src={profile.avatar_url} fullName={profile.full_name} size="sm" />
+                <Link 
+                    to="/profile"
+                    className="hidden lg:block text-sm font-medium text-slate-700 hover:text-slate-900 transition-colors"
+                >
+                    {profile.full_name || 'Profile'}
+                </Link>
+            </div>
+        );
+    }
 
-  if (session) {
-    return (
-      <div className="relative" ref={dropdownRef}>
-        <button
-          onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-          className="btn btn-ghost btn-circle avatar"
+    // If user is not logged in
+    return mobile ? (
+        <Link 
+            to="/login"
+            onClick={handleLinkClick}
+            className="flex items-center justify-center w-full px-4 py-3 text-sm font-medium text-slate-700 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors"
         >
-          <UserAvatar email={session.user.email} />
-        </button>
-        {isDropdownOpen && (
-          <ul tabIndex={0} className="absolute right-0 menu menu-sm mt-3 z-[50] p-2 shadow-lg bg-white rounded-box w-52 border border-slate-200">
-            <li className="p-2 font-semibold text-slate-700 border-b truncate">{session.user.email}</li>
-            <li>
-              <Link to="/profile" className="justify-between" onClick={() => setIsDropdownOpen(false)}>
-                Profile
-              </Link>
-            </li>
-            <li><a onClick={handleSignOut}>Logout</a></li>
-          </ul>
-        )}
-      </div>
+            Sign In
+        </Link>
+    ) : (
+        <Link 
+            to="/login"
+            className="px-3 lg:px-4 py-2 text-sm font-medium rounded-lg text-slate-700 bg-white hover:bg-slate-50 border border-slate-300 shadow-sm transition-colors"
+        >
+            Sign In
+        </Link>
     );
-  }
-
-  return (
-    <Link
-      to="/login"
-      className="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 transition-all duration-200 ease-in-out shadow-sm"
-    >
-      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2 h-5 w-5">
-        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
-        <circle cx="9" cy="7" r="4"/>
-        <path d="M22 21v-2a4 4 0 0 0-3-3.87"/>
-        <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-      </svg>
-      Sign In
-    </Link>
-  );
 }
