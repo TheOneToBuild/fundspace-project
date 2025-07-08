@@ -77,4 +77,7 @@ export {
   Compass,
   BarChart,
   LogOut,
+  Eye,
+  Star,
+  ThumbsUp,
 } from 'lucide-react';
