@@ -80,4 +80,5 @@ export {
   Eye,
   Star,
   ThumbsUp,
+  HandHeart,
 } from 'lucide-react';
