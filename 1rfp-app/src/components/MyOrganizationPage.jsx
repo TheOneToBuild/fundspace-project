@@ -1,4 +1,4 @@
-// Updated MyOrganizationPage.jsx - Allow Super Admins and Admins to Leave Organizations
+// Updated MyOrganizationPage.jsx - REMOVED Super Admin leave restrictions
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useOutletContext, Link } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
@@ -148,20 +148,13 @@ export default function MyOrganizationPage() {
         }
     }, [fetchOrganizationData]);
 
-    // UPDATED: Allow super admins and admins to leave organizations
+    // UPDATED: Allow all users to leave organizations without restrictions
     const executeLeave = async () => {
         if (!userMembership) return;
 
         try {
-            // Check if this is the last super admin - prevent leaving if so
-            if (userMembership.role === ROLES.SUPER_ADMIN) {
-                const superAdminCount = members.filter(member => member.role === ROLES.SUPER_ADMIN).length;
-                if (superAdminCount <= 1) {
-                    setError('Cannot leave: You are the only Super Admin. Please promote another member to Super Admin before leaving.');
-                    setConfirmingLeave(false);
-                    return;
-                }
-            }
+            // REMOVED: Super Admin restriction check
+            // All users (Super Admins, Admins, Members) can now leave without restrictions
 
             const { error: deleteError } = await supabase
                 .from('organization_memberships')
@@ -316,7 +309,7 @@ export default function MyOrganizationPage() {
                                 Edit Organization
                             </Link>
                         )}
-                        {/* UPDATED: Allow super admins, admins, and members to leave */}
+                        {/* UPDATED: All users can now leave (Super Admins, Admins, Members) */}
                         {canLeave && (
                             <button
                                 onClick={() => setConfirmingLeave(true)}
@@ -443,7 +436,7 @@ export default function MyOrganizationPage() {
                 )}
             </div>
 
-            {/* UPDATED: Confirmation Modal for Leaving Organization */}
+            {/* UPDATED: Confirmation Modal for Leaving Organization - Removed Super Admin restrictions */}
             {isConfirmingLeave && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                     <div className="bg-white p-6 rounded-xl shadow-xl max-w-md w-full mx-4">
@@ -452,11 +445,11 @@ export default function MyOrganizationPage() {
                             <p className="text-slate-600 mb-4">
                                 Are you sure you want to leave {organization.name}? You'll need to be re-invited to rejoin.
                             </p>
+                            {/* UPDATED: Removed Super Admin warning and made it optional/informational */}
                             {userRole === ROLES.SUPER_ADMIN && (
-                                <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                                    <p className="text-yellow-800 text-sm">
-                                        <strong>Warning:</strong> As a Super Admin, leaving may affect organization management. 
-                                        Make sure another Super Admin is available to manage the organization.
+                                <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                                    <p className="text-blue-800 text-sm">
+                                        <strong>Note:</strong> You are leaving as a Super Admin. Make sure other admins are available to manage the organization if needed.
                                     </p>
                                 </div>
                             )}

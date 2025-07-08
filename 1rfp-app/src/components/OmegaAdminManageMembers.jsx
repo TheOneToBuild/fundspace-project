@@ -1,4 +1,4 @@
-// src/components/OmegaAdminManageMembers.jsx - FIXED with correct column names
+// src/components/OmegaAdminManageMembers.jsx - REMOVED Super Admin restrictions
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useOutletContext, Link } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
@@ -61,6 +61,13 @@ export default function OmegaAdminManageMembers() {
             
             const tableName = orgType === 'nonprofit' ? 'nonprofits' : 'funders';
             
+            // FIXED: Convert orgId to number for database query
+            const organizationId = parseInt(orgId, 10);
+            
+            if (isNaN(organizationId)) {
+                throw new Error('Invalid organization ID');
+            }
+            
             // FIXED: Use correct columns based on the schema
             let selectColumns = 'id, name, slug';
             
@@ -75,7 +82,7 @@ export default function OmegaAdminManageMembers() {
             const { data: orgData, error: orgError } = await supabase
                 .from(tableName)
                 .select(selectColumns)
-                .eq('id', orgId)
+                .eq('id', organizationId) // Use converted number
                 .single();
 
             if (orgError) throw orgError;
@@ -83,7 +90,7 @@ export default function OmegaAdminManageMembers() {
 
             setOrganization({ ...orgData, type: orgType });
 
-            // Fetch organization members - FIXED: Remove email column which doesn't exist
+            // Fetch organization members - FIXED: Use converted number for organization_id
             const { data: memberData, error: memberError } = await supabase
                 .from('organization_memberships')
                 .select(`
@@ -96,7 +103,7 @@ export default function OmegaAdminManageMembers() {
                         is_omega_admin
                     )
                 `)
-                .eq('organization_id', orgId)
+                .eq('organization_id', organizationId) // Use converted number
                 .eq('organization_type', orgType)
                 .order('role', { ascending: false })
                 .order('joined_at', { ascending: true });
@@ -122,11 +129,14 @@ export default function OmegaAdminManageMembers() {
             setError('');
             setSuccess('');
 
+            // FIXED: Convert orgId to number for database query
+            const organizationId = parseInt(orgId, 10);
+
             const { error: updateError } = await supabase
                 .from('organization_memberships')
                 .update({ role: newRole })
                 .eq('profile_id', member.profile_id)
-                .eq('organization_id', orgId);
+                .eq('organization_id', organizationId); // Use converted number
 
             if (updateError) throw updateError;
 
@@ -142,26 +152,23 @@ export default function OmegaAdminManageMembers() {
         }
     };
 
-    // Handle member removal
+    // Handle member removal - REMOVED Super Admin restrictions
     const handleRemoveMember = async (member) => {
         try {
             setError('');
             setSuccess('');
 
-            // Check if this is the last super admin
-            if (member.role === ROLES.SUPER_ADMIN) {
-                const superAdminCount = members.filter(m => m.role === ROLES.SUPER_ADMIN).length;
-                if (superAdminCount <= 1) {
-                    setError('Cannot remove the last Super Admin. Please promote another member first.');
-                    return;
-                }
-            }
+            // REMOVED: Super Admin restriction check
+            // Omega Admins can now remove any member, including Super Admins
+
+            // FIXED: Convert orgId to number for database query
+            const organizationId = parseInt(orgId, 10);
 
             const { error: deleteError } = await supabase
                 .from('organization_memberships')
                 .delete()
                 .eq('profile_id', member.profile_id)
-                .eq('organization_id', orgId);
+                .eq('organization_id', organizationId); // Use converted number
 
             if (deleteError) throw deleteError;
 
@@ -526,7 +533,7 @@ export default function OmegaAdminManageMembers() {
                                                 </button>
                                             )}
 
-                                            {/* Remove Button */}
+                                            {/* Remove Button - Now works for all roles including Super Admin */}
                                             <button
                                                 onClick={() => openConfirmModal('remove', member)}
                                                 className="inline-flex items-center px-3 py-1 text-sm bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors"
@@ -554,7 +561,7 @@ export default function OmegaAdminManageMembers() {
                 )}
             </div>
 
-            {/* Confirmation Modal */}
+            {/* Confirmation Modal - UPDATED: Removed Super Admin warning */}
             {confirmModal.isOpen && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                     <div className="bg-white p-6 rounded-xl shadow-xl max-w-md w-full mx-4">
@@ -584,13 +591,7 @@ export default function OmegaAdminManageMembers() {
                                 </p>
                             )}
                             
-                            {confirmModal.type === 'remove' && confirmModal.member?.role === ROLES.SUPER_ADMIN && (
-                                <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                                    <p className="text-yellow-800 text-sm">
-                                        <strong>Warning:</strong> Removing a Super Admin may affect organization management capabilities.
-                                    </p>
-                                </div>
-                            )}
+                            {/* REMOVED: Super Admin warning since Omega Admins can now remove anyone */}
                         </div>
                         
                         <div className="flex space-x-3">
