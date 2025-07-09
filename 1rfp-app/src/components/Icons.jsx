@@ -81,4 +81,7 @@ export {
   Star,
   ThumbsUp,
   HandHeart,
+  MessageCircle,
+  Plus,
+  Sparkles,
 } from 'lucide-react';

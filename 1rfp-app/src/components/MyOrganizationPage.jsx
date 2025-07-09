@@ -1,4 +1,4 @@
-// Updated MyOrganizationPage.jsx - REMOVED Super Admin leave restrictions
+// Updated MyOrganizationPage.jsx - FIXED Leave Organization functionality
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useOutletContext, Link } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
@@ -33,52 +33,90 @@ export default function MyOrganizationPage() {
     const isOmegaAdmin = profile?.is_omega_admin === true;
 
     const checkMembership = useCallback(async () => {
+        console.log('=== MEMBERSHIP CHECK STARTED ===');
         setConfirmingLeave(false); 
 
         if (!session?.user?.id || !profile) {
+            console.log('❌ No session or profile, skipping membership check');
             setLoading(false);
             return;
         }
+
+        console.log('Debug info:', {
+            'session.user.id': session?.user?.id,
+            'profile.id': profile?.id,
+            'isOmegaAdmin': isOmegaAdmin
+        });
 
         setLoading(true);
         setError('');
 
         // For Omega Admins, show the organization selector instead
         if (isOmegaAdmin) {
+            console.log('👑 User is Omega Admin, skipping membership check');
             setLoading(false);
-            return; // Don't check membership for Omega Admins
+            return;
         }
 
-        // Check for legacy admin status first (backwards compatibility)
-        if (profile.managed_nonprofit_id || profile.managed_funder_id) {
-            setUserMembership({ 
-                role: 'super_admin',
-                organization_id: profile.managed_nonprofit_id || profile.managed_funder_id, 
-                organization_type: profile.managed_nonprofit_id ? 'nonprofit' : 'funder'
+        try {
+            // Check new membership system
+            const { data: memberships, error: membershipError } = await supabase
+                .from('organization_memberships')
+                .select('*')
+                .eq('profile_id', profile.id)
+                .order('joined_at', { ascending: false })
+                .limit(1);
+
+            console.log('Membership query result:', {
+                memberships,
+                membershipError,
+                'profile.id used in query': profile.id,
+                'query timestamp': new Date().toISOString()
             });
+
+            if (membershipError) {
+                console.error('❌ Membership check error:', membershipError);
+                setError('Error checking membership');
+                setLoading(false);
+                return;
+            }
+
+            // If we found a membership, use it
+            if (memberships && memberships.length > 0) {
+                console.log('✅ Found membership:', memberships[0]);
+                setUserMembership(memberships[0]);
+                setLoading(false);
+                return;
+            }
+
+            // Check for legacy admin status
+            if (profile.managed_nonprofit_id || profile.managed_funder_id) {
+                console.log('📋 Found legacy admin membership');
+                setUserMembership({ 
+                    role: 'super_admin',
+                    organization_id: profile.managed_nonprofit_id || profile.managed_funder_id, 
+                    organization_type: profile.managed_nonprofit_id ? 'nonprofit' : 'funder'
+                });
+                setLoading(false);
+                return;
+            }
+
+            // No membership found - clear all organization state
+            console.log('❌ No membership found - clearing organization state');
+            setUserMembership(null);
+            setOrganization(null);
+            setMembers([]);
             setLoading(false);
-            return;
-        }
 
-        // Check new membership system
-        const { data: memberships, error: membershipError } = await supabase
-            .from('organization_memberships')
-            .select('*')
-            .eq('profile_id', profile.id)
-            .limit(1);
-
-        if (membershipError) {
-            console.error('Membership check error:', membershipError);
+        } catch (err) {
+            console.error('❌ Error in checkMembership:', err);
             setError('Error checking membership');
+            // Also clear state on error
+            setUserMembership(null);
+            setOrganization(null);
+            setMembers([]);
             setLoading(false);
-            return;
         }
-
-        if (memberships && memberships.length > 0) {
-            setUserMembership(memberships[0]);
-        }
-
-        setLoading(false);
     }, [profile, session?.user?.id, isOmegaAdmin]);
 
     const fetchOrganizationData = useCallback(async () => {
@@ -148,13 +186,18 @@ export default function MyOrganizationPage() {
         }
     }, [fetchOrganizationData]);
 
-    // UPDATED: Allow all users to leave organizations without restrictions
+    // ENHANCED: Fixed leave organization function with automatic redirect
     const executeLeave = async () => {
         if (!userMembership) return;
 
         try {
-            // REMOVED: Super Admin restriction check
-            // All users (Super Admins, Admins, Members) can now leave without restrictions
+            setLoading(true); // Show loading state
+            setError(''); // Clear any existing errors
+
+            console.log('Leaving organization...', {
+                userId: session.user.id,
+                organizationId: userMembership.organization_id
+            });
 
             const { error: deleteError } = await supabase
                 .from('organization_memberships')
@@ -163,16 +206,35 @@ export default function MyOrganizationPage() {
                 .eq('organization_id', userMembership.organization_id);
 
             if (deleteError) {
+                console.error('Error leaving organization:', deleteError);
                 setError('Error leaving organization: ' + deleteError.message);
                 setConfirmingLeave(false);
-            } else {
-                // Successfully left - redirect to setup page or refresh membership
-                checkMembership();
+                setLoading(false);
+                return;
             }
+
+            console.log('Successfully left organization');
+
+            // Immediately clear the user membership state
+            setUserMembership(null);
+            setOrganization(null);
+            setMembers([]);
+            setConfirmingLeave(false);
+            
+            // Wait a moment for database consistency
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            // Double-check by calling checkMembership
+            await checkMembership();
+            
+            // The component should now automatically show the setup page
+            // since userMembership is null
+
         } catch (err) {
-            console.error('Error leaving organization:', err);
+            console.error('Unexpected error leaving organization:', err);
             setError('An unexpected error occurred while leaving the organization.');
             setConfirmingLeave(false);
+            setLoading(false);
         }
     };
 
@@ -266,7 +328,7 @@ export default function MyOrganizationPage() {
     const canManageMembers = hasPermission(userRole, PERMISSIONS.MANAGE_MEMBERS, isOmegaAdmin);
     const canManageAdmins = hasPermission(userRole, PERMISSIONS.MANAGE_ADMINS, isOmegaAdmin);
 
-    // UPDATED: Determine if user can leave (all roles except omega admins can leave)
+    // All users can leave (except omega admins who don't join organizations)
     const canLeave = !isOmegaAdmin && userMembership;
 
     return (
@@ -309,7 +371,6 @@ export default function MyOrganizationPage() {
                                 Edit Organization
                             </Link>
                         )}
-                        {/* UPDATED: All users can now leave (Super Admins, Admins, Members) */}
                         {canLeave && (
                             <button
                                 onClick={() => setConfirmingLeave(true)}
@@ -436,7 +497,7 @@ export default function MyOrganizationPage() {
                 )}
             </div>
 
-            {/* UPDATED: Confirmation Modal for Leaving Organization - Removed Super Admin restrictions */}
+            {/* UPDATED: Confirmation Modal for Leaving Organization */}
             {isConfirmingLeave && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                     <div className="bg-white p-6 rounded-xl shadow-xl max-w-md w-full mx-4">
@@ -445,7 +506,6 @@ export default function MyOrganizationPage() {
                             <p className="text-slate-600 mb-4">
                                 Are you sure you want to leave {organization.name}? You'll need to be re-invited to rejoin.
                             </p>
-                            {/* UPDATED: Removed Super Admin warning and made it optional/informational */}
                             {userRole === ROLES.SUPER_ADMIN && (
                                 <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
                                     <p className="text-blue-800 text-sm">
@@ -457,15 +517,24 @@ export default function MyOrganizationPage() {
                         <div className="flex space-x-3">
                             <button
                                 onClick={() => setConfirmingLeave(false)}
-                                className="flex-1 px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50"
+                                disabled={loading}
+                                className="flex-1 px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 disabled:opacity-50"
                             >
                                 Cancel
                             </button>
                             <button
                                 onClick={executeLeave}
-                                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+                                disabled={loading}
+                                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 flex items-center justify-center"
                             >
-                                Leave Organization
+                                {loading ? (
+                                    <>
+                                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                                        Leaving...
+                                    </>
+                                ) : (
+                                    'Leave Organization'
+                                )}
                             </button>
                         </div>
                     </div>
