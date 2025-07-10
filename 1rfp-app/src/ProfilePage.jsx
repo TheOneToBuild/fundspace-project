@@ -1,4 +1,4 @@
-// src/ProfilePage.jsx - OPTIMIZED VERSION
+// src/ProfilePage.jsx - SOCIAL COMMUNITY HUB VERSION
 import React, { useState, useEffect, useCallback, useContext, useMemo } from 'react';
 import { supabase } from './supabaseClient';
 import { useNavigate, Outlet, useOutletContext } from 'react-router-dom';
@@ -11,42 +11,106 @@ export default function ProfilePage() {
     const navigate = useNavigate();
     const { setPageBgColor } = useContext(LayoutContext);
 
-    // Consolidated state with better organization
+    // Enhanced state management for social features
     const [appState, setAppState] = useState({
+        // Existing data
         trendingGrants: [],
         savedGrants: [],
         posts: [],
         isDetailModalOpen: false,
         selectedGrant: null,
         dataLoading: false,
-        error: null
+        error: null,
+        
+        // New social features
+        communityMembers: [],
+        followingUsers: [],
+        followerUsers: [],
+        impactMetrics: {
+            grantsApplied: 0,
+            grantsReceived: 0,
+            totalFunding: 0,
+            communitiesHelped: 0,
+            postsShared: 0,
+            connectionsGrown: 0
+        },
+        stories: [],
+        communityEvents: [],
+        suggestedConnections: [],
+        recentActivity: [],
+        
+        // Social stats
+        totalPosts: 0,
+        totalFollowers: 0,
+        totalFollowing: 0,
+        
+        // Dashboard state
+        activeTab: 'community', // 'community', 'grants', 'organization', 'events', 'analytics'
+        showCreatePost: false
     });
 
-    const { trendingGrants, savedGrants, posts, isDetailModalOpen, selectedGrant, dataLoading, error } = appState;
+    const { 
+        trendingGrants, savedGrants, posts, isDetailModalOpen, selectedGrant, 
+        dataLoading, error, communityMembers, impactMetrics, stories, activeTab,
+        totalPosts, totalFollowers, totalFollowing, suggestedConnections
+    } = appState;
 
-    // Memoized background effect
+    // Enhanced background effect with gradient
     useEffect(() => {
-        setPageBgColor('bg-slate-50');
+        setPageBgColor('bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20');
         return () => setPageBgColor('bg-white');
     }, [setPageBgColor]);
 
-    // Optimized data fetching with error handling and loading states
+    // Enhanced data fetching with social features
     const fetchPageData = useCallback(async (userId) => {
         setAppState(prev => ({ ...prev, dataLoading: true, error: null }));
         
         try {
-            const [savedGrantsRes, trendingGrantsRes, postsRes] = await Promise.all([
+            const [
+                savedGrantsRes, 
+                trendingGrantsRes, 
+                postsRes, 
+                socialStatsRes,
+                followersRes,
+                followingRes,
+                communityMembersRes
+            ] = await Promise.all([
+                // Existing queries
                 supabase
                     .from('saved_grants')
                     .select(`id, grant_id, grants(*, funders(name, logo_url, slug))`)
                     .eq('user_id', userId)
                     .order('created_at', { ascending: false }),
                 supabase.rpc('get_trending_grants'),
-                supabase.rpc('get_feed_posts', { user_id_param: userId })
+                supabase.rpc('get_feed_posts', { user_id_param: userId }),
+                
+                // New social queries
+                supabase
+                    .from('profiles')
+                    .select('id')
+                    .eq('id', userId)
+                    .single(),
+                    
+                supabase
+                    .from('followers')
+                    .select('follower_id, profiles!followers_follower_id_fkey(id, full_name, avatar_url, title)')
+                    .eq('following_id', userId),
+                    
+                supabase
+                    .from('followers')
+                    .select('following_id, profiles!followers_following_id_fkey(id, full_name, avatar_url, title)')
+                    .eq('follower_id', userId),
+                    
+                supabase
+                    .from('profiles')
+                    .select('id, full_name, avatar_url, title, organization_name')
+                    .neq('id', userId)
+                    .limit(10)
             ]);
 
             const updatedState = { dataLoading: false };
 
+            // Process existing data
             if (savedGrantsRes.data) {
                 updatedState.savedGrants = savedGrantsRes.data.map(item => ({
                     ...item.grants,
@@ -61,7 +125,41 @@ export default function ProfilePage() {
 
             if (postsRes.data) {
                 updatedState.posts = postsRes.data;
+                updatedState.totalPosts = postsRes.data.length;
             }
+
+            // Process social data
+            if (followersRes.data) {
+                updatedState.followerUsers = followersRes.data.map(f => f.profiles);
+                updatedState.totalFollowers = followersRes.data.length;
+            }
+
+            if (followingRes.data) {
+                updatedState.followingUsers = followingRes.data.map(f => f.profiles);
+                updatedState.totalFollowing = followingRes.data.length;
+            }
+
+            if (communityMembersRes.data) {
+                updatedState.communityMembers = communityMembersRes.data;
+                updatedState.suggestedConnections = communityMembersRes.data.slice(0, 5);
+            }
+
+            // Mock impact metrics (replace with real data later)
+            updatedState.impactMetrics = {
+                grantsApplied: Math.floor(Math.random() * 15) + 5,
+                grantsReceived: Math.floor(Math.random() * 5) + 1,
+                totalFunding: Math.floor(Math.random() * 500000) + 50000,
+                communitiesHelped: Math.floor(Math.random() * 10) + 3,
+                postsShared: postsRes.data?.length || 0,
+                connectionsGrown: (followersRes.data?.length || 0) + (followingRes.data?.length || 0)
+            };
+
+            // Mock stories data
+            updatedState.stories = [
+                { id: 1, type: 'grant_success', title: 'Grant Success', image: null, viewed: false },
+                { id: 2, type: 'community_event', title: 'Workshop', image: null, viewed: true },
+                { id: 3, type: 'team_update', title: 'Team News', image: null, viewed: false }
+            ];
 
             setAppState(prev => ({ ...prev, ...updatedState }));
         } catch (error) {
@@ -73,7 +171,57 @@ export default function ProfilePage() {
             }));
         }
     }, []);
-    
+
+    // Tab switching handler
+    const handleTabChange = useCallback((newTab) => {
+        setAppState(prev => ({ ...prev, activeTab: newTab }));
+    }, []);
+
+    // Social action handlers
+    const handleFollowUser = useCallback(async (userId) => {
+        try {
+            await supabase
+                .from('followers')
+                .insert({ follower_id: session.user.id, following_id: userId });
+            
+            // Refresh data to update counts
+            fetchPageData(session.user.id);
+        } catch (error) {
+            console.error('Error following user:', error);
+        }
+    }, [session, fetchPageData]);
+
+    const handleUnfollowUser = useCallback(async (userId) => {
+        try {
+            await supabase
+                .from('followers')
+                .delete()
+                .match({ follower_id: session.user.id, following_id: userId });
+            
+            // Refresh data to update counts
+            fetchPageData(session.user.id);
+        } catch (error) {
+            console.error('Error unfollowing user:', error);
+        }
+    }, [session, fetchPageData]);
+
+    // Story handlers
+    const handleStoryClick = useCallback((storyId) => {
+        setAppState(prev => ({
+            ...prev,
+            stories: prev.stories.map(story => 
+                story.id === storyId ? { ...story, viewed: true } : story
+            )
+        }));
+        // Here you would open story viewer modal
+        console.log('Opening story:', storyId);
+    }, []);
+
+    const handleCreateStory = useCallback(() => {
+        // Here you would open story creation modal
+        console.log('Opening story creator');
+    }, []);
+
     // Authentication and data loading effect
     useEffect(() => {
         if (loading) return;
@@ -85,7 +233,7 @@ export default function ProfilePage() {
         }
     }, [session, loading, navigate, fetchPageData]);
     
-    // Optimized post handlers with immediate UI updates
+    // Existing post handlers (keeping original functionality)
     const handleNewPost = useCallback((newPostData) => {
         const postWithProfileAndReactions = {
             ...newPostData,
@@ -97,18 +245,20 @@ export default function ProfilePage() {
         
         setAppState(prev => ({
             ...prev,
-            posts: [postWithProfileAndReactions, ...prev.posts]
+            posts: [postWithProfileAndReactions, ...prev.posts],
+            totalPosts: prev.totalPosts + 1
         }));
     }, [profile]);
 
     const handleDeletePost = useCallback((deletedPostId) => {
         setAppState(prev => ({
             ...prev,
-            posts: prev.posts.filter(p => p.id !== deletedPostId)
+            posts: prev.posts.filter(p => p.id !== deletedPostId),
+            totalPosts: Math.max(0, prev.totalPosts - 1)
         }));
     }, []);
     
-    // Grant modal handlers
+    // Existing grant modal handlers
     const openDetail = useCallback((grant) => {
         setAppState(prev => ({
             ...prev,
@@ -125,7 +275,7 @@ export default function ProfilePage() {
         }));
     }, []);
 
-    // Optimized trending grant click with better data transformation
+    // Existing grant handlers
     const handleTrendingGrantClick = useCallback(async (grantId) => {
         try {
             const { data } = await supabase
@@ -149,7 +299,6 @@ export default function ProfilePage() {
         }
     }, [openDetail]);
 
-    // Optimized save/unsave handlers with optimistic updates
     const handleSaveGrant = useCallback(async (grantId) => {
         if (!session || !grantId) return;
         
@@ -158,7 +307,6 @@ export default function ProfilePage() {
                 .from('saved_grants')
                 .insert({ user_id: session.user.id, grant_id: grantId });
             
-            // Optimistic update - refresh data
             fetchPageData(session.user.id);
         } catch (error) {
             console.error('Error saving grant:', error);
@@ -174,15 +322,15 @@ export default function ProfilePage() {
                 .delete()
                 .match({ user_id: session.user.id, grant_id: grantId });
             
-            // Optimistic update - refresh data
             fetchPageData(session.user.id);
         } catch (error) {
             console.error('Error unsaving grant:', error);
         }
     }, [session, fetchPageData]);
 
-    // Memoized outlet context to prevent unnecessary re-renders
+    // Enhanced outlet context for social features
     const outletContext = useMemo(() => ({
+        // Existing context
         profile,
         posts,
         handleNewPost,
@@ -191,16 +339,39 @@ export default function ProfilePage() {
         session,
         handleSaveGrant,
         handleUnsaveGrant,
-        openDetail
-    }), [profile, posts, handleNewPost, handleDeletePost, savedGrants, session, handleSaveGrant, handleUnsaveGrant, openDetail]);
+        openDetail,
+        
+        // New social context
+        activeTab,
+        handleTabChange,
+        impactMetrics,
+        stories,
+        handleStoryClick,
+        handleCreateStory,
+        communityMembers,
+        suggestedConnections,
+        handleFollowUser,
+        handleUnfollowUser,
+        socialStats: {
+            totalPosts,
+            totalFollowers,
+            totalFollowing
+        }
+    }), [
+        profile, posts, handleNewPost, handleDeletePost, savedGrants, session, 
+        handleSaveGrant, handleUnsaveGrant, openDetail, activeTab, handleTabChange,
+        impactMetrics, stories, handleStoryClick, handleCreateStory, communityMembers,
+        suggestedConnections, handleFollowUser, handleUnfollowUser, totalPosts, 
+        totalFollowers, totalFollowing
+    ]);
 
     // Loading and error states
     if (loading || !profile) {
         return (
-            <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+            <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20 flex items-center justify-center">
                 <div className="text-center">
                     <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                    <p className="text-slate-600">Loading Profile...</p>
+                    <p className="text-slate-600">Loading your community hub...</p>
                 </div>
             </div>
         );
@@ -208,12 +379,12 @@ export default function ProfilePage() {
 
     if (error) {
         return (
-            <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-                <div className="text-center bg-white p-8 rounded-xl shadow-sm border border-red-200">
+            <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20 flex items-center justify-center">
+                <div className="text-center bg-white/80 backdrop-blur-sm p-8 rounded-xl shadow-sm border border-red-200">
                     <p className="text-red-600 mb-4">{error}</p>
                     <button 
                         onClick={() => fetchPageData(session.user.id)}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                     >
                         Retry
                     </button>

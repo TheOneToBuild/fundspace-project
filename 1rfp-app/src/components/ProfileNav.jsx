@@ -1,58 +1,116 @@
-// Updated ProfileNav.jsx - Fixed for Omega Admins
-import React from 'react';
-import { NavLink } from 'react-router-dom';
-import { Star } from 'lucide-react';
-import Avatar from './Avatar.jsx'; 
+// src/components/ProfileNav.jsx
+import React, { useState, useEffect } from 'react';
+import { NavLink, useOutletContext } from 'react-router-dom';
+import { supabase } from '../supabaseClient';
 import { isPlatformAdmin } from '../utils/permissions.js';
 
-export default function ProfileNav({ user, profile }) {
-    const navLinkClass = ({ isActive }) => 
-        `flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors ${
-            isActive 
-            ? 'bg-blue-100 text-blue-700 font-semibold' 
-            : 'text-slate-600 hover:bg-slate-100'
-        }`;
-
-    const omegaNavLinkClass = ({ isActive }) => 
-        `flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors ${
-            isActive 
-            ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white font-semibold' 
-            : 'text-purple-700 hover:bg-purple-50'
-        }`;
+export default function ProfileNav() {
+    const { profile } = useOutletContext();
+    const [stats, setStats] = useState({
+        followersCount: 0,
+        favoritesCount: 0
+    });
+    const [loading, setLoading] = useState(true);
 
     const isOmegaAdmin = isPlatformAdmin(profile?.is_omega_admin);
 
+    useEffect(() => {
+        if (profile?.id) {
+            fetchProfileStats();
+        }
+    }, [profile?.id]);
+
+    const fetchProfileStats = async () => {
+        try {
+            setLoading(true);
+            
+            // Fetch followers count (users following this profile)
+            const { count: followersCount, error: followersError } = await supabase
+                .from('followers')
+                .select('*', { count: 'exact', head: true })
+                .eq('following_id', profile.id);
+
+            if (followersError) {
+                console.error('Error fetching followers count:', followersError);
+            }
+
+            // Fetch funder bookmarks count
+            const { count: funderBookmarksCount, error: funderBookmarksError } = await supabase
+                .from('funder_bookmarks')
+                .select('*', { count: 'exact', head: true })
+                .eq('user_id', profile.id);
+
+            if (funderBookmarksError) {
+                console.error('Error fetching funder bookmarks count:', funderBookmarksError);
+            }
+
+            // Fetch nonprofit bookmarks count
+            const { count: nonprofitBookmarksCount, error: nonprofitBookmarksError } = await supabase
+                .from('nonprofit_bookmarks')
+                .select('*', { count: 'exact', head: true })
+                .eq('user_id', profile.id);
+
+            if (nonprofitBookmarksError) {
+                console.error('Error fetching nonprofit bookmarks count:', nonprofitBookmarksError);
+            }
+
+            // Total favorites = funder bookmarks + nonprofit bookmarks
+            const totalFavorites = (funderBookmarksCount || 0) + (nonprofitBookmarksCount || 0);
+
+            setStats({
+                followersCount: followersCount || 0,
+                favoritesCount: totalFavorites
+            });
+
+        } catch (err) {
+            console.error('Error fetching profile stats:', err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const navLinkClass = ({ isActive }) =>
+        `flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
+            isActive 
+                ? 'bg-blue-100 text-blue-700' 
+                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+        }`;
+
     return (
         <div className="space-y-4">
-            <div className="p-4 bg-white rounded-xl shadow-md border border-slate-200 text-center">
-                <div className="w-20 h-20 mx-auto mb-3 ring-4 ring-blue-200 rounded-full">
-                    <Avatar src={profile?.avatar_url} fullName={profile?.full_name} size="lg" />
-                </div>
-                <p className="font-bold text-lg text-slate-800 truncate w-full">{profile?.full_name || user?.email}</p>
-                <p className="text-sm text-slate-500">{profile?.organization_name || profile?.role || 'Community Member'}</p>
-                <div className="mt-2 space-y-2">
-                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-green-100 text-green-800">
-                        <div className="w-2 h-2 bg-green-500 rounded-full mr-1.5"></div>
-                        Active now
-                    </span>
-                    {/* Omega Admin Badge */}
-                    {isOmegaAdmin && (
-                        <div className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-gradient-to-r from-purple-500 to-pink-500 text-white font-medium">
-                            <Star className="w-3 h-3 mr-1" />
-                            Platform Admin
-                        </div>
-                    )}
-                </div>
-            </div>
-            <div className="p-3 bg-white rounded-xl shadow-md border border-slate-200">
-                <div className="grid grid-cols-2 gap-4 text-center">
-                    <div>
-                        <p className="text-xl font-bold text-slate-800">47</p>
-                        <p className="text-xs text-slate-500">Colleagues</p>
+            {/* Profile Header */}
+            <div className="bg-white p-6 rounded-xl shadow-md border border-slate-200">
+                <div className="text-center">
+                    <div className="w-20 h-20 bg-slate-200 rounded-full mx-auto mb-4 flex items-center justify-center overflow-hidden">
+                        {profile?.avatar_url ? (
+                            <img src={profile.avatar_url} alt="Profile" className="w-full h-full object-cover" />
+                        ) : (
+                            <span className="text-2xl font-bold text-slate-600">
+                                {profile?.full_name?.charAt(0)?.toUpperCase() || '?'}
+                            </span>
+                        )}
                     </div>
-                    <div>
-                        <p className="text-xl font-bold text-slate-800">23</p>
-                        <p className="text-xs text-slate-500">In Network</p>
+                    <h2 className="text-lg font-semibold text-slate-800 mb-1">
+                        {profile?.full_name || 'Your Name'}
+                    </h2>
+                    <p className="text-sm text-slate-500 mb-4">
+                        {profile?.title || 'Your Title'} {profile?.organization_name && `at ${profile.organization_name}`}
+                    </p>
+                </div>
+                
+                {/* Stats */}
+                <div className="flex justify-center space-x-8 border-t border-slate-200 pt-4">
+                    <div className="text-center">
+                        <p className="text-xl font-bold text-slate-800">
+                            {loading ? '...' : stats.followersCount}
+                        </p>
+                        <p className="text-xs text-slate-500">Followers</p>
+                    </div>
+                    <div className="text-center">
+                        <p className="text-xl font-bold text-slate-800">
+                            {loading ? '...' : stats.favoritesCount}
+                        </p>
+                        <p className="text-xs text-slate-500">Favorites</p>
                     </div>
                 </div>
             </div>
@@ -85,30 +143,27 @@ export default function ProfileNav({ user, profile }) {
                     </NavLink>
                 </nav>
             </div>
-            
-            {/* Omega Admin Section */}
+
+            {/* Omega Admin Navigation */}
             {isOmegaAdmin && (
-                <div className="p-4 bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl shadow-md border border-purple-200">
-                    <div className="flex items-center mb-3">
-                        <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center mr-3">
-                            <Star className="w-4 h-4 text-white" />
-                        </div>
-                        <h3 className="font-semibold text-purple-800">Platform Admin</h3>
-                    </div>
+                <div className="p-4 bg-gradient-to-r from-purple-50 to-blue-50 rounded-xl shadow-md border border-purple-200">
+                    <h3 className="text-sm font-semibold text-purple-800 mb-3 uppercase tracking-wider">
+                        Omega Admin
+                    </h3>
                     <nav className="space-y-1">
-                        <NavLink to="/profile/omega-admin" end className={omegaNavLinkClass}>
-                            <span>🚀</span>
+                        <NavLink to="/profile/omega-admin" end className={navLinkClass}>
+                            <span>👑</span>
                             <span>Admin Dashboard</span>
                         </NavLink>
-                        <NavLink to="/profile/omega-admin/claims" className={omegaNavLinkClass}>
-                            <span>✋</span>
-                            <span>Review Claims</span>
-                        </NavLink>
-                        <NavLink to="/profile/omega-admin/analytics" className={omegaNavLinkClass}>
+                        <NavLink to="/profile/omega-admin/analytics" className={navLinkClass}>
                             <span>📊</span>
-                            <span>Platform Analytics</span>
+                            <span>Analytics</span>
                         </NavLink>
-                        <NavLink to="/profile/omega-admin/organizations" className={omegaNavLinkClass}>
+                        <NavLink to="/profile/omega-admin/claims" className={navLinkClass}>
+                            <span>📋</span>
+                            <span>Manage Claims</span>
+                        </NavLink>
+                        <NavLink to="/profile/omega-admin/organizations" className={navLinkClass}>
                             <span>🏢</span>
                             <span>Manage Organizations</span>
                         </NavLink>
