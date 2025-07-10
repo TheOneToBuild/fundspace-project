@@ -1,4 +1,4 @@
-// src/utils/permissions.js - Updated with enhanced Omega Admin support
+// src/utils/permissions.js - Updated with enhanced Super Admin support
 
 export const ROLES = {
   OMEGA_ADMIN: 'omega_admin',
@@ -76,6 +76,72 @@ export function canManageUser(currentUserRole, targetUserRole, isOmegaAdmin = fa
   }
   
   return false;
+}
+
+/**
+ * Check if current user can promote target user to a specific role
+ * @param {string} currentUserRole - Current user's role
+ * @param {string} targetRole - Role to promote to
+ * @param {boolean} isOmegaAdmin - Whether current user is omega admin
+ * @returns {boolean} - Whether current user can promote to target role
+ */
+export function canPromoteToRole(currentUserRole, targetRole, isOmegaAdmin = false) {
+  // Omega admins can promote to any role except omega_admin
+  if (isOmegaAdmin === true) {
+    return [ROLES.MEMBER, ROLES.ADMIN, ROLES.SUPER_ADMIN].includes(targetRole);
+  }
+
+  // Super admins can promote to any role except omega_admin and super_admin
+  if (currentUserRole === ROLES.SUPER_ADMIN) {
+    return [ROLES.MEMBER, ROLES.ADMIN, ROLES.SUPER_ADMIN].includes(targetRole);
+  }
+  
+  // Regular admins can only promote to member or admin
+  if (currentUserRole === ROLES.ADMIN) {
+    return [ROLES.MEMBER, ROLES.ADMIN].includes(targetRole);
+  }
+  
+  return false;
+}
+
+/**
+ * Check if current user can demote target user from a specific role
+ * @param {string} currentUserRole - Current user's role
+ * @param {string} currentTargetRole - Target user's current role
+ * @param {boolean} isOmegaAdmin - Whether current user is omega admin
+ * @returns {boolean} - Whether current user can demote target user
+ */
+export function canDemoteFromRole(currentUserRole, currentTargetRole, isOmegaAdmin = false) {
+  // Omega admins can demote anyone except other omega admins
+  if (isOmegaAdmin === true) {
+    return currentTargetRole !== ROLES.OMEGA_ADMIN;
+  }
+
+  // Super admins can demote anyone except omega admins
+  if (currentUserRole === ROLES.SUPER_ADMIN) {
+    return [ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.MEMBER].includes(currentTargetRole);
+  }
+  
+  // Regular admins can only demote other admins and members
+  if (currentUserRole === ROLES.ADMIN) {
+    return [ROLES.ADMIN, ROLES.MEMBER].includes(currentTargetRole);
+  }
+  
+  return false;
+}
+
+/**
+ * Check if current user can manage members (view member management interface)
+ * @param {string} currentUserRole - Current user's role
+ * @param {boolean} isOmegaAdmin - Whether current user is omega admin
+ * @returns {boolean} - Whether current user can access member management
+ */
+export function canAccessMemberManagement(currentUserRole, isOmegaAdmin = false) {
+  if (isOmegaAdmin === true) {
+    return true;
+  }
+  
+  return [ROLES.SUPER_ADMIN, ROLES.ADMIN].includes(currentUserRole);
 }
 
 /**

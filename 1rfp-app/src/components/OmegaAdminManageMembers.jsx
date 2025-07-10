@@ -1,4 +1,4 @@
-// src/components/OmegaAdminManageMembers.jsx - REMOVED Super Admin restrictions
+// src/components/OmegaAdminManageMembers.jsx - Complete with Super Admin support
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useOutletContext, Link } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
@@ -22,7 +22,15 @@ import {
     MoreVertical
 } from 'lucide-react';
 import Avatar from './Avatar.jsx';
-import { isPlatformAdmin, ROLES, getRoleDisplayName, getRoleBadgeColor } from '../utils/permissions.js';
+import { 
+    isPlatformAdmin, 
+    ROLES, 
+    getRoleDisplayName, 
+    getRoleBadgeColor,
+    canPromoteToRole,
+    canDemoteFromRole,
+    canAccessMemberManagement
+} from '../utils/permissions.js';
 
 export default function OmegaAdminManageMembers() {
     const { profile } = useOutletContext();
@@ -37,6 +45,7 @@ export default function OmegaAdminManageMembers() {
     const [roleFilter, setRoleFilter] = useState('all');
     const [sortBy, setSortBy] = useState('role'); // 'role', 'name', 'joined'
     const [sortOrder, setSortOrder] = useState('desc'); // 'asc', 'desc'
+    const [currentUserRole, setCurrentUserRole] = useState(null);
     
     // Confirmation modal state
     const [confirmModal, setConfirmModal] = useState({
@@ -53,6 +62,37 @@ export default function OmegaAdminManageMembers() {
             fetchOrganizationAndMembers();
         }
     }, [isOmegaAdmin, orgType, orgId]);
+
+    // Get current user's role in this organization
+    useEffect(() => {
+        const getCurrentUserRole = async () => {
+            if (!profile?.id || !orgId || !orgType) return;
+            
+            // Skip for omega admins since they don't have org memberships
+            if (isPlatformAdmin(profile?.is_omega_admin)) {
+                setCurrentUserRole('omega_admin');
+                return;
+            }
+            
+            try {
+                const { data, error } = await supabase
+                    .from('organization_memberships')
+                    .select('role')
+                    .eq('profile_id', profile.id)
+                    .eq('organization_id', parseInt(orgId, 10))
+                    .eq('organization_type', orgType)
+                    .single();
+                    
+                if (!error && data) {
+                    setCurrentUserRole(data.role);
+                }
+            } catch (err) {
+                console.error('Error fetching user role:', err);
+            }
+        };
+        
+        getCurrentUserRole();
+    }, [profile?.id, orgId, orgType, profile?.is_omega_admin]);
 
     const fetchOrganizationAndMembers = async () => {
         try {
@@ -129,6 +169,12 @@ export default function OmegaAdminManageMembers() {
             setError('');
             setSuccess('');
 
+            // Check permissions before attempting
+            if (!canPromoteToRole(currentUserRole, newRole, isOmegaAdmin)) {
+                setError('You do not have permission to assign this role.');
+                return;
+            }
+
             // FIXED: Convert orgId to number for database query
             const organizationId = parseInt(orgId, 10);
 
@@ -152,14 +198,17 @@ export default function OmegaAdminManageMembers() {
         }
     };
 
-    // Handle member removal - REMOVED Super Admin restrictions
+    // Handle member removal
     const handleRemoveMember = async (member) => {
         try {
             setError('');
             setSuccess('');
 
-            // REMOVED: Super Admin restriction check
-            // Omega Admins can now remove any member, including Super Admins
+            // Check permissions before attempting
+            if (!isOmegaAdmin && currentUserRole !== ROLES.SUPER_ADMIN) {
+                setError('You do not have permission to remove members.');
+                return;
+            }
 
             // FIXED: Convert orgId to number for database query
             const organizationId = parseInt(orgId, 10);
@@ -267,8 +316,8 @@ export default function OmegaAdminManageMembers() {
         return filtered;
     }, [members, searchQuery, roleFilter, sortBy, sortOrder]);
 
-    // Access denied for non-omega admins
-    if (!isOmegaAdmin) {
+    // Access denied for non-omega admins and non-super admins
+    if (!currentUserRole || !canAccessMemberManagement(currentUserRole, isOmegaAdmin)) {
         return (
             <div className="min-h-screen bg-slate-50 p-4 sm:p-8">
                 <div className="max-w-4xl mx-auto">
@@ -278,7 +327,7 @@ export default function OmegaAdminManageMembers() {
                         </div>
                         <h1 className="text-2xl font-bold text-slate-800 mb-2">Access Restricted</h1>
                         <p className="text-slate-600 mb-6">
-                            This page is only accessible to Omega Admins.
+                            This page is only accessible to Omega Admins and Super Admins.
                         </p>
                     </div>
                 </div>
@@ -486,11 +535,11 @@ export default function OmegaAdminManageMembers() {
                                         </div>
                                     </div>
 
-                                    {/* Action Buttons - Only show for non-Omega Admin members */}
-                                    {!member.profiles?.is_omega_admin && (
+                                    {/* Action Buttons - Show for manageable members */}
+                                    {!member.profiles?.is_omega_admin && currentUserRole && canAccessMemberManagement(currentUserRole, isOmegaAdmin) && (
                                         <div className="flex items-center space-x-2 ml-4">
-                                            {/* Promote/Demote Buttons */}
-                                            {member.role === ROLES.MEMBER && (
+                                            {/* Promote Buttons */}
+                                            {member.role === ROLES.MEMBER && canPromoteToRole(currentUserRole, ROLES.ADMIN, isOmegaAdmin) && (
                                                 <button
                                                     onClick={() => openConfirmModal('promote', member, ROLES.ADMIN)}
                                                     className="inline-flex items-center px-3 py-1 text-sm bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors"
@@ -503,26 +552,30 @@ export default function OmegaAdminManageMembers() {
                                             
                                             {member.role === ROLES.ADMIN && (
                                                 <>
-                                                    <button
-                                                        onClick={() => openConfirmModal('promote', member, ROLES.SUPER_ADMIN)}
-                                                        className="inline-flex items-center px-3 py-1 text-sm bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition-colors"
-                                                        title="Promote to Super Admin"
-                                                    >
-                                                        <Crown className="w-4 h-4 mr-1" />
-                                                        Super Admin
-                                                    </button>
-                                                    <button
-                                                        onClick={() => openConfirmModal('demote', member, ROLES.MEMBER)}
-                                                        className="inline-flex items-center px-3 py-1 text-sm bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors"
-                                                        title="Demote to Member"
-                                                    >
-                                                        <UserMinus className="w-4 h-4 mr-1" />
-                                                        Demote
-                                                    </button>
+                                                    {canPromoteToRole(currentUserRole, ROLES.SUPER_ADMIN, isOmegaAdmin) && (
+                                                        <button
+                                                            onClick={() => openConfirmModal('promote', member, ROLES.SUPER_ADMIN)}
+                                                            className="inline-flex items-center px-3 py-1 text-sm bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition-colors"
+                                                            title="Promote to Super Admin"
+                                                        >
+                                                            <Crown className="w-4 h-4 mr-1" />
+                                                            Super Admin
+                                                        </button>
+                                                    )}
+                                                    {canDemoteFromRole(currentUserRole, member.role, isOmegaAdmin) && (
+                                                        <button
+                                                            onClick={() => openConfirmModal('demote', member, ROLES.MEMBER)}
+                                                            className="inline-flex items-center px-3 py-1 text-sm bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors"
+                                                            title="Demote to Member"
+                                                        >
+                                                            <UserMinus className="w-4 h-4 mr-1" />
+                                                            Demote
+                                                        </button>
+                                                    )}
                                                 </>
                                             )}
                                             
-                                            {member.role === ROLES.SUPER_ADMIN && (
+                                            {member.role === ROLES.SUPER_ADMIN && canDemoteFromRole(currentUserRole, member.role, isOmegaAdmin) && (
                                                 <button
                                                     onClick={() => openConfirmModal('demote', member, ROLES.ADMIN)}
                                                     className="inline-flex items-center px-3 py-1 text-sm bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors"
@@ -533,15 +586,17 @@ export default function OmegaAdminManageMembers() {
                                                 </button>
                                             )}
 
-                                            {/* Remove Button - Now works for all roles including Super Admin */}
-                                            <button
-                                                onClick={() => openConfirmModal('remove', member)}
-                                                className="inline-flex items-center px-3 py-1 text-sm bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors"
-                                                title="Remove from Organization"
-                                            >
-                                                <Trash2 className="w-4 h-4 mr-1" />
-                                                Remove
-                                            </button>
+                                            {/* Remove Button - Available to Super Admins and Omega Admins */}
+                                            {(isOmegaAdmin || currentUserRole === ROLES.SUPER_ADMIN) && (
+                                                <button
+                                                    onClick={() => openConfirmModal('remove', member)}
+                                                    className="inline-flex items-center px-3 py-1 text-sm bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors"
+                                                    title="Remove from Organization"
+                                                >
+                                                    <Trash2 className="w-4 h-4 mr-1" />
+                                                    Remove
+                                                </button>
+                                            )}
                                         </div>
                                     )}
 
@@ -561,7 +616,7 @@ export default function OmegaAdminManageMembers() {
                 )}
             </div>
 
-            {/* Confirmation Modal - UPDATED: Removed Super Admin warning */}
+            {/* Confirmation Modal */}
             {confirmModal.isOpen && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                     <div className="bg-white p-6 rounded-xl shadow-xl max-w-md w-full mx-4">
@@ -590,8 +645,6 @@ export default function OmegaAdminManageMembers() {
                                     <strong>{getRoleDisplayName(confirmModal.newRole)}</strong>?
                                 </p>
                             )}
-                            
-                            {/* REMOVED: Super Admin warning since Omega Admins can now remove anyone */}
                         </div>
                         
                         <div className="flex space-x-3">
