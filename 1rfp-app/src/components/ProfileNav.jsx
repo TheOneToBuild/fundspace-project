@@ -66,8 +66,8 @@ export default function ProfileNav() {
     const communityNavLinkClass = ({ isActive }) =>
         `flex items-center space-x-2 w-full px-3 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
             isActive 
-                ? 'bg-emerald-500 text-white shadow-sm' 
-                : 'text-slate-700 hover:bg-emerald-50 hover:text-emerald-700'
+                ? 'bg-indigo-400 text-white shadow-sm' 
+                : 'text-slate-700 hover:bg-indigo-50 hover:text-indigo-700'
         }`;
 
     return (
@@ -117,29 +117,28 @@ export default function ProfileNav() {
             {/* Compact Community Feeds */}
             <div className="bg-white p-3 rounded-xl shadow-sm border border-slate-200">
                 <div className="flex items-center space-x-2 mb-2">
-                    <div className="w-5 h-5 bg-emerald-300 rounded-md flex items-center justify-center">
+                    <div className="w-5 h-5 bg-blue-200 rounded-md flex items-center justify-center">
                         <span className="text-xs">🌱</span>
                     </div>
                     <h3 className="text-sm font-bold text-slate-700">Community Feeds</h3>
                 </div>
                 <nav className="space-y-1">
                     <NavLink to="/profile" end className={communityNavLinkClass}>
-                        <div className="w-6 h-6 bg-sky-300 rounded-md flex items-center justify-center text-xs shadow-sm">
-                            🌍
+                        <div className="w-6 h-6 bg-purple-200 rounded-md flex items-center justify-center text-xs shadow-sm">
+                            👋
                         </div>
                         <span className="flex-1 font-medium">Hello World</span>
                     </NavLink>
                     
-                    <div className="flex items-center space-x-2 w-full px-3 py-2 text-sm font-medium text-slate-500 cursor-not-allowed">
-                        <div className="w-6 h-6 bg-rose-300 rounded-md flex items-center justify-center text-xs opacity-60">
+                    <NavLink to="/profile/hello-community" className={communityNavLinkClass}>
+                        <div className="w-6 h-6 bg-pink-200 rounded-md flex items-center justify-center text-xs shadow-sm">
                             🤝
                         </div>
-                        <span className="flex-1">Hello Community</span>
-                        <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full">Soon</span>
-                    </div>
+                        <span className="flex-1 font-medium">Hello Community</span>
+                    </NavLink>
                     
                     <div className="flex items-center space-x-2 w-full px-3 py-2 text-sm font-medium text-slate-500 cursor-not-allowed">
-                        <div className="w-6 h-6 bg-violet-300 rounded-md flex items-center justify-center text-xs opacity-60">
+                        <div className="w-6 h-6 bg-orange-200 rounded-md flex items-center justify-center text-xs opacity-60">
                             🏢
                         </div>
                         <span className="flex-1">Hello Workplace</span>
@@ -147,7 +146,7 @@ export default function ProfileNav() {
                     </div>
                     
                     <div className="flex items-center space-x-2 w-full px-3 py-2 text-sm font-medium text-slate-500 cursor-not-allowed">
-                        <div className="w-6 h-6 bg-cyan-300 rounded-md flex items-center justify-center text-xs opacity-60">
+                        <div className="w-6 h-6 bg-teal-200 rounded-md flex items-center justify-center text-xs opacity-60">
                             👥
                         </div>
                         <span className="flex-1">Hello Team</span>
@@ -159,21 +158,21 @@ export default function ProfileNav() {
             {/* Compact Your Profile Section */}
             <div className="bg-white p-3 rounded-xl shadow-sm border border-slate-200">
                 <div className="flex items-center space-x-2 mb-2">
-                    <div className="w-5 h-5 bg-indigo-300 rounded-md flex items-center justify-center">
+                    <div className="w-5 h-5 bg-purple-200 rounded-md flex items-center justify-center">
                         <span className="text-xs">👤</span>
                     </div>
                     <h3 className="text-sm font-bold text-slate-700">Your Profile</h3>
                 </div>
                 <nav className="space-y-1">
                     <NavLink to="/profile/members" className={navLinkClass}>
-                        <div className="w-6 h-6 bg-teal-300 rounded-md flex items-center justify-center text-xs shadow-sm">
+                        <div className="w-6 h-6 bg-green-200 rounded-md flex items-center justify-center text-xs shadow-sm">
                             👥
                         </div>
                         <span className="font-medium">Explore Members</span>
                     </NavLink>
                     
                     <NavLink to="/profile/saved-grants" className={navLinkClass}>
-                        <div className="w-6 h-6 bg-orange-300 rounded-md flex items-center justify-center text-xs shadow-sm">
+                        <div className="w-6 h-6 bg-yellow-200 rounded-md flex items-center justify-center text-xs shadow-sm">
                             📑
                         </div>
                         <span className="font-medium">Saved Grants</span>
@@ -181,7 +180,7 @@ export default function ProfileNav() {
                     
                     {!isOmegaAdmin && (
                         <NavLink to="/profile/my-organization" className={navLinkClass}>
-                            <div className="w-6 h-6 bg-pink-300 rounded-md flex items-center justify-center text-xs shadow-sm">
+                            <div className="w-6 h-6 bg-red-200 rounded-md flex items-center justify-center text-xs shadow-sm">
                                 🏢
                             </div>
                             <span className="font-medium">My Organization</span>
@@ -189,7 +188,7 @@ export default function ProfileNav() {
                     )}
                     
                     <NavLink to="/profile/settings" className={navLinkClass}>
-                        <div className="w-6 h-6 bg-slate-300 rounded-md flex items-center justify-center text-xs shadow-sm">
+                        <div className="w-6 h-6 bg-gray-300 rounded-md flex items-center justify-center text-xs shadow-sm">
                             ⚙️
                         </div>
                         <span className="font-medium">Settings</span>

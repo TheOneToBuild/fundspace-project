@@ -28,6 +28,8 @@ import SavedGrantsPage from './SavedGrantsPage.jsx';
 import ExploreMembersPage from './ExploreMembersPage.jsx';
 import MemberProfilePage from './MemberProfilePage.jsx';
 import DashboardHomePage from './components/DashboardHomePage.jsx';
+// --- HELLO COMMUNITY IMPORT ---
+import HelloCommunityRoute from './components/HelloCommunityRoute.jsx';
 // --- OMEGA ADMIN IMPORTS ---
 import OmegaAdminDashboard from './components/OmegaAdminDashboard.jsx';
 import OmegaAdminAnalytics from './components/OmegaAdminAnalytics.jsx';
@@ -342,6 +344,7 @@ export default function App() {
               <Route path="members" element={<ExploreMembersPage />} />
               <Route path="members/:profileId" element={<MemberProfilePage />} />
               <Route path="saved-grants" element={<SavedGrantsPage />} />
+              <Route path="hello-community" element={<HelloCommunityRoute />} />
               <Route path="settings" element={<SettingsPage />} />
               
               {/* --- ORGANIZATION ROUTES --- */}
