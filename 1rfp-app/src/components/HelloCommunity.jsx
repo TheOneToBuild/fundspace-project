@@ -34,113 +34,113 @@ const NewsCard = ({ title, summary, category, timeAgo, image }) => (
 const TrendingNews = ({ userRole }) => {
     const [news, setNews] = useState([]);
 
-    useEffect(() => {
-        // Mock news data that loads instantly (no delay) - exactly like DashboardHomePage
-        const mockNews = {
-            Funder: [
-                {
-                    id: 1,
-                    title: "MacKenzie Scott Announces $2.15B in New Giving",
-                    summary: "Focus on equity and community-led organizations continues with latest philanthropic distribution targeting underserved communities nationwide.",
-                    category: "Philanthropy",
-                    timeAgo: "2 hours ago",
-                    image: "https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=400&h=200&fit=crop"
-                },
-                {
-                    id: 2,
-                    title: "Foundation Trends: Impact Investing Reaches Record High",
-                    summary: "New report shows 40% increase in foundation impact investing commitments this year, with climate and social justice leading sectors.",
-                    category: "Breaking News",
-                    timeAgo: "4 hours ago",
-                    image: "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=400&h=200&fit=crop"
-                },
-                {
-                    id: 3,
-                    title: "DAF Giving Surpasses $50B Milestone",
-                    summary: "Donor-advised funds continue to grow as preferred vehicle for strategic philanthropy, with tech entrepreneurs leading adoption.",
-                    category: "Philanthropy",
-                    timeAgo: "6 hours ago",
-                    image: "https://images.unsplash.com/photo-1553729459-efe14ef6055d?w=400&h=200&fit=crop"
-                },
-                {
-                    id: 4,
-                    title: "Giving Tuesday Sets New Global Record",
-                    summary: "International day of giving generates $3.1B in donations across 80+ countries, demonstrating sustained philanthropic momentum.",
-                    category: "Philanthropy",
-                    timeAgo: "1 day ago",
-                    image: "https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=400&h=200&fit=crop"
-                },
-                {
-                    id: 5,
-                    title: "Corporate Foundation Pledges Hit $15B",
-                    summary: "Major corporations announce unprecedented foundation commitments focused on climate action and social equity initiatives.",
-                    category: "Breaking News",
-                    timeAgo: "2 days ago",
-                    image: "https://images.unsplash.com/photo-1450101499163-c8848c66ca85?w=400&h=200&fit=crop"
-                },
-                {
-                    id: 6,
-                    title: "Family Foundation Leadership Trends",
-                    summary: "Next-generation philanthropists bring fresh approaches to family foundation governance and strategic giving priorities.",
-                    category: "Philanthropy",
-                    timeAgo: "1 week ago",
-                    image: "https://images.unsplash.com/photo-1511632765486-a01980e01a18?w=400&h=200&fit=crop"
-                }
-            ],
-            Nonprofit: [
-                {
-                    id: 1,
-                    title: "Federal Funding Opportunities Expanded for Community Organizations",
-                    summary: "New ARPA allocations prioritize grassroots nonprofits serving underrepresented communities with streamlined application processes.",
-                    category: "Breaking News",
-                    timeAgo: "1 hour ago",
-                    image: "https://images.unsplash.com/photo-1573164713714-d95e436ab8d6?w=400&h=200&fit=crop"
-                },
-                {
-                    id: 2,
-                    title: "Study: Nonprofit Collaboration Increases Program Effectiveness by 35%",
-                    summary: "Research highlights benefits of cross-sector partnerships in achieving mission goals and maximizing community impact through shared resources.",
-                    category: "Nonprofit",
-                    timeAgo: "3 hours ago",
-                    image: "https://images.unsplash.com/photo-1600880292203-757bb62b4baf?w=400&h=200&fit=crop"
-                },
-                {
-                    id: 3,
-                    title: "Digital Fundraising Tools See 60% Adoption Increase",
-                    summary: "Small nonprofits embrace technology to diversify revenue streams and reach new donors through innovative online platforms.",
-                    category: "Nonprofit",
-                    timeAgo: "5 hours ago",
-                    image: "https://images.unsplash.com/photo-1556157382-97eda2d62296?w=400&h=200&fit=crop"
-                },
-                {
-                    id: 4,
-                    title: "Volunteer Engagement Reaches Pre-Pandemic Levels",
-                    summary: "Community organizations report strongest volunteer participation since 2019, driven by renewed civic engagement across all demographics.",
-                    category: "Community",
-                    timeAgo: "1 day ago",
-                    image: "https://images.unsplash.com/photo-1559027615-cd4628902d4a?w=400&h=200&fit=crop"
-                },
-                {
-                    id: 5,
-                    title: "Nonprofit Sector Shows Record Growth",
-                    summary: "IRS data reveals 4.2% increase in new nonprofit registrations, with environmental and social justice organizations leading expansion.",
-                    category: "Breaking News",
-                    timeAgo: "2 days ago",
-                    image: "https://images.unsplash.com/photo-1582213782179-e0d53f98f2ca?w=400&h=200&fit=crop"
-                },
-                {
-                    id: 6,
-                    title: "Board Diversity Initiative Shows Results",
-                    summary: "National survey reveals significant improvements in nonprofit board composition, with 40% increase in diverse leadership representation.",
-                    category: "Nonprofit",
-                    timeAgo: "1 week ago",
-                    image: "https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?w=400&h=200&fit=crop"
-                }
-            ]
-        };
+    // Mock news data - loads instantly without any delay
+    const mockNews = {
+        Funder: [
+            {
+                id: 1,
+                title: "MacKenzie Scott Announces $2.15B in New Giving",
+                summary: "Focus on equity and community-led organizations continues with latest philanthropic distribution targeting underserved communities nationwide.",
+                category: "Philanthropy",
+                timeAgo: "2 hours ago",
+                image: "https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=400&h=200&fit=crop"
+            },
+            {
+                id: 2,
+                title: "Foundation Trends: Impact Investing Reaches Record High",
+                summary: "New report shows 40% increase in foundation impact investing commitments this year, with climate and social justice leading sectors.",
+                category: "Breaking News",
+                timeAgo: "4 hours ago",
+                image: "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=400&h=200&fit=crop"
+            },
+            {
+                id: 3,
+                title: "DAF Giving Surpasses $50B Milestone",
+                summary: "Donor-advised funds continue to grow as preferred vehicle for strategic philanthropy, with tech entrepreneurs leading adoption.",
+                category: "Philanthropy",
+                timeAgo: "6 hours ago",
+                image: "https://images.unsplash.com/photo-1553729459-efe14ef6055d?w=400&h=200&fit=crop"
+            },
+            {
+                id: 4,
+                title: "Giving Tuesday Sets New Global Record",
+                summary: "International day of giving generates $3.1B in donations across 80+ countries, demonstrating sustained philanthropic momentum.",
+                category: "Philanthropy",
+                timeAgo: "1 day ago",
+                image: "https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=400&h=200&fit=crop"
+            },
+            {
+                id: 5,
+                title: "Corporate Foundation Pledges Hit $15B",
+                summary: "Major corporations announce unprecedented foundation commitments focused on climate action and social equity initiatives.",
+                category: "Breaking News",
+                timeAgo: "2 days ago",
+                image: "https://images.unsplash.com/photo-1450101499163-c8848c66ca85?w=400&h=200&fit=crop"
+            },
+            {
+                id: 6,
+                title: "Family Foundation Leadership Trends",
+                summary: "Next-generation philanthropists bring fresh approaches to family foundation governance and strategic giving priorities.",
+                category: "Philanthropy",
+                timeAgo: "1 week ago",
+                image: "https://images.unsplash.com/photo-1511632765486-a01980e01a18?w=400&h=200&fit=crop"
+            }
+        ],
+        Nonprofit: [
+            {
+                id: 1,
+                title: "Federal Funding Opportunities Expanded for Community Organizations",
+                summary: "New ARPA allocations prioritize grassroots nonprofits serving underrepresented communities with streamlined application processes.",
+                category: "Breaking News",
+                timeAgo: "1 hour ago",
+                image: "https://images.unsplash.com/photo-1573164713714-d95e436ab8d6?w=400&h=200&fit=crop"
+            },
+            {
+                id: 2,
+                title: "Study: Nonprofit Collaboration Increases Program Effectiveness by 35%",
+                summary: "Research highlights benefits of cross-sector partnerships in achieving mission goals and maximizing community impact through shared resources.",
+                category: "Nonprofit",
+                timeAgo: "3 hours ago",
+                image: "https://images.unsplash.com/photo-1600880292203-757bb62b4baf?w=400&h=200&fit=crop"
+            },
+            {
+                id: 3,
+                title: "Digital Fundraising Tools See 60% Adoption Increase",
+                summary: "Small nonprofits embrace technology to diversify revenue streams and reach new donors through innovative online platforms.",
+                category: "Nonprofit",
+                timeAgo: "5 hours ago",
+                image: "https://images.unsplash.com/photo-1556157382-97eda2d62296?w=400&h=200&fit=crop"
+            },
+            {
+                id: 4,
+                title: "Volunteer Engagement Reaches Pre-Pandemic Levels",
+                summary: "Community organizations report strongest volunteer participation since 2019, driven by renewed civic engagement across all demographics.",
+                category: "Community",
+                timeAgo: "1 day ago",
+                image: "https://images.unsplash.com/photo-1559027615-cd4628902d4a?w=400&h=200&fit=crop"
+            },
+            {
+                id: 5,
+                title: "Nonprofit Sector Shows Record Growth",
+                summary: "IRS data reveals 4.2% increase in new nonprofit registrations, with environmental and social justice organizations leading expansion.",
+                category: "Breaking News",
+                timeAgo: "2 days ago",
+                image: "https://images.unsplash.com/photo-1582213782179-e0d53f98f2ca?w=400&h=200&fit=crop"
+            },
+            {
+                id: 6,
+                title: "Board Diversity Initiative Shows Results",
+                summary: "National survey reveals significant improvements in nonprofit board composition, with 40% increase in diverse leadership representation.",
+                category: "Nonprofit",
+                timeAgo: "1 week ago",
+                image: "https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?w=400&h=200&fit=crop"
+            }
+        ]
+    };
 
-        // Set news instantly (no loading delay)
-        setNews(mockNews[userRole] || []);
+    useEffect(() => {
+        const newsData = mockNews[userRole] || [];
+        setNews(newsData);
     }, [userRole]);
 
     const scrollNews = (direction) => {
@@ -343,37 +343,30 @@ const CommunityEmptyState = ({ userRole }) => {
 export default function HelloCommunity() {
     const { profile } = useOutletContext();
     const [posts, setPosts] = useState([]);
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(false);
     const [hasEnteredCommunity, setHasEnteredCommunity] = useState(false);
     const [showWelcome, setShowWelcome] = useState(false);
 
-    // Check if user can post and determine their community
     const userRole = profile?.role;
     const canPost = userRole === 'Funder' || userRole === 'Nonprofit';
 
-    // Check if user has previously entered the community
     useEffect(() => {
         if (profile?.id && userRole) {
             const storageKey = `community-entered-${profile.id}-${userRole}`;
             const hasEntered = localStorage.getItem(storageKey) === 'true';
             setHasEnteredCommunity(hasEntered);
-            
-            // Show welcome section only if user hasn't entered and can post
             setShowWelcome(!hasEntered && canPost);
         }
     }, [profile?.id, userRole, canPost]);
 
-    // FIXED: Fetch community posts using direct query instead of RPC
     const fetchCommunityPosts = useCallback(async () => {
         if (!userRole || (userRole !== 'Funder' && userRole !== 'Nonprofit')) {
-            setLoading(false);
+            setPosts([]);
             return;
         }
 
-        setLoading(true);
         try {
-            // Get basic posts first
-            const { data: basicPosts, error: postsError } = await supabase
+            const { data: postsData, error: postsError } = await supabase
                 .from('posts')
                 .select(`
                     *,
@@ -387,64 +380,66 @@ export default function HelloCommunity() {
                     )
                 `)
                 .eq('channel', 'hello-community')
-                .eq('profiles.role', userRole) // Filter by user's role
-                .order('created_at', { ascending: false });
-            
+                .eq('profiles.role', userRole)
+                .order('created_at', { ascending: false })
+                .limit(20);
+
             if (postsError) {
                 console.error('Error fetching community posts:', postsError);
                 setPosts([]);
-                setLoading(false);
                 return;
             }
 
-            // Add reaction data to each post
-            const postsWithReactions = await Promise.all(
-                (basicPosts || []).map(async (post) => {
-                    // Get reaction summary
-                    const { data: reactionData, error: reactionError } = await supabase
-                        .from('post_likes')
-                        .select('reaction_type')
-                        .eq('post_id', post.id);
+            if (postsData && postsData.length > 0) {
+                const postIds = postsData.map(post => post.id);
+                
+                const { data: allReactions } = await supabase
+                    .from('post_likes')
+                    .select('post_id, reaction_type')
+                    .in('post_id', postIds);
 
-                    let reactionSummary = [];
-                    if (reactionData && !reactionError) {
-                        const counts = {};
-                        reactionData.forEach(like => {
-                            if (like.reaction_type) {
-                                counts[like.reaction_type] = (counts[like.reaction_type] || 0) + 1;
-                            }
-                        });
-                        
-                        reactionSummary = Object.entries(counts).map(([type, count]) => ({
-                            type,
-                            count
-                        }));
-                    }
+                const { data: allComments } = await supabase
+                    .from('post_comments')
+                    .select('post_id')
+                    .in('post_id', postIds);
 
-                    // Get basic counts
-                    const { count: likesCount } = await supabase
-                        .from('post_likes')
-                        .select('*', { count: 'exact', head: true })
-                        .eq('post_id', post.id);
-
-                    const { count: commentsCount } = await supabase
-                        .from('post_comments')
-                        .select('*', { count: 'exact', head: true })
-                        .eq('post_id', post.id);
-
-                    return {
-                        ...post,
-                        likes_count: likesCount || 0,
-                        comments_count: commentsCount || 0,
-                        reactions: {
-                            summary: reactionSummary,
-                            sample: []
+                const reactionCounts = {};
+                const reactionSummaries = {};
+                
+                if (allReactions) {
+                    allReactions.forEach(reaction => {
+                        const postId = reaction.post_id;
+                        reactionCounts[postId] = (reactionCounts[postId] || 0) + 1;
+                        if (!reactionSummaries[postId]) {
+                            reactionSummaries[postId] = {};
                         }
-                    };
-                })
-            );
+                        const type = reaction.reaction_type || 'like';
+                        reactionSummaries[postId][type] = (reactionSummaries[postId][type] || 0) + 1;
+                    });
+                }
 
-            setPosts(postsWithReactions);
+                const commentCounts = {};
+                if (allComments) {
+                    allComments.forEach(comment => {
+                        const postId = comment.post_id;
+                        commentCounts[postId] = (commentCounts[postId] || 0) + 1;
+                    });
+                }
+
+                const enrichedPosts = postsData.map(post => ({
+                    ...post,
+                    likes_count: reactionCounts[post.id] || 0,
+                    comments_count: commentCounts[post.id] || 0,
+                    reactions: {
+                        summary: Object.entries(reactionSummaries[post.id] || {}).map(([type, count]) => ({ type, count })),
+                        sample: []
+                    }
+                }));
+
+                setPosts(enrichedPosts);
+            } else {
+                setPosts([]);
+            }
         } catch (error) {
             console.error('Error in fetchCommunityPosts:', error);
             setPosts([]);
@@ -453,6 +448,7 @@ export default function HelloCommunity() {
         }
     }, [userRole]);
 
+    // Fetch posts immediately without delay
     useEffect(() => {
         fetchCommunityPosts();
     }, [fetchCommunityPosts]);
@@ -484,10 +480,8 @@ export default function HelloCommunity() {
 
     return (
         <div className="space-y-6">
-            {/* Trending News - Role-specific and instant loading */}
             <TrendingNews userRole={userRole} />
             
-            {/* Community Welcome Section - Only show for first-time visitors */}
             {showWelcome && (
                 <CommunityWelcomeSection 
                     userRole={userRole} 
@@ -496,13 +490,10 @@ export default function HelloCommunity() {
                 />
             )}
 
-            {/* Show community content if user has entered OR if there are existing posts OR if they can't post */}
             {(hasEnteredCommunity || posts.length > 0 || !canPost) && (
                 <>
-                    {/* Channel Identifier */}
                     <ChannelIdentifier userRole={userRole} />
                     
-                    {/* Create Post Section - Only for Funders and Nonprofits */}
                     {canPost && (
                         <CreatePost 
                             profile={profile} 
@@ -511,7 +502,6 @@ export default function HelloCommunity() {
                         />
                     )}
                     
-                    {/* Posts Feed */}
                     <div className="space-y-6">
                         {loading ? (
                             <div className="space-y-4">
@@ -545,7 +535,6 @@ export default function HelloCommunity() {
                         )}
                     </div>
                     
-                    {/* Load More - Future Enhancement */}
                     {posts.length > 0 && !loading && (
                         <div className="text-center py-8">
                             <button className="px-6 py-3 bg-white border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 transition-colors font-medium">

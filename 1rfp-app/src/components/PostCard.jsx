@@ -1,3 +1,4 @@
+// src/components/PostCard.jsx
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../supabaseClient';
 import { useOutletContext } from 'react-router-dom';
@@ -242,7 +243,7 @@ const TagDisplay = ({ tags }) => {
     return (
         <div className="flex flex-wrap gap-2 mb-3">
             {parsedTags.map(tag => (
-                <div key={tag.id} className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border ${tag.color}`}>
+                <div key={tag.id} className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border ${tag.color || 'bg-gray-100 text-gray-800 border-gray-200'}`}>
                     <span>{tag.label}</span>
                 </div>
             ))}
@@ -708,12 +709,12 @@ const ProfileoneImageViewer = ({
                                 </div>
                             )}
                             <img
-                                src={images[currentIndex]}
+                                src={images[currentIndex] || '/api/placeholder/800/600'}
                                 alt={`Image ${currentIndex + 1}`}
                                 className="max-w-full max-h-full object-contain"
+                                onError={(e) => { e.target.src = '/api/placeholder/800/600'; }}
                             />
                         </div>
-                        
                         <div className={`bg-white flex flex-col flex-1 min-w-[420px] max-w-[480px] overflow-y-auto`}>
                             <div className="p-6 border-b border-gray-200">
                                 <div className="flex items-start space-x-3">
@@ -728,19 +729,16 @@ const ProfileoneImageViewer = ({
                                     </div>
                                 </div>
                             </div>
-                            
                             {post.content && (
                                 <div className="px-6 py-4 border-b border-gray-200">
                                     <p className="text-gray-800 leading-relaxed text-base">{post.content}</p>
                                 </div>
                             )}
-                            
                             {post.tags && post.tags.length > 0 && (
                                 <div className="px-6 py-3 border-b border-gray-200">
                                     <TagDisplay tags={post.tags} />
                                 </div>
                             )}
-                            
                             <div className="px-6 py-4 border-b border-gray-200">
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center">
@@ -774,7 +772,6 @@ const ProfileoneImageViewer = ({
                                     </div>
                                 </div>
                             </div>
-                            
                             <div className="px-6 py-3 border-b border-gray-200">
                                 <div className="flex items-center space-x-1">
                                     <div className="relative flex-1">
@@ -820,7 +817,6 @@ const ProfileoneImageViewer = ({
                                     </button>
                                 </div>
                             </div>
-                            
                             <div className="p-6 flex-1">
                                 <CommentSection 
                                     post={post} 
@@ -840,7 +836,6 @@ const ProfileoneImageViewer = ({
                         >
                             <X size={20} />
                         </button>
-                        
                         <div className="p-6 border-b border-gray-200">
                             <div className="flex items-start space-x-3">
                                 <Avatar src={post.profiles.avatar_url} fullName={post.profiles.full_name} size="md" />
@@ -854,13 +849,11 @@ const ProfileoneImageViewer = ({
                                 </div>
                             </div>
                         </div>
-                        
                         {post.content && (
                             <div className="px-6 py-4 border-b border-gray-200">
                                 <p className="text-gray-800 leading-relaxed text-base">{post.content}</p>
                             </div>
                         )}
-                        
                         <div className="px-6 py-4 border-b border-gray-200">
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center">
@@ -894,7 +887,6 @@ const ProfileoneImageViewer = ({
                                 </div>
                             </div>
                         </div>
-                        
                         <div className="p-6 flex-1">
                             <CommentSection 
                                 post={post} 
@@ -993,7 +985,7 @@ const ImageMosaic = ({ images, onImageClick }) => {
     );
 };
 
-export default function PostCard({ post, onDelete }) {
+export default function PostCard({ post, onDelete, disabled = false }) {
     const { profile: currentUserProfile } = useOutletContext();
     const [selectedReaction, setSelectedReaction] = useState(null);
     const [likeCount, setLikeCount] = useState(post.likes_count || 0);
@@ -1018,6 +1010,8 @@ export default function PostCard({ post, onDelete }) {
     const reactorsTimeoutRef = useRef(null);
 
     useEffect(() => {
+        if (!post || !post.profiles) return;
+
         const { image_url, image_urls, tags } = post;
         const displayImages = image_urls && image_urls.length > 0 ? image_urls : (image_url ? [image_url] : []);
         setEditedImages(displayImages);
@@ -1038,13 +1032,50 @@ export default function PostCard({ post, onDelete }) {
     }, [post]);
 
     const refreshPostData = async () => {
-        const { data: refreshedPost, error } = await supabase.rpc('get_single_post', { p_post_id: post.id }).single();
-        if (error) {
-            console.error("Failed to refresh post data:", error);
-        } else if (refreshedPost) {
-            setLikeCount(refreshedPost.likes_count || 0);
-            setReactionSummary(refreshedPost.reactions?.summary || []);
-            setReactionSample(refreshedPost.reactions?.sample || []);
+        if (!post?.id) return;
+
+        try {
+            const { data: postData, error: postError } = await supabase
+                .from('posts')
+                .select(`
+                    *,
+                    profiles!posts_profile_id_fkey(
+                        id,
+                        full_name,
+                        avatar_url,
+                        role,
+                        title,
+                        organization_name
+                    )
+                `)
+                .eq('id', post.id)
+                .single();
+
+            if (postError) throw postError;
+
+            const { data: likesData, error: likesError } = await supabase
+                .from('post_likes')
+                .select('user_id, reaction_type')
+                .eq('post_id', post.id)
+                .order('created_at', { ascending: false });
+
+            if (likesError) throw likesError;
+
+            const reactionCounts = {};
+            const reactionSummaries = {};
+            if (likesData) {
+                likesData.forEach(like => {
+                    const type = like.reaction_type || 'like';
+                    reactionCounts[post.id] = (reactionCounts[post.id] || 0) + 1;
+                    reactionSummaries[post.id] = reactionSummaries[post.id] || {};
+                    reactionSummaries[post.id][type] = (reactionSummaries[post.id][type] || 0) + 1;
+                });
+            }
+
+            setLikeCount(reactionCounts[post.id] || 0);
+            setReactionSummary(Object.entries(reactionSummaries[post.id] || {}).map(([type, count]) => ({ type, count })) || []);
+        } catch (error) {
+            console.error('Failed to refresh post data:', error);
         }
     };
 
@@ -1057,87 +1088,87 @@ export default function PostCard({ post, onDelete }) {
 
     useEffect(() => {
         const fetchReactors = async () => {
-            if (likeCount > 0) {
-                try {
-                    const { data: likesData, error: likesError } = await supabase
-                        .from('post_likes')
-                        .select(`
-                            user_id,
-                            reaction_type,
-                            created_at
-                        `)
-                        .eq('post_id', post.id)
-                        .order('created_at', { ascending: false });
+            if (likeCount <= 0 || !post?.id) {
+                setReactors([]);
+                return;
+            }
 
-                    if (likesError) {
-                        console.error("Error fetching post_likes:", likesError);
+            try {
+                const { data: likesData, error: likesError } = await supabase
+                    .from('post_likes')
+                    .select(`
+                        user_id,
+                        reaction_type,
+                        created_at
+                    `)
+                    .eq('post_id', post.id)
+                    .order('created_at', { ascending: false });
+
+                if (likesError) {
+                    console.error("Error fetching post_likes:", likesError);
+                    setReactors([]);
+                    return;
+                }
+
+                if (likesData && likesData.length > 0) {
+                    const userIds = likesData.map(like => like.user_id);
+
+                    const { data: profilesData, error: profilesError } = await supabase
+                        .from('profiles')
+                        .select(`
+                            id,
+                            full_name,
+                            avatar_url,
+                            title,
+                            organization_name,
+                            role
+                        `)
+                        .in('id', userIds);
+
+                    if (profilesError) {
+                        console.error("Error fetching profiles:", profilesError);
                         setReactors([]);
                         return;
                     }
 
-                    if (likesData && likesData.length > 0) {
-                        const userIds = likesData.map(like => like.user_id);
+                    const transformedReactors = likesData.map(like => {
+                        const profile = profilesData?.find(p => p.id === like.user_id);
+                        return {
+                            user_id: like.user_id,
+                            profile_id: profile?.id,
+                            full_name: profile?.full_name,
+                            avatar_url: profile?.avatar_url,
+                            title: profile?.title,
+                            organization_name: profile?.organization_name,
+                            role: profile?.role,
+                            reaction_type: like.reaction_type,
+                            created_at: like.created_at
+                        };
+                    }).filter(reactor => reactor.full_name);
 
-                        const { data: profilesData, error: profilesError } = await supabase
-                            .from('profiles')
-                            .select(`
-                                id,
-                                full_name,
-                                avatar_url,
-                                title,
-                                organization_name,
-                                role
-                            `)
-                            .in('id', userIds);
+                    setReactors(transformedReactors);
 
-                        if (profilesError) {
-                            console.error("Error fetching profiles:", profilesError);
-                            setReactors([]);
-                            return;
-                        }
-
-                        const transformedReactors = likesData.map(like => {
-                            const profile = profilesData?.find(p => p.id === like.user_id);
-                            return {
-                                user_id: like.user_id,
-                                profile_id: profile?.id,
-                                full_name: profile?.full_name,
-                                avatar_url: profile?.avatar_url,
-                                title: profile?.title,
-                                organization_name: profile?.organization_name,
-                                role: profile?.role,
-                                reaction_type: like.reaction_type,
-                                created_at: like.created_at
-                            };
-                        }).filter(reactor => reactor.full_name);
-
-                        setReactors(transformedReactors);
-
-                        const actualCount = transformedReactors.length;
-                        if (actualCount !== likeCount) {
-                            setLikeCount(actualCount);
-                        }
-                    } else {
-                        setReactors([]);
+                    const actualCount = transformedReactors.length;
+                    if (actualCount !== likeCount) {
+                        setLikeCount(actualCount);
                     }
-                } catch (error) {
-                    console.error('Error in fetchReactors:', error);
+                } else {
                     setReactors([]);
                 }
-            } else {
+            } catch (error) {
+                console.error('Error in fetchReactors:', error);
                 setReactors([]);
             }
         };
 
         fetchReactors();
-    }, [post.id]);
+    }, [post.id, likeCount]);
 
     useEffect(() => {
         const checkReactionStatus = async () => {
-            if (!currentUserProfile) return;
+            if (!currentUserProfile || !post?.id) return;
             const { data } = await supabase.from('post_likes').select('reaction_type').eq('post_id', post.id).eq('user_id', currentUserProfile.id).maybeSingle();
-            if (data) setSelectedReaction(data.reaction_type);
-            else setSelectedReaction(null);
+            setSelectedReaction(data?.reaction_type || null);
         };
         checkReactionStatus();
     }, [post.id, currentUserProfile]);
@@ -1155,42 +1186,49 @@ export default function PostCard({ post, onDelete }) {
     }, [isMenuOpen]);
 
     const handleReaction = async (reactionType) => {
+        if (!currentUserProfile || !post?.id || disabled) return;
+
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
 
         try {
-            if (selectedReaction === reactionType) {
-                await supabase.from('post_likes').delete().eq('post_id', post.id).eq('user_id', user.id);
+            const { data: existingReaction } = await supabase
+                .from('post_likes')
+                .select('id')
+                .eq('post_id', post.id)
+                .eq('user_id', user.id)
+                .maybeSingle();
+
+            if (existingReaction && selectedReaction === reactionType) {
+                await supabase.from('post_likes').delete().eq('id', existingReaction.id);
                 setSelectedReaction(null);
                 setLikeCount(prev => Math.max(0, prev - 1));
             } else {
-                await supabase.from('post_likes').upsert({
+                const upsertData = {
                     post_id: post.id,
                     user_id: user.id,
                     reaction_type: reactionType
-                });
-                const wasNewReaction = !selectedReaction;
+                };
+                await supabase.from('post_likes').upsert(upsertData, { onConflict: 'post_id,user_id' });
                 setSelectedReaction(reactionType);
-                if (wasNewReaction) {
-                    setLikeCount(prev => prev + 1);
-                }
+                setLikeCount(prev => existingReaction ? prev : prev + 1);
             }
             await refreshPostData();
         } catch (error) {
             console.error('Error updating reaction:', error);
+            if (error.code === '409') {
+                console.warn('Duplicate reaction attempt ignored.');
+            } else {
+                alert('Failed to update reaction. Please try again.');
+            }
         }
-        setReactionPanelOpen(false);
     };
 
     const handleEditPost = async (editData) => {
         setIsMenuOpen(false);
 
         const { data: { user } } = await supabase.auth.getUser();
-
-        if (!user) {
-            console.error("No authenticated user found");
-            return;
-        }
+        if (!user) return;
 
         const updateData = {
             content: editData.content.trim(),
@@ -1225,6 +1263,7 @@ export default function PostCard({ post, onDelete }) {
             post.tags = editData.tags;
             post.image_url = updateData.image_url;
             post.image_urls = updateData.image_urls;
+            await refreshPostData();
         }
     };
 
@@ -1240,7 +1279,7 @@ export default function PostCard({ post, onDelete }) {
                     parsedTags = [];
                 }
             } else if (Array.isArray(post.tags)) {
-                parsedTags = post.tags;
+                parsedTags = tags;
             }
         }
         setEditedTags(parsedTags);
@@ -1254,11 +1293,7 @@ export default function PostCard({ post, onDelete }) {
         setIsMenuOpen(false);
 
         const { data: { user } } = await supabase.auth.getUser();
-
-        if (!user) {
-            console.error("No authenticated user found");
-            return;
-        }
+        if (!user) return;
 
         const { error } = await supabase
             .from('posts')
@@ -1268,10 +1303,8 @@ export default function PostCard({ post, onDelete }) {
 
         if (error) {
             console.error("Error deleting post:", error);
-        } else {
-            if (onDelete) {
-                onDelete(post.id);
-            }
+        } else if (onDelete) {
+            onDelete(post.id);
         }
     };
 
@@ -1338,7 +1371,7 @@ export default function PostCard({ post, onDelete }) {
                 </div>
                 <div className="flex items-center space-x-2 text-slate-500">
                     <span className="text-xs">{timeAgo(created_at)}</span>
-                    {isAuthor && (
+                    {isAuthor && !disabled && (
                         <div className="relative" ref={menuRef}>
                             <button onClick={() => setIsMenuOpen(c => !c)} className="p-1.5 rounded-full hover:bg-slate-100">
                                 <MoreHorizontal size={18} />
@@ -1374,7 +1407,7 @@ export default function PostCard({ post, onDelete }) {
                             <>
                                 {'... '}
                                 <button
-                                    onClick={() => setIsImageModalOpen(true)}
+                                    onClick={() => setIsExpanded(true)}
                                     className="text-blue-600 hover:text-blue-700 text-sm font-medium inline"
                                 >
                                     View more
@@ -1398,7 +1431,7 @@ export default function PostCard({ post, onDelete }) {
                     onImageClick={handleImageClick}
                 />
             )}
-            {parsedTags && parsedTags.length > 0 && !isEditing && (
+            {parsedTags.length > 0 && !isEditing && (
                 <TagDisplay tags={parsedTags} />
             )}
             {isEditing && (
@@ -1481,7 +1514,7 @@ export default function PostCard({ post, onDelete }) {
                         className="flex items-center space-x-2 cursor-pointer hover:bg-slate-100 rounded-lg px-3 py-2 transition-colors"
                         onMouseEnter={handleReactionMouseEnter}
                         onMouseLeave={handleReactionMouseLeave}
-                        onClick={() => handleReaction('like')}
+                        onClick={() => !disabled && handleReaction('like')}
                     >
                         {currentReaction ? (
                             <currentReaction.Icon size={18} className={`${currentReaction.color.replace('bg-', 'text-')} fill-current`} />
@@ -1492,7 +1525,7 @@ export default function PostCard({ post, onDelete }) {
                             {currentReaction ? currentReaction.label : 'Like'}
                         </span>
                     </div>
-                    {isReactionPanelOpen && (
+                    {isReactionPanelOpen && !disabled && (
                         <div
                             className="absolute bottom-full mb-2 bg-white border rounded-lg shadow-lg px-3 py-2 flex space-x-2 z-30"
                             onMouseEnter={handleReactionMouseEnter}
@@ -1512,8 +1545,9 @@ export default function PostCard({ post, onDelete }) {
                     )}
                 </div>
                 <button
-                    onClick={() => setShowComments(!showComments)}
+                    onClick={() => !disabled && setShowComments(!showComments)}
                     className="flex items-center space-x-2 text-slate-600 hover:text-blue-600 hover:bg-slate-100 rounded-lg px-3 py-2 transition-colors"
+                    disabled={disabled}
                 >
                     <MessageSquare size={18} />
                     <span className="text-sm font-medium">Comment</span>
