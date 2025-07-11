@@ -22,7 +22,12 @@ export default function DashboardFeed() {
     return (
         <div className="space-y-6">
             <WelcomeHeader profile={profile} />
-            <CreatePost profile={profile} />
+            
+            {/* Explicitly set CreatePost to hello-world channel */}
+            <CreatePost 
+                profile={profile} 
+                channel="hello-world"
+            />
             
             <div className="border-b border-slate-200">
                 <nav className="-mb-px flex space-x-6" aria-label="Tabs">

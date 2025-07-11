@@ -61,11 +61,85 @@ export default function ProfilePage() {
         return () => setPageBgColor('bg-white');
     }, [setPageBgColor]);
 
-    // Enhanced data fetching with social features
+    // Enhanced data fetching with social features - FIXED VERSION
     const fetchPageData = useCallback(async (userId) => {
         setAppState(prev => ({ ...prev, dataLoading: true, error: null }));
         
         try {
+            // Create a function to fetch posts with reactions
+            const fetchPostsWithReactions = async () => {
+                // Get basic posts first
+                const { data: basicPosts, error: postsError } = await supabase
+                    .from('posts')
+                    .select(`
+                        *,
+                        profiles!posts_profile_id_fkey(
+                            id,
+                            full_name,
+                            avatar_url,
+                            role,
+                            title,
+                            organization_name
+                        )
+                    `)
+                    .eq('channel', 'hello-world')
+                    .order('created_at', { ascending: false });
+                
+                if (postsError) {
+                    console.error('Error fetching posts:', postsError);
+                    return { data: [], error: postsError };
+                }
+
+                // Add reaction data to each post
+                const postsWithReactions = await Promise.all(
+                    (basicPosts || []).map(async (post) => {
+                        // Get reaction summary
+                        const { data: reactionData, error: reactionError } = await supabase
+                            .from('post_likes')
+                            .select('reaction_type')
+                            .eq('post_id', post.id);
+
+                        let reactionSummary = [];
+                        if (reactionData && !reactionError) {
+                            const counts = {};
+                            reactionData.forEach(like => {
+                                if (like.reaction_type) {
+                                    counts[like.reaction_type] = (counts[like.reaction_type] || 0) + 1;
+                                }
+                            });
+                            
+                            reactionSummary = Object.entries(counts).map(([type, count]) => ({
+                                type,
+                                count
+                            }));
+                        }
+
+                        // Get basic counts
+                        const { count: likesCount } = await supabase
+                            .from('post_likes')
+                            .select('*', { count: 'exact', head: true })
+                            .eq('post_id', post.id);
+
+                        const { count: commentsCount } = await supabase
+                            .from('post_comments')
+                            .select('*', { count: 'exact', head: true })
+                            .eq('post_id', post.id);
+
+                        return {
+                            ...post,
+                            likes_count: likesCount || 0,
+                            comments_count: commentsCount || 0,
+                            reactions: {
+                                summary: reactionSummary,
+                                sample: []
+                            }
+                        };
+                    })
+                );
+
+                return { data: postsWithReactions, error: null };
+            };
+
             const [
                 savedGrantsRes, 
                 trendingGrantsRes, 
@@ -82,7 +156,7 @@ export default function ProfilePage() {
                     .eq('user_id', userId)
                     .order('created_at', { ascending: false }),
                 supabase.rpc('get_trending_grants'),
-                supabase.rpc('get_feed_posts', { user_id_param: userId }),
+                fetchPostsWithReactions(), // Use our custom function instead of get_feed_posts
                 
                 // New social queries
                 supabase

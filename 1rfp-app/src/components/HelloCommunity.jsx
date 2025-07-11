@@ -1,7 +1,7 @@
 // src/components/HelloCommunity.jsx
 import React, { useState, useEffect, useCallback } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, Clock, TrendingUp } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Clock, TrendingUp, ArrowRight, Users, MessageCircle } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import CreatePost from './CreatePost.jsx';
 import PostCard from './PostCard.jsx';
@@ -192,6 +192,90 @@ const TrendingNews = ({ userRole }) => {
     );
 };
 
+const CommunityWelcomeSection = ({ userRole, onEnterCommunity, hasEnteredCommunity }) => {
+    const getCommunityInfo = () => {
+        if (userRole === 'Funder') {
+            return {
+                icon: '🏦',
+                title: 'Welcome to the Funder Community',
+                description: 'Connect with fellow funders, share insights, and discuss philanthropic strategies in this dedicated space.',
+                channelTag: '#funder-community',
+                bgGradient: 'from-green-50 to-emerald-50',
+                borderColor: 'border-green-200',
+                buttonColor: 'bg-green-600 hover:bg-green-700',
+                tagColor: 'bg-green-50 text-green-700 border-green-200'
+            };
+        } else if (userRole === 'Nonprofit') {
+            return {
+                icon: '🌟',
+                title: 'Welcome to the Nonprofit Community',
+                description: 'Connect with other nonprofit organizations, share successes, and collaborate on making greater impact.',
+                channelTag: '#nonprofit-community',
+                bgGradient: 'from-purple-50 to-indigo-50',
+                borderColor: 'border-purple-200',
+                buttonColor: 'bg-purple-600 hover:bg-purple-700',
+                tagColor: 'bg-purple-50 text-purple-700 border-purple-200'
+            };
+        } else {
+            return {
+                icon: '👀',
+                title: 'Community Discussions',
+                description: 'This space is designed for funders and nonprofits to connect within their respective communities.',
+                channelTag: '#community-space',
+                bgGradient: 'from-gray-50 to-slate-50',
+                borderColor: 'border-gray-200',
+                buttonColor: 'bg-gray-600 hover:bg-gray-700',
+                tagColor: 'bg-gray-50 text-gray-700 border-gray-200'
+            };
+        }
+    };
+
+    const { icon, title, description, channelTag, bgGradient, borderColor, buttonColor, tagColor } = getCommunityInfo();
+    const canPost = userRole === 'Funder' || userRole === 'Nonprofit';
+
+    return (
+        <div className={`bg-gradient-to-r ${bgGradient} border ${borderColor} rounded-xl p-6 mb-6`}>
+            <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-4">
+                    <div className="text-4xl">{icon}</div>
+                    <div className="flex-1">
+                        <div className="flex items-center space-x-3 mb-2">
+                            <h2 className="text-xl font-bold text-slate-800">{title}</h2>
+                            <div className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border ${tagColor}`}>
+                                <span>{channelTag}</span>
+                            </div>
+                        </div>
+                        <p className="text-slate-600 mb-4 max-w-2xl">{description}</p>
+                        
+                        {canPost && (
+                            <div className="flex items-center space-x-4">
+                                <div className="flex items-center space-x-2 text-sm text-slate-500">
+                                    <Users size={16} />
+                                    <span>Connect with peers</span>
+                                </div>
+                                <div className="flex items-center space-x-2 text-sm text-slate-500">
+                                    <MessageCircle size={16} />
+                                    <span>Share insights</span>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+                
+                {canPost && !hasEnteredCommunity && (
+                    <button
+                        onClick={onEnterCommunity}
+                        className={`flex items-center space-x-2 px-6 py-3 ${buttonColor} text-white rounded-lg font-medium transition-colors shadow-sm`}
+                    >
+                        <span>Enter Community</span>
+                        <ArrowRight size={18} />
+                    </button>
+                )}
+            </div>
+        </div>
+    );
+};
+
 const ChannelIdentifier = ({ userRole }) => {
     if (!userRole || (userRole !== 'Funder' && userRole !== 'Nonprofit')) {
         return null;
@@ -219,15 +303,15 @@ const CommunityEmptyState = ({ userRole }) => {
     const getEmptyMessage = () => {
         if (userRole === 'Funder') {
             return {
-                icon: '🏦',
-                title: 'Welcome to the Funder Community',
-                description: 'Connect with fellow funders, share insights, and discuss philanthropic strategies in this dedicated space.'
+                icon: '💬',
+                title: 'Start the Conversation',
+                description: 'Be the first to share an insight, ask a question, or start a discussion with your fellow funders.'
             };
         } else if (userRole === 'Nonprofit') {
             return {
-                icon: '🌟',
-                title: 'Welcome to the Nonprofit Community',
-                description: 'Connect with other nonprofit organizations, share successes, and collaborate on making greater impact.'
+                icon: '💬',
+                title: 'Start the Conversation',
+                description: 'Be the first to share a success story, ask for advice, or start a discussion with other nonprofits.'
             };
         } else {
             return {
@@ -249,7 +333,7 @@ const CommunityEmptyState = ({ userRole }) => {
             {canPost && (
                 <div className="inline-flex items-center px-4 py-2 bg-indigo-100 text-indigo-700 rounded-lg text-sm font-medium">
                     <span className="w-2 h-2 bg-indigo-400 rounded-full mr-2 animate-pulse"></span>
-                    Be the first to share something with your community!
+                    Share your first post above to get the discussion started!
                 </div>
             )}
         </div>
@@ -260,12 +344,26 @@ export default function HelloCommunity() {
     const { profile } = useOutletContext();
     const [posts, setPosts] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [hasEnteredCommunity, setHasEnteredCommunity] = useState(false);
+    const [showWelcome, setShowWelcome] = useState(false);
 
     // Check if user can post and determine their community
     const userRole = profile?.role;
     const canPost = userRole === 'Funder' || userRole === 'Nonprofit';
 
-    // Fetch community posts based on user's role (automatic filtering)
+    // Check if user has previously entered the community
+    useEffect(() => {
+        if (profile?.id && userRole) {
+            const storageKey = `community-entered-${profile.id}-${userRole}`;
+            const hasEntered = localStorage.getItem(storageKey) === 'true';
+            setHasEnteredCommunity(hasEntered);
+            
+            // Show welcome section only if user hasn't entered and can post
+            setShowWelcome(!hasEntered && canPost);
+        }
+    }, [profile?.id, userRole, canPost]);
+
+    // FIXED: Fetch community posts using direct query instead of RPC
     const fetchCommunityPosts = useCallback(async () => {
         if (!userRole || (userRole !== 'Funder' && userRole !== 'Nonprofit')) {
             setLoading(false);
@@ -274,8 +372,8 @@ export default function HelloCommunity() {
 
         setLoading(true);
         try {
-            // Fetch posts only from users with the same role AND in the hello-community channel
-            const { data: postsData, error: postsError } = await supabase
+            // Get basic posts first
+            const { data: basicPosts, error: postsError } = await supabase
                 .from('posts')
                 .select(`
                     *,
@@ -288,25 +386,47 @@ export default function HelloCommunity() {
                         organization_name
                     )
                 `)
+                .eq('channel', 'hello-community')
                 .eq('profiles.role', userRole) // Filter by user's role
-                .eq('channel', 'hello-community') // Filter by channel
                 .order('created_at', { ascending: false });
-
+            
             if (postsError) {
                 console.error('Error fetching community posts:', postsError);
+                setPosts([]);
+                setLoading(false);
                 return;
             }
 
-            // Fetch reaction counts for each post
+            // Add reaction data to each post
             const postsWithReactions = await Promise.all(
-                (postsData || []).map(async (post) => {
-                    // Get basic like count
+                (basicPosts || []).map(async (post) => {
+                    // Get reaction summary
+                    const { data: reactionData, error: reactionError } = await supabase
+                        .from('post_likes')
+                        .select('reaction_type')
+                        .eq('post_id', post.id);
+
+                    let reactionSummary = [];
+                    if (reactionData && !reactionError) {
+                        const counts = {};
+                        reactionData.forEach(like => {
+                            if (like.reaction_type) {
+                                counts[like.reaction_type] = (counts[like.reaction_type] || 0) + 1;
+                            }
+                        });
+                        
+                        reactionSummary = Object.entries(counts).map(([type, count]) => ({
+                            type,
+                            count
+                        }));
+                    }
+
+                    // Get basic counts
                     const { count: likesCount } = await supabase
                         .from('post_likes')
                         .select('*', { count: 'exact', head: true })
                         .eq('post_id', post.id);
 
-                    // Get comment count
                     const { count: commentsCount } = await supabase
                         .from('post_comments')
                         .select('*', { count: 'exact', head: true })
@@ -314,9 +434,12 @@ export default function HelloCommunity() {
 
                     return {
                         ...post,
-                        reactions: { summary: [], sample: [] },
                         likes_count: likesCount || 0,
-                        comments_count: commentsCount || 0
+                        comments_count: commentsCount || 0,
+                        reactions: {
+                            summary: reactionSummary,
+                            sample: []
+                        }
                     };
                 })
             );
@@ -324,6 +447,7 @@ export default function HelloCommunity() {
             setPosts(postsWithReactions);
         } catch (error) {
             console.error('Error in fetchCommunityPosts:', error);
+            setPosts([]);
         } finally {
             setLoading(false);
         }
@@ -349,64 +473,87 @@ export default function HelloCommunity() {
         setPosts(prev => prev.filter(p => p.id !== deletedPostId));
     }, []);
 
+    const handleEnterCommunity = () => {
+        if (profile?.id && userRole) {
+            const storageKey = `community-entered-${profile.id}-${userRole}`;
+            localStorage.setItem(storageKey, 'true');
+            setHasEnteredCommunity(true);
+            setShowWelcome(false);
+        }
+    };
+
     return (
         <div className="space-y-6">
             {/* Trending News - Role-specific and instant loading */}
             <TrendingNews userRole={userRole} />
             
-            {/* Channel Identifier */}
-            <ChannelIdentifier userRole={userRole} />
-            
-            {/* Create Post Section - Only for Funders and Nonprofits */}
-            {canPost && (
-                <CreatePost 
-                    profile={profile} 
-                    onNewPost={handleNewPost}
-                    channel="hello-community"
+            {/* Community Welcome Section - Only show for first-time visitors */}
+            {showWelcome && (
+                <CommunityWelcomeSection 
+                    userRole={userRole} 
+                    onEnterCommunity={handleEnterCommunity}
+                    hasEnteredCommunity={hasEnteredCommunity}
                 />
             )}
-            
-            {/* Posts Feed */}
-            <div className="space-y-6">
-                {loading ? (
-                    <div className="space-y-4">
-                        {[1, 2, 3].map(i => (
-                            <div key={i} className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 animate-pulse">
-                                <div className="flex items-center space-x-3 mb-4">
-                                    <div className="w-12 h-12 bg-slate-200 rounded-full"></div>
-                                    <div className="flex-1">
-                                        <div className="h-4 bg-slate-200 rounded mb-2"></div>
-                                        <div className="h-3 bg-slate-200 rounded w-1/2"></div>
-                                    </div>
-                                </div>
-                                <div className="space-y-2">
-                                    <div className="h-4 bg-slate-200 rounded"></div>
-                                    <div className="h-4 bg-slate-200 rounded"></div>
-                                    <div className="h-4 bg-slate-200 rounded w-3/4"></div>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                ) : posts.length === 0 ? (
-                    <CommunityEmptyState userRole={userRole} />
-                ) : (
-                    posts.map(post => (
-                        <PostCard 
-                            key={post.id} 
-                            post={post} 
-                            onDelete={handleDeletePost}
+
+            {/* Show community content if user has entered OR if there are existing posts OR if they can't post */}
+            {(hasEnteredCommunity || posts.length > 0 || !canPost) && (
+                <>
+                    {/* Channel Identifier */}
+                    <ChannelIdentifier userRole={userRole} />
+                    
+                    {/* Create Post Section - Only for Funders and Nonprofits */}
+                    {canPost && (
+                        <CreatePost 
+                            profile={profile} 
+                            onNewPost={handleNewPost}
+                            channel="hello-community"
                         />
-                    ))
-                )}
-            </div>
-            
-            {/* Load More - Future Enhancement */}
-            {posts.length > 0 && !loading && (
-                <div className="text-center py-8">
-                    <button className="px-6 py-3 bg-white border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 transition-colors font-medium">
-                        Load More Posts
-                    </button>
-                </div>
+                    )}
+                    
+                    {/* Posts Feed */}
+                    <div className="space-y-6">
+                        {loading ? (
+                            <div className="space-y-4">
+                                {[1, 2, 3].map(i => (
+                                    <div key={i} className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 animate-pulse">
+                                        <div className="flex items-center space-x-3 mb-4">
+                                            <div className="w-12 h-12 bg-slate-200 rounded-full"></div>
+                                            <div className="flex-1">
+                                                <div className="h-4 bg-slate-200 rounded mb-2"></div>
+                                                <div className="h-3 bg-slate-200 rounded w-1/2"></div>
+                                            </div>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <div className="h-4 bg-slate-200 rounded"></div>
+                                            <div className="h-4 bg-slate-200 rounded"></div>
+                                            <div className="h-4 bg-slate-200 rounded w-3/4"></div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : posts.length === 0 ? (
+                            <CommunityEmptyState userRole={userRole} />
+                        ) : (
+                            posts.map(post => (
+                                <PostCard 
+                                    key={post.id} 
+                                    post={post} 
+                                    onDelete={handleDeletePost}
+                                />
+                            ))
+                        )}
+                    </div>
+                    
+                    {/* Load More - Future Enhancement */}
+                    {posts.length > 0 && !loading && (
+                        <div className="text-center py-8">
+                            <button className="px-6 py-3 bg-white border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 transition-colors font-medium">
+                                Load More Posts
+                            </button>
+                        </div>
+                    )}
+                </>
             )}
         </div>
     );
