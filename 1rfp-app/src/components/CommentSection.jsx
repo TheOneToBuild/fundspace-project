@@ -1,9 +1,10 @@
-// src/components/CommentSection.jsx
+// Updated CommentSection.jsx with Avatar components
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../supabaseClient';
 import { Send, Trash2 } from 'lucide-react';
+import Avatar from './Avatar.jsx'; // Import the Avatar component
 
-// Helper functions (no changes needed)
+// Helper functions
 const timeAgo = (date) => {
     const seconds = Math.floor((new Date() - new Date(date)) / 1000);
     let interval = seconds / 31536000;
@@ -19,14 +20,6 @@ const timeAgo = (date) => {
     return Math.floor(seconds) + "s";
 };
 
-const getInitials = (name) => {
-    if (!name) return '?';
-    const words = name.split(' ');
-    if (words.length > 1 && words[1]) return (words[0][0] + words[1][0]).toUpperCase();
-    return (words[0] || '').substring(0, 2).toUpperCase();
-};
-
-// MODIFIED: The component now expects onCommentAdded and onCommentDeleted props
 export default function CommentSection({ post, currentUserProfile, onCommentAdded, onCommentDeleted }) {
     const [comments, setComments] = useState([]);
     const [newComment, setNewComment] = useState('');
@@ -37,7 +30,16 @@ export default function CommentSection({ post, currentUserProfile, onCommentAdde
         setLoading(true);
         const { data, error } = await supabase
             .from('post_comments')
-            .select('*, profiles(id, full_name, role)') // Ensure profile `id` is selected
+            .select(`
+                *, 
+                profiles(
+                    id, 
+                    full_name, 
+                    role, 
+                    avatar_url,
+                    organization_name
+                )
+            `) // Include avatar_url in the fetch
             .eq('post_id', post.id)
             .order('created_at', { ascending: true });
         
@@ -116,9 +118,12 @@ export default function CommentSection({ post, currentUserProfile, onCommentAdde
         <div className="pt-4 mt-2 space-y-4">
             {/* New Comment Form */}
             <form onSubmit={handleCommentSubmit} className="flex items-start space-x-3">
-                <div className="w-9 h-9 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center font-bold text-xs flex-shrink-0">
-                    {getInitials(currentUserProfile?.full_name)}
-                </div>
+                {/* Replace initials div with Avatar component */}
+                <Avatar 
+                    src={currentUserProfile?.avatar_url} 
+                    fullName={currentUserProfile?.full_name} 
+                    size="sm" 
+                />
                 <div className="flex-1 relative">
                     <textarea
                         value={newComment}
@@ -127,7 +132,11 @@ export default function CommentSection({ post, currentUserProfile, onCommentAdde
                         className="w-full p-2 pr-10 bg-slate-100 rounded-lg border-slate-200 focus:ring-2 focus:ring-blue-500 placeholder-slate-500 transition-all text-sm"
                         rows="1"
                     />
-                    <button type="submit" disabled={!newComment.trim()} className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-blue-600 disabled:text-slate-400 rounded-full hover:bg-blue-100 disabled:hover:bg-transparent">
+                    <button 
+                        type="submit" 
+                        disabled={!newComment.trim()} 
+                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-blue-600 disabled:text-slate-400 rounded-full hover:bg-blue-100 disabled:hover:bg-transparent"
+                    >
                         <Send size={18} />
                     </button>
                 </div>
@@ -137,24 +146,35 @@ export default function CommentSection({ post, currentUserProfile, onCommentAdde
             <div className="space-y-4">
                 {loading && <p className="text-sm text-slate-500">Loading comments...</p>}
                 {comments.map(comment => (
-                    <div key={comment.id} className="flex items-start space-x-3 group">
-                        <div className="w-9 h-9 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-xs flex-shrink-0">
-                            {getInitials(comment.profiles.full_name)}
-                        </div>
-                        <div className="flex-1 bg-slate-50 p-3 rounded-lg">
-                            <div className="flex items-baseline justify-between">
-                                <p className="font-semibold text-sm text-slate-800">{comment.profiles.full_name}</p>
+                    <div key={comment.id} className="flex items-start space-x-3">
+                        {/* Replace initials div with Avatar component */}
+                        <Avatar 
+                            src={comment.profiles?.avatar_url} 
+                            fullName={comment.profiles?.full_name} 
+                            size="sm" 
+                        />
+                        <div className="flex-1 bg-slate-100 rounded-lg p-3">
+                            <div className="flex items-center justify-between mb-1">
                                 <div className="flex items-center space-x-2">
-                                     <p className="text-xs text-slate-400">{timeAgo(comment.created_at)}</p>
-                                     {/* Delete button only shows for the comment author */}
-                                     {comment.profiles.id === currentUserProfile?.id && (
-                                        <button onClick={() => handleDeleteComment(comment.id)} className="text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <Trash2 size={12} />
-                                        </button>
-                                     )}
+                                    <span className="font-semibold text-slate-900 text-sm">
+                                        {comment.profiles?.full_name || 'Unknown User'}
+                                    </span>
+                                    <span className="text-xs text-slate-500">
+                                        {timeAgo(comment.created_at)}
+                                    </span>
                                 </div>
+                                {/* Show delete button only for the comment author */}
+                                {comment.profile_id === currentUserProfile?.id && (
+                                    <button
+                                        onClick={() => handleDeleteComment(comment.id)}
+                                        className="text-slate-400 hover:text-red-500 p-1 rounded-full hover:bg-red-50 transition-colors"
+                                        title="Delete comment"
+                                    >
+                                        <Trash2 size={14} />
+                                    </button>
+                                )}
                             </div>
-                            <p className="text-sm text-slate-700 mt-1 whitespace-pre-wrap">{comment.content}</p>
+                            <p className="text-sm text-slate-700">{comment.content}</p>
                         </div>
                     </div>
                 ))}

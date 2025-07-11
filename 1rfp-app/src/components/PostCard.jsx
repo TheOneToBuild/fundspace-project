@@ -28,22 +28,27 @@ const timeAgo = (date) => {
 };
 
 const ReactorsText = ({ likeCount, reactors, onViewReactions }) => {
-    if (!likeCount || likeCount < 1) return null;
-    
+    const actualCount = reactors?.length || 0;
+    const displayCount = Math.max(likeCount, actualCount);
+
+    if (!displayCount || displayCount < 1) return null;
+
     const firstName = reactors?.[0]?.full_name?.split(' ')?.[0];
-    const hasMultiple = likeCount > 1;
+    const hasMultiple = displayCount > 1;
 
     let displayText;
-    if (likeCount === 1 && firstName) {
+    if (displayCount === 1 && firstName) {
         displayText = firstName;
+    } else if (displayCount === 2 && firstName) {
+        displayText = `${firstName} + 1 other`;
     } else if (hasMultiple && firstName) {
-        displayText = `${firstName} + (${likeCount - 1}) others`;
+        displayText = `${firstName} + ${displayCount - 1} others`;
     } else {
-        displayText = `${likeCount} ${likeCount === 1 ? 'reaction' : 'reactions'}`;
+        displayText = `${displayCount} ${displayCount === 1 ? 'reaction' : 'reactions'}`;
     }
 
     return (
-        <span 
+        <span
             className="ml-2 font-medium text-slate-600 hover:underline cursor-pointer"
             onClick={onViewReactions}
         >
@@ -52,7 +57,6 @@ const ReactorsText = ({ likeCount, reactors, onViewReactions }) => {
     );
 };
 
-// Reactions Preview Tooltip with Avatars
 const ReactionsPreview = ({ reactors, likeCount, onViewAll }) => {
     const previewCount = Math.min(3, reactors.length);
     const previewReactors = reactors.slice(0, previewCount);
@@ -95,7 +99,6 @@ const ReactionsPreview = ({ reactors, likeCount, onViewAll }) => {
     );
 };
 
-// Full Reactions Modal with Pagination
 const ReactionsModal = ({ post, isOpen, onClose, reactors, likeCount, reactionSummary }) => {
     const [activeTab, setActiveTab] = useState('all');
     const [displayCount, setDisplayCount] = useState(6);
@@ -127,7 +130,7 @@ const ReactionsModal = ({ post, isOpen, onClose, reactors, likeCount, reactionSu
             <div className="bg-white rounded-lg shadow-xl w-full max-w-md max-h-[70vh] overflow-hidden">
                 <div className="flex items-center justify-between p-4 border-b">
                     <h3 className="text-lg font-semibold">Reactions</h3>
-                    <button 
+                    <button
                         onClick={onClose}
                         className="p-1 hover:bg-gray-100 rounded-full transition-colors"
                     >
@@ -141,8 +144,8 @@ const ReactionsModal = ({ post, isOpen, onClose, reactors, likeCount, reactionSu
                             setDisplayCount(6);
                         }}
                         className={`px-3 py-1 rounded-full text-sm font-medium transition-colors whitespace-nowrap ${
-                            activeTab === 'all' 
-                                ? 'bg-blue-100 text-blue-700 border border-blue-200' 
+                            activeTab === 'all'
+                                ? 'bg-blue-100 text-blue-700 border border-blue-200'
                                 : 'text-gray-600 hover:bg-gray-100'
                         }`}
                     >
@@ -159,8 +162,8 @@ const ReactionsModal = ({ post, isOpen, onClose, reactors, likeCount, reactionSu
                                     setDisplayCount(6);
                                 }}
                                 className={`px-3 py-1 rounded-full text-sm font-medium transition-colors flex items-center space-x-1 whitespace-nowrap ${
-                                    activeTab === type 
-                                        ? 'bg-blue-100 text-blue-700 border border-blue-200' 
+                                    activeTab === type
+                                        ? 'bg-blue-100 text-blue-700 border border-blue-200'
                                         : 'text-gray-600 hover:bg-gray-100'
                                 }`}
                             >
@@ -174,8 +177,8 @@ const ReactionsModal = ({ post, isOpen, onClose, reactors, likeCount, reactionSu
                 </div>
                 <div className="overflow-y-auto flex-1" style={{ maxHeight: '400px' }}>
                     {displayedReactors.map((reactor, index) => (
-                        <div 
-                            key={index} 
+                        <div
+                            key={index}
                             className="flex items-center space-x-3 p-3 hover:bg-gray-50 transition-colors cursor-pointer"
                             onClick={() => handleProfileClick(reactor.profile_id || reactor.user_id)}
                         >
@@ -183,7 +186,7 @@ const ReactionsModal = ({ post, isOpen, onClose, reactors, likeCount, reactionSu
                             <div className="flex-1 min-w-0">
                                 <p className="font-medium text-gray-900 truncate">{reactor.full_name}</p>
                                 <p className="text-sm text-gray-500 truncate">
-                                    {reactor.title || reactor.organization_name || reactor.role}
+                                    {reactor.organization_name || reactor.role || 'No organization'}
                                 </p>
                             </div>
                             {reactor.reaction_type && (
@@ -222,10 +225,9 @@ const ReactionsModal = ({ post, isOpen, onClose, reactors, likeCount, reactionSu
     );
 };
 
-// Tag display component
 const TagDisplay = ({ tags }) => {
     let parsedTags = tags;
-    
+
     if (typeof tags === 'string') {
         try {
             parsedTags = JSON.parse(tags);
@@ -234,7 +236,7 @@ const TagDisplay = ({ tags }) => {
             return null;
         }
     }
-    
+
     if (!parsedTags || !Array.isArray(parsedTags) || parsedTags.length === 0) return null;
 
     return (
@@ -248,17 +250,16 @@ const TagDisplay = ({ tags }) => {
     );
 };
 
-// Edit mode component for tags and images
-const EditMode = ({ 
-    post, 
-    editedContent, 
-    setEditedContent, 
-    editedTags, 
-    setEditedTags, 
-    editedImages, 
-    setEditedImages, 
-    onSave, 
-    onCancel 
+const EditMode = ({
+    post,
+    editedContent,
+    setEditedContent,
+    editedTags,
+    setEditedTags,
+    editedImages,
+    setEditedImages,
+    onSave,
+    onCancel
 }) => {
     const [showTagSelector, setShowTagSelector] = useState(false);
     const [customTagInput, setCustomTagInput] = useState('');
@@ -297,7 +298,7 @@ const EditMode = ({
         if (editedTags.length >= 6 && !editedTags.some(tag => tag.id === tagId)) {
             return;
         }
-        
+
         setEditedTags(prev => {
             const existingTag = prev.find(tag => tag.id === tagId);
             if (existingTag) {
@@ -311,14 +312,14 @@ const EditMode = ({
 
     const addCustomTag = () => {
         if (!customTagInput.trim() || editedTags.length >= 6) return;
-        
+
         const customTag = {
             id: `custom-${Date.now()}`,
             label: customTagInput.trim(),
             color: getRandomTagColor(),
             isCustom: true
         };
-        
+
         setEditedTags(prev => [...prev, customTag]);
         setCustomTagInput('');
     };
@@ -345,7 +346,7 @@ const EditMode = ({
     const handleImageSelect = (event) => {
         const files = Array.from(event.target.files);
         const maxImages = 6;
-        
+
         if (editedImages.length + newImages.length + files.length > maxImages) {
             alert(`You can only have up to ${maxImages} images per post.`);
             return;
@@ -353,8 +354,8 @@ const EditMode = ({
 
         const validFiles = files.filter(file => {
             const isValidType = file.type.startsWith('image/');
-            const isValidSize = file.size <= 10 * 1024 * 1024; // 10MB limit
-            
+            const isValidSize = file.size <= 10 * 1024 * 1024;
+
             if (!isValidType) {
                 alert('Please select only image files.');
                 return false;
@@ -378,7 +379,7 @@ const EditMode = ({
 
     const uploadNewImages = async () => {
         if (newImages.length === 0) return [];
-        
+
         setUploading(true);
         const uploadPromises = newImages.map(async (imageObj) => {
             const fileExt = imageObj.file.name.split('.').pop();
@@ -415,9 +416,9 @@ const EditMode = ({
         try {
             const newImageUrls = await uploadNewImages();
             const allImages = [...editedImages, ...newImageUrls];
-            
+
             newImages.forEach(img => URL.revokeObjectURL(img.preview));
-            
+
             onSave({
                 content: editedContent,
                 tags: editedTags,
@@ -610,8 +611,24 @@ const EditMode = ({
     );
 };
 
-// LinkedIn-Inspired Image Viewer Modal
-const LinkedInImageViewer = ({ post, images, initialIndex, isOpen, onClose, onReaction, selectedReaction, currentUserProfile, likeCount, reactionSummary, commentCount, showImageSection = true }) => {
+const ProfileoneImageViewer = ({
+    post,
+    images,
+    initialIndex,
+    isOpen,
+    onClose,
+    onReaction,
+    selectedReaction,
+    currentUserProfile,
+    likeCount,
+    reactionSummary,
+    commentCount,
+    showImageSection = true,
+    onCommentAdded,
+    onCommentDeleted,
+    reactors = [],
+    onViewReactions
+}) => {
     const [currentIndex, setCurrentIndex] = useState(initialIndex);
     const [showReactionPanel, setShowReactionPanel] = useState(false);
 
@@ -696,6 +713,7 @@ const LinkedInImageViewer = ({ post, images, initialIndex, isOpen, onClose, onRe
                                 className="max-w-full max-h-full object-contain"
                             />
                         </div>
+                        
                         <div className={`bg-white flex flex-col flex-1 min-w-[420px] max-w-[480px] overflow-y-auto`}>
                             <div className="p-6 border-b border-gray-200">
                                 <div className="flex items-start space-x-3">
@@ -710,34 +728,41 @@ const LinkedInImageViewer = ({ post, images, initialIndex, isOpen, onClose, onRe
                                     </div>
                                 </div>
                             </div>
+                            
                             {post.content && (
                                 <div className="px-6 py-4 border-b border-gray-200">
                                     <p className="text-gray-800 leading-relaxed text-base">{post.content}</p>
                                 </div>
                             )}
+                            
                             {post.tags && post.tags.length > 0 && (
                                 <div className="px-6 py-3 border-b border-gray-200">
                                     <TagDisplay tags={post.tags} />
                                 </div>
                             )}
+                            
                             <div className="px-6 py-4 border-b border-gray-200">
                                 <div className="flex items-center justify-between">
-                                    <div className="flex items-center space-x-2">
-                                        <div className="flex items-center -space-x-1">
-                                            {(reactionSummary || []).sort((a, b) => b.count - a.count).slice(0, 3).map(({ type }) => {
-                                                const reaction = reactions.find(r => r.type === type);
-                                                if (!reaction) return null;
-                                                return (
-                                                    <div key={type} className={`p-1 rounded-full ${reaction.color} border-2 border-white shadow-sm`}>
-                                                        <reaction.Icon size={12} className="text-white" />
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
+                                    <div className="flex items-center">
                                         {likeCount > 0 && (
-                                            <span className="text-gray-600 text-sm hover:underline cursor-pointer">
-                                                {likeCount} {likeCount === 1 ? 'reaction' : 'reactions'}
-                                            </span>
+                                            <div className="flex items-center cursor-pointer">
+                                                <div className="flex items-center -space-x-1">
+                                                    {(reactionSummary || []).sort((a, b) => b.count - a.count).slice(0, 3).map(({ type }) => {
+                                                        const reaction = reactions.find(r => r.type === type);
+                                                        if (!reaction) return null;
+                                                        return (
+                                                            <div key={type} className={`p-0.5 rounded-full ${reaction.color} border-2 border-white`}>
+                                                                <reaction.Icon size={12} className="text-white" />
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                                <ReactorsText 
+                                                    likeCount={likeCount} 
+                                                    reactors={reactors} 
+                                                    onViewReactions={onViewReactions}
+                                                />
+                                            </div>
                                         )}
                                     </div>
                                     <div className="text-gray-600 text-sm">
@@ -749,6 +774,7 @@ const LinkedInImageViewer = ({ post, images, initialIndex, isOpen, onClose, onRe
                                     </div>
                                 </div>
                             </div>
+                            
                             <div className="px-6 py-3 border-b border-gray-200">
                                 <div className="flex items-center space-x-1">
                                     <div className="relative flex-1">
@@ -794,12 +820,13 @@ const LinkedInImageViewer = ({ post, images, initialIndex, isOpen, onClose, onRe
                                     </button>
                                 </div>
                             </div>
+                            
                             <div className="p-6 flex-1">
                                 <CommentSection 
                                     post={post} 
                                     currentUserProfile={currentUserProfile}
-                                    onCommentAdded={() => {}}
-                                    onCommentDeleted={() => {}}
+                                    onCommentAdded={onCommentAdded}
+                                    onCommentDeleted={onCommentDeleted}
                                     compact={true}
                                 />
                             </div>
@@ -813,6 +840,7 @@ const LinkedInImageViewer = ({ post, images, initialIndex, isOpen, onClose, onRe
                         >
                             <X size={20} />
                         </button>
+                        
                         <div className="p-6 border-b border-gray-200">
                             <div className="flex items-start space-x-3">
                                 <Avatar src={post.profiles.avatar_url} fullName={post.profiles.full_name} size="md" />
@@ -826,57 +854,35 @@ const LinkedInImageViewer = ({ post, images, initialIndex, isOpen, onClose, onRe
                                 </div>
                             </div>
                         </div>
+                        
                         {post.content && (
                             <div className="px-6 py-4 border-b border-gray-200">
                                 <p className="text-gray-800 leading-relaxed text-base">{post.content}</p>
                             </div>
                         )}
-                        {post.image_urls && post.image_urls.length > 0 && (
-                            <div className="px-6 py-4 border-b border-gray-200">
-                                <div className="grid grid-cols-2 gap-2">
-                                    {post.image_urls.map((imageUrl, index) => (
-                                        <img
-                                            key={index}
-                                            src={imageUrl}
-                                            alt={`Post image ${index + 1}`}
-                                            className="w-full rounded-lg object-cover"
-                                        />
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-                        {post.image_url && !post.image_urls && (
-                            <div className="px-6 py-4 border-b border-gray-200">
-                                <img
-                                    src={post.image_url}
-                                    alt="Post image"
-                                    className="w-full rounded-lg object-cover"
-                                />
-                            </div>
-                        )}
-                        {post.tags && post.tags.length > 0 && (
-                            <div className="px-6 py-3 border-b border-gray-200">
-                                <TagDisplay tags={post.tags} />
-                            </div>
-                        )}
+                        
                         <div className="px-6 py-4 border-b border-gray-200">
                             <div className="flex items-center justify-between">
-                                <div className="flex items-center space-x-2">
-                                    <div className="flex items-center -space-x-1">
-                                        {(reactionSummary || []).sort((a, b) => b.count - a.count).slice(0, 3).map(({ type }) => {
-                                            const reaction = reactions.find(r => r.type === type);
-                                            if (!reaction) return null;
-                                            return (
-                                                <div key={type} className={`p-1 rounded-full ${reaction.color} border-2 border-white shadow-sm`}>
-                                                    <reaction.Icon size={12} className="text-white" />
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
+                                <div className="flex items-center">
                                     {likeCount > 0 && (
-                                        <span className="text-gray-600 text-sm hover:underline cursor-pointer">
-                                            {likeCount} {likeCount === 1 ? 'reaction' : 'reactions'}
-                                        </span>
+                                        <div className="flex items-center cursor-pointer">
+                                            <div className="flex items-center -space-x-1">
+                                                {(reactionSummary || []).sort((a, b) => b.count - a.count).slice(0, 3).map(({ type }) => {
+                                                    const reaction = reactions.find(r => r.type === type);
+                                                    if (!reaction) return null;
+                                                    return (
+                                                        <div key={type} className={`p-0.5 rounded-full ${reaction.color} border-2 border-white`}>
+                                                            <reaction.Icon size={12} className="text-white" />
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                            <ReactorsText 
+                                                likeCount={likeCount} 
+                                                reactors={reactors} 
+                                                onViewReactions={onViewReactions}
+                                            />
+                                        </div>
                                     )}
                                 </div>
                                 <div className="text-gray-600 text-sm">
@@ -888,57 +894,13 @@ const LinkedInImageViewer = ({ post, images, initialIndex, isOpen, onClose, onRe
                                 </div>
                             </div>
                         </div>
-                        <div className="px-6 py-3 border-b border-gray-200">
-                            <div className="flex items-center space-x-1">
-                                <div className="relative flex-1">
-                                    <button
-                                        onClick={() => setShowReactionPanel(!showReactionPanel)}
-                                        className={`w-full flex items-center justify-center space-x-2 py-3 px-4 rounded-lg transition-all hover:bg-gray-100 ${
-                                            currentReaction 
-                                                ? `${currentReaction.color.replace('bg-', 'text-')}` 
-                                                : 'text-gray-600'
-                                        }`}
-                                    >
-                                        {currentReaction ? (
-                                            <currentReaction.Icon size={20} />
-                                        ) : (
-                                            <ThumbsUp size={20} />
-                                        )}
-                                        <span className="text-sm font-medium">
-                                            {currentReaction ? currentReaction.label : 'Like'}
-                                        </span>
-                                    </button>
-                                    {showReactionPanel && (
-                                        <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-white rounded-lg shadow-lg border p-2 flex space-x-1">
-                                            {reactions.map(({ type, Icon, color, label }) => (
-                                                <button
-                                                    key={type}
-                                                    onClick={() => handleReaction(type)}
-                                                    className={`p-2 rounded-full hover:scale-110 transition-transform ${color}`}
-                                                    title={label}
-                                                >
-                                                    <Icon size={16} className="text-white" />
-                                                </button>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-                                <button className="flex-1 flex items-center justify-center space-x-2 text-gray-600 hover:bg-gray-100 py-3 px-4 rounded-lg transition-colors">
-                                    <MessageSquare size={20} />
-                                    <span className="text-sm font-medium">Comment</span>
-                                </button>
-                                <button className="flex-1 flex items-center justify-center space-x-2 text-gray-600 hover:bg-gray-100 py-3 px-4 rounded-lg transition-colors">
-                                    <Share2 size={20} />
-                                    <span className="text-sm font-medium">Share</span>
-                                </button>
-                            </div>
-                        </div>
+                        
                         <div className="p-6 flex-1">
                             <CommentSection 
                                 post={post} 
                                 currentUserProfile={currentUserProfile}
-                                onCommentAdded={() => {}}
-                                onCommentDeleted={() => {}}
+                                onCommentAdded={onCommentAdded}
+                                onCommentDeleted={onCommentDeleted}
                                 compact={true}
                             />
                         </div>
@@ -949,7 +911,6 @@ const LinkedInImageViewer = ({ post, images, initialIndex, isOpen, onClose, onRe
     );
 };
 
-// Enhanced Image Mosaic Component
 const ImageMosaic = ({ images, onImageClick }) => {
     if (!images || images.length === 0) return null;
 
@@ -998,8 +959,8 @@ const ImageMosaic = ({ images, onImageClick }) => {
                 {images.slice(0, 6).map((imageUrl, index) => {
                     const layout = mosaicLayout[index] || { span: 'col-span-2 row-span-2', aspect: 'aspect-square' };
                     return (
-                        <div 
-                            key={index} 
+                        <div
+                            key={index}
                             className={`relative group cursor-pointer overflow-hidden rounded-lg ${layout.span}`}
                             onClick={() => onImageClick(index)}
                         >
@@ -1034,7 +995,6 @@ const ImageMosaic = ({ images, onImageClick }) => {
 
 export default function PostCard({ post, onDelete }) {
     const { profile: currentUserProfile } = useOutletContext();
-    
     const [selectedReaction, setSelectedReaction] = useState(null);
     const [likeCount, setLikeCount] = useState(post.likes_count || 0);
     const [commentCount, setCommentCount] = useState(post.comments_count || 0);
@@ -1098,40 +1058,71 @@ export default function PostCard({ post, onDelete }) {
     useEffect(() => {
         const fetchReactors = async () => {
             if (likeCount > 0) {
-                const { data, error } = await supabase
-                    .from('post_likes')
-                    .select(`
-                        user_id,
-                        reaction_type,
-                        created_at,
-                        profiles!inner(
-                            id,
-                            full_name,
-                            avatar_url,
-                            title,
-                            organization_name,
-                            role
-                        )
-                    `)
-                    .eq('post_id', post.id)
-                    .order('created_at', { ascending: false });
+                try {
+                    const { data: likesData, error: likesError } = await supabase
+                        .from('post_likes')
+                        .select(`
+                            user_id,
+                            reaction_type,
+                            created_at
+                        `)
+                        .eq('post_id', post.id)
+                        .order('created_at', { ascending: false });
 
-                if (error) {
-                    console.error("Error fetching reactors:", error);
+                    if (likesError) {
+                        console.error("Error fetching post_likes:", likesError);
+                        setReactors([]);
+                        return;
+                    }
+
+                    if (likesData && likesData.length > 0) {
+                        const userIds = likesData.map(like => like.user_id);
+
+                        const { data: profilesData, error: profilesError } = await supabase
+                            .from('profiles')
+                            .select(`
+                                id,
+                                full_name,
+                                avatar_url,
+                                title,
+                                organization_name,
+                                role
+                            `)
+                            .in('id', userIds);
+
+                        if (profilesError) {
+                            console.error("Error fetching profiles:", profilesError);
+                            setReactors([]);
+                            return;
+                        }
+
+                        const transformedReactors = likesData.map(like => {
+                            const profile = profilesData?.find(p => p.id === like.user_id);
+                            return {
+                                user_id: like.user_id,
+                                profile_id: profile?.id,
+                                full_name: profile?.full_name,
+                                avatar_url: profile?.avatar_url,
+                                title: profile?.title,
+                                organization_name: profile?.organization_name,
+                                role: profile?.role,
+                                reaction_type: like.reaction_type,
+                                created_at: like.created_at
+                            };
+                        }).filter(reactor => reactor.full_name);
+
+                        setReactors(transformedReactors);
+
+                        const actualCount = transformedReactors.length;
+                        if (actualCount !== likeCount) {
+                            setLikeCount(actualCount);
+                        }
+                    } else {
+                        setReactors([]);
+                    }
+                } catch (error) {
+                    console.error('Error in fetchReactors:', error);
                     setReactors([]);
-                } else {
-                    const transformedReactors = (data || []).map(item => ({
-                        user_id: item.user_id,
-                        profile_id: item.profiles.id,
-                        full_name: item.profiles.full_name,
-                        avatar_url: item.profiles.avatar_url,
-                        title: item.profiles.title,
-                        organization_name: item.profiles.organization_name,
-                        role: item.profiles.role,
-                        reaction_type: item.reaction_type,
-                        created_at: item.created_at
-                    }));
-                    setReactors(transformedReactors);
                 }
             } else {
                 setReactors([]);
@@ -1139,7 +1130,7 @@ export default function PostCard({ post, onDelete }) {
         };
 
         fetchReactors();
-    }, [likeCount, post.id]);
+    }, [post.id]);
 
     useEffect(() => {
         const checkReactionStatus = async () => {
@@ -1193,14 +1184,14 @@ export default function PostCard({ post, onDelete }) {
 
     const handleEditPost = async (editData) => {
         setIsMenuOpen(false);
-        
+
         const { data: { user } } = await supabase.auth.getUser();
-        
+
         if (!user) {
             console.error("No authenticated user found");
             return;
         }
-        
+
         const updateData = {
             content: editData.content.trim(),
             tags: editData.tags.length > 0 ? JSON.stringify(editData.tags) : null
@@ -1218,13 +1209,13 @@ export default function PostCard({ post, onDelete }) {
             updateData.image_url = null;
             updateData.image_urls = null;
         }
-        
+
         const { error } = await supabase
             .from('posts')
             .update(updateData)
             .eq('id', post.id)
             .eq('user_id', user.id);
-        
+
         if (error) {
             console.error("Error updating post:", error);
             alert('Failed to update post. Please try again.');
@@ -1261,20 +1252,20 @@ export default function PostCard({ post, onDelete }) {
 
     const handleDeletePost = async () => {
         setIsMenuOpen(false);
-        
+
         const { data: { user } } = await supabase.auth.getUser();
-        
+
         if (!user) {
             console.error("No authenticated user found");
             return;
         }
-        
+
         const { error } = await supabase
             .from('posts')
             .delete()
             .eq('id', post.id)
             .eq('user_id', user.id);
-        
+
         if (error) {
             console.error("Error deleting post:", error);
         } else {
@@ -1292,7 +1283,7 @@ export default function PostCard({ post, onDelete }) {
     const handleReactionMouseLeave = () => {
         reactionTimeoutRef.current = setTimeout(() => setReactionPanelOpen(false), 300);
     };
-    
+
     const handleReactorsEnter = async () => {
         clearTimeout(reactorsTimeoutRef.current);
         setShowReactors(true);
@@ -1308,7 +1299,7 @@ export default function PostCard({ post, onDelete }) {
         setSelectedImageIndex(index);
         setIsImageModalOpen(true);
     };
-    
+
     if (!post || !post.profiles) return null;
 
     const { content, created_at, profiles: author, image_url, image_urls, tags } = post;
@@ -1320,7 +1311,7 @@ export default function PostCard({ post, onDelete }) {
     const shouldTruncate = content && content.length > MAX_CHARS;
 
     const displayImages = image_urls && image_urls.length > 0 ? image_urls : (image_url ? [image_url] : []);
-    
+
     let parsedTags = [];
     if (tags) {
         if (typeof tags === 'string') {
@@ -1354,11 +1345,11 @@ export default function PostCard({ post, onDelete }) {
                             </button>
                             {isMenuOpen && (
                                 <div className="absolute right-0 mt-2 w-32 bg-white rounded-md shadow-lg border z-20">
-                                    <button 
+                                    <button
                                         onClick={() => {
                                             setIsMenuOpen(false);
                                             setIsEditing(true);
-                                        }} 
+                                        }}
                                         className="w-full text-left flex items-center gap-2 px-4 py-2 text-sm text-blue-600 hover:bg-blue-50"
                                     >
                                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1402,8 +1393,8 @@ export default function PostCard({ post, onDelete }) {
                 </div>
             )}
             {displayImages.length > 0 && !isEditing && (
-                <ImageMosaic 
-                    images={displayImages} 
+                <ImageMosaic
+                    images={displayImages}
                     onImageClick={handleImageClick}
                 />
             )}
@@ -1412,7 +1403,7 @@ export default function PostCard({ post, onDelete }) {
             )}
             {isEditing && (
                 <div className="mb-4">
-                    <EditMode 
+                    <EditMode
                         post={post}
                         editedContent={editedContent}
                         setEditedContent={setEditedContent}
@@ -1425,7 +1416,7 @@ export default function PostCard({ post, onDelete }) {
                     />
                 </div>
             )}
-            <LinkedInImageViewer
+            <ProfileoneImageViewer
                 post={post}
                 images={displayImages.length > 0 ? displayImages : ['/api/placeholder/800/600']}
                 initialIndex={selectedImageIndex}
@@ -1438,6 +1429,10 @@ export default function PostCard({ post, onDelete }) {
                 reactionSummary={reactionSummary}
                 commentCount={commentCount}
                 showImageSection={displayImages.length > 0}
+                onCommentAdded={() => setCommentCount(prev => prev + 1)}
+                onCommentDeleted={() => setCommentCount(prev => Math.max(0, prev - 1))}
+                reactors={reactors}
+                onViewReactions={() => setShowReactionsModal(true)}
             />
             <div className="flex items-center justify-between text-sm text-slate-500 mb-2 min-h-[20px]">
                 <div className="relative" onMouseEnter={handleReactorsEnter} onMouseLeave={handleReactorsLeave}>
@@ -1454,15 +1449,15 @@ export default function PostCard({ post, onDelete }) {
                                     );
                                 })}
                             </div>
-                            <ReactorsText 
-                                likeCount={likeCount} 
-                                reactors={reactors} 
+                            <ReactorsText
+                                likeCount={likeCount}
+                                reactors={reactors}
                                 onViewReactions={() => setShowReactionsModal(true)}
                             />
                         </div>
                     )}
                     {showReactors && likeCount > 0 && (
-                        <ReactionsPreview 
+                        <ReactionsPreview
                             reactors={reactors}
                             likeCount={likeCount}
                             onViewAll={() => {
@@ -1482,7 +1477,7 @@ export default function PostCard({ post, onDelete }) {
             </div>
             <div className="border-t pt-3 flex items-center justify-between">
                 <div className="relative">
-                    <div 
+                    <div
                         className="flex items-center space-x-2 cursor-pointer hover:bg-slate-100 rounded-lg px-3 py-2 transition-colors"
                         onMouseEnter={handleReactionMouseEnter}
                         onMouseLeave={handleReactionMouseLeave}
@@ -1498,7 +1493,7 @@ export default function PostCard({ post, onDelete }) {
                         </span>
                     </div>
                     {isReactionPanelOpen && (
-                        <div 
+                        <div
                             className="absolute bottom-full mb-2 bg-white border rounded-lg shadow-lg px-3 py-2 flex space-x-2 z-30"
                             onMouseEnter={handleReactionMouseEnter}
                             onMouseLeave={handleReactionMouseLeave}
@@ -1516,7 +1511,7 @@ export default function PostCard({ post, onDelete }) {
                         </div>
                     )}
                 </div>
-                <button 
+                <button
                     onClick={() => setShowComments(!showComments)}
                     className="flex items-center space-x-2 text-slate-600 hover:text-blue-600 hover:bg-slate-100 rounded-lg px-3 py-2 transition-colors"
                 >
@@ -1530,8 +1525,8 @@ export default function PostCard({ post, onDelete }) {
             </div>
             {showComments && (
                 <div className="mt-4 border-t pt-4 max-h-96 overflow-y-auto">
-                    <CommentSection 
-                        post={post} 
+                    <CommentSection
+                        post={post}
                         currentUserProfile={currentUserProfile}
                         onCommentAdded={() => setCommentCount(prev => prev + 1)}
                         onCommentDeleted={() => setCommentCount(prev => Math.max(0, prev - 1))}
