@@ -8,50 +8,55 @@ import CreatePost from './CreatePost.jsx';
 import PostCard from './PostCard.jsx';
 import { rssNewsService as newsService } from '../services/rssNewsService.js';
 
-const NewsCard = memo(({ title, summary, category, timeAgo, image, url }) => (
-  <div
-    className="flex-shrink-0 w-80 bg-white rounded-xl border border-slate-200 overflow-hidden hover:shadow-lg transition-shadow cursor-pointer"
-    onClick={() => url && window.open(url, '_blank')}
-  >
-    <div className="h-40 bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center relative">
-      <img
-        src={image}
-        alt={title}
-        className="w-full h-full object-cover"
-        onError={(e) => {
-          e.target.src = 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=400&h=200&fit=crop';
-        }}
-      />
-      <div className="absolute top-3 left-3 bg-white/90 backdrop-blur px-2 py-1 rounded-full text-xs font-medium text-slate-700">
-        {category}
+// Fallback logic has been removed.
+
+const NewsCard = memo(({ title, summary, category, timeAgo, image, url }) => {
+  return (
+    <div
+      className="flex-shrink-0 w-80 bg-white rounded-xl border border-slate-200 overflow-hidden hover:shadow-lg transition-shadow cursor-pointer"
+      onClick={() => url && window.open(url, '_blank')}
+    >
+      <div className="h-40 bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center relative">
+        {/* Conditionally render the image only if it exists */}
+        {image ? (
+          <img
+            src={image}
+            alt={title}
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          // If no image, a neutral background is shown by the parent div.
+          null
+        )}
+      </div>
+      <div className="p-4">
+        <h3 className="font-semibold text-slate-800 text-sm line-clamp-2 mb-2">{title}</h3>
+        <p className="text-slate-600 text-xs line-clamp-3 mb-3">{summary}</p>
+        <div className="flex items-center justify-between text-xs text-slate-500">
+          <div className="flex items-center">
+            <Clock size={12} className="mr-1" />
+            {timeAgo}
+          </div>
+          <div className="flex items-center">
+            <TrendingUp size={12} className="mr-1" />
+            Trending
+          </div>
+        </div>
       </div>
     </div>
-    <div className="p-4">
-      <h3 className="font-semibold text-slate-800 text-sm line-clamp-2 mb-2">{title}</h3>
-      <p className="text-slate-600 text-xs line-clamp-3 mb-3">{summary}</p>
-      <div className="flex items-center justify-between text-xs text-slate-500">
-        <div className="flex items-center">
-          <Clock size={12} className="mr-1" />
-          {timeAgo}
-        </div>
-        <div className="flex items-center">
-          <TrendingUp size={12} className="mr-1" />
-          Trending
-        </div>
-      </div>
-    </div>
-  </div>
-));
+  );
+});
 
 NewsCard.propTypes = {
   title: PropTypes.string.isRequired,
   summary: PropTypes.string.isRequired,
   category: PropTypes.string.isRequired,
   timeAgo: PropTypes.string.isRequired,
-  image: PropTypes.string.isRequired,
+  image: PropTypes.string,
   url: PropTypes.string
 };
 
+// ... (The rest of the file is identical to the last version you provided)
 const TrendingNews = ({ userRole }) => {
   const [news, setNews] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -116,7 +121,6 @@ const TrendingNews = ({ userRole }) => {
           <h2 className="text-xl font-bold text-slate-800">{newsTitle}</h2>
         </div>
         <div className="flex space-x-4 overflow-hidden">
-          {/* UPDATED: Show 10 skeletons */}
           {[...Array(10)].map((_, i) => (
             <div
               key={i}
