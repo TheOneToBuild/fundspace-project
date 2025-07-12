@@ -1,8 +1,9 @@
 // src/components/CreatePost.jsx
 import React, { useState, useRef, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
-import { Camera, X, Smile } from 'lucide-react';
+import { Camera, X, Smile, Link2 } from 'lucide-react';
 import Avatar from './Avatar.jsx';
+import urlDetectionUtils from '../utils/urlDetection.js';
 
 export default function CreatePost({ profile, onNewPost, channel = 'hello-world' }) {
     const [postText, setPostText] = useState('');
@@ -15,6 +16,8 @@ export default function CreatePost({ profile, onNewPost, channel = 'hello-world'
     const [selectedTags, setSelectedTags] = useState([]);
     const [showTagSelector, setShowTagSelector] = useState(false);
     const [customTagInput, setCustomTagInput] = useState('');
+    const [linkPreview, setLinkPreview] = useState(null);
+    const [isFetchingPreview, setIsFetchingPreview] = useState(false);
     const fileInputRef = useRef(null);
     const containerRef = useRef(null);
     const dragCounter = useRef(0);
@@ -38,6 +41,45 @@ export default function CreatePost({ profile, onNewPost, channel = 'hello-world'
         { id: 'advocacy', label: 'Advocacy', color: 'bg-red-100 text-red-800 border-red-200' },
         { id: 'research', label: 'Research', color: 'bg-gray-100 text-gray-800 border-gray-200' }
     ];
+
+    // Debounce function
+    const debounce = (func, delay) => {
+        let timeout;
+        return (...args) => {
+            clearTimeout(timeout);
+            timeout = setTimeout(() => func(...args), delay);
+        };
+    };
+
+    const fetchLinkPreview = async (url) => {
+        if (!url || linkPreview) return;
+
+        setIsFetchingPreview(true);
+        try {
+            // Replace with your actual API endpoint for fetching link previews
+            const response = await fetch(`/api/link-preview?url=${encodeURIComponent(url)}`);
+            if (!response.ok) {
+                throw new Error('Failed to fetch preview');
+            }
+            const data = await response.json();
+            setLinkPreview({ ...data, url });
+        } catch (error) {
+            console.error('Error fetching link preview:', error);
+            // You might want to clear the preview or show an error state
+        } finally {
+            setIsFetchingPreview(false);
+        }
+    };
+
+    const debouncedFetchPreview = debounce(fetchLinkPreview, 500);
+
+    useEffect(() => {
+        const urls = urlDetectionUtils.suggestUrlsForPreview(postText);
+        if (urls.length > 0) {
+            debouncedFetchPreview(urls[0]);
+        }
+    }, [postText]);
+
 
     const getRandomTagColor = () => {
         const colors = [
@@ -250,7 +292,8 @@ export default function CreatePost({ profile, onNewPost, channel = 'hello-world'
                     image_urls: imageUrls.length > 0 ? imageUrls : null,
                     image_url: imageUrls.length === 1 ? imageUrls[0] : null,
                     tags: selectedTags.length > 0 ? JSON.stringify(selectedTags) : null,
-                    channel: channel  // Include the channel
+                    channel: channel,  // Include the channel
+                    link_url: linkPreview ? linkPreview.url : null,
                 })
                 .select()
                 .single();
@@ -266,6 +309,7 @@ export default function CreatePost({ profile, onNewPost, channel = 'hello-world'
             setPostText('');
             setSelectedImages([]);
             setSelectedTags([]);
+            setLinkPreview(null);
             
             if (onNewPost) {
                 onNewPost(newPost);
@@ -369,6 +413,32 @@ export default function CreatePost({ profile, onNewPost, channel = 'hello-world'
                             </div>
                         )}
                     </div>
+
+                    {/* Link Preview */}
+                    {isFetchingPreview && (
+                        <div className="mt-3 text-sm text-slate-500">Fetching link preview...</div>
+                    )}
+                    {linkPreview && (
+                        <div className="mt-3 relative border rounded-lg overflow-hidden">
+                            <button
+                                onClick={() => setLinkPreview(null)}
+                                className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 shadow-md z-10"
+                                type="button"
+                            >
+                                <X size={14} />
+                            </button>
+                            {linkPreview.image && (
+                                <img src={linkPreview.image} alt="Link preview" className="w-full h-48 object-cover" />
+                            )}
+                            <div className="p-3 bg-slate-50">
+                                <p className="font-semibold text-slate-800 truncate">{linkPreview.title}</p>
+                                <p className="text-sm text-slate-600 truncate">{linkPreview.description}</p>
+                                <a href={linkPreview.url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline">
+                                    {linkPreview.url}
+                                </a>
+                            </div>
+                        </div>
+                    )}
                     
                     {/* Enhanced Image Preview Mosaic */}
                     {selectedImages.length > 0 && (
@@ -551,7 +621,7 @@ export default function CreatePost({ profile, onNewPost, channel = 'hello-world'
                         
                         <button
                             onClick={handlePostSubmit}
-                            disabled={isLoading || (!postText.trim() && selectedImages.length === 0)}
+                            disabled={isLoading || (!postText.trim() && selectedImages.length === 0 && !linkPreview)}
                             className="bg-blue-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm"
                             type="button"
                         >
