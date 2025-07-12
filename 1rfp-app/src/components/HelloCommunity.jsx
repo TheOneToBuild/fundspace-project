@@ -6,7 +6,7 @@ import { ChevronLeft, ChevronRight, Clock, TrendingUp, ArrowRight, Users, Messag
 import { supabase } from '../supabaseClient';
 import CreatePost from './CreatePost.jsx';
 import PostCard from './PostCard.jsx';
-import { newsService } from '../services/newsService.js';
+import { rssNewsService as newsService } from '../services/rssNewsService.js';
 
 const NewsCard = memo(({ title, summary, category, timeAgo, image, url }) => (
   <div

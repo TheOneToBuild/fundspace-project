@@ -8,3 +8,15 @@
 
   # The command to build your site
   command = "npm run build"
+
+# Functions configuration
+[functions]
+  directory = "netlify/functions"
+
+# CORS headers for functions
+[[headers]]
+  for = "/.netlify/functions/*"
+  [headers.values]
+    Access-Control-Allow-Origin = "*"
+    Access-Control-Allow-Headers = "Content-Type"
+    Access-Control-Allow-Methods = "GET, OPTIONS"
