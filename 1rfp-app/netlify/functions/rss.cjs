@@ -1,5 +1,5 @@
-// 1rfp-app/netlify/functions/rss.js
-// Complete Netlify Function for RSS fetching
+// 1rfp-app/netlify/functions/rss.cjs
+// Enhanced Netlify Function for RSS fetching - Bay Area focus + real images
 
 exports.handler = async (event, context) => {
   // Enable CORS
@@ -40,25 +40,30 @@ exports.handler = async (event, context) => {
       };
     }
 
+    // Updated RSS feeds focused on Bay Area/California nonprofit and funder news
     const RSS_FEEDS = {
       funder: [
         'https://www.philanthropy.com/rss.php',
-        'https://ssir.org/rss.xml',
-        'https://www.nonprofitquarterly.org/feed/',
+        'https://ssir.org/rss.xml', // Stanford Social Innovation Review (Bay Area based)
         'https://www.foundationcenter.org/news/rss.xml',
-        'https://www.councilofnonprofits.org/feed'
+        'https://www.nonprofitquarterly.org/feed/',
+        // Add Bay Area specific feeds
+        'https://www.sfgate.com/rss/feed/Business-1078.php',
+        'https://www.mercurynews.com/feed/',
       ],
       nonprofit: [
         'https://www.nonprofitquarterly.org/feed/',
+        'https://ssir.org/rss.xml',
         'https://www.charitynavigator.org/index.cfm?bay=content.rss',
-        'https://www.guidestar.org/rss.xml',
-        'https://www.boardsource.org/feed/',
-        'https://www.independentsector.org/feed/'
+        'https://www.sfgate.com/rss/feed/Local-1079.php',
+        'https://www.mercurynews.com/feed/',
+        'https://www.philanthropy.com/rss.php'
       ],
       general: [
-        'https://feeds.npr.org/1001/rss.xml',
-        'https://feeds.reuters.com/reuters/topNews',
-        'https://feeds.bbci.co.uk/news/rss.xml'
+        'https://www.sfgate.com/rss/feed/Local-1079.php',
+        'https://www.mercurynews.com/feed/',
+        'https://ssir.org/rss.xml',
+        'https://www.nonprofitquarterly.org/feed/'
       ]
     };
 
@@ -82,7 +87,7 @@ exports.handler = async (event, context) => {
         console.log(`Fetching: ${feedUrl}`);
         
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
         
         const response = await fetch(feedUrl, {
           headers: {
@@ -122,15 +127,18 @@ exports.handler = async (event, context) => {
       }
     });
 
-    // Remove duplicates by title and limit results
-    const uniqueArticles = allArticles
+    // Filter for Bay Area/California content
+    const bayAreaArticles = allArticles.filter(article => isBayAreaRelevant(article));
+
+    // Remove duplicates by title and limit results to 10
+    const uniqueArticles = bayAreaArticles
       .filter((article, index, arr) => 
         arr.findIndex(a => a.title === article.title) === index
       )
-      .sort(() => Math.random() - 0.5) // Shuffle for variety
-      .slice(0, 10);
+      .sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate)) // Sort by date, newest first
+      .slice(0, 10); // Limit to exactly 10 articles
 
-    console.log(`Returning ${uniqueArticles.length} unique articles for ${category}`);
+    console.log(`Returning ${uniqueArticles.length} Bay Area relevant articles for ${category}`);
 
     return {
       statusCode: 200,
@@ -143,7 +151,8 @@ exports.handler = async (event, context) => {
         articles: uniqueArticles,
         category: category,
         timestamp: new Date().toISOString(),
-        total: uniqueArticles.length
+        total: uniqueArticles.length,
+        filtered: `Bay Area/California ${category} news`
       })
     };
 
@@ -163,7 +172,38 @@ exports.handler = async (event, context) => {
   }
 };
 
-// Helper function to parse RSS XML to articles
+// Enhanced function to check if article is Bay Area/California relevant
+function isBayAreaRelevant(article) {
+  const content = `${article.title} ${article.summary}`.toLowerCase();
+  
+  // Bay Area specific terms
+  const bayAreaTerms = [
+    'san francisco', 'sf', 'bay area', 'silicon valley', 'oakland', 'berkeley', 'san jose',
+    'palo alto', 'mountain view', 'fremont', 'hayward', 'santa clara', 'sunnyvale',
+    'redwood city', 'menlo park', 'cupertino', 'milpitas', 'alameda', 'richmond',
+    'san mateo', 'daly city', 'vallejo', 'concord', 'santa rosa', 'petaluma'
+  ];
+  
+  // California general terms
+  const californiaTerms = [
+    'california', 'calif', 'ca ', 'golden state', 'sacramento', 'los angeles', 'san diego'
+  ];
+  
+  // Nonprofit/Funder specific terms
+  const nonprofitFunderTerms = [
+    'nonprofit', 'non-profit', 'charity', 'foundation', 'philanthrop', 'grant', 'donation',
+    'fundrais', 'volunteer', 'community', 'social impact', 'giving', 'endowment'
+  ];
+  
+  // Check if article contains Bay Area terms OR (California terms AND nonprofit/funder terms)
+  const hasBayArea = bayAreaTerms.some(term => content.includes(term));
+  const hasCalifornia = californiaTerms.some(term => content.includes(term));
+  const hasNonprofitFunder = nonprofitFunderTerms.some(term => content.includes(term));
+  
+  return hasBayArea || (hasCalifornia && hasNonprofitFunder);
+}
+
+// Enhanced function to parse RSS XML to articles with real image extraction
 function parseRSSToArticles(xmlText, feedUrl) {
   const articles = [];
   
@@ -179,7 +219,7 @@ function parseRSSToArticles(xmlText, feedUrl) {
     
     const items = [...cleanXml.matchAll(itemRegex), ...cleanXml.matchAll(entryRegex)];
     
-    items.slice(0, 5).forEach((item, index) => {
+    items.forEach((item, index) => {
       const itemContent = item[1];
       
       // Extract title (handle CDATA)
@@ -187,7 +227,7 @@ function parseRSSToArticles(xmlText, feedUrl) {
       let title = titleMatch?.[1] || '';
       
       // Extract description/summary (handle CDATA)
-      const descMatch = itemContent.match(/<(?:description|summary)[^>]*>(?:<!\[CDATA\[)?(.*?)(?:\]\]>)?<\/(?:description|summary)>/is);
+      const descMatch = itemContent.match(/<(?:description|summary|content:encoded)[^>]*>(?:<!\[CDATA\[)?(.*?)(?:\]\]>)?<\/(?:description|summary|content:encoded)>/is);
       let description = descMatch?.[1] || '';
       
       // Extract link
@@ -196,7 +236,10 @@ function parseRSSToArticles(xmlText, feedUrl) {
       
       // Extract publication date
       const pubDateMatch = itemContent.match(/<(?:pubDate|published|updated)[^>]*>([^<]*)<\/(?:pubDate|published|updated)>/i);
-      const pubDate = pubDateMatch?.[1] || '';
+      const pubDate = pubDateMatch?.[1] || new Date().toISOString();
+      
+      // Enhanced image extraction
+      const imageUrl = extractImageFromContent(itemContent, description, link);
       
       // Clean HTML tags and entities
       title = cleanTextContent(title);
@@ -209,9 +252,10 @@ function parseRSSToArticles(xmlText, feedUrl) {
           summary: description.length > 200 ? description.substring(0, 200) + '...' : description,
           category: categorizeFeed(feedUrl),
           timeAgo: formatTimeAgo(pubDate),
-          image: getDefaultImage(feedUrl),
+          image: imageUrl,
           url: link.trim(),
-          source: feedUrl
+          source: feedUrl,
+          pubDate: pubDate
         });
       }
     });
@@ -221,6 +265,61 @@ function parseRSSToArticles(xmlText, feedUrl) {
   }
   
   return articles;
+}
+
+// Enhanced image extraction function
+function extractImageFromContent(itemContent, description, articleUrl) {
+  // Try multiple methods to extract image URL
+  
+  // Method 1: Media RSS namespace
+  let imageMatch = itemContent.match(/<media:content[^>]*url=["']([^"']*\.(?:jpg|jpeg|png|gif|webp))[^"']*["']/i);
+  if (imageMatch) return imageMatch[1];
+  
+  // Method 2: Media thumbnail
+  imageMatch = itemContent.match(/<media:thumbnail[^>]*url=["']([^"']*\.(?:jpg|jpeg|png|gif|webp))[^"']*["']/i);
+  if (imageMatch) return imageMatch[1];
+  
+  // Method 3: Enclosure tag
+  imageMatch = itemContent.match(/<enclosure[^>]*url=["']([^"']*\.(?:jpg|jpeg|png|gif|webp))[^"']*["']/i);
+  if (imageMatch) return imageMatch[1];
+  
+  // Method 4: Image in description/content
+  imageMatch = description.match(/<img[^>]*src=["']([^"']*\.(?:jpg|jpeg|png|gif|webp))[^"']*["']/i);
+  if (imageMatch) return imageMatch[1];
+  
+  // Method 5: Look for any image URL in content
+  imageMatch = itemContent.match(/https?:\/\/[^"\s]*\.(?:jpg|jpeg|png|gif|webp)(?:\?[^"\s]*)?/i);
+  if (imageMatch) return imageMatch[0];
+  
+  // Method 6: Extract from common news site patterns
+  const siteSpecificImage = extractSiteSpecificImage(articleUrl, itemContent);
+  if (siteSpecificImage) return siteSpecificImage;
+  
+  // Fallback to category-based default image
+  return getDefaultImage(categorizeFeed(articleUrl));
+}
+
+// Site-specific image extraction patterns
+function extractSiteSpecificImage(articleUrl, content) {
+  // SF Gate specific patterns
+  if (articleUrl.includes('sfgate.com')) {
+    const match = content.match(/https:\/\/[^"\s]*sfgate[^"\s]*\.(?:jpg|jpeg|png|gif|webp)/i);
+    if (match) return match[0];
+  }
+  
+  // Mercury News specific patterns
+  if (articleUrl.includes('mercurynews.com')) {
+    const match = content.match(/https:\/\/[^"\s]*mercurynews[^"\s]*\.(?:jpg|jpeg|png|gif|webp)/i);
+    if (match) return match[0];
+  }
+  
+  // Philanthropy.com patterns
+  if (articleUrl.includes('philanthropy.com')) {
+    const match = content.match(/https:\/\/[^"\s]*philanthropy[^"\s]*\.(?:jpg|jpeg|png|gif|webp)/i);
+    if (match) return match[0];
+  }
+  
+  return null;
 }
 
 // Clean HTML tags and decode common entities
@@ -276,7 +375,7 @@ function formatTimeAgo(dateString) {
   }
 }
 
-// Get default image based on feed category
+// Get default image based on feed category (fallback only)
 function getDefaultImage(feedUrl) {
   const category = categorizeFeed(feedUrl);
   
