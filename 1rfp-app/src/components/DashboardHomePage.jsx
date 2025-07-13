@@ -1,12 +1,14 @@
 // src/components/DashboardHomePage.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback, memo } from 'react';
 import { useOutletContext } from 'react-router-dom';
+import { supabase } from '../supabaseClient';
 import { ChevronLeft, ChevronRight, Clock, TrendingUp, ArrowRight, Users, MessageCircle, Globe } from 'lucide-react';
 import PostCard from './PostCard.jsx';
 import CreatePost from './CreatePost.jsx';
 import { rssNewsService as newsService } from '../services/rssNewsService.js';
+import PropTypes from 'prop-types';
 
-const NewsCard = ({ title, summary, timeAgo, image, url }) => {
+const NewsCard = memo(({ title, summary, timeAgo, image, url }) => {
   return (
     <div 
       className="flex-shrink-0 w-80 bg-white rounded-xl border border-slate-200 overflow-hidden hover:shadow-lg transition-shadow cursor-pointer"
@@ -20,12 +22,13 @@ const NewsCard = ({ title, summary, timeAgo, image, url }) => {
         <p className="text-slate-600 text-xs line-clamp-3 mb-3">{summary}</p>
         <div className="flex items-center justify-between text-xs text-slate-500">
           <div className="flex items-center"><Clock size={12} className="mr-1" />{timeAgo}</div>
-          <div className="flex items-center"><TrendingUp size={12} className="mr-1" />Trending</div>
         </div>
       </div>
     </div>
   );
-};
+});
+NewsCard.displayName = 'NewsCard';
+NewsCard.propTypes = { title: PropTypes.string, summary: PropTypes.string, timeAgo: PropTypes.string, image: PropTypes.string, url: PropTypes.string };
 
 const TrendingNewsSection = () => {
   const [news, setNews] = useState([]);
@@ -34,9 +37,15 @@ const TrendingNewsSection = () => {
   useEffect(() => {
     const fetchNews = async () => {
       setLoading(true);
-      const newsData = await newsService.getGlobalBreakingNews();
-      setNews(Array.isArray(newsData) ? newsData : []);
-      setLoading(false);
+      try {
+        const newsData = await newsService.getGlobalBreakingNews();
+        setNews(Array.isArray(newsData) ? newsData : []);
+      } catch (error) {
+        console.error("Failed to fetch news:", error);
+        setNews([]);
+      } finally {
+        setLoading(false);
+      }
     };
     fetchNews();
   }, []);
@@ -48,22 +57,8 @@ const TrendingNewsSection = () => {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="mb-6">
-        <h2 className="text-xl font-bold text-slate-800 mb-4">Global Breaking News</h2>
-        <div className="flex space-x-4">
-          {[...Array(5)].map((_, i) => (
-            <div key={i} className="flex-shrink-0 w-80 bg-white rounded-xl border border-slate-200 animate-pulse">
-              <div className="h-40 bg-slate-200"></div><div className="p-4"><div className="h-4 bg-slate-200 rounded mb-2"></div><div className="h-3 bg-slate-200 rounded"></div></div>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  if (news.length === 0) return null;
+  if (loading) return null; // Don't show anything while loading
+  if (news.length === 0) return null; // Don't show the section if there's no news
 
   return (
     <div className="mb-6">
@@ -81,74 +76,56 @@ const TrendingNewsSection = () => {
   );
 };
 
-const HelloWorldWelcomeSection = ({ onEnterWorld, hasEnteredWorld }) => {
-  return (
+const HelloWorldWelcomeSection = ({ onEnterWorld, hasEnteredWorld }) => (
     <div className="bg-gradient-to-r from-sky-50 to-blue-50 border border-sky-200 rounded-xl p-6 mb-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
           <div className="text-4xl">🌍</div>
-          <div className="flex-1">
-            <div className="flex items-center space-x-3 mb-2">
-              <h2 className="text-xl font-bold text-slate-800">Welcome to Hello World</h2>
-              <div className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border bg-sky-50 text-sky-700 border-sky-200">
-                <span>#hello-world</span>
-              </div>
-            </div>
-            <p className="text-slate-600 mb-4 max-w-2xl">
-              Connect with the entire community! Share updates, discover opportunities, and engage with funders, nonprofits, and community members in this open space.
-            </p>
-            
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-2 text-sm text-slate-500">
-                <Users size={16} />
-                <span>Open community</span>
-              </div>
-              <div className="flex items-center space-x-2 text-sm text-slate-500">
-                <MessageCircle size={16} />
-                <span>Share & discover</span>
-              </div>
-              <div className="flex items-center space-x-2 text-sm text-slate-500">
-                <Globe size={16} />
-                <span>All welcome</span>
-              </div>
-            </div>
+          <div>
+            <h2 className="text-xl font-bold text-slate-800">Welcome to Hello World</h2>
+            <p className="text-slate-600 max-w-2xl">Connect with the entire community! Share updates, discover opportunities, and engage.</p>
           </div>
         </div>
-        
         {!hasEnteredWorld && (
-          <button
-            onClick={onEnterWorld}
-            className="flex items-center space-x-2 px-6 py-3 bg-sky-600 hover:bg-sky-700 text-white rounded-lg font-medium transition-colors shadow-sm"
-          >
-            <span>Join the Conversation</span>
-            <ArrowRight size={18} />
+          <button onClick={onEnterWorld} className="flex items-center space-x-2 px-6 py-3 bg-sky-600 hover:bg-sky-700 text-white rounded-lg font-medium transition-colors shadow-sm">
+            <span>Join the Conversation</span><ArrowRight size={18} />
           </button>
         )}
       </div>
     </div>
-  );
-};
+);
+HelloWorldWelcomeSection.propTypes = { onEnterWorld: PropTypes.func.isRequired, hasEnteredWorld: PropTypes.bool.isRequired };
 
-const HelloWorldEmptyState = () => {
-  return (
+const HelloWorldEmptyState = () => (
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-8 text-center">
       <div className="text-6xl mb-4">💬</div>
       <h3 className="text-xl font-bold text-slate-800 mb-2">Start the Global Conversation</h3>
-      <p className="text-slate-600 mb-4 max-w-md mx-auto">
-        Be the first to share something with the entire community! Ask questions, share insights, or announce opportunities.
-      </p>
-      <div className="inline-flex items-center px-4 py-2 bg-indigo-100 text-indigo-700 rounded-lg text-sm font-medium">
-        <span className="w-2 h-2 bg-indigo-400 rounded-full mr-2 animate-pulse"></span>
-        Share your first post above to get things started!
-      </div>
+      <p className="text-slate-600 max-w-md mx-auto">Be the first to share something! Your post will appear here.</p>
     </div>
-  );
-};
+);
+
+const POSTS_PER_PAGE = 5;
 
 export default function DashboardHomePage() {
-  const { profile, posts, handleNewPost, handleDeletePost } = useOutletContext() || {};
+  const { profile } = useOutletContext() || {};
+  const [posts, setPosts] = useState([]);
+  const [page, setPage] = useState(0);
+  const [isLoading, setIsLoading] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
   const [hasEnteredWorld, setHasEnteredWorld] = useState(false);
   const [showWelcome, setShowWelcome] = useState(false);
+
+  const observer = useRef();
+  const loaderRef = useCallback(node => {
+    if (isLoading) return;
+    if (observer.current) observer.current.disconnect();
+    observer.current = new IntersectionObserver(entries => {
+      if (entries[0].isIntersecting && hasMore) {
+        setPage(prevPage => prevPage + 1);
+      }
+    });
+    if (node) observer.current.observe(node);
+  }, [isLoading, hasMore]);
 
   useEffect(() => {
     if (profile?.id) {
@@ -156,70 +133,72 @@ export default function DashboardHomePage() {
       const hasEntered = localStorage.getItem(storageKey) === 'true';
       setHasEnteredWorld(hasEntered);
       setShowWelcome(!hasEntered);
-    } else {
-      setHasEnteredWorld(false);
-      setShowWelcome(false);
     }
   }, [profile?.id]);
 
+  useEffect(() => {
+    const fetchPosts = async () => {
+        if (!hasMore) return;
+        setIsLoading(true);
+        const from = page * POSTS_PER_PAGE;
+        const to = from + POSTS_PER_PAGE - 1;
+
+        const { data: newPosts, error } = await supabase.from('posts').select('*, profiles!posts_profile_id_fkey(*)').eq('channel', 'hello-world').order('created_at', { ascending: false }).range(from, to);
+
+        if (error) console.error("Error fetching posts:", error);
+        else {
+            setPosts(prevPosts => (page === 0 ? newPosts : [...prevPosts, ...newPosts]));
+            if (newPosts.length < POSTS_PER_PAGE) setHasMore(false);
+        }
+        setIsLoading(false);
+    };
+    fetchPosts();
+  }, [page]);
+  
+  useEffect(() => {
+    const channel = supabase.channel('public:posts');
+    channel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'posts', filter: 'channel=eq.hello-world' }, async (payload) => {
+        const { data: profileData } = await supabase.from('profiles').select('*').eq('id', payload.new.profile_id).single();
+        if (profileData) {
+            const newPostWithProfile = { ...payload.new, profiles: profileData };
+            setPosts(currentPosts => {
+                if (currentPosts.some(p => p.id === newPostWithProfile.id)) return currentPosts;
+                return [newPostWithProfile, ...currentPosts];
+            });
+        }
+    }).subscribe();
+
+    return () => supabase.removeChannel(channel);
+  }, []);
+
   const handleEnterWorld = () => {
     if (profile?.id) {
-      const storageKey = `hello-world-entered-${profile.id}`;
-      localStorage.setItem(storageKey, 'true');
+      localStorage.setItem(`hello-world-entered-${profile.id}`, 'true');
       setHasEnteredWorld(true);
       setShowWelcome(false);
     }
   };
 
-  const loading = !posts && !profile;
+  const handleNewPost = (newPost) => setPosts(p => [{ ...newPost, profiles: profile }, ...p]);
+  const handleDeletePost = (postId) => setPosts(p => p.filter(post => post.id !== postId));
 
   return (
     <div className="space-y-6">
       <TrendingNewsSection />
-
-      {showWelcome && (
-        <HelloWorldWelcomeSection 
-          onEnterWorld={handleEnterWorld}
-          hasEnteredWorld={hasEnteredWorld}
-        />
-      )}
-
-      {(hasEnteredWorld || (posts && posts.length > 0)) && (
+      {showWelcome && <HelloWorldWelcomeSection onEnterWorld={handleEnterWorld} hasEnteredWorld={hasEnteredWorld}/>}
+      {(hasEnteredWorld || posts.length > 0) && (
         <>
-          <div className="mb-6">
-            <div className="inline-flex items-center px-4 py-2 rounded-full text-sm font-medium bg-sky-50 text-sky-700 border border-sky-200">
-              <span className="mr-2">🌍</span>
-              <span>#hello-world</span>
-            </div>
-          </div>
-
-          <CreatePost 
-            profile={profile} 
-            onNewPost={handleNewPost} 
-            channel="hello-world"
-          />
-
-          {loading && <p className="text-center text-slate-500">Loading feed...</p>}
-          
-          {!loading && (!posts || posts.length === 0) && (
-            <HelloWorldEmptyState />
-          )}
-
-          {!loading && posts && posts.length > 0 && (
+          <CreatePost profile={profile} onNewPost={handleNewPost} channel="hello-world" />
+          {posts.length > 0 && (
             <div className="space-y-6">
-              {posts.map(post => (
-                <PostCard key={`post-${post.id}`} post={post} onDelete={handleDeletePost} />
-              ))}
+              {posts.map(post => <PostCard key={`post-${post.id}`} post={post} onDelete={handleDeletePost} />)}
             </div>
           )}
-
-          {posts && posts.length > 0 && !loading && (
-            <div className="text-center py-8">
-              <button className="px-6 py-3 bg-white border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 transition-colors font-medium">
-                Load More Posts
-              </button>
-            </div>
-          )}
+          <div ref={loaderRef} className="h-10 text-center">
+            {isLoading && <p className="text-slate-500">Loading...</p>}
+            {!isLoading && !hasMore && posts.length > 0 && <p className="text-slate-500">You've reached the end.</p>}
+          </div>
+          {!isLoading && posts.length === 0 && <HelloWorldEmptyState />}
         </>
       )}
     </div>
