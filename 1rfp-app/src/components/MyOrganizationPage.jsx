@@ -1,4 +1,4 @@
-// Updated MyOrganizationPage.jsx - FIXED Leave Organization functionality
+// Updated MyOrganizationPage.jsx with Social Metrics Integration
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useOutletContext, Link } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
@@ -7,6 +7,7 @@ import Avatar from './Avatar.jsx';
 import EnhancedOrganizationSetupPage from './OrganizationSetupPage.jsx';
 import OmegaAdminOrgSelector from './OmegaAdminOrgSelector.jsx';
 import AdminManagementModal from './AdminManagementModal.jsx';
+import SocialMetricsCard from './SocialMetricsCard.jsx'; // Import our social metrics component
 // Import our new permission utilities
 import { hasPermission, PERMISSIONS, ROLES, getRoleDisplayName, getRoleBadgeColor, canManageUser } from '../utils/permissions.js';
 
@@ -340,6 +341,7 @@ export default function MyOrganizationPage() {
                 </div>
             )}
 
+            {/* Organization Header with integrated About Us */}
             <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
                 <div className="flex items-start justify-between flex-wrap gap-4">
                     <div className="flex items-center space-x-4">
@@ -382,24 +384,24 @@ export default function MyOrganizationPage() {
                         )}
                     </div>
                 </div>
+
+                {/* About Us section - moved here and simplified */}
+                {organization.description && (
+                    <div className="mt-6 pt-6 border-t border-slate-200">
+                        <p className="text-slate-600 leading-relaxed">{organization.description}</p>
+                    </div>
+                )}
             </div>
 
-            {/* About Us section */}
-            {organization.description && (
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                    <h2 className="text-lg font-semibold text-slate-800 mb-3">About Us</h2>
-                    <p className="text-slate-600 leading-relaxed">{organization.description}</p>
-                    {organization.website && (
-                        <div className="mt-4 pt-4 border-t border-slate-200">
-                            <a href={organization.website} target="_blank" rel="noopener noreferrer" className="inline-flex items-center text-blue-600 hover:text-blue-800">
-                                <Globe className="w-4 h-4 mr-2" /> Visit Website
-                            </a>
-                        </div>
-                    )}
-                </div>
-            )}
+            {/* Social Metrics Card - NEW ADDITION */}
+            <SocialMetricsCard 
+                organization={organization} 
+                organizationType={userMembership.organization_type}
+                userRole={userRole}
+                isOmegaAdmin={isOmegaAdmin}
+            />
 
-            {/* Team Members section */}
+            {/* Team Members section - REMAINS THE SAME */}
             <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
                 <div className="flex items-center justify-between mb-4">
                     <h2 className="text-lg font-semibold text-slate-800">Team Members ({members.length})</h2>

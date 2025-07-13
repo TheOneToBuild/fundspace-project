@@ -68,7 +68,7 @@ const TrendingNewsSection = () => {
   return (
     <div className="mb-6">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-bold text-slate-800">Global Breaking News</h2>
+        <h2 className="text-xl font-bold text-slate-800">Trending World News</h2>
         <div className="flex space-x-2">
           <button onClick={() => scrollNews('left')} className="p-2 bg-white border rounded-lg hover:bg-slate-50"><ChevronLeft size={16} /></button>
           <button onClick={() => scrollNews('right')} className="p-2 bg-white border rounded-lg hover:bg-slate-50"><ChevronRight size={16} /></button>

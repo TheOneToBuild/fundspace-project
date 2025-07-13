@@ -1,74 +1,4 @@
-// NEW: Kudos carousel component
-  const renderKudosCarousel = () => {
-    const handleAddKudos = () => {
-      if (newKudos.trim()) {
-        const newKudosItem = {
-          id: Date.now(),
-          text: newKudos,
-          author: {
-            name: "You", // In real app, would use session user data
-            organization: "Your Organization",
-            avatar: null
-          },
-          createdAt: new Date().toISOString()
-        };
-        setKudos(prev => [newKudosItem, ...prev]);
-        setNewKudos('');
-      }
-    };
-
-    // Ensure kudos is always an array
-    const kudosArray = kudos || [];
-
-    return (
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-            <Star className="text-yellow-500" />
-            Community Kudos
-          </h3>
-          <span className="text-sm text-slate-500">{kudosArray.length} testimonials</span>
-        </div>
-
-        {/* Add Kudos Form */}
-        <div className="bg-blue-50 rounded-xl p-6 border border-blue-100">
-          <h4 className="font-semibold text-slate-800 mb-3">Share your experience working with {funder.name}</h4>
-          <div className="space-y-3">
-            <textarea
-              value={newKudos}
-              onChange={(e) => setNewKudos(e.target.value)}
-              placeholder="Write about your experience, partnership, or the impact of their support..."
-              className="w-full p-4 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-h-[100px]"
-            />
-            <button
-              onClick={handleAddKudos}
-              disabled={!newKudos.trim()}
-              className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors"
-            >
-              Add Kudos
-            </button>
-          </div>
-        </div>
-
-        {/* Kudos Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {kudosArray.map((kudo) => (
-            <div key={kudo.id} className="bg-white rounded-xl border border-slate-200 p-6 hover:shadow-lg transition-shadow">
-              <div className="flex items-start gap-4 mb-4">
-                <Avatar src={kudo.author.avatar} fullName={kudo.author.name} size="md" />
-                <div className="flex-1">
-                  <h5 className="font-bold text-slate-800">{kudo.author.name}</h5>
-                  <p className="text-sm text-blue-600">{kudo.author.organization}</p>
-                  <p className="text-xs text-slate-500">{formatDate(kudo.createdAt)}</p>
-                </div>
-              </div>
-              <p className="text-slate-700 leading-relaxed">{kudo.text}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  };// src/FunderProfilePage.jsx - Enhanced with Modern Design & Social Features
+// Updated FunderProfilePage.jsx with real social interactions - COMPLETE VERSION
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { supabase } from './supabaseClient.js';
@@ -86,6 +16,10 @@ import NonprofitCard from './components/NonprofitCard.jsx';
 import PublicPageLayout from './components/PublicPageLayout.jsx';
 import Avatar from './components/Avatar.jsx';
 
+// Import our new social hooks
+import { useFunderFollow, useFunderBookmark, usePostLike } from './utils/funderSocialHooks.js';
+import { useProfileViewTracking } from './utils/profileViewsHooks.js';
+
 const FunderProfilePage = () => {
   const { funderSlug } = useParams();
   const navigate = useNavigate();
@@ -100,19 +34,48 @@ const FunderProfilePage = () => {
   const [selectedGrant, setSelectedGrant] = useState(null);
   const [teamMembers, setTeamMembers] = useState([]);
   
-  // Social/Interactive states
-  const [isFollowing, setIsFollowing] = useState(false);
-  const [followersCount, setFollowersCount] = useState(0);
-  const [isLiked, setIsLiked] = useState(false);
-  const [likesCount, setLikesCount] = useState(0);
+  // Social/Interactive states - now managed by hooks
   const [starRating, setStarRating] = useState(4.8);
   const [recentActivities, setRecentActivities] = useState([]);
   const [impactStories, setImpactStories] = useState([]);
   const [organizationPosts, setOrganizationPosts] = useState([]);
   const [grantees, setGrantees] = useState([]);
-  const [kudos, setKudos] = useState([]); // NEW: Kudos feature - initialized as empty array
-  const [newKudos, setNewKudos] = useState(''); // NEW: For adding kudos
+  const [kudos, setKudos] = useState([]);
+  const [newKudos, setNewKudos] = useState('');
   const [activeTab, setActiveTab] = useState('home');
+
+  // Get session for social features
+  const [session, setSession] = useState(null);
+  
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // Use our custom hooks for social features
+  const {
+    isFollowing,
+    followersCount,
+    loading: followLoading,
+    toggleFollow
+  } = useFunderFollow(funder?.id, session?.user?.id);
+
+  const {
+    isBookmarked: isLiked,
+    bookmarksCount: likesCount,
+    loading: likeLoading,
+    toggleBookmark: toggleLike
+  } = useFunderBookmark(funder?.id, session?.user?.id);
+
+  // Track profile views
+  const { viewRecorded } = useProfileViewTracking(funder?.id, session?.user?.id);
 
   const openDetail = useCallback((grant) => {
     const fetchFullGrantData = async () => {
@@ -150,15 +113,21 @@ const FunderProfilePage = () => {
     setIsDetailModal(false);
   }, []);
 
-  // Social interaction handlers
+  // Social interaction handlers now use real data
   const handleFollow = async () => {
-    setIsFollowing(!isFollowing);
-    setFollowersCount(prev => isFollowing ? prev - 1 : prev + 1);
+    if (!session) {
+      alert('Please log in to follow funders');
+      return;
+    }
+    await toggleFollow();
   };
 
   const handleLike = async () => {
-    setIsLiked(!isLiked);
-    setLikesCount(prev => isLiked ? prev - 1 : prev + 1);
+    if (!session) {
+      alert('Please log in to like funders');
+      return;
+    }
+    await toggleLike();
   };
 
   useEffect(() => {
@@ -212,6 +181,101 @@ const FunderProfilePage = () => {
         const formattedGrants = (grantsRes.data || []).map(grant => ({ ...grant, foundationName: grant.funders?.name || funderData.name, funderLogoUrl: grant.funders?.logo_url || funderData.logo_url, funderSlug: grant.funders?.slug || funderData.slug, fundingAmount: grant.max_funding_amount || grant.funding_amount_text || 'Not specified', dueDate: grant.deadline, grantType: grant.grant_type, eligibility_criteria: grant.eligibility_criteria, categories: grant.grant_categories.map(gc => gc.categories), locations: grant.grant_locations.map(gl => gl.locations) }));
         setFunderGrants(formattedGrants);
 
+        // Fetch real activities if the table exists
+        try {
+          const { data: activitiesData, error: activitiesError } = await supabase
+            .from('funder_activities')
+            .select('*')
+            .eq('funder_id', funderId)
+            .order('activity_date', { ascending: false })
+            .limit(5);
+          
+          if (activitiesData && !activitiesError) {
+            setRecentActivities(activitiesData.map(activity => ({
+              id: activity.id,
+              type: activity.activity_type,
+              description: activity.description || activity.title,
+              date: activity.activity_date,
+              amount: activity.amount
+            })));
+          } else {
+            // Fallback to mock data
+            setRecentActivities([
+              { id: 1, type: 'grant_awarded', description: 'Awarded $50,000 to Bay Area Food Bank', date: '2024-01-15', amount: '$50,000' },
+              { id: 2, type: 'new_program', description: 'Launched Environmental Justice Initiative', date: '2024-01-10' },
+              { id: 3, type: 'partnership', description: 'Partnered with Silicon Valley Community Foundation', date: '2024-01-05' }
+            ]);
+          }
+        } catch (activitiesError) {
+          console.warn("Activities table not available, using mock data");
+          setRecentActivities([
+            { id: 1, type: 'grant_awarded', description: 'Awarded $50,000 to Bay Area Food Bank', date: '2024-01-15', amount: '$50,000' },
+            { id: 2, type: 'new_program', description: 'Launched Environmental Justice Initiative', date: '2024-01-10' },
+            { id: 3, type: 'partnership', description: 'Partnered with Silicon Valley Community Foundation', date: '2024-01-05' }
+          ]);
+        }
+
+        // Fetch real impact stories if the table exists
+        try {
+          const { data: storiesData, error: storiesError } = await supabase
+            .from('impact_stories')
+            .select('*')
+            .eq('funder_id', funderId)
+            .order('created_at', { ascending: false })
+            .limit(4);
+          
+          if (storiesData && !storiesError) {
+            setImpactStories(storiesData.map(story => ({
+              id: story.id,
+              title: story.title,
+              nonprofit: story.nonprofit_name,
+              amount: story.grant_amount,
+              impact: story.impact_metrics,
+              image: story.image_url
+            })));
+          } else {
+            // Fallback to mock data
+            setImpactStories([
+              {
+                id: 1,
+                title: 'Transforming Youth Education in Oakland',
+                nonprofit: 'Oakland Youth Center',
+                amount: '$75,000',
+                impact: 'Served 500+ at-risk youth with after-school programs',
+                image: 'https://images.unsplash.com/photo-1544717297-fa95b6ee9643?w=400'
+              },
+              {
+                id: 2,
+                title: 'Clean Water Access Project',
+                nonprofit: 'East Bay Environmental Alliance',
+                amount: '$100,000',
+                impact: 'Provided clean water access to 1,200 families',
+                image: 'https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=400'
+              }
+            ]);
+          }
+        } catch (storiesError) {
+          console.warn("Impact stories table not available, using mock data");
+          setImpactStories([
+            {
+              id: 1,
+              title: 'Transforming Youth Education in Oakland',
+              nonprofit: 'Oakland Youth Center',
+              amount: '$75,000',
+              impact: 'Served 500+ at-risk youth with after-school programs',
+              image: 'https://images.unsplash.com/photo-1544717297-fa95b6ee9643?w=400'
+            },
+            {
+              id: 2,
+              title: 'Clean Water Access Project',
+              nonprofit: 'East Bay Environmental Alliance',
+              amount: '$100,000',
+              impact: 'Provided clean water access to 1,200 families',
+              image: 'https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=400'
+            }
+          ]);
+        }
+
         try {
           const { data: membersData, error: membersError } = await supabase.rpc('get_organization_members', {
               organization_id_param: funderId,
@@ -224,35 +288,9 @@ const FunderProfilePage = () => {
           setTeamMembers([]);
         }
         
-        setFollowersCount(Math.floor(Math.random() * 500) + 100);
-        setLikesCount(Math.floor(Math.random() * 200) + 50);
         setStarRating((Math.random() * 1.5 + 3.5).toFixed(1));
         
-        setRecentActivities([
-          { id: 1, type: 'grant_awarded', description: 'Awarded $50,000 to Bay Area Food Bank', date: '2024-01-15', amount: '$50,000' },
-          { id: 2, type: 'new_program', description: 'Launched Environmental Justice Initiative', date: '2024-01-10' },
-          { id: 3, type: 'partnership', description: 'Partnered with Silicon Valley Community Foundation', date: '2024-01-05' }
-        ]);
-
-        setImpactStories([
-          {
-            id: 1,
-            title: 'Transforming Youth Education in Oakland',
-            nonprofit: 'Oakland Youth Center',
-            amount: '$75,000',
-            impact: 'Served 500+ at-risk youth with after-school programs',
-            image: 'https://images.unsplash.com/photo-1544717297-fa95b6ee9643?w=400'
-          },
-          {
-            id: 2,
-            title: 'Clean Water Access Project',
-            nonprofit: 'East Bay Environmental Alliance',
-            amount: '$100,000',
-            impact: 'Provided clean water access to 1,200 families',
-            image: 'https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=400'
-          }
-        ]);
-
+        // Mock organization posts (you can replace this with real posts later)
         setOrganizationPosts([
           {
             id: 1,
@@ -289,7 +327,9 @@ const FunderProfilePage = () => {
             location: "Oakland, CA",
             focusAreas: ["Food Security", "Community Health"],
             budget: "$2.5M - $5M",
-            imageUrl: "https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?w=400"
+            imageUrl: "https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?w=400",
+            grantAmount: "$50,000",
+            grantYear: "2023"
           },
           {
             id: 2,
@@ -298,7 +338,9 @@ const FunderProfilePage = () => {
             location: "Oakland, CA", 
             focusAreas: ["Youth Development", "Education"],
             budget: "$500K - $1M",
-            imageUrl: "https://images.unsplash.com/photo-1544717297-fa95b6ee9643?w=400"
+            imageUrl: "https://images.unsplash.com/photo-1544717297-fa95b6ee9643?w=400",
+            grantAmount: "$75,000",
+            grantYear: "2023"
           },
           {
             id: 3,
@@ -307,7 +349,9 @@ const FunderProfilePage = () => {
             location: "Berkeley, CA",
             focusAreas: ["Environment", "Sustainability"],
             budget: "$1M - $2M", 
-            imageUrl: "https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=400"
+            imageUrl: "https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=400",
+            grantAmount: "$100,000",
+            grantYear: "2023"
           }
         ]);
 
@@ -340,7 +384,7 @@ const FunderProfilePage = () => {
     if (funder) document.title = `1RFP - ${funder.name}`;
   }, [funder]);
 
-  // NEW: Kudos carousel component - moved after state declarations
+  // Kudos carousel component
   const renderKudosCarousel = () => {
     const handleAddKudos = () => {
       if (newKudos.trim()) {
@@ -348,9 +392,9 @@ const FunderProfilePage = () => {
           id: Date.now(),
           text: newKudos,
           author: {
-            name: "You", // In real app, would use session user data
+            name: session?.user?.user_metadata?.full_name || "Anonymous User",
             organization: "Your Organization",
-            avatar: null
+            avatar: session?.user?.user_metadata?.avatar_url || null
           },
           createdAt: new Date().toISOString()
         };
@@ -359,7 +403,6 @@ const FunderProfilePage = () => {
       }
     };
 
-    // Limit to 20 kudos and reverse order (newest first)
     const displayKudos = kudos.slice(0, 20);
 
     return (
@@ -373,24 +416,39 @@ const FunderProfilePage = () => {
         </div>
 
         {/* Add Kudos Form */}
-        <div className="bg-blue-50 rounded-xl p-6 border border-blue-100">
-          <h4 className="font-semibold text-slate-800 mb-3">Share your experience working with {funder.name}</h4>
-          <div className="space-y-3">
-            <textarea
-              value={newKudos}
-              onChange={(e) => setNewKudos(e.target.value)}
-              placeholder="Write about your experience, partnership, or the impact of their support..."
-              className="w-full p-4 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-h-[100px]"
-            />
-            <button
-              onClick={handleAddKudos}
-              disabled={!newKudos.trim()}
-              className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors"
-            >
-              Add Kudos
-            </button>
+        {session && (
+          <div className="bg-blue-50 rounded-xl p-6 border border-blue-100">
+            <h4 className="font-semibold text-slate-800 mb-3">Share your experience working with {funder.name}</h4>
+            <div className="space-y-3">
+              <textarea
+                value={newKudos}
+                onChange={(e) => setNewKudos(e.target.value)}
+                placeholder="Write about your experience, partnership, or the impact of their support..."
+                className="w-full p-4 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-h-[100px]"
+              />
+              <button
+                onClick={handleAddKudos}
+                disabled={!newKudos.trim()}
+                className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors"
+              >
+                Add Kudos
+              </button>
+            </div>
           </div>
-        </div>
+        )}
+
+        {/* Login prompt for non-authenticated users */}
+        {!session && (
+          <div className="bg-slate-50 rounded-xl p-6 border border-slate-200 text-center">
+            <p className="text-slate-600 mb-3">Want to share your experience with {funder.name}?</p>
+            <Link 
+              to="/login" 
+              className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              Log in to add kudos
+            </Link>
+          </div>
+        )}
 
         {/* Kudos Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -402,153 +460,78 @@ const FunderProfilePage = () => {
                 <div className="flex-1">
                   <h5 className="font-bold text-slate-800">{kudo.author.name}</h5>
                   <p className="text-sm text-blue-600">{kudo.author.organization}</p>
+                  <p className="text-xs text-slate-500">{formatDate(kudo.createdAt)}</p>
                 </div>
               </div>
             </div>
           ))}
         </div>
+
+        {kudos.length === 0 && (
+          <div className="text-center py-12 text-slate-500">
+            <Star className="w-16 h-16 mx-auto text-slate-300 mb-4" />
+            <h3 className="text-lg font-medium text-slate-900 mb-2">No kudos yet</h3>
+            <p className="text-slate-600">Be the first to share your experience with {funder.name}!</p>
+          </div>
+        )}
       </div>
     );
   };
 
-  const renderHeroSection = () => (
-    <div className="relative overflow-hidden bg-gradient-to-br from-rose-50 via-orange-50 to-yellow-50">
-      <div className="relative container mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="flex flex-col lg:flex-row items-start gap-8">
-          <div className="flex-1">
-            <div className="flex items-center gap-6 mb-6">
-              <div className="relative">
-                {funder.logo_url ? (
-                  <img 
-                    src={funder.logo_url} 
-                    alt={`${funder.name} logo`} 
-                    className="h-24 w-24 lg:h-32 lg:w-32 rounded-2xl object-contain bg-white/10 backdrop-blur border border-white/20 p-3" 
-                  />
-                ) : (
-                  <div className="h-24 w-24 lg:h-32 lg:w-32 rounded-2xl bg-slate-100 border border-slate-300 flex items-center justify-center font-bold text-3xl lg:text-4xl text-slate-600">
-                    {funder.name?.charAt(0)}
-                  </div>
-                )}
-                <div className="absolute -bottom-2 -right-2 bg-green-500 rounded-full p-2">
-                  <Star size={16} className="text-white" />
-                </div>
-              </div>
-              
-              <div className="flex-1">
-                <h1 className="text-3xl lg:text-4xl font-bold mb-2 text-slate-800">{funder.name}</h1>
-                {funder.funder_type?.name && (
-                  <div className="flex items-center gap-3 mb-4">
-                    <span className="px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-sm font-medium border border-emerald-200">
-                      {funder.funder_type.name}
-                    </span>
-                    {funder.location && (
-                      <div className="flex items-center gap-3">
-                        <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-medium border border-blue-200 flex items-center gap-1">
-                          <MapPin size={12} />
-                          {funder.location}
-                        </span>
-                        <a 
-                          href={funder.website} 
-                          target="_blank" 
-                          rel="noopener noreferrer" 
-                          className="inline-flex items-center justify-center px-4 py-2 bg-emerald-600 text-white font-medium rounded-lg hover:bg-emerald-700 transition-colors shadow-sm text-sm"
-                        >
-                          <Globe size={14} className="mr-1" />
-                          Visit Website
-                        </a>
-                      </div>
-                    )}
-                  </div>
-                )}
-                
-                <div className="flex items-center gap-6 text-slate-600 mb-4">
-                  <div className="flex items-center gap-2">
-                    <Eye size={14} className="text-blue-600" />
-                    <span>{followersCount} followers</span>
-                    <button 
-                      onClick={handleFollow}
-                      className={`ml-2 px-3 py-1 rounded-md text-xs font-medium transition-colors ${
-                        isFollowing 
-                          ? 'bg-slate-200 text-slate-700 hover:bg-slate-300' 
-                          : 'bg-blue-600 text-white hover:bg-blue-700'
-                      }`}
-                    >
-                      {isFollowing ? '✓ Following' : '+ Follow'}
-                    </button>
-                  </div>
-                  <span className="text-slate-400">•</span>
-                  <div className="flex items-center gap-2">
-                    <Heart size={14} className={`text-red-600 ${isLiked ? 'fill-current' : ''}`} />
-                    <span>{likesCount} likes</span>
-                    <button
-                      onClick={handleLike}
-                      className={`ml-2 px-3 py-1 rounded-md text-xs font-medium transition-colors ${
-                        isLiked 
-                          ? 'bg-red-100 text-red-700 hover:bg-red-200' 
-                          : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
-                      }`}
-                    >
-                      {isLiked ? '❤️ Liked' : '👍 Like'}
-                    </button>
-                  </div>
-                </div>
+  // Organization Posts component with real like functionality
+  const PostCard = ({ post }) => {
+    const {
+      isLiked: postIsLiked,
+      likesCount: postLikesCount,
+      toggleLike: togglePostLike
+    } = usePostLike(post.id, session?.user?.id);
 
-                {/* Focus Areas Pills */}
-                {funder.focus_areas && funder.focus_areas.length > 0 && (
-                  <div className="flex flex-wrap gap-2">
-                    {funder.focus_areas.slice(0, 4).map(area => (
-                      <span key={area} className={`text-xs font-medium px-3 py-1.5 rounded-full ${getPillClasses(area)}`}>
-                        {area}
-                      </span>
-                    ))}
-                    {funder.focus_areas.length > 4 && (
-                      <span className="text-xs font-medium px-3 py-1.5 rounded-full bg-slate-100 text-slate-600">
-                        +{funder.focus_areas.length - 4} more
-                      </span>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
+    const handlePostLike = async () => {
+      if (!session) {
+        alert('Please log in to like posts');
+        return;
+      }
+      await togglePostLike();
+    };
+
+    return (
+      <div className="bg-white rounded-xl border border-slate-200 p-6 hover:shadow-lg transition-shadow">
+        <div className="flex items-start gap-4 mb-4">
+          <Avatar src={funder.logo_url} fullName={funder.name} size="md" />
+          <div className="flex-1">
+            <h4 className="font-bold text-slate-800">{funder.name}</h4>
+            <p className="text-sm text-slate-500">{formatDate(post.timestamp)}</p>
           </div>
         </div>
+        
+        <p className="text-slate-700 mb-4 leading-relaxed">{post.content}</p>
+        
+        {post.image && (
+          <div className="mb-4 rounded-lg overflow-hidden">
+            <img src={post.image} alt="Post image" className="w-full h-64 object-cover" />
+          </div>
+        )}
+        
+        <div className="flex items-center gap-6 pt-4 border-t border-slate-100">
+          <button 
+            onClick={handlePostLike}
+            className={`flex items-center gap-2 transition-colors ${
+              postIsLiked 
+                ? 'text-red-500 hover:text-red-600' 
+                : 'text-slate-500 hover:text-red-500'
+            }`}
+          >
+            <Heart size={16} className={postIsLiked ? 'fill-current' : ''} />
+            <span className="text-sm">{postLikesCount} likes</span>
+          </button>
+          <button className="flex items-center gap-2 text-slate-500 hover:text-blue-500 transition-colors">
+            <MessageSquare size={16} />
+            <span className="text-sm">{post.comments} comments</span>
+          </button>
+        </div>
       </div>
-    </div>
-  );
-
-  const renderTabNavigation = () => (
-    <div className="sticky top-0 bg-white border-b border-slate-200 z-30">
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-        <nav className="flex space-x-8 overflow-x-auto">
-          {[
-            { id: 'home', label: 'Home', icon: Globe },
-            { id: 'overview', label: 'Overview', icon: Building },
-            { id: 'grants', label: 'Active Grants', icon: ClipboardList },
-            { id: 'grantees', label: 'Our Grantees', icon: Users },
-            { id: 'kudos', label: 'Community Kudos', icon: Star },
-            { id: 'impact', label: 'Impact Stories', icon: TrendingUp },
-            { id: 'team', label: 'Team', icon: Users }
-          ].map((tab) => {
-            const Icon = tab.icon;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 py-4 px-2 border-b-2 font-medium text-sm transition-colors ${
-                  activeTab === tab.id
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-slate-500 hover:text-slate-700'
-                }`}
-              >
-                <Icon size={16} />
-                {tab.label}
-              </button>
-            );
-          })}
-        </nav>
-      </div>
-    </div>
-  );
+    );
+  };
 
   const renderOrganizationPosts = () => (
     <div className="space-y-6">
@@ -558,34 +541,7 @@ const FunderProfilePage = () => {
       </h3>
       
       {organizationPosts.map((post) => (
-        <div key={post.id} className="bg-white rounded-xl border border-slate-200 p-6 hover:shadow-lg transition-shadow">
-          <div className="flex items-start gap-4 mb-4">
-            <Avatar src={funder.logo_url} fullName={funder.name} size="md" />
-            <div className="flex-1">
-              <h4 className="font-bold text-slate-800">{funder.name}</h4>
-              <p className="text-sm text-slate-500">{formatDate(post.timestamp)}</p>
-            </div>
-          </div>
-          
-          <p className="text-slate-700 mb-4 leading-relaxed">{post.content}</p>
-          
-          {post.image && (
-            <div className="mb-4 rounded-lg overflow-hidden">
-              <img src={post.image} alt="Post image" className="w-full h-64 object-cover" />
-            </div>
-          )}
-          
-          <div className="flex items-center gap-6 pt-4 border-t border-slate-100">
-            <button className="flex items-center gap-2 text-slate-500 hover:text-red-500 transition-colors">
-              <Heart size={16} />
-              <span className="text-sm">{post.likes} likes</span>
-            </button>
-            <button className="flex items-center gap-2 text-slate-500 hover:text-blue-500 transition-colors">
-              <MessageSquare size={16} />
-              <span className="text-sm">{post.comments} comments</span>
-            </button>
-          </div>
-        </div>
+        <PostCard key={post.id} post={post} />
       ))}
     </div>
   );
@@ -855,6 +811,147 @@ const FunderProfilePage = () => {
     );
   };
 
+  const renderHeroSection = () => (
+    <div className="relative overflow-hidden bg-gradient-to-br from-rose-50 via-orange-50 to-yellow-50">
+      <div className="relative container mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <div className="flex flex-col lg:flex-row items-start gap-8">
+          <div className="flex-1">
+            <div className="flex items-center gap-6 mb-6">
+              <div className="relative">
+                {funder.logo_url ? (
+                  <img 
+                    src={funder.logo_url} 
+                    alt={`${funder.name} logo`} 
+                    className="h-24 w-24 lg:h-32 lg:w-32 rounded-2xl object-contain bg-white/10 backdrop-blur border border-white/20 p-3" 
+                  />
+                ) : (
+                  <div className="h-24 w-24 lg:h-32 lg:w-32 rounded-2xl bg-slate-100 border border-slate-300 flex items-center justify-center font-bold text-3xl lg:text-4xl text-slate-600">
+                    {funder.name?.charAt(0)}
+                  </div>
+                )}
+                <div className="absolute -bottom-2 -right-2 bg-green-500 rounded-full p-2">
+                  <Star size={16} className="text-white" />
+                </div>
+              </div>
+              
+              <div className="flex-1">
+                <h1 className="text-3xl lg:text-4xl font-bold mb-2 text-slate-800">{funder.name}</h1>
+                {funder.funder_type?.name && (
+                  <div className="flex items-center gap-3 mb-4">
+                    <span className="px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-sm font-medium border border-emerald-200">
+                      {funder.funder_type.name}
+                    </span>
+                    {funder.location && (
+                      <div className="flex items-center gap-3">
+                        <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-medium border border-blue-200 flex items-center gap-1">
+                          <MapPin size={12} />
+                          {funder.location}
+                        </span>
+                        <a 
+                          href={funder.website} 
+                          target="_blank" 
+                          rel="noopener noreferrer" 
+                          className="inline-flex items-center justify-center px-4 py-2 bg-emerald-600 text-white font-medium rounded-lg hover:bg-emerald-700 transition-colors shadow-sm text-sm"
+                        >
+                          <Globe size={14} className="mr-1" />
+                          Visit Website
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                )}
+                
+                <div className="flex items-center gap-6 text-slate-600 mb-4">
+                  <div className="flex items-center gap-2">
+                    <Eye size={14} className="text-blue-600" />
+                    <span>{followLoading ? '...' : followersCount} followers</span>
+                    <button 
+                      onClick={handleFollow}
+                      disabled={followLoading}
+                      className={`ml-2 px-3 py-1 rounded-md text-xs font-medium transition-colors disabled:opacity-50 ${
+                        isFollowing 
+                          ? 'bg-slate-200 text-slate-700 hover:bg-slate-300' 
+                          : 'bg-blue-600 text-white hover:bg-blue-700'
+                      }`}
+                    >
+                      {followLoading ? '...' : (isFollowing ? '✓ Following' : '+ Follow')}
+                    </button>
+                  </div>
+                  <span className="text-slate-400">•</span>
+                  <div className="flex items-center gap-2">
+                    <Heart size={14} className={`text-red-600 ${isLiked ? 'fill-current' : ''}`} />
+                    <span>{likeLoading ? '...' : likesCount} likes</span>
+                    <button
+                      onClick={handleLike}
+                      disabled={likeLoading}
+                      className={`ml-2 px-3 py-1 rounded-md text-xs font-medium transition-colors disabled:opacity-50 ${
+                        isLiked 
+                          ? 'bg-red-100 text-red-700 hover:bg-red-200' 
+                          : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+                      }`}
+                    >
+                      {likeLoading ? '...' : (isLiked ? '❤️ Liked' : '👍 Like')}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Focus Areas Pills */}
+                {funder.focus_areas && funder.focus_areas.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {funder.focus_areas.slice(0, 4).map(area => (
+                      <span key={area} className={`text-xs font-medium px-3 py-1.5 rounded-full ${getPillClasses(area)}`}>
+                        {area}
+                      </span>
+                    ))}
+                    {funder.focus_areas.length > 4 && (
+                      <span className="text-xs font-medium px-3 py-1.5 rounded-full bg-slate-100 text-slate-600">
+                        +{funder.focus_areas.length - 4} more
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderTabNavigation = () => (
+    <div className="sticky top-0 bg-white border-b border-slate-200 z-30">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+        <nav className="flex space-x-8 overflow-x-auto">
+          {[
+            { id: 'home', label: 'Home', icon: Globe },
+            { id: 'overview', label: 'Overview', icon: Building },
+            { id: 'grants', label: 'Active Grants', icon: ClipboardList },
+            { id: 'grantees', label: 'Our Grantees', icon: Users },
+            { id: 'kudos', label: 'Community Kudos', icon: Star },
+            { id: 'impact', label: 'Impact Stories', icon: TrendingUp },
+            { id: 'team', label: 'Team', icon: Users }
+          ].map((tab) => {
+            const Icon = tab.icon;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex items-center gap-2 py-4 px-2 border-b-2 font-medium text-sm transition-colors ${
+                  activeTab === tab.id
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                <Icon size={16} />
+                {tab.label}
+              </button>
+            );
+          })}
+        </nav>
+      </div>
+    </div>
+  );
+
   if (loading) return ( 
     <div className="text-center py-20">
       <Loader size={40} className="mx-auto text-green-400 mb-3 animate-spin" />
@@ -879,7 +976,7 @@ const FunderProfilePage = () => {
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto">
           <div className="min-h-screen py-8">
-            {/* Home Tab - Social Feed only (kudos moved to separate tab) */}
+            {/* Home Tab - Social Feed */}
             {activeTab === 'home' && (
               <div className="max-w-6xl mx-auto">
                 {renderOrganizationPosts()}
@@ -1068,7 +1165,7 @@ const FunderProfilePage = () => {
               </div>
             )}
 
-            {/* NEW: Dedicated Kudos Tab */}
+            {/* Kudos Tab */}
             {activeTab === 'kudos' && (
               <div className="max-w-6xl mx-auto">
                 {renderKudosCarousel()}

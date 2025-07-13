@@ -79,7 +79,7 @@ const TrendingNews = ({ userRole }) => {
     }
   };
   
-  const newsTitle = userRole === 'Funder' ? 'Philanthropy News' : 'Nonprofit News';
+  const newsTitle = 'Trending Community News';
 
   if (loading) {
     return (

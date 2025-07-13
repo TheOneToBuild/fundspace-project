@@ -208,8 +208,8 @@ const PublicHeader = () => {
 
 // --- Main App Layout (conditionally renders header) ---
 const AppLayout = () => {
-    const { session, profile, notifications, unreadCount, markNotificationsAsRead } = useOutletContext();
-    const outletContext = { session, profile, notifications, unreadCount, markNotificationsAsRead };
+    const { session, profile, notifications, unreadCount, markNotificationsAsRead, refreshProfile } = useOutletContext();
+    const outletContext = { session, profile, notifications, unreadCount, markNotificationsAsRead, refreshProfile };
     
     const [pageBgColor, setPageBgColor] = useState('bg-white');
 
@@ -263,6 +263,26 @@ export default function App() {
     setLoading(false);
   };
 
+  // Add refreshProfile function
+  const refreshProfile = async () => {
+    if (session?.user?.id) {
+      try {
+        const { data: freshProfile, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', session.user.id)
+          .single();
+        
+        if (!error && freshProfile) {
+          setProfile(freshProfile);
+          console.log('Profile refreshed:', freshProfile.profile_view_privacy);
+        }
+      } catch (err) {
+        console.error('Error refreshing profile:', err);
+      }
+    }
+  };
+
   useEffect(() => {
     const getInitialSession = async () => {
       setLoading(true);
@@ -309,7 +329,8 @@ export default function App() {
     }
   };
 
-  const outletContext = { session, profile, loading, notifications, unreadCount, markNotificationsAsRead };
+  // Updated outlet context to include refreshProfile
+  const outletContext = { session, profile, loading, notifications, unreadCount, markNotificationsAsRead, refreshProfile };
 
   return (
     <BrowserRouter>

@@ -1,4 +1,4 @@
-// src/ProfilePage.jsx - SOCIAL COMMUNITY HUB VERSION
+// src/ProfilePage.jsx - SOCIAL COMMUNITY HUB VERSION WITH APP CONTEXT FIX
 import React, { useState, useEffect, useCallback, useContext, useMemo } from 'react';
 import { supabase } from './supabaseClient';
 import { useNavigate, Outlet, useOutletContext } from 'react-router-dom';
@@ -7,7 +7,10 @@ import GrantDetailModal from './GrantDetailModal.jsx';
 import { LayoutContext } from './App.jsx';
 
 export default function ProfilePage() {
-    const { session, profile, loading, notifications, unreadCount, markNotificationsAsRead } = useOutletContext();
+    // FIXED: Get the full context from App.jsx
+    const appContext = useOutletContext();
+    const { session, profile, loading, notifications, unreadCount, markNotificationsAsRead, refreshProfile } = appContext;
+    
     const navigate = useNavigate();
     const { setPageBgColor } = useContext(LayoutContext);
 
@@ -402,9 +405,12 @@ export default function ProfilePage() {
         }
     }, [session, fetchPageData]);
 
-    // Enhanced outlet context for social features
+    // FIXED: Enhanced outlet context that merges App context with ProfilePage context
     const outletContext = useMemo(() => ({
-        // Existing context
+        // IMPORTANT: Include ALL the original App.jsx context
+        ...appContext,
+        
+        // ProfilePage-specific context (these may override some App context)
         profile,
         posts,
         handleNewPost,
@@ -432,6 +438,7 @@ export default function ProfilePage() {
             totalFollowing
         }
     }), [
+        appContext, // Include the full App context
         profile, posts, handleNewPost, handleDeletePost, savedGrants, session, 
         handleSaveGrant, handleUnsaveGrant, openDetail, activeTab, handleTabChange,
         impactMetrics, stories, handleStoryClick, handleCreateStory, communityMembers,
