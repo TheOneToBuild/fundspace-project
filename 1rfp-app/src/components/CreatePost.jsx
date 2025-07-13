@@ -1,11 +1,16 @@
-// src/components/CreatePost.jsx
+// Updated CreatePost.jsx with support for custom onNewPost handler and placeholder
 import React, { useState, useRef, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { Camera, X, Smile, Link2 } from 'lucide-react';
 import Avatar from './Avatar.jsx';
 import urlDetectionUtils from '../utils/urlDetection.js';
 
-export default function CreatePost({ profile, onNewPost, channel = 'hello-world' }) {
+export default function CreatePost({ 
+  profile, 
+  onNewPost, 
+  channel = 'hello-world',
+  placeholder = null // NEW: Custom placeholder support
+}) {
     const [postText, setPostText] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
@@ -79,7 +84,6 @@ export default function CreatePost({ profile, onNewPost, channel = 'hello-world'
             debouncedFetchPreview(urls[0]);
         }
     }, [postText]);
-
 
     const getRandomTagColor = () => {
         const colors = [
@@ -262,6 +266,7 @@ export default function CreatePost({ profile, onNewPost, channel = 'hello-world'
         return Promise.all(uploadPromises);
     };
 
+    // UPDATED: Handle post submission with support for custom onNewPost handler
     const handlePostSubmit = async () => {
         if ((!postText.trim() && selectedImages.length === 0) || !profile) return;
 
@@ -283,36 +288,57 @@ export default function CreatePost({ profile, onNewPost, channel = 'hello-world'
                 imageUrls = await uploadImages(selectedImages);
             }
 
-            const { data: newPost, error: postError } = await supabase
-                .from('posts')
-                .insert({
-                    content: postText.trim() || '',
-                    user_id: user.id,
-                    profile_id: profile.id,
-                    image_urls: imageUrls.length > 0 ? imageUrls : null,
-                    image_url: imageUrls.length === 1 ? imageUrls[0] : null,
-                    tags: selectedTags.length > 0 ? JSON.stringify(selectedTags) : null,
-                    channel: channel,  // Include the channel
-                    link_url: linkPreview ? linkPreview.url : null,
-                })
-                .select()
-                .single();
+            // Prepare post data
+            const postData = {
+                content: postText.trim() || '',
+                user_id: user.id,
+                profile_id: profile.id,
+                image_urls: imageUrls.length > 0 ? imageUrls : null,
+                image_url: imageUrls.length === 1 ? imageUrls[0] : null,
+                tags: selectedTags.length > 0 ? JSON.stringify(selectedTags) : null,
+                channel: channel,
+                link_url: linkPreview ? linkPreview.url : null,
+            };
 
-            if (postError) {
-                setError('Failed to create post. Please try again.');
-                console.error('Post creation error:', postError);
-                return;
-            }
+            // NEW: Check if we have a custom onNewPost handler (for organization posts)
+            if (onNewPost && typeof onNewPost === 'function' && channel === 'organization') {
+                // For organization posts, we need to add organization-specific fields
+                // Let the parent component handle the database insertion
+                const result = await onNewPost(postData);
+                
+                if (result) {
+                    // Clear form on success
+                    selectedImages.forEach(img => URL.revokeObjectURL(img.preview));
+                    setPostText('');
+                    setSelectedImages([]);
+                    setSelectedTags([]);
+                    setLinkPreview(null);
+                }
+            } else {
+                // Default behavior for regular posts
+                const { data: newPost, error: postError } = await supabase
+                    .from('posts')
+                    .insert(postData)
+                    .select()
+                    .single();
 
-            selectedImages.forEach(img => URL.revokeObjectURL(img.preview));
-            
-            setPostText('');
-            setSelectedImages([]);
-            setSelectedTags([]);
-            setLinkPreview(null);
-            
-            if (onNewPost) {
-                onNewPost(newPost);
+                if (postError) {
+                    setError('Failed to create post. Please try again.');
+                    console.error('Post creation error:', postError);
+                    return;
+                }
+
+                selectedImages.forEach(img => URL.revokeObjectURL(img.preview));
+                
+                setPostText('');
+                setSelectedImages([]);
+                setSelectedTags([]);
+                setLinkPreview(null);
+                
+                // Call the onNewPost callback if provided
+                if (onNewPost && typeof onNewPost === 'function') {
+                    onNewPost(newPost);
+                }
             }
 
         } catch (error) {
@@ -366,6 +392,12 @@ export default function CreatePost({ profile, onNewPost, channel = 'hello-world'
 
     const mosaicLayout = getRandomMosaicLayout(selectedImages.length);
 
+    // NEW: Dynamic placeholder based on props or default
+    const getPlaceholder = () => {
+        if (placeholder) return placeholder;
+        return `What's on your mind, ${profile?.full_name?.split(' ')[0] || 'there'}?`;
+    };
+
     return (
         <div 
             ref={containerRef}
@@ -380,7 +412,7 @@ export default function CreatePost({ profile, onNewPost, channel = 'hello-world'
                         <textarea
                             value={postText}
                             onChange={(e) => setPostText(e.target.value)}
-                            placeholder={`What's on your mind, ${profile?.full_name?.split(' ')[0] || 'there'}?`}
+                            placeholder={getPlaceholder()}
                             className="w-full p-3 pr-12 border border-slate-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                             rows="3"
                             disabled={isLoading}

@@ -1,14 +1,15 @@
-// Updated MyOrganizationPage.jsx with Social Metrics Integration
+// Complete MyOrganizationPage.jsx with Organization Posts Integration
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useOutletContext, Link } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
-import { Users, Shield, MapPin, Globe, Building2, Edit, AlertTriangle, LogOut, Search, Crown, UserPlus, UserMinus, Settings, Star } from 'lucide-react';
+import { Users, Shield, MapPin, Globe, Building2, Edit, AlertTriangle, LogOut, Search, Crown, UserPlus, UserMinus, Settings, Star, MessageSquare } from 'lucide-react';
 import Avatar from './Avatar.jsx';
 import EnhancedOrganizationSetupPage from './OrganizationSetupPage.jsx';
 import OmegaAdminOrgSelector from './OmegaAdminOrgSelector.jsx';
 import AdminManagementModal from './AdminManagementModal.jsx';
-import SocialMetricsCard from './SocialMetricsCard.jsx'; // Import our social metrics component
-// Import our new permission utilities
+import SocialMetricsCard from './SocialMetricsCard.jsx';
+import OrganizationPosts from './OrganizationPosts.jsx'; // NEW: Import OrganizationPosts component
+// Import our permission utilities
 import { hasPermission, PERMISSIONS, ROLES, getRoleDisplayName, getRoleBadgeColor, canManageUser } from '../utils/permissions.js';
 
 export default function MyOrganizationPage() {
@@ -29,6 +30,9 @@ export default function MyOrganizationPage() {
     const [selectedMember, setSelectedMember] = useState(null);
     const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
     const [modalAction, setModalAction] = useState(null);
+
+    // NEW: Tab state for managing different sections
+    const [activeTab, setActiveTab] = useState('overview');
 
     // Check if user is Omega Admin
     const isOmegaAdmin = profile?.is_omega_admin === true;
@@ -192,8 +196,8 @@ export default function MyOrganizationPage() {
         if (!userMembership) return;
 
         try {
-            setLoading(true); // Show loading state
-            setError(''); // Clear any existing errors
+            setLoading(true);
+            setError('');
 
             console.log('Leaving organization...', {
                 userId: session.user.id,
@@ -227,9 +231,6 @@ export default function MyOrganizationPage() {
             
             // Double-check by calling checkMembership
             await checkMembership();
-            
-            // The component should now automatically show the setup page
-            // since userMembership is null
 
         } catch (err) {
             console.error('Unexpected error leaving organization:', err);
@@ -332,6 +333,13 @@ export default function MyOrganizationPage() {
     // All users can leave (except omega admins who don't join organizations)
     const canLeave = !isOmegaAdmin && userMembership;
 
+    // NEW: Tab configuration
+    const tabs = [
+        { id: 'overview', label: 'Overview', icon: Building2 },
+        { id: 'posts', label: 'Updates', icon: MessageSquare },
+        { id: 'team', label: 'Team', icon: Users }
+    ];
+
     return (
         <div className="space-y-6">
             {error && (
@@ -391,113 +399,152 @@ export default function MyOrganizationPage() {
                         <p className="text-slate-600 leading-relaxed">{organization.description}</p>
                     </div>
                 )}
+
+                {/* NEW: Tab Navigation */}
+                <div className="mt-6 pt-6 border-t border-slate-200">
+                    <nav className="flex space-x-8">
+                        {tabs.map((tab) => {
+                            const Icon = tab.icon;
+                            return (
+                                <button
+                                    key={tab.id}
+                                    onClick={() => setActiveTab(tab.id)}
+                                    className={`flex items-center gap-2 py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
+                                        activeTab === tab.id
+                                            ? 'border-blue-500 text-blue-600'
+                                            : 'border-transparent text-slate-500 hover:text-slate-700'
+                                    }`}
+                                >
+                                    <Icon size={16} />
+                                    {tab.label}
+                                </button>
+                            );
+                        })}
+                    </nav>
+                </div>
             </div>
 
-            {/* Social Metrics Card - NEW ADDITION */}
-            <SocialMetricsCard 
-                organization={organization} 
-                organizationType={userMembership.organization_type}
-                userRole={userRole}
-                isOmegaAdmin={isOmegaAdmin}
-            />
+            {/* Tab Content */}
+            {activeTab === 'overview' && (
+                <>
+                    {/* Social Metrics Card */}
+                    <SocialMetricsCard 
+                        organization={organization} 
+                        organizationType={userMembership.organization_type}
+                        userRole={userRole}
+                        isOmegaAdmin={isOmegaAdmin}
+                    />
+                </>
+            )}
 
-            {/* Team Members section - REMAINS THE SAME */}
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-lg font-semibold text-slate-800">Team Members ({members.length})</h2>
-                    <div className="flex items-center space-x-3">
-                        <div className="relative">
-                            <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" />
-                            <input
-                                type="text"
-                                placeholder="Search members..."
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                className="pl-10 pr-4 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                            />
-                        </div>
-                        <select
-                            value={roleFilter}
-                            onChange={(e) => setRoleFilter(e.target.value)}
-                            className="px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        >
-                            <option value="all">All Roles</option>
-                            <option value={ROLES.SUPER_ADMIN}>Super Admins</option>
-                            <option value={ROLES.ADMIN}>Admins</option>
-                            <option value={ROLES.MEMBER}>Members</option>
-                        </select>
-                    </div>
-                </div>
+            {activeTab === 'posts' && (
+                <OrganizationPosts
+                    organization={organization}
+                    organizationType={userMembership.organization_type}
+                    userRole={userRole}
+                    isOmegaAdmin={isOmegaAdmin}
+                    profile={profile}
+                />
+            )}
 
-                <div className="space-y-3">
-                    {filteredMembers.map((member) => (
-                        <div key={member.profile_id} className="flex items-center justify-between p-4 border border-slate-200 rounded-lg hover:bg-slate-50">
-                            <div className="flex items-center space-x-3">
-                                <Avatar 
-                                    src={member.profiles?.avatar_url} 
-                                    fullName={member.profiles?.full_name} 
-                                    size="md" 
+            {activeTab === 'team' && (
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                    <div className="flex items-center justify-between mb-4">
+                        <h2 className="text-lg font-semibold text-slate-800">Team Members ({members.length})</h2>
+                        <div className="flex items-center space-x-3">
+                            <div className="relative">
+                                <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" />
+                                <input
+                                    type="text"
+                                    placeholder="Search members..."
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    className="pl-10 pr-4 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                 />
-                                <div>
-                                    <div className="flex items-center space-x-2">
-                                        <h3 className="font-medium text-slate-800">{member.profiles?.full_name || 'Unknown User'}</h3>
-                                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getRoleBadgeColor(member.role, member.profiles?.is_omega_admin)}`}>
-                                            {member.role === ROLES.SUPER_ADMIN && <Crown className="w-3 h-3 mr-1" />}
-                                            {member.role === ROLES.ADMIN && <Shield className="w-3 h-3 mr-1" />}
-                                            {member.role === ROLES.MEMBER && <Users className="w-3 h-3 mr-1" />}
-                                            {member.profiles?.is_omega_admin && <Star className="w-3 h-3 mr-1" />}
-                                            {getRoleDisplayName(member.role, member.profiles?.is_omega_admin)}
-                                        </span>
-                                    </div>
-                                    {member.profiles?.title && (
-                                        <p className="text-sm text-slate-500">{member.profiles.title}</p>
-                                    )}
-                                    <p className="text-xs text-slate-400">
-                                        Joined {new Date(member.joined_at).toLocaleDateString()}
-                                    </p>
-                                </div>
                             </div>
+                            <select
+                                value={roleFilter}
+                                onChange={(e) => setRoleFilter(e.target.value)}
+                                className="px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            >
+                                <option value="all">All Roles</option>
+                                <option value={ROLES.SUPER_ADMIN}>Super Admins</option>
+                                <option value={ROLES.ADMIN}>Admins</option>
+                                <option value={ROLES.MEMBER}>Members</option>
+                            </select>
+                        </div>
+                    </div>
 
-                            {/* Member Actions */}
-                            {canManageMembers && member.profile_id !== profile.id && (
-                                <div className="flex items-center space-x-2">
-                                    {member.role === ROLES.MEMBER && canManageAdmins && (
+                    <div className="space-y-3">
+                        {filteredMembers.map((member) => (
+                            <div key={member.profile_id} className="flex items-center justify-between p-4 border border-slate-200 rounded-lg hover:bg-slate-50">
+                                <div className="flex items-center space-x-3">
+                                    <Avatar 
+                                        src={member.profiles?.avatar_url} 
+                                        fullName={member.profiles?.full_name} 
+                                        size="md" 
+                                    />
+                                    <div>
+                                        <div className="flex items-center space-x-2">
+                                            <h3 className="font-medium text-slate-800">{member.profiles?.full_name || 'Unknown User'}</h3>
+                                            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getRoleBadgeColor(member.role, member.profiles?.is_omega_admin)}`}>
+                                                {member.role === ROLES.SUPER_ADMIN && <Crown className="w-3 h-3 mr-1" />}
+                                                {member.role === ROLES.ADMIN && <Shield className="w-3 h-3 mr-1" />}
+                                                {member.role === ROLES.MEMBER && <Users className="w-3 h-3 mr-1" />}
+                                                {member.profiles?.is_omega_admin && <Star className="w-3 h-3 mr-1" />}
+                                                {getRoleDisplayName(member.role, member.profiles?.is_omega_admin)}
+                                            </span>
+                                        </div>
+                                        {member.profiles?.title && (
+                                            <p className="text-sm text-slate-500">{member.profiles.title}</p>
+                                        )}
+                                        <p className="text-xs text-slate-400">
+                                            Joined {new Date(member.joined_at).toLocaleDateString()}
+                                        </p>
+                                    </div>
+                                </div>
+
+                                {/* Member Actions */}
+                                {canManageMembers && member.profile_id !== profile.id && (
+                                    <div className="flex items-center space-x-2">
+                                        {member.role === ROLES.MEMBER && canManageAdmins && (
+                                            <button
+                                                onClick={() => handleMemberAction(member, 'promote')}
+                                                className="text-green-600 hover:text-green-800 p-1 rounded"
+                                                title="Promote to Admin"
+                                            >
+                                                <UserPlus className="w-4 h-4" />
+                                            </button>
+                                        )}
+                                        {(member.role === ROLES.ADMIN || member.role === ROLES.SUPER_ADMIN) && canManageAdmins && (
+                                            <button
+                                                onClick={() => handleMemberAction(member, 'demote')}
+                                                className="text-orange-600 hover:text-orange-800 p-1 rounded"
+                                                title="Demote to Member"
+                                            >
+                                                <UserMinus className="w-4 h-4" />
+                                            </button>
+                                        )}
                                         <button
-                                            onClick={() => handleMemberAction(member, 'promote')}
-                                            className="text-green-600 hover:text-green-800 p-1 rounded"
-                                            title="Promote to Admin"
-                                        >
-                                            <UserPlus className="w-4 h-4" />
-                                        </button>
-                                    )}
-                                    {(member.role === ROLES.ADMIN || member.role === ROLES.SUPER_ADMIN) && canManageAdmins && (
-                                        <button
-                                            onClick={() => handleMemberAction(member, 'demote')}
-                                            className="text-orange-600 hover:text-orange-800 p-1 rounded"
-                                            title="Demote to Member"
+                                            onClick={() => handleMemberAction(member, 'remove')}
+                                            className="text-red-600 hover:text-red-800 p-1 rounded"
+                                            title="Remove from Organization"
                                         >
                                             <UserMinus className="w-4 h-4" />
                                         </button>
-                                    )}
-                                    <button
-                                        onClick={() => handleMemberAction(member, 'remove')}
-                                        className="text-red-600 hover:text-red-800 p-1 rounded"
-                                        title="Remove from Organization"
-                                    >
-                                        <UserMinus className="w-4 h-4" />
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-                    ))}
-                </div>
-
-                {filteredMembers.length === 0 && (
-                    <div className="text-center py-8 text-slate-500">
-                        {searchQuery || roleFilter !== 'all' ? 'No members match your search criteria.' : 'No members found.'}
+                                    </div>
+                                )}
+                            </div>
+                        ))}
                     </div>
-                )}
-            </div>
+
+                    {filteredMembers.length === 0 && (
+                        <div className="text-center py-8 text-slate-500">
+                            {searchQuery || roleFilter !== 'all' ? 'No members match your search criteria.' : 'No members found.'}
+                        </div>
+                    )}
+                </div>
+            )}
 
             {/* UPDATED: Confirmation Modal for Leaving Organization */}
             {isConfirmingLeave && (

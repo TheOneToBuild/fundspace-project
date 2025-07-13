@@ -1,30 +1,24 @@
-// Updated FunderProfilePage.jsx with real social interactions - COMPLETE VERSION
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { supabase } from './supabaseClient.js';
 import { 
-  Loader, ArrowLeft, ArrowRight, ExternalLink, MapPin, DollarSign, IconBriefcase, 
-  MessageSquare, ClipboardList, Users as SimilarIcon, ClipboardCheck, List, Award, 
-  Users, Tag, Lightbulb, Heart, TrendingUp, Calendar, 
-  Eye, Star, Coffee, Globe, Building 
+  Loader, ArrowLeft, ArrowRight, ExternalLink, MapPin, DollarSign, 
+  MessageSquare, ClipboardList, Users, ClipboardCheck, List, Award, 
+  Tag, Lightbulb, Heart, TrendingUp, Calendar, Eye, Star, Globe, Building 
 } from './components/Icons.jsx';
-import { getPillClasses, getGrantTypePillClasses, formatDate, getFunderTypePillClasses } from './utils.js';
+import { getPillClasses, formatDate } from './utils.js';
 import GrantCard from './components/GrantCard.jsx';
 import GrantDetailModal from './GrantDetailModal.jsx';
 import FunderCard from './components/FunderCard.jsx';
 import NonprofitCard from './components/NonprofitCard.jsx';
 import PublicPageLayout from './components/PublicPageLayout.jsx';
 import Avatar from './components/Avatar.jsx';
-
-// Import our new social hooks
 import { useFunderFollow, useFunderBookmark, usePostLike } from './utils/funderSocialHooks.js';
 import { useProfileViewTracking } from './utils/profileViewsHooks.js';
 
 const FunderProfilePage = () => {
   const { funderSlug } = useParams();
   const navigate = useNavigate();
-  
-  // Core data states
   const [funder, setFunder] = useState(null);
   const [allFunders, setAllFunders] = useState([]);
   const [funderGrants, setFunderGrants] = useState([]);
@@ -33,8 +27,6 @@ const FunderProfilePage = () => {
   const [isDetailModalOpen, setIsDetailModal] = useState(false);
   const [selectedGrant, setSelectedGrant] = useState(null);
   const [teamMembers, setTeamMembers] = useState([]);
-  
-  // Social/Interactive states - now managed by hooks
   const [starRating, setStarRating] = useState(4.8);
   const [recentActivities, setRecentActivities] = useState([]);
   const [impactStories, setImpactStories] = useState([]);
@@ -43,10 +35,8 @@ const FunderProfilePage = () => {
   const [kudos, setKudos] = useState([]);
   const [newKudos, setNewKudos] = useState('');
   const [activeTab, setActiveTab] = useState('home');
-
-  // Get session for social features
   const [session, setSession] = useState(null);
-  
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
@@ -59,7 +49,6 @@ const FunderProfilePage = () => {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Use our custom hooks for social features
   const {
     isFollowing,
     followersCount,
@@ -74,36 +63,35 @@ const FunderProfilePage = () => {
     toggleBookmark: toggleLike
   } = useFunderBookmark(funder?.id, session?.user?.id);
 
-  // Track profile views
   const { viewRecorded } = useProfileViewTracking(funder?.id, session?.user?.id);
 
   const openDetail = useCallback((grant) => {
     const fetchFullGrantData = async () => {
-        const { data, error } = await supabase
-            .from('grants')
-            .select(`*, funders(name, logo_url, slug), grant_categories(categories(id, name)), grant_locations(locations(id, name))`)
-            .eq('id', grant.id)
-            .single();
+      const { data, error } = await supabase
+        .from('grants')
+        .select(`*, funders(name, logo_url, slug), grant_categories(categories(id, name)), grant_locations(locations(id, name))`)
+        .eq('id', grant.id)
+        .single();
 
-        if (error) {
-            console.error("Error fetching full grant details:", error);
-            setSelectedGrant(grant);
-        } else {
-            const formattedGrant = {
-                ...data,
-                foundationName: data.funders?.name || 'Unknown Funder', 
-                funderLogoUrl: data.funders?.logo_url || null,
-                funderSlug: data.funders?.slug || null,
-                fundingAmount: data.max_funding_amount || data.funding_amount_text || 'Not specified',
-                dueDate: data.deadline,
-                grantType: data.grant_type,
-                eligibility_criteria: data.eligibility_criteria,
-                categories: data.grant_categories.map(gc => gc.categories),
-                locations: data.grant_locations.map(gl => gl.locations)
-            };
-            setSelectedGrant(formattedGrant);
-        }
-        setIsDetailModal(true);
+      if (error) {
+        console.error("Error fetching full grant details:", error);
+        setSelectedGrant(grant);
+      } else {
+        const formattedGrant = {
+          ...data,
+          foundationName: data.funders?.name || 'Unknown Funder',
+          funderLogoUrl: data.funders?.logo_url || null,
+          funderSlug: data.funders?.slug || null,
+          fundingAmount: data.max_funding_amount || data.funding_amount_text || 'Not specified',
+          dueDate: data.deadline,
+          grantType: data.grant_type,
+          eligibility_criteria: data.eligibility_criteria,
+          categories: data.grant_categories.map(gc => gc.categories),
+          locations: data.grant_locations.map(gl => gl.locations)
+        };
+        setSelectedGrant(formattedGrant);
+      }
+      setIsDetailModal(true);
     };
     fetchFullGrantData();
   }, []);
@@ -113,7 +101,6 @@ const FunderProfilePage = () => {
     setIsDetailModal(false);
   }, []);
 
-  // Social interaction handlers now use real data
   const handleFollow = async () => {
     if (!session) {
       alert('Please log in to follow funders');
@@ -135,53 +122,125 @@ const FunderProfilePage = () => {
       if (!funderSlug) return;
       setLoading(true);
       setError(null);
-      
+
       try {
         const { data: funderIdData, error: funderIdError } = await supabase
-            .from('funders')
-            .select('id')
-            .eq('slug', funderSlug)
-            .single();
+          .from('funders')
+          .select('id')
+          .eq('slug', funderSlug)
+          .single();
 
         if (funderIdError) throw funderIdError;
         const funderId = funderIdData.id;
-        
-        const [funderRes, allFundersRes, grantsRes] = await Promise.all([
-            supabase
-              .from('funders')
-              .select('*, funder_categories(categories(name)), funder_type:funder_type_id(name), funder_funding_locations(locations(id, name))')
-              .eq('id', funderId)
-              .single(),
-            supabase
-              .from('funders')
-              .select('*, funder_categories(categories(name)), funder_type:funder_type_id(name), funder_funding_locations(locations(id, name))'),
-            supabase
-              .from('grants')
-              .select(`*, funders(name, logo_url, slug), grant_categories(categories(id, name)), grant_locations(locations(id, name))`)
-              .eq('funder_id', funderId)
-              .order('deadline', { ascending: true, nullsFirst: false })
+
+        const [funderRes, allFundersRes, grantsRes, orgPostsRes] = await Promise.all([
+          supabase
+            .from('funders')
+            .select('*, funder_categories(categories(name)), funder_type:funder_type_id(name), funder_funding_locations(locations(id, name))')
+            .eq('id', funderId)
+            .single(),
+          supabase
+            .from('funders')
+            .select('*, funder_categories(categories(name)), funder_type:funder_type_id(name), funder_funding_locations(locations(id, name))'),
+          supabase
+            .from('grants')
+            .select(`*, funders(name, logo_url, slug), grant_categories(categories(id, name)), grant_locations(locations(id, name))`)
+            .eq('funder_id', funderId)
+            .order('deadline', { ascending: true, nullsFirst: false }),
+          supabase
+            .from('posts')
+            .select(`
+              *,
+              profiles!posts_profile_id_fkey(
+                id,
+                full_name,
+                avatar_url,
+                role,
+                title,
+                organization_name
+              )
+            `)
+            .eq('organization_id', funderId)
+            .eq('organization_type', 'funder')
+            .eq('channel', 'organization')
+            .order('created_at', { ascending: false })
+            .limit(10)
         ]);
 
         if (funderRes.error) throw funderRes.error;
         if (allFundersRes.error) console.warn("Could not fetch all funders:", allFundersRes.error.message);
         if (grantsRes.error) console.warn("Could not fetch grants for funder:", grantsRes.error.message);
-        
+
         const funderData = funderRes.data;
         if (funderData) {
-            funderData.focus_areas = funderData.funder_categories.map(fc => fc.categories.name);
-            funderData.funding_locations = funderData.funder_funding_locations.map(ffl => ffl.locations.name);
+          funderData.focus_areas = funderData.funder_categories.map(fc => fc.categories.name);
+          funderData.funding_locations = funderData.funder_funding_locations.map(ffl => ffl.locations.name);
         }
         setFunder(funderData);
 
         if (allFundersRes.data) {
-             const formattedAllFunders = allFundersRes.data.map(f => ({ ...f, focus_areas: f.funder_categories.map(fc => fc.categories.name), funding_locations: f.funder_funding_locations.map(ffl => ffl.locations.name) }));
-            setAllFunders(formattedAllFunders);
+          const formattedAllFunders = allFundersRes.data.map(f => ({
+            ...f,
+            focus_areas: f.funder_categories.map(fc => fc.categories.name),
+            funding_locations: f.funder_funding_locations.map(ffl => ffl.locations.name)
+          }));
+          setAllFunders(formattedAllFunders);
         }
-        
-        const formattedGrants = (grantsRes.data || []).map(grant => ({ ...grant, foundationName: grant.funders?.name || funderData.name, funderLogoUrl: grant.funders?.logo_url || funderData.logo_url, funderSlug: grant.funders?.slug || funderData.slug, fundingAmount: grant.max_funding_amount || grant.funding_amount_text || 'Not specified', dueDate: grant.deadline, grantType: grant.grant_type, eligibility_criteria: grant.eligibility_criteria, categories: grant.grant_categories.map(gc => gc.categories), locations: grant.grant_locations.map(gl => gl.locations) }));
+
+        const formattedGrants = (grantsRes.data || []).map(grant => ({
+          ...grant,
+          foundationName: grant.funders?.name || funderData.name,
+          funderLogoUrl: grant.funders?.logo_url || funderData.logo_url,
+          funderSlug: grant.funders?.slug || funderData.slug,
+          fundingAmount: grant.max_funding_amount || grant.funding_amount_text || 'Not specified',
+          dueDate: grant.deadline,
+          grantType: grant.grant_type,
+          eligibility_criteria: grant.eligibility_criteria,
+          categories: grant.grant_categories.map(gc => gc.categories),
+          locations: grant.grant_locations.map(gl => gl.locations)
+        }));
         setFunderGrants(formattedGrants);
 
-        // Fetch real activities if the table exists
+        if (orgPostsRes.data && !orgPostsRes.error) {
+          const postsWithReactions = await Promise.all(
+            orgPostsRes.data.map(async post => {
+              const { data: reactionData } = await supabase
+                .from('post_likes')
+                .select('reaction_type')
+                .eq('post_id', post.id);
+
+              const counts = {};
+              reactionData?.forEach(like => {
+                if (like.reaction_type) {
+                  counts[like.reaction_type] = (counts[like.reaction_type] || 0) + 1;
+                }
+              });
+
+              const reactionSummary = Object.entries(counts).map(([type, count]) => ({ type, count }));
+
+              const { count: likesCount } = await supabase
+                .from('post_likes')
+                .select('*', { count: 'exact', head: true })
+                .eq('post_id', post.id);
+
+              const { count: commentsCount } = await supabase
+                .from('post_comments')
+                .select('*', { count: 'exact', head: true })
+                .eq('post_id', post.id);
+
+              return {
+                ...post,
+                likes_count: likesCount || 0,
+                comments_count: commentsCount || 0,
+                reactions: { summary: reactionSummary, sample: [] }
+              };
+            })
+          );
+          setOrganizationPosts(postsWithReactions);
+        } else {
+          setOrganizationPosts([]);
+        }
+
         try {
           const { data: activitiesData, error: activitiesError } = await supabase
             .from('funder_activities')
@@ -189,7 +248,7 @@ const FunderProfilePage = () => {
             .eq('funder_id', funderId)
             .order('activity_date', { ascending: false })
             .limit(5);
-          
+
           if (activitiesData && !activitiesError) {
             setRecentActivities(activitiesData.map(activity => ({
               id: activity.id,
@@ -199,7 +258,6 @@ const FunderProfilePage = () => {
               amount: activity.amount
             })));
           } else {
-            // Fallback to mock data
             setRecentActivities([
               { id: 1, type: 'grant_awarded', description: 'Awarded $50,000 to Bay Area Food Bank', date: '2024-01-15', amount: '$50,000' },
               { id: 2, type: 'new_program', description: 'Launched Environmental Justice Initiative', date: '2024-01-10' },
@@ -215,7 +273,6 @@ const FunderProfilePage = () => {
           ]);
         }
 
-        // Fetch real impact stories if the table exists
         try {
           const { data: storiesData, error: storiesError } = await supabase
             .from('impact_stories')
@@ -223,7 +280,7 @@ const FunderProfilePage = () => {
             .eq('funder_id', funderId)
             .order('created_at', { ascending: false })
             .limit(4);
-          
+
           if (storiesData && !storiesError) {
             setImpactStories(storiesData.map(story => ({
               id: story.id,
@@ -234,7 +291,6 @@ const FunderProfilePage = () => {
               image: story.image_url
             })));
           } else {
-            // Fallback to mock data
             setImpactStories([
               {
                 id: 1,
@@ -278,8 +334,8 @@ const FunderProfilePage = () => {
 
         try {
           const { data: membersData, error: membersError } = await supabase.rpc('get_organization_members', {
-              organization_id_param: funderId,
-              organization_type_param: 'funder'
+            organization_id_param: funderId,
+            organization_type_param: 'funder'
           });
           if (membersError) console.warn("Could not fetch team members:", membersError.message);
           else setTeamMembers(membersData || []);
@@ -287,37 +343,8 @@ const FunderProfilePage = () => {
           console.warn("Team members function not available:", membersError.message);
           setTeamMembers([]);
         }
-        
+
         setStarRating((Math.random() * 1.5 + 3.5).toFixed(1));
-        
-        // Mock organization posts (you can replace this with real posts later)
-        setOrganizationPosts([
-          {
-            id: 1,
-            content: "Excited to announce our new $2M Climate Action Initiative! We're looking for innovative nonprofits working on environmental justice in the Bay Area. Applications open February 1st.",
-            type: 'announcement',
-            timestamp: '2024-01-20T10:00:00Z',
-            likes: 45,
-            comments: 12,
-            image: 'https://images.unsplash.com/photo-1569163139394-de44cb5b4d32?w=600'
-          },
-          {
-            id: 2,
-            content: "Proud to share that our grantee, Oakland Community Kitchen, just reached their milestone of serving 100,000 meals to families in need! 🎉 This is the kind of impact that drives our mission every day.",
-            type: 'celebration',
-            timestamp: '2024-01-18T14:30:00Z',
-            likes: 67,
-            comments: 8
-          },
-          {
-            id: 3,
-            content: "Reflecting on our grantmaking philosophy: We believe the best solutions come from the communities we serve. That's why 80% of our funding goes directly to community-led organizations with lived experience.",
-            type: 'reflection',
-            timestamp: '2024-01-15T09:15:00Z',
-            likes: 32,
-            comments: 15
-          }
-        ]);
 
         setGrantees([
           {
@@ -335,7 +362,7 @@ const FunderProfilePage = () => {
             id: 2,
             name: "Oakland Youth Center",
             tagline: "Empowering youth through education and mentorship",
-            location: "Oakland, CA", 
+            location: "Oakland, CA",
             focusAreas: ["Youth Development", "Education"],
             budget: "$500K - $1M",
             imageUrl: "https://images.unsplash.com/photo-1544717297-fa95b6ee9643?w=400",
@@ -348,7 +375,7 @@ const FunderProfilePage = () => {
             tagline: "Protecting our environment for future generations",
             location: "Berkeley, CA",
             focusAreas: ["Environment", "Sustainability"],
-            budget: "$1M - $2M", 
+            budget: "$1M - $2M",
             imageUrl: "https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=400",
             grantAmount: "$100,000",
             grantYear: "2023"
@@ -362,20 +389,23 @@ const FunderProfilePage = () => {
         setLoading(false);
       }
     };
-    
+
     fetchFunderData();
   }, [funderSlug]);
-  
+
   const similarFunders = useMemo(() => {
     if (!funder || !allFunders.length) return [];
     return allFunders
       .filter(f => f.id !== funder.id)
-      .map(otherFunder => ({ ...otherFunder, similarityScore: otherFunder.focus_areas.filter(area => funder.focus_areas.includes(area)).length }))
+      .map(otherFunder => ({
+        ...otherFunder,
+        similarityScore: otherFunder.focus_areas.filter(area => funder.focus_areas.includes(area)).length
+      }))
       .filter(f => f.similarityScore > 0)
       .sort((a, b) => b.similarityScore - a.similarityScore)
       .slice(0, 3);
   }, [funder, allFunders]);
-  
+
   const handleSimilarFunderFilterClick = useCallback((key, value) => {
     navigate('/funders', { state: { prefilledFilter: { key, value } } });
   }, [navigate]);
@@ -384,7 +414,6 @@ const FunderProfilePage = () => {
     if (funder) document.title = `1RFP - ${funder.name}`;
   }, [funder]);
 
-  // Kudos carousel component
   const renderKudosCarousel = () => {
     const handleAddKudos = () => {
       if (newKudos.trim()) {
@@ -415,7 +444,6 @@ const FunderProfilePage = () => {
           <span className="text-sm text-slate-500">{kudos.length} kudos</span>
         </div>
 
-        {/* Add Kudos Form */}
         {session && (
           <div className="bg-blue-50 rounded-xl p-6 border border-blue-100">
             <h4 className="font-semibold text-slate-800 mb-3">Share your experience working with {funder.name}</h4>
@@ -437,12 +465,11 @@ const FunderProfilePage = () => {
           </div>
         )}
 
-        {/* Login prompt for non-authenticated users */}
         {!session && (
           <div className="bg-slate-50 rounded-xl p-6 border border-slate-200 text-center">
             <p className="text-slate-600 mb-3">Want to share your experience with {funder.name}?</p>
-            <Link 
-              to="/login" 
+            <Link
+              to="/login"
               className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
             >
               Log in to add kudos
@@ -450,9 +477,8 @@ const FunderProfilePage = () => {
           </div>
         )}
 
-        {/* Kudos Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {displayKudos.map((kudo) => (
+          {displayKudos.map(kudo => (
             <div key={kudo.id} className="bg-white rounded-xl border border-slate-200 p-6 hover:shadow-lg transition-shadow">
               <p className="text-slate-700 leading-relaxed mb-4">{kudo.text}</p>
               <div className="flex items-start gap-4">
@@ -478,7 +504,6 @@ const FunderProfilePage = () => {
     );
   };
 
-  // Organization Posts component with real like functionality
   const PostCard = ({ post }) => {
     const {
       isLiked: postIsLiked,
@@ -494,30 +519,102 @@ const FunderProfilePage = () => {
       await togglePostLike();
     };
 
+    const formatContent = (content) => {
+      if (!content) return '';
+
+      let tags = [];
+      try {
+        if (post.tags) {
+          tags = typeof post.tags === 'string' ? JSON.parse(post.tags) : post.tags;
+        }
+      } catch (e) {
+        console.warn('Error parsing post tags:', e);
+      }
+
+      return (
+        <div>
+          <p className="text-slate-700 mb-4 leading-relaxed">{content}</p>
+          {tags?.length > 0 && (
+            <div className="flex flex-wrap gap-2 mb-4">
+              {tags.map(tag => (
+                <span
+                  key={tag.id}
+                  className={`text-xs font-medium px-2 py-1 rounded-full border ${tag.color || 'bg-slate-100 text-slate-700 border-slate-200'}`}
+                >
+                  #{tag.label}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      );
+    };
+
     return (
       <div className="bg-white rounded-xl border border-slate-200 p-6 hover:shadow-lg transition-shadow">
         <div className="flex items-start gap-4 mb-4">
           <Avatar src={funder.logo_url} fullName={funder.name} size="md" />
           <div className="flex-1">
             <h4 className="font-bold text-slate-800">{funder.name}</h4>
-            <p className="text-sm text-slate-500">{formatDate(post.timestamp)}</p>
+            <p className="text-sm text-slate-500">
+              {formatDate(post.created_at)}
+              {post.profiles?.full_name && (
+                <span className="ml-2">• by {post.profiles.full_name}</span>
+              )}
+            </p>
           </div>
         </div>
-        
-        <p className="text-slate-700 mb-4 leading-relaxed">{post.content}</p>
-        
-        {post.image && (
+
+        {formatContent(post.content)}
+
+        {post.image_urls?.length > 0 && (
           <div className="mb-4 rounded-lg overflow-hidden">
-            <img src={post.image} alt="Post image" className="w-full h-64 object-cover" />
+            {post.image_urls.length === 1 ? (
+              <img src={post.image_urls[0]} alt="Post image" className="w-full h-64 object-cover" />
+            ) : (
+              <div className="grid grid-cols-2 gap-2">
+                {post.image_urls.slice(0, 4).map((url, index) => (
+                  <div key={index} className="relative">
+                    <img src={url} alt={`Post image ${index + 1}`} className="w-full h-32 object-cover" />
+                    {index === 3 && post.image_urls.length > 4 && (
+                      <div className="absolute inset-0 bg-black bg-opacity-60 flex items-center justify-center">
+                        <span className="text-white font-bold">+{post.image_urls.length - 4}</span>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
-        
+
+        {post.image_url && !post.image_urls && (
+          <div className="mb-4 rounded-lg overflow-hidden">
+            <img src={post.image_url} alt="Post image" className="w-full h-64 object-cover" />
+          </div>
+        )}
+
+        {post.link_url && (
+          <div className="mb-4 border rounded-lg overflow-hidden bg-slate-50">
+            <div className="p-3">
+              <a
+                href={post.link_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-600 hover:underline text-sm font-medium"
+              >
+                🔗 {post.link_url}
+              </a>
+            </div>
+          </div>
+        )}
+
         <div className="flex items-center gap-6 pt-4 border-t border-slate-100">
-          <button 
+          <button
             onClick={handlePostLike}
             className={`flex items-center gap-2 transition-colors ${
-              postIsLiked 
-                ? 'text-red-500 hover:text-red-600' 
+              postIsLiked
+                ? 'text-red-500 hover:text-red-600'
                 : 'text-slate-500 hover:text-red-500'
             }`}
           >
@@ -526,7 +623,7 @@ const FunderProfilePage = () => {
           </button>
           <button className="flex items-center gap-2 text-slate-500 hover:text-blue-500 transition-colors">
             <MessageSquare size={16} />
-            <span className="text-sm">{post.comments} comments</span>
+            <span className="text-sm">{post.comments_count || 0} comments</span>
           </button>
         </div>
       </div>
@@ -539,23 +636,90 @@ const FunderProfilePage = () => {
         <MessageSquare className="text-blue-500" />
         Latest Updates
       </h3>
-      
-      {organizationPosts.map((post) => (
-        <PostCard key={post.id} post={post} />
-      ))}
+
+      {organizationPosts.length > 0 ? (
+        <div>
+          {organizationPosts.map(post => (
+            <PostCard key={post.id} post={post} />
+          ))}
+          {organizationPosts.length >= 10 && (
+            <div className="text-center py-6">
+              <button
+                onClick={async () => {
+                  try {
+                    const { data: morePosts } = await supabase
+                      .from('posts')
+                      .select(`
+                        *,
+                        profiles!posts_profile_id_fkey(
+                          id,
+                          full_name,
+                          avatar_url,
+                          role,
+                          title,
+                          organization_name
+                        )
+                      `)
+                      .eq('organization_id', funder.id)
+                      .eq('organization_type', 'funder')
+                      .eq('channel', 'organization')
+                      .lt('created_at', organizationPosts[organizationPosts.length - 1].created_at)
+                      .order('created_at', { ascending: false })
+                      .limit(10);
+
+                    if (morePosts?.length) {
+                      const postsWithReactions = await Promise.all(
+                        morePosts.map(async post => {
+                          const { count: likesCount } = await supabase
+                            .from('post_likes')
+                            .select('*', { count: 'exact', head: true })
+                            .eq('post_id', post.id);
+
+                          const { count: commentsCount } = await supabase
+                            .from('post_comments')
+                            .select('*', { count: 'exact', head: true })
+                            .eq('post_id', post.id);
+
+                          return {
+                            ...post,
+                            likes_count: likesCount || 0,
+                            comments_count: commentsCount || 0,
+                            reactions: { summary: [], sample: [] }
+                          };
+                        })
+                      );
+                      setOrganizationPosts(prev => [...prev, ...postsWithReactions]);
+                    }
+                  } catch (error) {
+                    console.error('Error loading more posts:', error);
+                  }
+                }}
+                className="px-6 py-3 bg-white border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 transition-colors font-medium"
+              >
+                Load More Updates
+              </button>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="text-center py-12 text-slate-500">
+          <MessageSquare className="w-16 h-16 mx-auto text-slate-300 mb-4" />
+          <h3 className="text-lg font-medium text-slate-900 mb-2">No Updates Yet</h3>
+          <p className="text-slate-600">
+            {funder.name} hasn't shared any updates yet. Check back soon!
+          </p>
+        </div>
+      )}
     </div>
   );
 
-  // Enhanced Grantees Section with Analytics
   const renderGranteesSection = () => {
-    // Calculate analytics from grantees data
     const totalGrantees = grantees.length;
     const totalFunding = grantees.reduce((sum, grantee) => {
       const amount = parseInt(grantee.grantAmount?.replace(/[$,]/g, '') || 0);
       return sum + amount;
     }, 0);
 
-    // Focus area analysis
     const focusAreaCounts = {};
     grantees.forEach(grantee => {
       grantee.focusAreas.forEach(area => {
@@ -563,7 +727,6 @@ const FunderProfilePage = () => {
       });
     });
 
-    // Location analysis
     const locationCounts = {};
     grantees.forEach(grantee => {
       const city = grantee.location.split(',')[0];
@@ -577,7 +740,6 @@ const FunderProfilePage = () => {
           <p className="text-slate-600">Organizations we're proud to support in the Bay Area</p>
         </div>
 
-        {/* Impact Highlights */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-6 text-center">
             <div className="text-3xl font-bold text-blue-600 mb-2">{totalGrantees}</div>
@@ -596,7 +758,6 @@ const FunderProfilePage = () => {
           </div>
         </div>
 
-        {/* Focus Areas Analysis */}
         <div className="bg-white rounded-xl border border-slate-200 p-6">
           <h4 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
             <Tag className="text-pink-500" />
@@ -608,16 +769,14 @@ const FunderProfilePage = () => {
               .map(([area, count]) => (
                 <div key={area} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
                   <span className="text-sm font-medium text-slate-700">{area}</span>
-                  <span className="bg-blue-100 text-blue-700 text-xs font-bold px-2 py-1 rounded-full">
+                  <span className="text-xs font-bold px-2 py-1 rounded-full bg-blue-100 text-blue-700">
                     {count}
                   </span>
                 </div>
-              ))
-            }
+              ))}
           </div>
         </div>
 
-        {/* Geographic Distribution */}
         <div className="bg-white rounded-xl border border-slate-200 p-6">
           <h4 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
             <MapPin className="text-indigo-500" />
@@ -631,20 +790,18 @@ const FunderProfilePage = () => {
                   <div className="text-lg font-bold text-indigo-600">{count}</div>
                   <div className="text-sm text-indigo-700">{city}</div>
                 </div>
-              ))
-            }
+              ))}
           </div>
         </div>
-        
-        {/* Grantee Cards */}
+
         <div>
           <h4 className="text-lg font-bold text-slate-800 mb-4">All Grantees</h4>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {grantees.map((grantee) => (
+            {grantees.map(grantee => (
               <div key={grantee.id} className="bg-white rounded-xl border border-slate-200 overflow-hidden hover:shadow-lg transition-shadow">
                 <div className="aspect-video relative overflow-hidden">
-                  <img 
-                    src={grantee.imageUrl} 
+                  <img
+                    src={grantee.imageUrl}
                     alt={grantee.name}
                     className="w-full h-full object-cover"
                   />
@@ -689,13 +846,13 @@ const FunderProfilePage = () => {
         <h3 className="text-2xl font-bold text-slate-800 mb-3">Real Impact Stories</h3>
         <p className="text-slate-600">See how {funder.name} is making a difference in the Bay Area</p>
       </div>
-      
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        {impactStories.map((story) => (
+        {impactStories.map(story => (
           <div key={story.id} className="bg-white rounded-2xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow">
             <div className="aspect-video relative overflow-hidden">
-              <img 
-                src={story.image} 
+              <img
+                src={story.image}
                 alt={story.title}
                 className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
               />
@@ -703,12 +860,12 @@ const FunderProfilePage = () => {
                 {story.amount}
               </div>
             </div>
-            
+
             <div className="p-6">
               <h4 className="text-xl font-bold text-slate-800 mb-2">{story.title}</h4>
               <p className="text-blue-600 font-medium mb-3">{story.nonprofit}</p>
               <p className="text-slate-600 mb-4">{story.impact}</p>
-              
+
               <div className="flex items-center justify-between">
                 <span className="text-sm text-slate-500">Funded in 2023</span>
                 <button className="text-blue-600 hover:text-blue-700 font-medium text-sm">
@@ -728,16 +885,16 @@ const FunderProfilePage = () => {
         <Calendar className="text-blue-500" />
         Recent Activity
       </h3>
-      
+
       <div className="space-y-4">
-        {recentActivities.map((activity) => (
+        {recentActivities.map(activity => (
           <div key={activity.id} className="flex items-start gap-4 p-4 hover:bg-slate-50 rounded-lg transition-colors">
             <div className="flex-shrink-0 w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
               {activity.type === 'grant_awarded' && <DollarSign size={16} className="text-blue-600" />}
               {activity.type === 'new_program' && <Lightbulb size={16} className="text-blue-600" />}
               {activity.type === 'partnership' && <Users size={16} className="text-blue-600" />}
             </div>
-            
+
             <div className="flex-1">
               <p className="font-medium text-slate-800">{activity.description}</p>
               <div className="flex items-center gap-3 mt-1">
@@ -754,19 +911,13 @@ const FunderProfilePage = () => {
   );
 
   const renderTeamSection = () => {
-    // Mock data with different roles for demonstration
     const mockTeamData = [
-      // Leadership
       { id: 1, full_name: "Dr. Sarah Chen", title: "Executive Director", avatar_url: null, role_type: "leadership" },
       { id: 2, full_name: "Michael Rodriguez", title: "Chief Operating Officer", avatar_url: null, role_type: "leadership" },
-      
-      // Staff
       { id: 3, full_name: "Jane Do", title: "Program Manager", avatar_url: null, role_type: "staff" },
       { id: 4, full_name: "John Do", title: "Education Engineer", avatar_url: null, role_type: "staff" },
       { id: 5, full_name: "Emily Watson", title: "Research Coordinator", avatar_url: null, role_type: "staff" },
       { id: 6, full_name: "David Kim", title: "Communications Specialist", avatar_url: null, role_type: "staff" },
-      
-      // Board Members
       { id: 7, full_name: "Dr. Patricia Williams", title: "Board Chair", avatar_url: null, role_type: "board" },
       { id: 8, full_name: "Robert Johnson", title: "Board Treasurer", avatar_url: null, role_type: "board" },
       { id: 9, full_name: "Maria Gonzalez", title: "Board Secretary", avatar_url: null, role_type: "board" },
@@ -781,7 +932,7 @@ const FunderProfilePage = () => {
       <div className="mb-10">
         <h4 className="text-xl font-bold text-slate-800 mb-6 pb-2 border-b border-slate-200">{title}</h4>
         <div className={`grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 ${gridCols} gap-6`}>
-          {members.map((member) => (
+          {members.map(member => (
             <div key={member.id} className="bg-white rounded-lg border border-slate-200 p-6 text-center hover:shadow-md transition-shadow flex flex-col items-center justify-center">
               <div className="flex justify-center mb-4">
                 <Avatar src={member.avatar_url} fullName={member.full_name} size="lg" />
@@ -803,7 +954,7 @@ const FunderProfilePage = () => {
           <h3 className="text-2xl font-bold text-slate-800 mb-3">Meet Our Team</h3>
           <p className="text-slate-600">The people behind the mission</p>
         </div>
-        
+
         {leadership.length > 0 && renderTeamGroup("Leadership", leadership, "xl:grid-cols-4")}
         {staff.length > 0 && renderTeamGroup("Staff", staff, "xl:grid-cols-5")}
         {boardMembers.length > 0 && renderTeamGroup("Board Members", boardMembers, "xl:grid-cols-5")}
@@ -819,10 +970,10 @@ const FunderProfilePage = () => {
             <div className="flex items-center gap-6 mb-6">
               <div className="relative">
                 {funder.logo_url ? (
-                  <img 
-                    src={funder.logo_url} 
-                    alt={`${funder.name} logo`} 
-                    className="h-24 w-24 lg:h-32 lg:w-32 rounded-2xl object-contain bg-white/10 backdrop-blur border border-white/20 p-3" 
+                  <img
+                    src={funder.logo_url}
+                    alt={`${funder.name} logo`}
+                    className="h-24 w-24 lg:h-32 lg:w-32 rounded-2xl object-contain bg-white/10 backdrop-blur border border-white/20 p-3"
                   />
                 ) : (
                   <div className="h-24 w-24 lg:h-32 lg:w-32 rounded-2xl bg-slate-100 border border-slate-300 flex items-center justify-center font-bold text-3xl lg:text-4xl text-slate-600">
@@ -833,7 +984,7 @@ const FunderProfilePage = () => {
                   <Star size={16} className="text-white" />
                 </div>
               </div>
-              
+
               <div className="flex-1">
                 <h1 className="text-3xl lg:text-4xl font-bold mb-2 text-slate-800">{funder.name}</h1>
                 {funder.funder_type?.name && (
@@ -847,10 +998,10 @@ const FunderProfilePage = () => {
                           <MapPin size={12} />
                           {funder.location}
                         </span>
-                        <a 
-                          href={funder.website} 
-                          target="_blank" 
-                          rel="noopener noreferrer" 
+                        <a
+                          href={funder.website}
+                          target="_blank"
+                          rel="noopener noreferrer"
                           className="inline-flex items-center justify-center px-4 py-2 bg-emerald-600 text-white font-medium rounded-lg hover:bg-emerald-700 transition-colors shadow-sm text-sm"
                         >
                           <Globe size={14} className="mr-1" />
@@ -860,17 +1011,17 @@ const FunderProfilePage = () => {
                     )}
                   </div>
                 )}
-                
+
                 <div className="flex items-center gap-6 text-slate-600 mb-4">
                   <div className="flex items-center gap-2">
                     <Eye size={14} className="text-blue-600" />
                     <span>{followLoading ? '...' : followersCount} followers</span>
-                    <button 
+                    <button
                       onClick={handleFollow}
                       disabled={followLoading}
                       className={`ml-2 px-3 py-1 rounded-md text-xs font-medium transition-colors disabled:opacity-50 ${
-                        isFollowing 
-                          ? 'bg-slate-200 text-slate-700 hover:bg-slate-300' 
+                        isFollowing
+                          ? 'bg-slate-200 text-slate-700 hover:bg-slate-300'
                           : 'bg-blue-600 text-white hover:bg-blue-700'
                       }`}
                     >
@@ -885,8 +1036,8 @@ const FunderProfilePage = () => {
                       onClick={handleLike}
                       disabled={likeLoading}
                       className={`ml-2 px-3 py-1 rounded-md text-xs font-medium transition-colors disabled:opacity-50 ${
-                        isLiked 
-                          ? 'bg-red-100 text-red-700 hover:bg-red-200' 
+                        isLiked
+                          ? 'bg-red-100 text-red-700 hover:bg-red-200'
                           : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
                       }`}
                     >
@@ -895,10 +1046,9 @@ const FunderProfilePage = () => {
                   </div>
                 </div>
 
-                {/* Focus Areas Pills */}
-                {funder.focus_areas && funder.focus_areas.length > 0 && (
+                {funder.focus_areas?.length > 0 && (
                   <div className="flex flex-wrap gap-2">
-                    {funder.focus_areas.slice(0, 4).map(area => (
+ |                    {funder.focus_areas.slice(0, 4).map(area => (
                       <span key={area} className={`text-xs font-medium px-3 py-1.5 rounded-full ${getPillClasses(area)}`}>
                         {area}
                       </span>
@@ -930,7 +1080,7 @@ const FunderProfilePage = () => {
             { id: 'kudos', label: 'Community Kudos', icon: Star },
             { id: 'impact', label: 'Impact Stories', icon: TrendingUp },
             { id: 'team', label: 'Team', icon: Users }
-          ].map((tab) => {
+          ].map(tab => {
             const Icon = tab.icon;
             return (
               <button
@@ -952,13 +1102,13 @@ const FunderProfilePage = () => {
     </div>
   );
 
-  if (loading) return ( 
+  if (loading) return (
     <div className="text-center py-20">
       <Loader size={40} className="mx-auto text-green-400 mb-3 animate-spin" />
       <p>Loading Funder Profile...</p>
-    </div> 
+    </div>
   );
-  
+
   if (error || !funder) return (
     <div className="text-center py-20">
       <p className="text-red-600">{error || "Funder not found."}</p>
@@ -972,37 +1122,29 @@ const FunderProfilePage = () => {
     <PublicPageLayout bgColor="bg-slate-50">
       {renderHeroSection()}
       {renderTabNavigation()}
-      
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto">
           <div className="min-h-screen py-8">
-            {/* Home Tab - Social Feed */}
             {activeTab === 'home' && (
               <div className="max-w-6xl mx-auto">
                 {renderOrganizationPosts()}
               </div>
             )}
-
             {activeTab === 'overview' && (
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <div className="lg:col-span-3 space-y-0">
-                  {/* Mission and Approach with Integrated Quick Facts */}
-                  <div className="bg-white rounded-xl border border-slate-200 p-8 mb-8">
+                <div className="lg:col-span-3 space-y-8">
+                  <div className="bg-white rounded-xl border border-slate-200 p-8">
                     <h3 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
                       <Lightbulb className="text-yellow-500" />
                       Our Mission & Approach
                     </h3>
                     <p className="text-slate-600 leading-relaxed text-lg mb-8">{funder.description}</p>
-                    
-                    {/* Integrated Quick Facts with Visual Design */}
                     <div className="border-t border-slate-200 pt-8">
                       <h4 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
                         <Building className="text-blue-500" />
                         Quick Facts
                       </h4>
-                      
-                      {/* Focus Areas - At the top */}
-                      {funder.focus_areas && funder.focus_areas.length > 0 && (
+                      {funder.focus_areas?.length > 0 && (
                         <div className="mb-6 bg-pink-50 rounded-lg p-4 border border-pink-100">
                           <div className="flex items-center gap-3 mb-3">
                             <div className="w-8 h-8 bg-pink-500 rounded-full flex items-center justify-center">
@@ -1019,9 +1161,7 @@ const FunderProfilePage = () => {
                           </div>
                         </div>
                       )}
-                      
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {/* Location Card */}
                         <div className="bg-blue-50 rounded-lg p-4 border border-blue-100">
                           <div className="flex items-center gap-3 mb-2">
                             <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
@@ -1031,8 +1171,6 @@ const FunderProfilePage = () => {
                           </div>
                           <p className="text-slate-600 ml-11">{funder.location || 'Not specified'}</p>
                         </div>
-
-                        {/* Annual Giving Card */}
                         <div className="bg-green-50 rounded-lg p-4 border border-green-100">
                           <div className="flex items-center gap-3 mb-2">
                             <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
@@ -1042,8 +1180,6 @@ const FunderProfilePage = () => {
                           </div>
                           <p className="text-slate-600 ml-11">{funder.total_funding_annually || 'Not specified'}</p>
                         </div>
-
-                        {/* Grant Size Card */}
                         <div className="bg-orange-50 rounded-lg p-4 border border-orange-100">
                           <div className="flex items-center gap-3 mb-2">
                             <div className="w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center">
@@ -1053,8 +1189,6 @@ const FunderProfilePage = () => {
                           </div>
                           <p className="text-slate-600 ml-11">{funder.average_grant_size || 'Not specified'}</p>
                         </div>
-
-                        {/* Notable Grant Card */}
                         {funder.notable_grant && (
                           <div className="bg-amber-50 rounded-lg p-4 border border-amber-100">
                             <div className="flex items-center gap-3 mb-2">
@@ -1067,129 +1201,48 @@ const FunderProfilePage = () => {
                           </div>
                         )}
                       </div>
-
-                      {/* Geographic Scope */}
-                      {funder.funding_locations && funder.funding_locations.length > 0 && (
-                        <div className="mt-6 bg-purple-50 rounded-lg p-4 border border-purple-100">
-                          <div className="flex items-center gap-3 mb-3">
-                            <div className="w-8 h-8 bg-purple-500 rounded-full flex items-center justify-center">
-                              <IconBriefcase size={16} className="text-white" />
-                            </div>
-                            <span className="font-semibold text-slate-800">Geographic Scope</span>
-                          </div>
-                          <div className="flex flex-wrap gap-2 ml-11">
-                            {funder.funding_locations.map(location => (
-                              <span key={location} className={`text-sm font-semibold px-3 py-1.5 rounded-full ${getPillClasses(location)}`}>
-                                {location}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Grant Types */}
-                      {funder.grant_types && funder.grant_types.length > 0 && (
-                        <div className="mt-6 bg-slate-50 rounded-lg p-4 border border-slate-200">
-                          <div className="flex items-center gap-3 mb-3">
-                            <div className="w-8 h-8 bg-slate-500 rounded-full flex items-center justify-center">
-                              <ClipboardList size={16} className="text-white" />
-                            </div>
-                            <span className="font-semibold text-slate-800">Grant Types Offered</span>
-                          </div>
-                          <div className="flex flex-wrap gap-2 ml-11">
-                            {funder.grant_types.map(type => (
-                              <span key={type} className={`text-sm font-medium px-3 py-1.5 rounded-full border ${getGrantTypePillClasses(type)}`}>
-                                {type}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Similar Funders Section */}
-                      {similarFunders.length > 0 && (
-                        <div className="mt-8 pt-6 border-t border-slate-200">
-                          <h5 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
-                            <SimilarIcon size={18} className="text-indigo-500" />
-                            Similar Funders
-                          </h5>
-                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {similarFunders.map(similarFunder => (
-                              <FunderCard key={similarFunder.id} funder={similarFunder} />
-                            ))}
-                          </div>
-                        </div>
-                      )}
                     </div>
                   </div>
+                  {recentActivities.length > 0 && renderRecentActivity()}
                 </div>
               </div>
             )}
-
             {activeTab === 'grants' && (
-              <div className="space-y-8">
-                <div className="text-center">
-                  <h3 className="text-2xl font-bold text-slate-800 mb-3">Current Grant Opportunities</h3>
-                  <p className="text-slate-600">Active funding opportunities from {funder.name}</p>
-                </div>
-
-                {funder.application_process_summary && (
-                  <div className="bg-white rounded-xl border border-slate-200 p-8">
-                    <h3 className="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2">
-                      <ClipboardCheck className="text-blue-500" />
-                      How to Apply
-                    </h3>
-                    <p className="text-slate-600 leading-relaxed">{funder.application_process_summary}</p>
-                  </div>
-                )}
-                
-                {funderGrants.length > 0 ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="max-w-6xl mx-auto">
+                <div className="space-y-6">
+                  <h3 className="text-2xl font-bold text-slate-800 mb-3">Active Grants</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {funderGrants.map(grant => (
-                      <GrantCard key={grant.id} grant={grant} onOpenDetailModal={openDetail} />
+                      <GrantCard
+                        key={grant.id}
+                        grant={grant}
+                        onClick={() => openDetail(grant)}
+                      />
                     ))}
                   </div>
-                ) : (
-                  <div className="text-center py-12">
-                    <ClipboardList className="w-16 h-16 mx-auto text-slate-300 mb-4" />
-                    <h3 className="text-lg font-medium text-slate-900 mb-2">No Active Grants</h3>
-                    <p className="text-slate-600">Check back soon for new opportunities!</p>
-                  </div>
-                )}
+                  {funderGrants.length === 0 && (
+                    <div className="text-center py-12 text-slate-500">
+                      <ClipboardList className="w-16 h-16 mx-auto text-slate-300 mb-4" />
+                      <h3 className="text-lg font-medium text-slate-900 mb-2">No Active Grants</h3>
+                      <p className="text-slate-600">No grants are currently available from {funder.name}.</p>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
-
-            {activeTab === 'grantees' && (
-              <div>
-                {renderGranteesSection()}
-              </div>
-            )}
-
-            {/* Kudos Tab */}
-            {activeTab === 'kudos' && (
-              <div className="max-w-6xl mx-auto">
-                {renderKudosCarousel()}
-              </div>
-            )}
-
-            {activeTab === 'impact' && (
-              <div>
-                {renderImpactStories()}
-              </div>
-            )}
-            
-            {activeTab === 'team' && (
-              <div>
-                {renderTeamSection()}
-              </div>
-            )}
+            {activeTab === 'grantees' && renderGranteesSection()}
+            {activeTab === 'kudos' && renderKudosCarousel()}
+            {activeTab === 'impact' && renderImpactStories()}
+            {activeTab === 'team' && renderTeamSection()}
           </div>
+          {isDetailModalOpen && (
+            <GrantDetailModal
+              grant={selectedGrant}
+              onClose={closeDetail}
+            />
+          )}
         </div>
       </div>
-
-      {isDetailModalOpen && selectedGrant && (
-        <GrantDetailModal grant={selectedGrant} isOpen={isDetailModalOpen} onClose={closeDetail} />
-      )}
     </PublicPageLayout>
   );
 };
