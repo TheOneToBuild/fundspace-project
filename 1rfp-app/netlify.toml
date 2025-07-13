@@ -1,0 +1,30 @@
+# Correct Netlify build settings
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+# Functions configuration
+[functions]
+  directory = "netlify/functions"
+  external_node_modules = ["axios", "jsdom", "rss-parser", "@supabase/supabase-js"]
+  node_bundler = "esbuild"
+
+# Add this block to explicitly configure the dev server
+[dev]
+  functions = "netlify/functions"
+
+# Schedule the background function to run once every hour
+[functions.fetch-and-cache-news]
+  schedule = "0 * * * *"
+
+# Schedule the cleanup function to run once a day
+[functions.cleanup-old-news]
+  schedule = "0 0 * * *"
+
+# CORS headers for functions
+[[headers]]
+  for = "/.netlify/functions/*"
+  [headers.values]
+    Access-Control-Allow-Origin = "*"
+    Access-Control-Allow-Headers = "Content-Type"
+    Access-Control-Allow-Methods = "GET, OPTIONS"

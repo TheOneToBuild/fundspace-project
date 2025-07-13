@@ -8,26 +8,20 @@ import CreatePost from './CreatePost.jsx';
 import PostCard from './PostCard.jsx';
 import { rssNewsService as newsService } from '../services/rssNewsService.js';
 
-// Fallback logic has been removed.
-
-const NewsCard = memo(({ title, summary, category, timeAgo, image, url }) => {
+const NewsCard = memo(({ title, summary, timeAgo, image, url }) => {
   return (
     <div
       className="flex-shrink-0 w-80 bg-white rounded-xl border border-slate-200 overflow-hidden hover:shadow-lg transition-shadow cursor-pointer"
       onClick={() => url && window.open(url, '_blank')}
     >
-      <div className="h-40 bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center relative">
-        {/* Conditionally render the image only if it exists */}
+      <div className="h-40 bg-slate-100 flex items-center justify-center">
         {image ? (
           <img
             src={image}
             alt={title}
             className="w-full h-full object-cover"
           />
-        ) : (
-          // If no image, a neutral background is shown by the parent div.
-          null
-        )}
+        ) : null}
       </div>
       <div className="p-4">
         <h3 className="font-semibold text-slate-800 text-sm line-clamp-2 mb-2">{title}</h3>
@@ -50,51 +44,29 @@ const NewsCard = memo(({ title, summary, category, timeAgo, image, url }) => {
 NewsCard.propTypes = {
   title: PropTypes.string.isRequired,
   summary: PropTypes.string.isRequired,
-  category: PropTypes.string.isRequired,
   timeAgo: PropTypes.string.isRequired,
   image: PropTypes.string,
   url: PropTypes.string
 };
 
-// ... (The rest of the file is identical to the last version you provided)
 const TrendingNews = ({ userRole }) => {
   const [news, setNews] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
 
   useEffect(() => {
+    if (!userRole || (userRole !== 'Funder' && userRole !== 'Nonprofit')) {
+      setNews([]);
+      setLoading(false);
+      return;
+    }
+
     const fetchNews = async () => {
-      if (!userRole || (userRole !== 'Funder' && userRole !== 'Nonprofit')) {
-        setNews([]);
-        setLoading(false);
-        return;
-      }
-
-      try {
-        setLoading(true);
-        setError(null);
-
-        let newsData;
-        if (userRole === 'Funder') {
-          newsData = await newsService.getFunderNews();
-        } else {
-          newsData = await newsService.getNonprofitNews();
-        }
-
-        setNews(newsData);
-      } catch (err) {
-        console.error('Error fetching community news:', err);
-        setError('Failed to load news');
-        let fallbackNews;
-        if (userRole === 'Funder') {
-          fallbackNews = await newsService.getFallbackFunderNews();
-        } else {
-          fallbackNews = await newsService.getFallbackNonprofitNews();
-        }
-        setNews(fallbackNews);
-      } finally {
-        setLoading(false);
-      }
+      setLoading(true);
+      const newsData = userRole === 'Funder'
+        ? await newsService.getFunderNews()
+        : await newsService.getNonprofitNews();
+      setNews(Array.isArray(newsData) ? newsData : []);
+      setLoading(false);
     };
 
     fetchNews();
@@ -103,38 +75,20 @@ const TrendingNews = ({ userRole }) => {
   const scrollNews = (direction) => {
     const container = document.getElementById('community-news-scroll');
     if (container) {
-      const scrollAmount = 320;
-      container.scrollLeft += direction === 'left' ? -scrollAmount : scrollAmount;
+      container.scrollBy({ left: direction === 'left' ? -320 : 320, behavior: 'smooth' });
     }
   };
-
-  if (!userRole || (userRole !== 'Funder' && userRole !== 'Nonprofit')) {
-    return null;
-  }
-
+  
   const newsTitle = userRole === 'Funder' ? 'Philanthropy News' : 'Nonprofit News';
 
   if (loading) {
     return (
-      <div className="mb-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-bold text-slate-800">{newsTitle}</h2>
-        </div>
-        <div className="flex space-x-4 overflow-hidden">
-          {[...Array(10)].map((_, i) => (
-            <div
-              key={i}
-              className="flex-shrink-0 w-80 bg-white rounded-xl border border-slate-200 overflow-hidden animate-pulse"
-            >
-              <div className="h-40 bg-slate-200"></div>
-              <div className="p-4">
-                <div className="h-4 bg-slate-200 rounded mb-2"></div>
-                <div className="h-3 bg-slate-200 rounded w-3/4 mb-3"></div>
-                <div className="flex justify-between">
-                  <div className="h-3 bg-slate-200 rounded w-16"></div>
-                  <div className="h-3 bg-slate-200 rounded w-20"></div>
-                </div>
-              </div>
+       <div className="mb-6">
+        <h2 className="text-xl font-bold text-slate-800 mb-4">{newsTitle}</h2>
+        <div className="flex space-x-4">
+          {[...Array(5)].map((_, i) => (
+            <div key={i} className="flex-shrink-0 w-80 bg-white rounded-xl border border-slate-200 animate-pulse">
+              <div className="h-40 bg-slate-200"></div><div className="p-4"><div className="h-4 bg-slate-200 rounded mb-2"></div><div className="h-3 bg-slate-200 rounded"></div></div>
             </div>
           ))}
         </div>
@@ -142,47 +96,19 @@ const TrendingNews = ({ userRole }) => {
     );
   }
 
-  if (news.length === 0) {
-    return null;
-  }
+  if (!news.length) return null;
 
   return (
     <div className="mb-6">
       <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center space-x-3">
-          <h2 className="text-xl font-bold text-slate-800">{newsTitle}</h2>
-          {error && (
-            <span className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded-full border border-amber-200">
-              Using local news
-            </span>
-          )}
-        </div>
+        <h2 className="text-xl font-bold text-slate-800">{newsTitle}</h2>
         <div className="flex space-x-2">
-          <button
-            onClick={() => scrollNews('left')}
-            className="p-2 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
-            aria-label="Scroll left"
-          >
-            <ChevronLeft size={16} />
-          </button>
-          <button
-            onClick={() => scrollNews('right')}
-            className="p-2 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
-            aria-label="Scroll right"
-          >
-            <ChevronRight size={16} />
-          </button>
+          <button onClick={() => scrollNews('left')} className="p-2 bg-white border rounded-lg hover:bg-slate-50"><ChevronLeft size={16} /></button>
+          <button onClick={() => scrollNews('right')} className="p-2 bg-white border rounded-lg hover:bg-slate-50"><ChevronRight size={16} /></button>
         </div>
       </div>
-
-      <div
-        id="community-news-scroll"
-        className="flex space-x-4 overflow-x-auto scrollbar-hide pb-4"
-        style={{ scrollBehavior: 'smooth' }}
-      >
-        {news.map((newsItem) => (
-          <NewsCard key={newsItem.id} {...newsItem} />
-        ))}
+      <div id="community-news-scroll" className="flex space-x-4 overflow-x-auto scrollbar-hide pb-4">
+        {news.map(item => <NewsCard key={item.id} {...item} />)}
       </div>
     </div>
   );
