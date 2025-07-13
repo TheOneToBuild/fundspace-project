@@ -15,20 +15,25 @@ function extractImage(item) {
   return imgMatch ? imgMatch[1] : null;
 }
 
-// Keywords to exclude sports and celebrity news
-const EXCLUDED_KEYWORDS = [
-  // Sports
-  'sports', 'nba', 'nfl', 'mlb', 'nhl', 'olympics', 'game', 'match', 'player', 'team', 
-  'soccer', 'football', 'basketball', 'baseball', 'hockey', 'tennis', 'athlete',
-  // Celebrities
-  'celebrity', 'kardashian', 'taylor swift', 'movie star', 'red carpet', 'gossip', 
-  'entertainment news', 'hollywood', 'actor', 'actress', 'singer'
+const SPORTS_KEYWORDS = [
+  'sports', 'nba', 'nfl', 'mlb', 'nhl', 'wnba', 'mls', 'olympics', 'world cup',
+  'super bowl', 'playoffs', 'championship', 'game', 'match', 'player', 'team', 'score',
+  'inning', 'quarter', 'goal', 'touchdown', 'home run', 'slam dunk', 'athlete',
+  'warriors', 'giants', '49ers', 'sharks', 'athletics', 'lakers', 'dodgers'
 ];
+const CELEBRITY_KEYWORDS = [
+  'celebrity', 'kardashian', 'kanye', 'taylor swift', 'beyoncé', 'movie star', 'red carpet',
+  'gossip', 'entertainment weekly', 'tmz', 'hollywood', 'actor', 'actress', 'singer'
+];
+const EXCLUDED_KEYWORDS = [...SPORTS_KEYWORDS, ...CELEBRITY_KEYWORDS];
 
-// Function to check if an article is about an excluded topic
 function isExcludedTopic(item) {
   const content = `${item.title || ''} ${item.contentSnippet || ''}`.toLowerCase();
-  return EXCLUDED_KEYWORDS.some(keyword => content.includes(keyword));
+  const hasExcludedTerm = EXCLUDED_KEYWORDS.some(keyword => new RegExp(`\\b${keyword}\\b`).test(content));
+  if (hasExcludedTerm) {
+    console.log(`Excluding: "${item.title}"`);
+  }
+  return hasExcludedTerm;
 }
 
 // The main handler for the scheduled function
@@ -36,16 +41,36 @@ export const handler = async () => {
   console.log('Starting scheduled news fetch...');
 
   const RSS_FEEDS = [
-    // Bay Area, CA, and US News
-    { category: 'general', url: 'https://www.mercurynews.com/feed/' },
-    { category: 'general', url: 'https://www.sfchronicle.com/bayarea/feed/Bay-Area-News-435.php' },
-    { category: 'general', url: 'https://calmatters.org/feed/' },
-    { category: 'general', url: 'https://rss.app/feeds/ap/top-news.xml' }, // AP Top News (US)
+    // --- NEW & EXPANDED NEWS FEEDS ---
+    // National Breaking News
+    { category: 'general', url: 'http://feeds.reuters.com/reuters/topNews' },
+    { category: 'general', url: 'https://rss.nytimes.com/services/xml/rss/nyt/US.xml' },
+    { category: 'general', url: 'https://feeds.a.dj.com/rss/RSSWorldNews.xml' },
+    { category: 'general', url: 'https://rss.app/feeds/ap/top-news.xml' }, // Re-added
+    { category: 'general', url: 'http://feeds.bbci.co.uk/news/world/us_and_canada/rss.xml' }, // BBC News US & Canada
+    { category: 'general', url: 'https://feeds.npr.org/1001/rss.xml' }, // NPR News
 
-    // Philanthropy/Funder/Nonprofit News
+    // California & Bay Area News
+    { category: 'california', url: 'https://www.mercurynews.com/feed/' },
+    { category: 'california', url: 'https://www.sfchronicle.com/bayarea/feed/Bay-Area-News-435.php' },
+    { category: 'california', url: 'https://www.latimes.com/california/rss2.0.xml' },
+    { category: 'california', url: 'https://calmatters.org/feed/' }, // Re-added
+    { category: 'california', url: 'https://www.kqed.org/news/feed' }, // KQED News
+    { category: 'california', url: 'https://www.sacbee.com/news/california/rss/' }, // The Sacramento Bee
+
+    // Philanthropy/Funder News
     { category: 'funder', url: 'https://nonprofitquarterly.org/feed/' },
+    { category: 'funder', url: 'https://www.insidephilanthropy.com/home/rss' },
+    { category: 'funder', url: 'https://www.philanthropy.com/feed/grants' }, // Chronicle of Philanthropy (Grants)
+    { category: 'funder', url: 'https://candid.org/feed' }, // Candid Blog
+
+    // Nonprofit Sector News
     { category: 'nonprofit', url: 'https://www.philanthropy.com/feed' },
+    { category: 'nonprofit', url: 'https://ssir.org/rss' },
+    { category: 'nonprofit', url: 'https://www.thenonprofittimes.com/feed/' }, // The NonProfit Times
+    { category: 'nonprofit', url: 'https://blueavocado.org/feed/' } // Blue Avocado
   ];
+  // --- END EXPANDED FEEDS ---
 
   const fetchPromises = RSS_FEEDS.map(feedInfo =>
     parser.parseURL(feedInfo.url).then(feed => ({ ...feed, category: feedInfo.category }))
@@ -61,16 +86,14 @@ export const handler = async () => {
   for (const feed of results) {
     if (feed?.items) {
       for (const item of feed.items) {
-        // Check if the article is about sports or celebrities
         if (isExcludedTopic(item)) {
-          console.log(`Excluding topic: ${item.title}`);
-          continue; // Skip this article
+          continue; 
         }
 
         const image = extractImage(item);
-        if (image) { // Only process articles that have an image
+        if (image) {
           articlesToUpsert.push({
-            article_id: item.guid || item.link, // Use a stable ID
+            article_id: item.guid || item.link,
             title: item.title,
             summary: item.contentSnippet?.substring(0, 200).trim() || '',
             full_content: item.content || item.contentSnippet || '',
@@ -78,7 +101,7 @@ export const handler = async () => {
             image_url: image,
             pub_date: item.isoDate ? new Date(item.isoDate) : new Date(),
             source_name: feed.title,
-            category: feed.category, // Assign the category from our list
+            category: feed.category,
           });
         }
       }
@@ -86,7 +109,6 @@ export const handler = async () => {
   }
 
   if (articlesToUpsert.length > 0) {
-    // Use upsert to insert new articles or update existing ones based on the article_id
     const { data, error } = await supabase
       .from('rss_articles')
       .upsert(articlesToUpsert, { onConflict: 'article_id', ignoreDuplicates: true });

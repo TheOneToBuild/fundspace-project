@@ -23,16 +23,26 @@ export const handler = async (event) => {
   }
 
   try {
-    const { data, error } = await supabase
+    // --- UPDATED QUERY LOGIC ---
+    let query = supabase
       .from('rss_articles')
-      .select('title, summary, url, image_url, pub_date, source_name')
-      .eq('category', category)
+      .select('title, summary, url, image_url, pub_date, source_name');
+
+    // 'general' for HelloWorld gets national and california news
+    // 'funder'/'nonprofit' for HelloCommunity gets only CA-based philanthropy news
+    if (category === 'general') {
+      query = query.in('category', ['general', 'california']);
+    } else {
+      query = query.eq('category', category);
+    }
+
+    const { data, error } = await query
       .order('pub_date', { ascending: false })
       .limit(6);
+    // --- END UPDATED LOGIC ---
 
     if (error) throw error;
 
-    // Format the data for the frontend
     const articles = data.map(article => ({
       id: article.url,
       title: article.title,
