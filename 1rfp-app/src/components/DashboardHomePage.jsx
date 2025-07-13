@@ -57,8 +57,8 @@ const TrendingNewsSection = () => {
     }
   };
 
-  if (loading) return null; // Don't show anything while loading
-  if (news.length === 0) return null; // Don't show the section if there's no news
+  if (loading) return null;
+  if (news.length === 0) return null;
 
   return (
     <div className="mb-6">
@@ -82,8 +82,18 @@ const HelloWorldWelcomeSection = ({ onEnterWorld, hasEnteredWorld }) => (
         <div className="flex items-center space-x-4">
           <div className="text-4xl">🌍</div>
           <div>
-            <h2 className="text-xl font-bold text-slate-800">Welcome to Hello World</h2>
-            <p className="text-slate-600 max-w-2xl">Connect with the entire community! Share updates, discover opportunities, and engage.</p>
+            <div className="flex items-center space-x-3 mb-2">
+                <h2 className="text-xl font-bold text-slate-800">Welcome to Hello World</h2>
+                <div className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-sky-100 text-sky-800 border border-sky-200">
+                    <span>#hello-world</span>
+                </div>
+            </div>
+            <p className="text-slate-600 max-w-2xl mb-4">Connect with the entire community! Share updates, discover opportunities, and engage.</p>
+            <div className="flex items-center space-x-4 text-sm text-slate-500">
+                <div className="flex items-center space-x-2"><Users size={16} /><span>Open community</span></div>
+                <div className="flex items-center space-x-2"><MessageCircle size={16} /><span>Share & discover</span></div>
+                <div className="flex items-center space-x-2"><Globe size={16} /><span>All welcome</span></div>
+            </div>
           </div>
         </div>
         {!hasEnteredWorld && (
@@ -142,9 +152,7 @@ export default function DashboardHomePage() {
         setIsLoading(true);
         const from = page * POSTS_PER_PAGE;
         const to = from + POSTS_PER_PAGE - 1;
-
         const { data: newPosts, error } = await supabase.from('posts').select('*, profiles!posts_profile_id_fkey(*)').eq('channel', 'hello-world').order('created_at', { ascending: false }).range(from, to);
-
         if (error) console.error("Error fetching posts:", error);
         else {
             setPosts(prevPosts => (page === 0 ? newPosts : [...prevPosts, ...newPosts]));
@@ -156,8 +164,21 @@ export default function DashboardHomePage() {
   }, [page]);
   
   useEffect(() => {
-    const channel = supabase.channel('public:posts');
-    channel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'posts', filter: 'channel=eq.hello-world' }, async (payload) => {
+    const refreshPostCounts = async (postId) => {
+      const { data: likesData } = await supabase.from('post_likes').select('id', { count: 'exact' }).eq('post_id', postId);
+      const { data: commentsData } = await supabase.from('post_comments').select('id', { count: 'exact' }).eq('post_id', postId);
+      
+      setPosts(currentPosts => currentPosts.map(p => 
+        p.id === postId 
+          ? { ...p, likes_count: likesData?.length || 0, comments_count: commentsData?.length || 0 }
+          : p
+      ));
+    };
+
+    const channel = supabase.channel('public:posts_feed');
+    
+    channel
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'posts', filter: 'channel=eq.hello-world' }, async (payload) => {
         const { data: profileData } = await supabase.from('profiles').select('*').eq('id', payload.new.profile_id).single();
         if (profileData) {
             const newPostWithProfile = { ...payload.new, profiles: profileData };
@@ -166,9 +187,28 @@ export default function DashboardHomePage() {
                 return [newPostWithProfile, ...currentPosts];
             });
         }
-    }).subscribe();
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'posts' }, (payload) => {
+        setPosts(currentPosts => currentPosts.filter(p => p.id !== payload.old.id));
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'posts' }, (payload) => {
+        setPosts(currentPosts => currentPosts.map(p => 
+          p.id === payload.new.id ? { ...p, ...payload.new } : p
+        ));
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'post_likes' }, (payload) => {
+        const postId = payload.new?.post_id || payload.old?.post_id;
+        if (postId) refreshPostCounts(postId);
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'post_comments' }, (payload) => {
+        const postId = payload.new?.post_id || payload.old?.post_id;
+        if (postId) refreshPostCounts(postId);
+      })
+      .subscribe();
 
-    return () => supabase.removeChannel(channel);
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const handleEnterWorld = () => {
