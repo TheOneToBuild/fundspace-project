@@ -1,39 +1,44 @@
-// Updated CreatePost.jsx with support for custom onNewPost handler and placeholder
+// Production CreatePost.jsx - With Tags and Clean Mention Display
 import React, { useState, useRef, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
-import { Camera, X, Smile, Link2 } from 'lucide-react';
+import { Camera, X, Smile, AtSign } from 'lucide-react';
 import Avatar from './Avatar.jsx';
-import urlDetectionUtils from '../utils/urlDetection.js';
+import MentionDropdown from './mentions/MentionDropdown.jsx';
 
 export default function CreatePost({ 
   profile, 
   onNewPost, 
   channel = 'hello-world',
-  placeholder = null // NEW: Custom placeholder support
+  placeholder = null
 }) {
     const [postText, setPostText] = useState('');
+    const [displayText, setDisplayText] = useState(''); // For clean display
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
     const [selectedImages, setSelectedImages] = useState([]);
     const [uploading, setUploading] = useState(false);
     const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-    const [isDragActive, setIsDragActive] = useState(false);
+    
+    // Tag states
     const [selectedTags, setSelectedTags] = useState([]);
     const [showTagSelector, setShowTagSelector] = useState(false);
     const [customTagInput, setCustomTagInput] = useState('');
-    const [linkPreview, setLinkPreview] = useState(null);
-    const [isFetchingPreview, setIsFetchingPreview] = useState(false);
+    
+    // Mention states
+    const [showMentionDropdown, setShowMentionDropdown] = useState(false);
+    const [mentionQuery, setMentionQuery] = useState('');
+    const [mentionPosition, setMentionPosition] = useState({ top: 0, left: 0 });
+    const [currentMentionStart, setCurrentMentionStart] = useState(-1);
+    
     const fileInputRef = useRef(null);
-    const containerRef = useRef(null);
-    const dragCounter = useRef(0);
+    const textareaRef = useRef(null);
 
     const emojis = [
         '😊', '😂', '❤️', '👍', '🎉', '🔥', '💡', '🚀',
-        '💯', '⭐', '🌟', '💪', '🙌', '👏', '🎯', '💝',
-        '🌈', '🎊', '✨', '💫', '🌸', '🌺', '🌻', '🌷',
-        '🎈', '🎁', '🍀', '🌙', '☀️', '⚡', '🔮', '🎨'
+        '💯', '⭐', '🌟', '💪', '🙌', '👏', '🎯', '💝'
     ];
-
+    
+    // Restored the full list of available tags
     const availableTags = [
         { id: 'education', label: 'Education', color: 'bg-blue-100 text-blue-800 border-blue-200' },
         { id: 'health', label: 'Health', color: 'bg-green-100 text-green-800 border-green-200' },
@@ -47,43 +52,7 @@ export default function CreatePost({
         { id: 'research', label: 'Research', color: 'bg-gray-100 text-gray-800 border-gray-200' }
     ];
 
-    // Debounce function
-    const debounce = (func, delay) => {
-        let timeout;
-        return (...args) => {
-            clearTimeout(timeout);
-            timeout = setTimeout(() => func(...args), delay);
-        };
-    };
-
-    const fetchLinkPreview = async (url) => {
-        if (!url || linkPreview) return;
-
-        setIsFetchingPreview(true);
-        try {
-            // Replace with your actual API endpoint for fetching link previews
-            const response = await fetch(`/api/link-preview?url=${encodeURIComponent(url)}`);
-            if (!response.ok) {
-                throw new Error('Failed to fetch preview');
-            }
-            const data = await response.json();
-            setLinkPreview({ ...data, url });
-        } catch (error) {
-            console.error('Error fetching link preview:', error);
-            // You might want to clear the preview or show an error state
-        } finally {
-            setIsFetchingPreview(false);
-        }
-    };
-
-    const debouncedFetchPreview = debounce(fetchLinkPreview, 500);
-
-    useEffect(() => {
-        const urls = urlDetectionUtils.suggestUrlsForPreview(postText);
-        if (urls.length > 0) {
-            debouncedFetchPreview(urls[0]);
-        }
-    }, [postText]);
+    // --- Start of Re-integrated Tag Functions ---
 
     const getRandomTagColor = () => {
         const colors = [
@@ -133,61 +102,112 @@ export default function CreatePost({
         setSelectedTags(prev => prev.filter(tag => tag.id !== tagId));
     };
 
-    // Global drag handlers for seamless experience
+    // --- End of Re-integrated Tag Functions ---
+
+    // Convert stored format to display format
+    const convertToDisplayText = (rawText) => {
+        if (!rawText) return '';
+        // Replace @[Name](id:type) with @Name
+        return rawText.replace(/@\[([^\]]+)\]\([^)]+\)/g, '@$1');
+    };
+
+    // Update display text whenever postText changes
     useEffect(() => {
-        const handleGlobalDragEnter = (e) => {
-            e.preventDefault();
-            dragCounter.current++;
-            if (e.dataTransfer.items && e.dataTransfer.items.length > 0) {
-                const hasImages = Array.from(e.dataTransfer.items).some(item => 
-                    item.type.startsWith('image/')
-                );
-                if (hasImages) {
-                    setIsDragActive(true);
+        setDisplayText(convertToDisplayText(postText));
+    }, [postText]);
+
+    // Mention handling
+    const handleTextChange = (e) => {
+        const value = e.target.value;
+        const cursorPosition = e.target.selectionStart;
+        
+        setDisplayText(value);
+        
+        if (!showMentionDropdown) {
+            setPostText(value);
+        }
+        
+        const textBeforeCursor = value.slice(0, cursorPosition);
+        const atIndex = textBeforeCursor.lastIndexOf('@');
+        
+        if (atIndex >= 0) {
+            const charBeforeAt = atIndex > 0 ? textBeforeCursor[atIndex - 1] : ' ';
+            if (charBeforeAt === ' ' || charBeforeAt === '\n' || atIndex === 0) {
+                const queryAfterAt = textBeforeCursor.slice(atIndex + 1);
+                
+                if (!queryAfterAt.includes(' ') && !queryAfterAt.includes('\n')) {
+                    setMentionQuery(queryAfterAt);
+                    setCurrentMentionStart(atIndex);
+                    setShowMentionDropdown(true);
+                    
+                    const textarea = textareaRef.current;
+                    if (textarea) {
+                        const rect = textarea.getBoundingClientRect();
+                        setMentionPosition({
+                            top: rect.bottom + window.scrollY + 5,
+                            left: rect.left + window.scrollX
+                        });
+                    }
+                    return;
                 }
             }
-        };
+        }
+        
+        setShowMentionDropdown(false);
+    };
 
-        const handleGlobalDragLeave = (e) => {
-            e.preventDefault();
-            dragCounter.current--;
-            if (dragCounter.current === 0) {
-                setIsDragActive(false);
-            }
-        };
-
-        const handleGlobalDrop = (e) => {
-            e.preventDefault();
-            dragCounter.current = 0;
-            setIsDragActive(false);
+    const handleMentionSelect = (mention) => {
+        if (currentMentionStart >= 0) {
+            const beforeMention = postText.slice(0, currentMentionStart);
+            const afterCursor = postText.slice(textareaRef.current.selectionStart);
+            const mentionStoredText = `@[${mention.name}](${mention.id}:${mention.type})`;
+            const mentionDisplayText = `@${mention.name}`;
             
-            const files = Array.from(e.dataTransfer.files);
-            const imageFiles = files.filter(file => file.type.startsWith('image/'));
+            const newStoredText = beforeMention + mentionStoredText + ' ' + afterCursor;
+            const newDisplayText = convertToDisplayText(beforeMention) + mentionDisplayText + ' ' + convertToDisplayText(afterCursor);
             
-            if (imageFiles.length > 0) {
-                processFiles(imageFiles);
-            }
-        };
+            setPostText(newStoredText);
+            setDisplayText(newDisplayText);
+            setShowMentionDropdown(false);
+            setCurrentMentionStart(-1);
+            
+            setTimeout(() => {
+                if (textareaRef.current) {
+                    const newCursorPos = convertToDisplayText(beforeMention).length + mentionDisplayText.length + 1;
+                    textareaRef.current.setSelectionRange(newCursorPos, newCursorPos);
+                    textareaRef.current.focus();
+                }
+            }, 0);
+        }
+    };
 
-        const handleGlobalDragOver = (e) => {
-            e.preventDefault();
-        };
+    const extractMentionsForStorage = (text) => {
+        if (!text) return [];
+        
+        const mentionRegex = /@\[([^\]]+)\]\(([^:]+):([^)]+)\)/g;
+        const mentions = [];
+        let match;
 
-        document.addEventListener('dragenter', handleGlobalDragEnter);
-        document.addEventListener('dragleave', handleGlobalDragLeave);
-        document.addEventListener('dragover', handleGlobalDragOver);
-        document.addEventListener('drop', handleGlobalDrop);
+        while ((match = mentionRegex.exec(text)) !== null) {
+            const [fullMatch, displayName, id, type] = match;
+            mentions.push({
+                displayName,
+                id,
+                type,
+                fullMatch,
+                start: match.index,
+                end: match.index + fullMatch.length
+            });
+        }
 
-        return () => {
-            document.removeEventListener('dragenter', handleGlobalDragEnter);
-            document.removeEventListener('dragleave', handleGlobalDragLeave);
-            document.removeEventListener('dragover', handleGlobalDragOver);
-            document.removeEventListener('drop', handleGlobalDrop);
-        };
-    }, []);
+        return mentions;
+    };
 
     const handleEmojiSelect = (emoji) => {
-        setPostText(prev => prev + emoji);
+        const newDisplayText = displayText + emoji;
+        const newStoredText = postText + emoji;
+        setDisplayText(newDisplayText);
+        setPostText(newStoredText);
         setShowEmojiPicker(false);
     };
 
@@ -266,7 +286,6 @@ export default function CreatePost({
         return Promise.all(uploadPromises);
     };
 
-    // UPDATED: Handle post submission with support for custom onNewPost handler
     const handlePostSubmit = async () => {
         if ((!postText.trim() && selectedImages.length === 0) || !profile) return;
 
@@ -288,7 +307,8 @@ export default function CreatePost({
                 imageUrls = await uploadImages(selectedImages);
             }
 
-            // Prepare post data
+            const mentions = extractMentionsForStorage(postText);
+
             const postData = {
                 content: postText.trim() || '',
                 user_id: user.id,
@@ -297,48 +317,34 @@ export default function CreatePost({
                 image_url: imageUrls.length === 1 ? imageUrls[0] : null,
                 tags: selectedTags.length > 0 ? JSON.stringify(selectedTags) : null,
                 channel: channel,
-                link_url: linkPreview ? linkPreview.url : null,
+                mentions: mentions.length > 0 ? JSON.stringify(mentions) : null,
             };
 
-            // NEW: Check if we have a custom onNewPost handler (for organization posts)
-            if (onNewPost && typeof onNewPost === 'function' && channel === 'organization') {
-                // For organization posts, we need to add organization-specific fields
-                // Let the parent component handle the database insertion
-                const result = await onNewPost(postData);
-                
-                if (result) {
-                    // Clear form on success
-                    selectedImages.forEach(img => URL.revokeObjectURL(img.preview));
-                    setPostText('');
-                    setSelectedImages([]);
-                    setSelectedTags([]);
-                    setLinkPreview(null);
-                }
-            } else {
-                // Default behavior for regular posts
-                const { data: newPost, error: postError } = await supabase
-                    .from('posts')
-                    .insert(postData)
-                    .select()
-                    .single();
+            const { data: newPost, error: postError } = await supabase
+                .from('posts')
+                .insert(postData)
+                .select()
+                .single();
 
-                if (postError) {
-                    setError('Failed to create post. Please try again.');
-                    console.error('Post creation error:', postError);
-                    return;
-                }
+            if (postError) {
+                setError('Failed to create post. Please try again.');
+                console.error('Post creation error:', postError);
+                return;
+            }
 
-                selectedImages.forEach(img => URL.revokeObjectURL(img.preview));
-                
-                setPostText('');
-                setSelectedImages([]);
-                setSelectedTags([]);
-                setLinkPreview(null);
-                
-                // Call the onNewPost callback if provided
-                if (onNewPost && typeof onNewPost === 'function') {
-                    onNewPost(newPost);
-                }
+            if (mentions.length > 0) {
+                await createMentionRecords(newPost.id, mentions);
+            }
+
+            selectedImages.forEach(img => URL.revokeObjectURL(img.preview));
+            
+            setPostText('');
+            setDisplayText('');
+            setSelectedImages([]);
+            setSelectedTags([]); // Clear tags on successful post
+            
+            if (onNewPost && typeof onNewPost === 'function') {
+                onNewPost(newPost);
             }
 
         } catch (error) {
@@ -350,84 +356,93 @@ export default function CreatePost({
         }
     };
 
-    // Improved random mosaic layout generator
-    const getRandomMosaicLayout = (count) => {
-        const layouts = {
-            1: [
-                { span: 'col-span-6 row-span-4', aspect: 'aspect-video' }
-            ],
-            2: [
-                { span: 'col-span-3 row-span-4', aspect: 'aspect-[3/4]' },
-                { span: 'col-span-3 row-span-4', aspect: 'aspect-[3/4]' }
-            ],
-            3: [
-                { span: 'col-span-4 row-span-4', aspect: 'aspect-square' },
-                { span: 'col-span-2 row-span-2', aspect: 'aspect-square' },
-                { span: 'col-span-2 row-span-2', aspect: 'aspect-square' }
-            ],
-            4: [
-                { span: 'col-span-3 row-span-3', aspect: 'aspect-square' },
-                { span: 'col-span-3 row-span-3', aspect: 'aspect-square' },
-                { span: 'col-span-3 row-span-2', aspect: 'aspect-[3/2]' },
-                { span: 'col-span-3 row-span-2', aspect: 'aspect-[3/2]' }
-            ],
-            5: [
-                { span: 'col-span-3 row-span-3', aspect: 'aspect-square' },
-                { span: 'col-span-3 row-span-3', aspect: 'aspect-square' },
-                { span: 'col-span-2 row-span-2', aspect: 'aspect-square' },
-                { span: 'col-span-2 row-span-2', aspect: 'aspect-square' },
-                { span: 'col-span-2 row-span-2', aspect: 'aspect-square' }
-            ],
-            6: [
-                { span: 'col-span-2 row-span-2', aspect: 'aspect-square' },
-                { span: 'col-span-2 row-span-2', aspect: 'aspect-square' },
-                { span: 'col-span-2 row-span-2', aspect: 'aspect-square' },
-                { span: 'col-span-2 row-span-2', aspect: 'aspect-square' },
-                { span: 'col-span-2 row-span-2', aspect: 'aspect-square' },
-                { span: 'col-span-2 row-span-2', aspect: 'aspect-square' }
-            ]
-        };
-        return layouts[count] || [];
+    const createMentionRecords = async (postId, mentions) => {
+        try {
+            const mentionRecords = mentions.map(mention => {
+                const record = {
+                    post_id: postId,
+                    mention_type: mention.type
+                };
+
+                if (mention.type === 'user') {
+                    record.mentioned_profile_id = mention.id;
+                } else if (mention.type === 'organization') {
+                    const [orgType, orgId] = mention.id.split('-');
+                    record.mentioned_organization_id = parseInt(orgId);
+                    record.mentioned_organization_type = orgType;
+                }
+
+                return record;
+            });
+
+            const { error } = await supabase
+                .from('post_mentions')
+                .insert(mentionRecords);
+
+            if (error) {
+                console.error('Error creating mention records:', error);
+            }
+        } catch (error) {
+            console.error('Error processing mentions:', error);
+        }
     };
 
-    const mosaicLayout = getRandomMosaicLayout(selectedImages.length);
-
-    // NEW: Dynamic placeholder based on props or default
     const getPlaceholder = () => {
         if (placeholder) return placeholder;
         return `What's on your mind, ${profile?.full_name?.split(' ')[0] || 'there'}?`;
     };
 
     return (
-        <div 
-            ref={containerRef}
-            className={`bg-white p-5 rounded-xl shadow-sm border border-slate-200 transition-all duration-200 ${
-                isDragActive ? 'ring-2 ring-blue-400 border-blue-300 bg-blue-50' : ''
-            }`}
-        >
+        <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
             <div className="flex items-start space-x-3">
                 <Avatar src={profile?.avatar_url} fullName={profile?.full_name} size="md" />
                 <div className="flex-1">
                     <div className="relative">
                         <textarea
-                            value={postText}
-                            onChange={(e) => setPostText(e.target.value)}
+                            ref={textareaRef}
+                            value={displayText}
+                            onChange={handleTextChange}
                             placeholder={getPlaceholder()}
-                            className="w-full p-3 pr-12 border border-slate-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            className="w-full p-3 pr-24 border border-slate-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                             rows="3"
                             disabled={isLoading}
                         />
                         
-                        {/* Emoji button */}
-                        <button
-                            onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                            className="absolute bottom-3 right-3 p-1 text-slate-400 hover:text-yellow-500 transition-colors"
-                            type="button"
-                        >
-                            <Smile size={20} />
-                        </button>
+                        <div className="absolute bottom-3 right-3 flex items-center space-x-3">
+                            <button
+                                onClick={() => { /* Logic to insert @ moved inside for simplicity */
+                                    if (textareaRef.current) {
+                                        const cursorPos = textareaRef.current.selectionStart;
+                                        const newDisplayText = displayText.slice(0, cursorPos) + '@' + displayText.slice(cursorPos);
+                                        const newStoredText = postText.slice(0, cursorPos) + '@' + postText.slice(cursorPos);
+                                        setDisplayText(newDisplayText);
+                                        setPostText(newStoredText);
+                                        setTimeout(() => {
+                                            if (textareaRef.current) {
+                                                const newCursorPos = cursorPos + 1;
+                                                textareaRef.current.setSelectionRange(newCursorPos, newCursorPos);
+                                                textareaRef.current.focus();
+                                                handleTextChange({ target: textareaRef.current });
+                                            }
+                                        }, 0);
+                                    }
+                                }}
+                                className="p-1 text-slate-400 hover:text-blue-500 transition-colors"
+                                type="button"
+                                title="Mention someone"
+                            >
+                                <AtSign size={20} />
+                            </button>
+                            
+                            <button
+                                onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                                className="p-1 text-slate-400 hover:text-yellow-500 transition-colors"
+                                type="button"
+                            >
+                                <Smile size={20} />
+                            </button>
+                        </div>
 
-                        {/* Emoji Picker */}
                         {showEmojiPicker && (
                             <div className="absolute top-full right-0 mt-2 bg-white rounded-lg shadow-lg border p-3 z-50 max-w-xs">
                                 <div className="grid grid-cols-8 gap-1">
@@ -446,71 +461,40 @@ export default function CreatePost({
                         )}
                     </div>
 
-                    {/* Link Preview */}
-                    {isFetchingPreview && (
-                        <div className="mt-3 text-sm text-slate-500">Fetching link preview...</div>
+                    {showMentionDropdown && (
+                        <MentionDropdown
+                            query={mentionQuery}
+                            onSelect={handleMentionSelect}
+                            onClose={() => setShowMentionDropdown(false)}
+                            position={mentionPosition}
+                        />
                     )}
-                    {linkPreview && (
-                        <div className="mt-3 relative border rounded-lg overflow-hidden">
-                            <button
-                                onClick={() => setLinkPreview(null)}
-                                className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 shadow-md z-10"
-                                type="button"
-                            >
-                                <X size={14} />
-                            </button>
-                            {linkPreview.image && (
-                                <img src={linkPreview.image} alt="Link preview" className="w-full h-48 object-cover" />
-                            )}
-                            <div className="p-3 bg-slate-50">
-                                <p className="font-semibold text-slate-800 truncate">{linkPreview.title}</p>
-                                <p className="text-sm text-slate-600 truncate">{linkPreview.description}</p>
-                                <a href={linkPreview.url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline">
-                                    {linkPreview.url}
-                                </a>
+                    
+                    {selectedImages.length > 0 && (
+                        <div className="mt-3">
+                            <div className="grid grid-cols-3 gap-2">
+                                {selectedImages.map((image, index) => (
+                                    <div key={image.id} className="relative group">
+                                        <img
+                                            src={image.preview}
+                                            alt={`Upload preview ${index + 1}`}
+                                            className="w-full h-32 object-cover rounded-lg"
+                                        />
+                                        <button
+                                            onClick={() => removeImage(image.id)}
+                                            className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                                            disabled={isLoading}
+                                            type="button"
+                                        >
+                                            <X size={14} />
+                                        </button>
+                                    </div>
+                                ))}
                             </div>
                         </div>
                     )}
                     
-                    {/* Enhanced Image Preview Mosaic */}
-                    {selectedImages.length > 0 && (
-                        <div className="mt-3">
-                            <div className="grid grid-cols-6 gap-2 h-80">
-                                {selectedImages.map((image, index) => {
-                                    const layout = mosaicLayout[index] || { span: 'col-span-2 row-span-2', aspect: 'aspect-square' };
-                                    return (
-                                        <div 
-                                            key={image.id} 
-                                            className={`relative group overflow-hidden rounded-lg ${layout.span}`}
-                                        >
-                                            <img
-                                                src={image.preview}
-                                                alt={`Upload preview ${index + 1}`}
-                                                className="w-full h-full object-cover"
-                                            />
-                                            <button
-                                                onClick={() => removeImage(image.id)}
-                                                className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity shadow-md"
-                                                disabled={isLoading}
-                                                type="button"
-                                            >
-                                                <X size={14} />
-                                            </button>
-                                            {index === 5 && selectedImages.length > 6 && (
-                                                <div className="absolute inset-0 bg-black bg-opacity-60 flex items-center justify-center">
-                                                    <span className="text-white font-bold text-lg">
-                                                        +{selectedImages.length - 6}
-                                                    </span>
-                                                </div>
-                                            )}
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Selected Tags Display */}
+                    {/* Re-integrated: Selected Tags Display */}
                     {selectedTags.length > 0 && (
                         <div className="mt-3 flex flex-wrap gap-2">
                             {selectedTags.map(tag => (
@@ -525,13 +509,6 @@ export default function CreatePost({
                                     </button>
                                 </div>
                             ))}
-                        </div>
-                    )}
-
-                    {isDragActive && selectedImages.length === 0 && (
-                        <div className="mt-3 border-2 border-dashed border-blue-300 rounded-lg p-8 text-center bg-blue-50">
-                            <Camera className="w-12 h-12 text-blue-500 mx-auto mb-2" />
-                            <p className="text-blue-600 font-medium">Drop images here to add to your post</p>
                         </div>
                     )}
 
@@ -565,7 +542,7 @@ export default function CreatePost({
                                 </>
                             )}
                             
-                            {/* Tag Selector */}
+                            {/* Re-integrated: Tag Selector Button and Modal */}
                             <div className="relative">
                                 <button
                                     onClick={() => setShowTagSelector(!showTagSelector)}
@@ -582,7 +559,6 @@ export default function CreatePost({
                                     <div className="absolute top-full mt-2 bg-white rounded-lg shadow-lg border p-4 z-50 w-96">
                                         <p className="text-sm font-medium text-slate-700 mb-3">Add tags to categorize your post (max 6)</p>
                                         
-                                        {/* Custom tag input */}
                                         <div className="mb-4">
                                             <div className="flex space-x-2">
                                                 <input
@@ -606,7 +582,6 @@ export default function CreatePost({
                                             </div>
                                         </div>
 
-                                        {/* Predefined tags */}
                                         <div className="grid grid-cols-2 gap-2 mb-4">
                                             {availableTags.map(tag => (
                                                 <button
@@ -644,6 +619,7 @@ export default function CreatePost({
                                     {selectedImages.length}/6 photos
                                 </span>
                             )}
+                            {/* Re-integrated: Tag counter */}
                             {selectedTags.length > 0 && (
                                 <span className="text-xs text-slate-500 bg-slate-100 px-2 py-1 rounded-full">
                                     {selectedTags.length} tag{selectedTags.length !== 1 ? 's' : ''}
@@ -653,12 +629,16 @@ export default function CreatePost({
                         
                         <button
                             onClick={handlePostSubmit}
-                            disabled={isLoading || (!postText.trim() && selectedImages.length === 0 && !linkPreview)}
+                            disabled={isLoading || (!postText.trim() && selectedImages.length === 0)}
                             className="bg-blue-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm"
                             type="button"
                         >
                             {uploading ? 'Uploading...' : isLoading ? 'Posting...' : 'Post'}
                         </button>
+                    </div>
+                    
+                    <div className="mt-2 text-xs text-slate-500">
+                        💡 Type @ to mention users or organizations
                     </div>
                 </div>
             </div>
