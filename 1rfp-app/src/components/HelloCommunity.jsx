@@ -1,4 +1,3 @@
-// src/components/HelloCommunity.jsx
 import React, { useState, useEffect, useCallback, memo, useRef } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import PropTypes from 'prop-types';
@@ -188,43 +187,38 @@ function HelloCommunity() {
 
   useEffect(() => {
     const fetchCommunityPosts = async () => {
-      if (!userRole || (userRole !== 'Funder' && userRole !== 'Nonprofit') || !hasMore) {
+      if (!userRole || !canPost || !hasMore) {
         setInitialLoading(false);
         return;
       }
 
       page === 0 ? setInitialLoading(true) : setIsPageLoading(true);
 
-      const from = page * POSTS_PER_PAGE;
-      const to = from + POSTS_PER_PAGE - 1;
-
       try {
-        const { data: postsData, error: postsError } = await supabase.from('posts').select('*, profiles!posts_profile_id_fkey(*)').eq('channel', 'hello-community').eq('profiles.role', userRole).order('created_at', { ascending: false }).range(from, to);
-        if (postsError) throw postsError;
+        const { data: postsData, error: rpcError } = await supabase.rpc('get_ranked_community_feed', {
+            role_filter: userRole,
+            page_number: page,
+            page_size: POSTS_PER_PAGE
+        });
+
+        if (rpcError) throw rpcError;
 
         if (postsData && postsData.length > 0) {
           const postIds = postsData.map((post) => post.id);
           const { data: allReactions } = await supabase.from('post_likes').select('post_id, reaction_type').in('post_id', postIds);
-          const { data: allComments } = await supabase.from('post_comments').select('post_id').in('post_id', postIds);
+          const userIds = [...new Set(postsData.map(p => p.profile_id))];
+          const { data: profiles, error: profileError } = await supabase.from('profiles').select('*').in('id', userIds);
+          if (profileError) throw profileError;
+          const profilesById = profiles.reduce((acc, p) => { acc[p.id] = p; return acc; }, {});
 
           const enrichedPosts = postsData.map((post) => {
             const reactionsForPost = allReactions?.filter(r => r.post_id === post.id) || [];
-            const reactionSummary = reactionsForPost.reduce((acc, r) => {
-                const type = r.reaction_type || 'like';
-                acc[type] = (acc[type] || 0) + 1;
-                return acc;
-            }, {});
-            return {
-              ...post,
-              likes_count: reactionsForPost.length,
-              comments_count: allComments?.filter(c => c.post_id === post.id).length || 0,
-              reactions: { summary: Object.entries(reactionSummary).map(([type, count]) => ({ type, count })), sample: [] }
-            };
+            const reactionSummary = reactionsForPost.reduce((acc, r) => { const type = r.reaction_type || 'like'; acc[type] = (acc[type] || 0) + 1; return acc; }, {});
+            return { ...post, profiles: profilesById[post.profile_id], reactions: { summary: Object.entries(reactionSummary).map(([type, count]) => ({ type, count })), sample: [] } };
           });
           
           setPosts(prev => (page === 0 ? enrichedPosts : [...prev, ...enrichedPosts]));
           if (postsData.length < POSTS_PER_PAGE) setHasMore(false);
-
         } else {
           setHasMore(false);
         }
@@ -237,7 +231,42 @@ function HelloCommunity() {
     };
     
     fetchCommunityPosts();
-  }, [userRole, page]);
+  }, [userRole, page, canPost, hasMore]);
+
+  useEffect(() => {
+    if (!userRole) return;
+
+    const handlePostInsert = async (payload) => {
+        const { data: profileData } = await supabase.from('profiles').select('id, role').eq('id', payload.new.profile_id).single();
+        if (profileData && profileData.role === userRole) {
+            const newPostWithProfile = { ...payload.new, profiles: profileData };
+            setPosts(currentPosts => {
+                if (currentPosts.some(p => p.id === newPostWithProfile.id)) return currentPosts;
+                return [newPostWithProfile, ...currentPosts];
+            });
+        }
+    };
+
+    const handlePostUpdate = (payload) => {
+        setPosts(currentPosts => currentPosts.map(p => p.id === payload.new.id ? { ...p, ...payload.new } : p));
+    };
+
+    const handlePostDelete = (payload) => {
+        setPosts(currentPosts => currentPosts.filter(p => p.id !== payload.old.id));
+    };
+
+    const channel = supabase.channel(`public:community_feed:${userRole}`);
+    
+    channel
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'posts', filter: `channel=eq.hello-community` }, handlePostInsert)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'posts' }, handlePostUpdate)
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'posts' }, handlePostDelete)
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [userRole]);
 
   const handleNewPost = useCallback((newPostData) => {
     setPosts(prev => [{ ...newPostData, profiles: profile, reactions: { summary: [], sample: [] }, likes_count: 0, comments_count: 0 }, ...prev]);
