@@ -184,17 +184,15 @@ export default function DashboardHomePage() {
                         acc[type] = (acc[type] || 0) + 1;
                         return acc;
                     }, {});
-
                     return {
                         ...post,
                         profiles: profilesById[post.profile_id],
                         reactions: { summary: Object.entries(reactionSummary).map(([type, count]) => ({ type, count })), sample: [] }
                     };
                 });
-
+                
                 setPosts(prevPosts => (page === 0 ? enrichedPosts : [...prevPosts, ...enrichedPosts]));
                 if (newPosts.length < POSTS_PER_PAGE) setHasMore(false);
-
             } else {
                 setHasMore(false);
             }
@@ -209,15 +207,13 @@ export default function DashboardHomePage() {
   }, [page]);
   
   useEffect(() => {
-    // --- THIS IS THE FULLY RESTORED REAL-TIME LOGIC ---
     const refreshPostCounts = async (postId) => {
-      const { data: postData, error } = await supabase
-        .from('posts')
-        .select('likes_count, comments_count')
-        .eq('id', postId)
-        .single();
-      
-      if (!error && postData) {
+      // First check if this post is in our current posts (hello-world channel)
+      const isInCurrentPosts = posts.some(p => p.id === postId);
+      if (!isInCurrentPosts) return;
+
+      const { data: postData } = await supabase.from('posts').select('likes_count, comments_count').eq('id', postId).single();
+      if (postData) {
         setPosts(currentPosts => currentPosts.map(p => 
           p.id === postId 
             ? { ...p, likes_count: postData.likes_count, comments_count: postData.comments_count }
@@ -226,7 +222,7 @@ export default function DashboardHomePage() {
       }
     };
 
-    const channel = supabase.channel('public:posts_feed_v2');
+    const channel = supabase.channel('public:posts_feed_hello_world');
     
     channel
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'posts', filter: 'channel=eq.hello-world' }, async (payload) => {
@@ -239,28 +235,32 @@ export default function DashboardHomePage() {
             });
         }
       })
-      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'posts' }, (payload) => {
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'posts', filter: 'channel=eq.hello-world' }, (payload) => {
         setPosts(currentPosts => currentPosts.filter(p => p.id !== payload.old.id));
       })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'posts' }, (payload) => {
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'posts', filter: 'channel=eq.hello-world' }, (payload) => {
         setPosts(currentPosts => currentPosts.map(p => 
           p.id === payload.new.id ? { ...p, ...payload.new } : p
         ));
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'post_likes' }, (payload) => {
         const postId = payload.new?.post_id || payload.old?.post_id;
-        if (postId) refreshPostCounts(postId);
+        if (postId) {
+            refreshPostCounts(postId);
+        }
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'post_comments' }, (payload) => {
         const postId = payload.new?.post_id || payload.old?.post_id;
-        if (postId) refreshPostCounts(postId);
+        if (postId) {
+            refreshPostCounts(postId);
+        }
       })
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [posts]); // Added posts as dependency to ensure we have the latest posts for filtering
 
   const handleEnterWorld = () => {
     if (profile?.id) {
@@ -271,13 +271,7 @@ export default function DashboardHomePage() {
   };
 
   const handleNewPost = (newPost) => {
-      const postWithProfile = {
-          ...newPost,
-          profiles: profile,
-          likes_count: 0,
-          comments_count: 0,
-          reactions: { summary: [], sample: [] }
-      };
+      const postWithProfile = { ...newPost, profiles: profile, likes_count: 0, comments_count: 0, reactions: { summary: [], sample: [] } };
       setPosts(p => [postWithProfile, ...p]);
   };
   

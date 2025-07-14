@@ -259,8 +259,8 @@ function HelloCommunity() {
     
     channel
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'posts', filter: `channel=eq.hello-community` }, handlePostInsert)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'posts' }, handlePostUpdate)
-      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'posts' }, handlePostDelete)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'posts', filter: `channel=eq.hello-community` }, handlePostUpdate)
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'posts', filter: `channel=eq.hello-community` }, handlePostDelete)
       .subscribe();
 
     return () => {
