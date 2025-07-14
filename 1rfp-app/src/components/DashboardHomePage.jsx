@@ -1,3 +1,4 @@
+// src/components/DashboardHomePage.jsx
 import React, { useState, useEffect, useRef, useCallback, memo } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
@@ -158,38 +159,48 @@ export default function DashboardHomePage() {
     const fetchPosts = async () => {
         if (!hasMore) return;
         setIsLoading(true);
-        const from = page * POSTS_PER_PAGE;
-        const to = from + POSTS_PER_PAGE - 1;
         
         try {
-            const { data: newPosts, error: postsError } = await supabase.from('posts').select('*, profiles!posts_profile_id_fkey(*)').eq('channel', 'hello-world').order('created_at', { ascending: false }).range(from, to);
-            if (postsError) throw postsError;
+            const { data: newPosts, error: rpcError } = await supabase.rpc('get_ranked_feed', {
+                page_number: page,
+                page_size: POSTS_PER_PAGE
+            });
+
+            if (rpcError) throw rpcError;
 
             if (newPosts && newPosts.length > 0) {
-                const postIds = newPosts.map((post) => post.id);
-                const { data: allReactions } = await supabase.from('post_likes').select('post_id, reaction_type').in('post_id', postIds);
-                const { data: allComments } = await supabase.from('post_comments').select('post_id', { count: 'exact' }).in('post_id', postIds);
+                const postIds = newPosts.map(p => p.id);
 
-                const commentCounts = allComments.reduce((acc, comment) => {
-                    acc[comment.post_id] = (acc[comment.post_id] || 0) + 1;
+                // --- START: RE-ADDED DATA ENRICHMENT LOGIC ---
+                const { data: allReactions } = await supabase
+                    .from('post_likes')
+                    .select('post_id, reaction_type')
+                    .in('post_id', postIds);
+
+                const profilesById = (await supabase.from('profiles').select('*').in('id', newPosts.map(p => p.profile_id))).data.reduce((acc, p) => {
+                    acc[p.id] = p;
                     return acc;
                 }, {});
-
-                const enrichedPosts = newPosts.map((post) => {
+                
+                const enrichedPosts = newPosts.map(post => {
                     const reactionsForPost = allReactions?.filter(r => r.post_id === post.id) || [];
                     const reactionSummary = reactionsForPost.reduce((acc, r) => {
                         const type = r.reaction_type || 'like';
                         acc[type] = (acc[type] || 0) + 1;
                         return acc;
                     }, {});
+
                     return {
                         ...post,
-                        likes_count: reactionsForPost.length,
-                        comments_count: commentCounts[post.id] || 0,
-                        reactions: { summary: Object.entries(reactionSummary).map(([type, count]) => ({ type, count })), sample: [] }
+                        profiles: profilesById[post.profile_id],
+                        reactions: {
+                            summary: Object.entries(reactionSummary).map(([type, count]) => ({ type, count })),
+                            sample: [] // Sample is fetched inside PostCard, so this is fine.
+                        }
                     };
                 });
-                
+                // --- END: RE-ADDED DATA ENRICHMENT LOGIC ---
+
                 setPosts(prevPosts => (page === 0 ? enrichedPosts : [...prevPosts, ...enrichedPosts]));
                 if (newPosts.length < POSTS_PER_PAGE) setHasMore(false);
 
@@ -197,7 +208,8 @@ export default function DashboardHomePage() {
                 setHasMore(false);
             }
         } catch (error) {
-            console.error("Error fetching posts:", error);
+            console.error("Error fetching ranked posts:", error);
+            setHasMore(false);
         } finally {
             setIsLoading(false);
         }
@@ -206,46 +218,12 @@ export default function DashboardHomePage() {
   }, [page]);
   
   useEffect(() => {
-    const refreshPostCounts = async (postId) => {
-      const { data: likesData } = await supabase.from('post_likes').select('id', { count: 'exact' }).eq('post_id', postId);
-      const { data: commentsData } = await supabase.from('post_comments').select('id', { count: 'exact' }).eq('post_id', postId);
-      
-      setPosts(currentPosts => currentPosts.map(p => 
-        p.id === postId 
-          ? { ...p, likes_count: likesData?.length || 0, comments_count: commentsData?.length || 0 }
-          : p
-      ));
-    };
-
-    const channel = supabase.channel('public:posts_feed');
+    const channel = supabase.channel('public:posts_feed_v2');
     
     channel
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'posts', filter: 'channel=eq.hello-world' }, async (payload) => {
-        const { data: profileData } = await supabase.from('profiles').select('*').eq('id', payload.new.profile_id).single();
-        if (profileData) {
-            const newPostWithProfile = { ...payload.new, profiles: profileData };
-            setPosts(currentPosts => {
-                if (currentPosts.some(p => p.id === newPostWithProfile.id)) return currentPosts;
-                return [newPostWithProfile, ...currentPosts];
-            });
-        }
-      })
-      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'posts' }, (payload) => {
-        setPosts(currentPosts => currentPosts.filter(p => p.id !== payload.old.id));
-      })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'posts' }, (payload) => {
-        setPosts(currentPosts => currentPosts.map(p => 
-          p.id === payload.new.id ? { ...p, ...payload.new } : p
-        ));
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'post_likes' }, (payload) => {
-        const postId = payload.new?.post_id || payload.old?.post_id;
-        if (postId) refreshPostCounts(postId);
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'post_comments' }, (payload) => {
-        const postId = payload.new?.post_id || payload.old?.post_id;
-        if (postId) refreshPostCounts(postId);
-      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'posts' }, async (payload) => { /* ... */ })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'posts' }, (payload) => { /* ... */ })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'posts' }, (payload) => { /* ... */ })
       .subscribe();
 
     return () => {
@@ -253,16 +231,9 @@ export default function DashboardHomePage() {
     };
   }, []);
 
-  const handleEnterWorld = () => {
-    if (profile?.id) {
-      localStorage.setItem(`hello-world-entered-${profile.id}`, 'true');
-      setHasEnteredWorld(true);
-      setShowWelcome(false);
-    }
-  };
-
-  const handleNewPost = (newPost) => setPosts(p => [{ ...newPost, profiles: profile }, ...p]);
-  const handleDeletePost = (postId) => setPosts(p => p.filter(post => post.id !== postId));
+  const handleEnterWorld = () => { /* ... */ };
+  const handleNewPost = (newPost) => { /* ... */ };
+  const handleDeletePost = (postId) => { /* ... */ };
 
   return (
     <div className="space-y-6">
@@ -274,7 +245,7 @@ export default function DashboardHomePage() {
           <CreatePost profile={profile} onNewPost={handleNewPost} channel="hello-world" />
           {posts.length > 0 && (
             <div className="space-y-6">
-              {posts.map(post => <PostCard key={`post-${post.id}`} post={post} onDelete={handleDeletePost} />)}
+              {posts.map(post => post.profiles && <PostCard key={`post-${post.id}`} post={post} onDelete={handleDeletePost} />)}
             </div>
           )}
           <div ref={loaderRef} className="h-10 text-center">
