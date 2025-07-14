@@ -1,4 +1,3 @@
-// src/components/DashboardHomePage.jsx
 import React, { useState, useEffect, useRef, useCallback, memo } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
@@ -114,6 +113,15 @@ const HelloWorldEmptyState = () => (
     </div>
 );
 
+const HelloWorldChannelIdentifier = () => (
+    <div className="mb-6">
+        <div className="inline-flex items-center px-4 py-2 rounded-full text-sm font-medium bg-sky-50 text-sky-700 border border-sky-200">
+            <span className="mr-2">🌍</span>
+            <span>#hello-world</span>
+        </div>
+    </div>
+);
+
 const POSTS_PER_PAGE = 5;
 
 export default function DashboardHomePage() {
@@ -152,13 +160,47 @@ export default function DashboardHomePage() {
         setIsLoading(true);
         const from = page * POSTS_PER_PAGE;
         const to = from + POSTS_PER_PAGE - 1;
-        const { data: newPosts, error } = await supabase.from('posts').select('*, profiles!posts_profile_id_fkey(*)').eq('channel', 'hello-world').order('created_at', { ascending: false }).range(from, to);
-        if (error) console.error("Error fetching posts:", error);
-        else {
-            setPosts(prevPosts => (page === 0 ? newPosts : [...prevPosts, ...newPosts]));
-            if (newPosts.length < POSTS_PER_PAGE) setHasMore(false);
+        
+        try {
+            const { data: newPosts, error: postsError } = await supabase.from('posts').select('*, profiles!posts_profile_id_fkey(*)').eq('channel', 'hello-world').order('created_at', { ascending: false }).range(from, to);
+            if (postsError) throw postsError;
+
+            if (newPosts && newPosts.length > 0) {
+                const postIds = newPosts.map((post) => post.id);
+                const { data: allReactions } = await supabase.from('post_likes').select('post_id, reaction_type').in('post_id', postIds);
+                const { data: allComments } = await supabase.from('post_comments').select('post_id', { count: 'exact' }).in('post_id', postIds);
+
+                const commentCounts = allComments.reduce((acc, comment) => {
+                    acc[comment.post_id] = (acc[comment.post_id] || 0) + 1;
+                    return acc;
+                }, {});
+
+                const enrichedPosts = newPosts.map((post) => {
+                    const reactionsForPost = allReactions?.filter(r => r.post_id === post.id) || [];
+                    const reactionSummary = reactionsForPost.reduce((acc, r) => {
+                        const type = r.reaction_type || 'like';
+                        acc[type] = (acc[type] || 0) + 1;
+                        return acc;
+                    }, {});
+                    return {
+                        ...post,
+                        likes_count: reactionsForPost.length,
+                        comments_count: commentCounts[post.id] || 0,
+                        reactions: { summary: Object.entries(reactionSummary).map(([type, count]) => ({ type, count })), sample: [] }
+                    };
+                });
+                
+                setPosts(prevPosts => (page === 0 ? enrichedPosts : [...prevPosts, ...enrichedPosts]));
+                if (newPosts.length < POSTS_PER_PAGE) setHasMore(false);
+
+            } else {
+                setHasMore(false);
+            }
+        } catch (error) {
+            console.error("Error fetching posts:", error);
+        } finally {
+            setIsLoading(false);
         }
-        setIsLoading(false);
     };
     fetchPosts();
   }, [page]);
@@ -228,6 +270,7 @@ export default function DashboardHomePage() {
       {showWelcome && <HelloWorldWelcomeSection onEnterWorld={handleEnterWorld} hasEnteredWorld={hasEnteredWorld}/>}
       {(hasEnteredWorld || posts.length > 0) && (
         <>
+          <HelloWorldChannelIdentifier />
           <CreatePost profile={profile} onNewPost={handleNewPost} channel="hello-world" />
           {posts.length > 0 && (
             <div className="space-y-6">
