@@ -1,42 +1,29 @@
-import React, { useState, useRef } from 'react';
+// Enhanced PostBody component with fixed navigation
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import ImageMosaic from './ImageMosaic';
 import TagDisplay from './TagDisplay';
-import MentionHoverCard from './MentionHoverCard';
 
 export default function PostBody({ content, images, tags, onImageClick }) {
     const navigate = useNavigate();
-    const [hoveredMention, setHoveredMention] = useState(null);
-    const [mentionPosition, setMentionPosition] = useState(null);
-    const hoverTimeoutRef = useRef(null);
-    const mentionRefs = useRef({});
-
     const MAX_CHARS = 300;
     const shouldTruncate = content && content.length > MAX_CHARS;
 
-    const handleMentionEnter = (mention, key) => {
-        clearTimeout(hoverTimeoutRef.current);
-        const ref = mentionRefs.current[key];
-        if (ref) {
-            const rect = ref.getBoundingClientRect();
-            setMentionPosition({ top: rect.bottom + window.scrollY + 5, left: rect.left + window.scrollX });
-            setHoveredMention(mention);
-        }
-    };
-    
-    const handleMentionLeave = () => {
-        hoverTimeoutRef.current = setTimeout(() => {
-            setHoveredMention(null);
-        }, 300);
-    };
-
     const handleMentionClick = (mention) => {
+        // Navigate to user or organization profile with correct routes
         if (mention.entityType === 'user') {
-            navigate(`/profile/${mention.id}`);
+            // For users, navigate to member profile page within the profile section
+            navigate(`/profile/members/${mention.id}`);
         } else if (mention.entityType === 'organization') {
+            // Parse organization ID from format like "funder-123" or "nonprofit-456"
             const [orgType, orgId] = mention.id.split('-');
-            const path = orgType === 'nonprofit' ? `/nonprofits/${orgId}` : `/funders/${orgId}`;
-            navigate(path);
+            if (orgType === 'nonprofit') {
+                // Navigate to nonprofit profile page using the orgId as slug
+                navigate(`/nonprofits/${orgId}`);
+            } else if (orgType === 'funder') {
+                // Navigate to funder profile page using the orgId as slug
+                navigate(`/funders/${orgId}`);
+            }
         }
     };
 
@@ -50,9 +37,13 @@ export default function PostBody({ content, images, tags, onImageClick }) {
 
         while ((match = mentionRegex.exec(text)) !== null) {
             const [fullMatch, displayName, id, type] = match;
+            
+            // Add text before mention
             if (match.index > lastIndex) {
                 parts.push(text.slice(lastIndex, match.index));
             }
+            
+            // Add mention as clickable element
             parts.push({
                 type: 'mention',
                 displayName,
@@ -60,9 +51,11 @@ export default function PostBody({ content, images, tags, onImageClick }) {
                 entityType: type,
                 key: `mention-${id}-${match.index}`
             });
+            
             lastIndex = match.index + fullMatch.length;
         }
-
+        
+        // Add remaining text
         if (lastIndex < text.length) {
             parts.push(text.slice(lastIndex));
         }
@@ -72,33 +65,31 @@ export default function PostBody({ content, images, tags, onImageClick }) {
                 {parts.map((part, index) => {
                     if (typeof part === 'string') {
                         return <span key={index}>{part}</span>;
-                    } 
-                    return (
-                        <span
-                            key={part.key}
-                            ref={el => (mentionRefs.current[part.key] = el)}
-                            onMouseEnter={() => handleMentionEnter(part, part.key)}
-                            onMouseLeave={handleMentionLeave}
-                            onClick={() => handleMentionClick(part)}
-                            className="inline-flex items-center px-1 py-0.5 rounded text-blue-600 bg-blue-50 hover:bg-blue-100 cursor-pointer font-medium transition-colors"
-                            title={`View profile for ${part.displayName}`}
-                        >
-                            @{part.displayName}
-                        </span>
-                    );
+                    } else if (part.type === 'mention') {
+                        return (
+                            <span
+                                key={part.key}
+                                className="inline-flex items-center px-1 py-0.5 rounded text-blue-600 bg-blue-50 hover:bg-blue-100 cursor-pointer font-medium transition-colors"
+                                onClick={() => handleMentionClick(part)}
+                                title={`Go to ${part.displayName}'s profile`}
+                            >
+                                @{part.displayName}
+                            </span>
+                        );
+                    }
+                    return null;
                 })}
             </span>
         );
     };
 
     return (
-        <div className="mb-4" onMouseLeave={handleMentionLeave}>
+        <div className="mb-4">
             {content && (
                 <div className="mb-4">
                     <div className="text-slate-700 leading-relaxed whitespace-pre-wrap">
                         {shouldTruncate ? (
                             <>
-                                {/* This line has been corrected from MAX_chars to MAX_CHARS */}
                                 {renderTextWithMentions(`${content.substring(0, MAX_CHARS).replace(/\s+\S*$/, '')}...`)}
                                 {' '}
                                 <button 
@@ -119,13 +110,6 @@ export default function PostBody({ content, images, tags, onImageClick }) {
             )}
             {tags && (
                 <TagDisplay tags={tags} />
-            )}
-            
-            {hoveredMention && (
-                 <MentionHoverCard 
-                    mention={hoveredMention} 
-                    position={mentionPosition} 
-                />
             )}
         </div>
     );

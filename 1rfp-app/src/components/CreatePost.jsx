@@ -1,4 +1,4 @@
-// Production CreatePost.jsx - With Tags and Clean Mention Display
+// Production CreatePost.jsx - With stylized mentions in textarea
 import React, { useState, useRef, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { Camera, X, Smile, AtSign } from 'lucide-react';
@@ -12,7 +12,6 @@ export default function CreatePost({
   placeholder = null
 }) {
     const [postText, setPostText] = useState('');
-    const [displayText, setDisplayText] = useState(''); // For clean display
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
     const [selectedImages, setSelectedImages] = useState([]);
@@ -32,13 +31,13 @@ export default function CreatePost({
     
     const fileInputRef = useRef(null);
     const textareaRef = useRef(null);
+    const overlayRef = useRef(null);
 
     const emojis = [
         '😊', '😂', '❤️', '👍', '🎉', '🔥', '💡', '🚀',
         '💯', '⭐', '🌟', '💪', '🙌', '👏', '🎯', '💝'
     ];
     
-    // Restored the full list of available tags
     const availableTags = [
         { id: 'education', label: 'Education', color: 'bg-blue-100 text-blue-800 border-blue-200' },
         { id: 'health', label: 'Health', color: 'bg-green-100 text-green-800 border-green-200' },
@@ -52,8 +51,7 @@ export default function CreatePost({
         { id: 'research', label: 'Research', color: 'bg-gray-100 text-gray-800 border-gray-200' }
     ];
 
-    // --- Start of Re-integrated Tag Functions ---
-
+    // Tag functions
     const getRandomTagColor = () => {
         const colors = [
             'bg-blue-100 text-blue-800 border-blue-200',
@@ -70,7 +68,7 @@ export default function CreatePost({
 
     const handleTagToggle = (tagId) => {
         if (selectedTags.length >= 6 && !selectedTags.some(tag => tag.id === tagId)) {
-            return; // Don't add more than 6 tags
+            return;
         }
         
         setSelectedTags(prev => {
@@ -102,18 +100,30 @@ export default function CreatePost({
         setSelectedTags(prev => prev.filter(tag => tag.id !== tagId));
     };
 
-    // --- End of Re-integrated Tag Functions ---
-
-    // Convert stored format to display format
-    const convertToDisplayText = (rawText) => {
-        if (!rawText) return '';
-        // Replace @[Name](id:type) with @Name
-        return rawText.replace(/@\[([^\]]+)\]\([^)]+\)/g, '@$1');
+    // Create display text with styled mentions
+    const createStyledOverlay = (text) => {
+        if (!text) return '';
+        
+        const mentionRegex = /@\[([^\]]+)\]\(([^:]+):([^)]+)\)/g;
+        let styledText = text;
+        
+        // Replace mentions with styled spans
+        styledText = styledText.replace(mentionRegex, (match, displayName, id, type) => {
+            return `<span class="mention-highlight">@${displayName}</span>`;
+        });
+        
+        // Convert line breaks to <br> tags
+        styledText = styledText.replace(/\n/g, '<br>');
+        
+        return styledText;
     };
 
-    // Update display text whenever postText changes
+    // Update overlay content when text changes
     useEffect(() => {
-        setDisplayText(convertToDisplayText(postText));
+        if (overlayRef.current) {
+            const styledContent = createStyledOverlay(postText);
+            overlayRef.current.innerHTML = styledContent;
+        }
     }, [postText]);
 
     // Mention handling
@@ -121,12 +131,9 @@ export default function CreatePost({
         const value = e.target.value;
         const cursorPosition = e.target.selectionStart;
         
-        setDisplayText(value);
+        setPostText(value);
         
-        if (!showMentionDropdown) {
-            setPostText(value);
-        }
-        
+        // Check for @ mentions
         const textBeforeCursor = value.slice(0, cursorPosition);
         const atIndex = textBeforeCursor.lastIndexOf('@');
         
@@ -160,20 +167,16 @@ export default function CreatePost({
         if (currentMentionStart >= 0) {
             const beforeMention = postText.slice(0, currentMentionStart);
             const afterCursor = postText.slice(textareaRef.current.selectionStart);
-            const mentionStoredText = `@[${mention.name}](${mention.id}:${mention.type})`;
-            const mentionDisplayText = `@${mention.name}`;
+            const mentionText = `@[${mention.name}](${mention.id}:${mention.type})`;
+            const newText = beforeMention + mentionText + ' ' + afterCursor;
             
-            const newStoredText = beforeMention + mentionStoredText + ' ' + afterCursor;
-            const newDisplayText = convertToDisplayText(beforeMention) + mentionDisplayText + ' ' + convertToDisplayText(afterCursor);
-            
-            setPostText(newStoredText);
-            setDisplayText(newDisplayText);
+            setPostText(newText);
             setShowMentionDropdown(false);
             setCurrentMentionStart(-1);
             
             setTimeout(() => {
                 if (textareaRef.current) {
-                    const newCursorPos = convertToDisplayText(beforeMention).length + mentionDisplayText.length + 1;
+                    const newCursorPos = beforeMention.length + mentionText.length + 1;
                     textareaRef.current.setSelectionRange(newCursorPos, newCursorPos);
                     textareaRef.current.focus();
                 }
@@ -204,10 +207,7 @@ export default function CreatePost({
     };
 
     const handleEmojiSelect = (emoji) => {
-        const newDisplayText = displayText + emoji;
-        const newStoredText = postText + emoji;
-        setDisplayText(newDisplayText);
-        setPostText(newStoredText);
+        setPostText(prev => prev + emoji);
         setShowEmojiPicker(false);
     };
 
@@ -221,7 +221,7 @@ export default function CreatePost({
 
         const validFiles = files.filter(file => {
             const isValidType = file.type.startsWith('image/');
-            const isValidSize = file.size <= 10 * 1024 * 1024; // 10MB limit
+            const isValidSize = file.size <= 10 * 1024 * 1024;
             
             if (!isValidType) {
                 setError('Please select only image files.');
@@ -339,9 +339,8 @@ export default function CreatePost({
             selectedImages.forEach(img => URL.revokeObjectURL(img.preview));
             
             setPostText('');
-            setDisplayText('');
             setSelectedImages([]);
-            setSelectedTags([]); // Clear tags on successful post
+            setSelectedTags([]);
             
             if (onNewPost && typeof onNewPost === 'function') {
                 onNewPost(newPost);
@@ -393,255 +392,300 @@ export default function CreatePost({
     };
 
     return (
-        <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
-            <div className="flex items-start space-x-3">
-                <Avatar src={profile?.avatar_url} fullName={profile?.full_name} size="md" />
-                <div className="flex-1">
-                    <div className="relative">
-                        <textarea
-                            ref={textareaRef}
-                            value={displayText}
-                            onChange={handleTextChange}
-                            placeholder={getPlaceholder()}
-                            className="w-full p-3 pr-24 border border-slate-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                            rows="3"
-                            disabled={isLoading}
-                        />
-                        
-                        <div className="absolute bottom-3 right-3 flex items-center space-x-3">
-                            <button
-                                onClick={() => { /* Logic to insert @ moved inside for simplicity */
-                                    if (textareaRef.current) {
-                                        const cursorPos = textareaRef.current.selectionStart;
-                                        const newDisplayText = displayText.slice(0, cursorPos) + '@' + displayText.slice(cursorPos);
-                                        const newStoredText = postText.slice(0, cursorPos) + '@' + postText.slice(cursorPos);
-                                        setDisplayText(newDisplayText);
-                                        setPostText(newStoredText);
-                                        setTimeout(() => {
-                                            if (textareaRef.current) {
-                                                const newCursorPos = cursorPos + 1;
-                                                textareaRef.current.setSelectionRange(newCursorPos, newCursorPos);
-                                                textareaRef.current.focus();
-                                                handleTextChange({ target: textareaRef.current });
-                                            }
-                                        }, 0);
-                                    }
+        <>
+            <style jsx>{`
+                .mention-highlight {
+                    background-color: rgb(239 246 255);
+                    color: rgb(37 99 235);
+                    padding: 2px 4px;
+                    border-radius: 4px;
+                    font-weight: 500;
+                }
+                .textarea-container {
+                    position: relative;
+                }
+                .styled-overlay {
+                    position: absolute;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    bottom: 0;
+                    padding: 12px;
+                    border: 1px solid transparent;
+                    background: transparent;
+                    color: transparent;
+                    pointer-events: none;
+                    white-space: pre-wrap;
+                    word-wrap: break-word;
+                    overflow: hidden;
+                    font-family: inherit;
+                    font-size: inherit;
+                    line-height: inherit;
+                    z-index: 1;
+                }
+                .transparent-textarea {
+                    position: relative;
+                    background: transparent;
+                    z-index: 2;
+                    color: rgb(51 65 85);
+                }
+            `}</style>
+            
+            <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+                <div className="flex items-start space-x-3">
+                    <Avatar src={profile?.avatar_url} fullName={profile?.full_name} size="md" />
+                    <div className="flex-1">
+                        <div className="relative textarea-container">
+                            <div 
+                                ref={overlayRef}
+                                className="styled-overlay"
+                                style={{
+                                    paddingRight: '96px' // Account for buttons on the right
                                 }}
-                                className="p-1 text-slate-400 hover:text-blue-500 transition-colors"
-                                type="button"
-                                title="Mention someone"
-                            >
-                                <AtSign size={20} />
-                            </button>
+                            />
+                            <textarea
+                                ref={textareaRef}
+                                value={postText}
+                                onChange={handleTextChange}
+                                placeholder={getPlaceholder()}
+                                className="transparent-textarea w-full p-3 pr-24 border border-slate-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                rows="3"
+                                disabled={isLoading}
+                            />
                             
-                            <button
-                                onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                                className="p-1 text-slate-400 hover:text-yellow-500 transition-colors"
-                                type="button"
-                            >
-                                <Smile size={20} />
-                            </button>
+                            <div className="absolute bottom-3 right-3 flex items-center space-x-3">
+                                <button
+                                    onClick={() => {
+                                        if (textareaRef.current) {
+                                            const cursorPos = textareaRef.current.selectionStart;
+                                            const newText = postText.slice(0, cursorPos) + '@' + postText.slice(cursorPos);
+                                            setPostText(newText);
+                                            setTimeout(() => {
+                                                if (textareaRef.current) {
+                                                    const newCursorPos = cursorPos + 1;
+                                                    textareaRef.current.setSelectionRange(newCursorPos, newCursorPos);
+                                                    textareaRef.current.focus();
+                                                    // Trigger the change event to detect mentions
+                                                    const event = { target: textareaRef.current };
+                                                    handleTextChange(event);
+                                                }
+                                            }, 0);
+                                        }
+                                    }}
+                                    className="p-1 text-slate-400 hover:text-blue-500 transition-colors"
+                                    type="button"
+                                    title="Mention someone"
+                                >
+                                    <AtSign size={20} />
+                                </button>
+                                
+                                <button
+                                    onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                                    className="p-1 text-slate-400 hover:text-yellow-500 transition-colors"
+                                    type="button"
+                                >
+                                    <Smile size={20} />
+                                </button>
+                            </div>
+
+                            {showEmojiPicker && (
+                                <div className="absolute top-full right-0 mt-2 bg-white rounded-lg shadow-lg border p-3 z-50 max-w-xs">
+                                    <div className="grid grid-cols-8 gap-1">
+                                        {emojis.map((emoji, index) => (
+                                            <button
+                                                key={index}
+                                                onClick={() => handleEmojiSelect(emoji)}
+                                                className="text-lg hover:bg-gray-100 rounded p-1 transition-colors"
+                                                type="button"
+                                            >
+                                                {emoji}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
-                        {showEmojiPicker && (
-                            <div className="absolute top-full right-0 mt-2 bg-white rounded-lg shadow-lg border p-3 z-50 max-w-xs">
-                                <div className="grid grid-cols-8 gap-1">
-                                    {emojis.map((emoji, index) => (
-                                        <button
-                                            key={index}
-                                            onClick={() => handleEmojiSelect(emoji)}
-                                            className="text-lg hover:bg-gray-100 rounded p-1 transition-colors"
-                                            type="button"
-                                        >
-                                            {emoji}
-                                        </button>
+                        {showMentionDropdown && (
+                            <MentionDropdown
+                                query={mentionQuery}
+                                onSelect={handleMentionSelect}
+                                onClose={() => setShowMentionDropdown(false)}
+                                position={mentionPosition}
+                            />
+                        )}
+                        
+                        {selectedImages.length > 0 && (
+                            <div className="mt-3">
+                                <div className="grid grid-cols-3 gap-2">
+                                    {selectedImages.map((image, index) => (
+                                        <div key={image.id} className="relative group">
+                                            <img
+                                                src={image.preview}
+                                                alt={`Upload preview ${index + 1}`}
+                                                className="w-full h-32 object-cover rounded-lg"
+                                            />
+                                            <button
+                                                onClick={() => removeImage(image.id)}
+                                                className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                disabled={isLoading}
+                                                type="button"
+                                            >
+                                                <X size={14} />
+                                            </button>
+                                        </div>
                                     ))}
                                 </div>
                             </div>
                         )}
-                    </div>
-
-                    {showMentionDropdown && (
-                        <MentionDropdown
-                            query={mentionQuery}
-                            onSelect={handleMentionSelect}
-                            onClose={() => setShowMentionDropdown(false)}
-                            position={mentionPosition}
-                        />
-                    )}
-                    
-                    {selectedImages.length > 0 && (
-                        <div className="mt-3">
-                            <div className="grid grid-cols-3 gap-2">
-                                {selectedImages.map((image, index) => (
-                                    <div key={image.id} className="relative group">
-                                        <img
-                                            src={image.preview}
-                                            alt={`Upload preview ${index + 1}`}
-                                            className="w-full h-32 object-cover rounded-lg"
-                                        />
+                        
+                        {selectedTags.length > 0 && (
+                            <div className="mt-3 flex flex-wrap gap-2">
+                                {selectedTags.map(tag => (
+                                    <div key={tag.id} className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border ${tag.color} group`}>
+                                        <span>{tag.label}</span>
                                         <button
-                                            onClick={() => removeImage(image.id)}
-                                            className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                                            disabled={isLoading}
+                                            onClick={() => removeTag(tag.id)}
+                                            className="ml-2 p-0.5 rounded-full hover:bg-black hover:bg-opacity-10 transition-colors"
                                             type="button"
                                         >
-                                            <X size={14} />
+                                            <X size={12} />
                                         </button>
                                     </div>
                                 ))}
                             </div>
-                        </div>
-                    )}
-                    
-                    {/* Re-integrated: Selected Tags Display */}
-                    {selectedTags.length > 0 && (
-                        <div className="mt-3 flex flex-wrap gap-2">
-                            {selectedTags.map(tag => (
-                                <div key={tag.id} className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border ${tag.color} group`}>
-                                    <span>{tag.label}</span>
+                        )}
+
+                        {error && (
+                            <div className="mt-2 text-red-600 text-sm bg-red-50 p-2 rounded">{error}</div>
+                        )}
+                        
+                        <div className="flex items-center justify-between mt-4">
+                            <div className="flex items-center space-x-4">
+                                {selectedImages.length < 6 && (
+                                    <>
+                                        <input
+                                            ref={fileInputRef}
+                                            type="file"
+                                            id="imageUpload"
+                                            multiple
+                                            accept="image/*"
+                                            onChange={handleImageSelect}
+                                            className="hidden"
+                                            disabled={isLoading}
+                                        />
+                                        <label
+                                            htmlFor="imageUpload"
+                                            className="flex items-center space-x-2 text-slate-600 hover:text-blue-600 cursor-pointer transition-colors py-1"
+                                        >
+                                            <Camera size={20} />
+                                            <span className="text-sm font-medium">
+                                                {selectedImages.length > 0 ? 'Add More' : 'Photos'}
+                                            </span>
+                                        </label>
+                                    </>
+                                )}
+                                
+                                {/* Tag Selector */}
+                                <div className="relative">
                                     <button
-                                        onClick={() => removeTag(tag.id)}
-                                        className="ml-2 p-0.5 rounded-full hover:bg-black hover:bg-opacity-10 transition-colors"
+                                        onClick={() => setShowTagSelector(!showTagSelector)}
+                                        className="flex items-center space-x-2 text-slate-600 hover:text-blue-600 cursor-pointer transition-colors py-1"
                                         type="button"
                                     >
-                                        <X size={12} />
+                                        <div className="w-5 h-5 rounded-full bg-gradient-to-r from-blue-400 to-purple-500 flex items-center justify-center">
+                                            <span className="text-white text-xs font-bold">#</span>
+                                        </div>
+                                        <span className="text-sm font-medium">Tags</span>
                                     </button>
-                                </div>
-                            ))}
-                        </div>
-                    )}
 
-                    {error && (
-                        <div className="mt-2 text-red-600 text-sm bg-red-50 p-2 rounded">{error}</div>
-                    )}
-                    
-                    <div className="flex items-center justify-between mt-4">
-                        <div className="flex items-center space-x-4">
-                            {selectedImages.length < 6 && (
-                                <>
-                                    <input
-                                        ref={fileInputRef}
-                                        type="file"
-                                        id="imageUpload"
-                                        multiple
-                                        accept="image/*"
-                                        onChange={handleImageSelect}
-                                        className="hidden"
-                                        disabled={isLoading}
-                                    />
-                                    <label
-                                        htmlFor="imageUpload"
-                                        className="flex items-center space-x-2 text-slate-600 hover:text-blue-600 cursor-pointer transition-colors py-1"
-                                    >
-                                        <Camera size={20} />
-                                        <span className="text-sm font-medium">
-                                            {selectedImages.length > 0 ? 'Add More' : 'Photos'}
-                                        </span>
-                                    </label>
-                                </>
-                            )}
-                            
-                            {/* Re-integrated: Tag Selector Button and Modal */}
-                            <div className="relative">
-                                <button
-                                    onClick={() => setShowTagSelector(!showTagSelector)}
-                                    className="flex items-center space-x-2 text-slate-600 hover:text-blue-600 cursor-pointer transition-colors py-1"
-                                    type="button"
-                                >
-                                    <div className="w-5 h-5 rounded-full bg-gradient-to-r from-blue-400 to-purple-500 flex items-center justify-center">
-                                        <span className="text-white text-xs font-bold">#</span>
-                                    </div>
-                                    <span className="text-sm font-medium">Tags</span>
-                                </button>
+                                    {showTagSelector && (
+                                        <div className="absolute top-full mt-2 bg-white rounded-lg shadow-lg border p-4 z-50 w-96">
+                                            <p className="text-sm font-medium text-slate-700 mb-3">Add tags to categorize your post (max 6)</p>
+                                            
+                                            <div className="mb-4">
+                                                <div className="flex space-x-2">
+                                                    <input
+                                                        type="text"
+                                                        value={customTagInput}
+                                                        onChange={(e) => setCustomTagInput(e.target.value)}
+                                                        placeholder="Create custom tag..."
+                                                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                        onKeyPress={(e) => e.key === 'Enter' && addCustomTag()}
+                                                        maxLength={20}
+                                                        disabled={selectedTags.length >= 6}
+                                                    />
+                                                    <button
+                                                        onClick={addCustomTag}
+                                                        disabled={!customTagInput.trim() || selectedTags.length >= 6}
+                                                        className="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                                        type="button"
+                                                    >
+                                                        Add
+                                                    </button>
+                                                </div>
+                                            </div>
 
-                                {showTagSelector && (
-                                    <div className="absolute top-full mt-2 bg-white rounded-lg shadow-lg border p-4 z-50 w-96">
-                                        <p className="text-sm font-medium text-slate-700 mb-3">Add tags to categorize your post (max 6)</p>
-                                        
-                                        <div className="mb-4">
-                                            <div className="flex space-x-2">
-                                                <input
-                                                    type="text"
-                                                    value={customTagInput}
-                                                    onChange={(e) => setCustomTagInput(e.target.value)}
-                                                    placeholder="Create custom tag..."
-                                                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                    onKeyPress={(e) => e.key === 'Enter' && addCustomTag()}
-                                                    maxLength={20}
-                                                    disabled={selectedTags.length >= 6}
-                                                />
+                                            <div className="grid grid-cols-2 gap-2 mb-4">
+                                                {availableTags.map(tag => (
+                                                    <button
+                                                        key={tag.id}
+                                                        onClick={() => handleTagToggle(tag.id)}
+                                                        disabled={selectedTags.length >= 6 && !selectedTags.some(t => t.id === tag.id)}
+                                                        className={`text-left px-3 py-2 rounded-lg text-sm font-medium border transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+                                                            selectedTags.some(t => t.id === tag.id)
+                                                                ? tag.color + ' ring-2 ring-blue-300'
+                                                                : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
+                                                        }`}
+                                                        type="button"
+                                                    >
+                                                        {tag.label}
+                                                    </button>
+                                                ))}
+                                            </div>
+
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-xs text-gray-500">{selectedTags.length}/6 tags selected</span>
                                                 <button
-                                                    onClick={addCustomTag}
-                                                    disabled={!customTagInput.trim() || selectedTags.length >= 6}
-                                                    className="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                                    onClick={() => setShowTagSelector(false)}
+                                                    className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
                                                     type="button"
                                                 >
-                                                    Add
+                                                    Done
                                                 </button>
                                             </div>
                                         </div>
+                                    )}
+                                </div>
 
-                                        <div className="grid grid-cols-2 gap-2 mb-4">
-                                            {availableTags.map(tag => (
-                                                <button
-                                                    key={tag.id}
-                                                    onClick={() => handleTagToggle(tag.id)}
-                                                    disabled={selectedTags.length >= 6 && !selectedTags.some(t => t.id === tag.id)}
-                                                    className={`text-left px-3 py-2 rounded-lg text-sm font-medium border transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
-                                                        selectedTags.some(t => t.id === tag.id)
-                                                            ? tag.color + ' ring-2 ring-blue-300'
-                                                            : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
-                                                    }`}
-                                                    type="button"
-                                                >
-                                                    {tag.label}
-                                                </button>
-                                            ))}
-                                        </div>
-
-                                        <div className="flex items-center justify-between">
-                                            <span className="text-xs text-gray-500">{selectedTags.length}/6 tags selected</span>
-                                            <button
-                                                onClick={() => setShowTagSelector(false)}
-                                                className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
-                                                type="button"
-                                            >
-                                                Done
-                                            </button>
-                                        </div>
-                                    </div>
+                                {selectedImages.length > 0 && (
+                                    <span className="text-xs text-slate-500 bg-slate-100 px-2 py-1 rounded-full">
+                                        {selectedImages.length}/6 photos
+                                    </span>
+                                )}
+                                {selectedTags.length > 0 && (
+                                    <span className="text-xs text-slate-500 bg-slate-100 px-2 py-1 rounded-full">
+                                        {selectedTags.length} tag{selectedTags.length !== 1 ? 's' : ''}
+                                    </span>
                                 )}
                             </div>
-
-                            {selectedImages.length > 0 && (
-                                <span className="text-xs text-slate-500 bg-slate-100 px-2 py-1 rounded-full">
-                                    {selectedImages.length}/6 photos
-                                </span>
-                            )}
-                            {/* Re-integrated: Tag counter */}
-                            {selectedTags.length > 0 && (
-                                <span className="text-xs text-slate-500 bg-slate-100 px-2 py-1 rounded-full">
-                                    {selectedTags.length} tag{selectedTags.length !== 1 ? 's' : ''}
-                                </span>
-                            )}
+                            
+                            <button
+                                onClick={handlePostSubmit}
+                                disabled={isLoading || (!postText.trim() && selectedImages.length === 0)}
+                                className="bg-blue-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm"
+                                type="button"
+                            >
+                                {uploading ? 'Uploading...' : isLoading ? 'Posting...' : 'Post'}
+                            </button>
                         </div>
                         
-                        <button
-                            onClick={handlePostSubmit}
-                            disabled={isLoading || (!postText.trim() && selectedImages.length === 0)}
-                            className="bg-blue-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm"
-                            type="button"
-                        >
-                            {uploading ? 'Uploading...' : isLoading ? 'Posting...' : 'Post'}
-                        </button>
-                    </div>
-                    
-                    <div className="mt-2 text-xs text-slate-500">
-                        💡 Type @ to mention users or organizations
+                        <div className="mt-2 text-xs text-slate-500">
+                            💡 Type @ to mention users or organizations
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
+        </>
     );
 }
