@@ -1,6 +1,7 @@
 // src/components/post/PostBody.jsx
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '../../supabaseClient';
 import ImageMosaic from './ImageMosaic';
 import TagDisplay from './TagDisplay';
 import MentionHoverCard from './MentionHoverCard';
@@ -13,16 +14,38 @@ export default function PostBody({ content, images, tags, onImageClick }) {
     const containsMentions = content && content.includes('<span') && content.includes('data-type');
     const shouldTruncate = content && content.length > MAX_CHARS && !content.includes('<img') && !containsMentions;
 
-    // Single hover state
+    // Hover state
     const [hoveredMention, setHoveredMention] = useState(null);
     const [hoverPosition, setHoverPosition] = useState(null);
     
     const hideTimeoutRef = useRef(null);
-    const showTimeoutRef = useRef(null);
     const postBodyRef = useRef(null);
     const isHoveringRef = useRef(false);
 
-    const handleMentionClick = (e) => {
+    // Function to get organization slug from ID
+    const getOrganizationSlug = async (orgType, orgId) => {
+        try {
+            const tableName = orgType === 'nonprofit' ? 'nonprofits' : 'funders';
+            const { data, error } = await supabase
+                .from(tableName)
+                .select('slug')
+                .eq('id', parseInt(orgId))
+                .single();
+
+            if (error) {
+                console.error(`❌ Error fetching ${orgType} slug:`, error);
+                return null;
+            }
+
+            console.log(`✅ Found ${orgType} slug:`, data?.slug);
+            return data?.slug;
+        } catch (error) {
+            console.error(`💥 Exception fetching ${orgType} slug:`, error);
+            return null;
+        }
+    };
+
+    const handleMentionClick = async (e) => {
         const target = e.target;
         
         // Check if clicked element is a mention
@@ -34,26 +57,55 @@ export default function PostBody({ content, images, tags, onImageClick }) {
             
             const mentionId = target.dataset.id;
             const mentionType = target.dataset.type;
+            const mentionLabel = target.dataset.label;
 
             if (!mentionId || !mentionType) {
-                console.warn('Missing mention data for click navigation');
+                console.warn('⚠️ Missing mention data for click navigation');
                 return;
             }
 
-            // Navigate based on mention type
-            if (mentionType === 'user') {
-                navigate(`/profile/${mentionId}`);
-            } else if (mentionType === 'organization') {
-                const [orgType, orgId] = mentionId.split('-');
-                if (orgId) {
-                    if (orgType === 'nonprofit') {
-                        navigate(`/nonprofits/${orgId}`);
-                    } else if (orgType === 'funder') {
-                        navigate(`/funders/${orgId}`);
+            console.log(`🔗 PostBody: Navigating to mention:`, {
+                mentionId,
+                mentionType,
+                mentionLabel
+            });
+
+            try {
+                // Navigate based on mention type
+                if (mentionType === 'user') {
+                    console.log(`👤 Navigating to user profile: /profile/members/${mentionId}`);
+                    navigate(`/profile/members/${mentionId}`);
+                } else if (mentionType === 'organization') {
+                    const [orgType, orgId] = mentionId.split('-');
+                    
+                    if (!orgId) {
+                        console.warn('⚠️ Invalid organization ID format:', mentionId);
+                        return;
                     }
-                } else {
-                    console.warn('Invalid organization ID format:', mentionId);
+
+                    console.log(`🏢 Organization navigation:`, { mentionId, orgType, orgId });
+
+                    // Get the organization slug from the database
+                    const slug = await getOrganizationSlug(orgType, orgId);
+                    
+                    if (slug) {
+                        if (orgType === 'nonprofit') {
+                            console.log(`🏛️ Navigating to nonprofit: /nonprofits/${slug}`);
+                            navigate(`/nonprofits/${slug}`);
+                        } else if (orgType === 'funder') {
+                            console.log(`💰 Navigating to funder: /funders/${slug}`);
+                            navigate(`/funders/${slug}`);
+                        }
+                    } else {
+                        console.error(`❌ Could not find slug for ${orgType} with ID ${orgId}`);
+                        // Fallback: try to navigate anyway (might show "not found" page)
+                        const fallbackPath = orgType === 'nonprofit' ? `/nonprofits/${orgId}` : `/funders/${orgId}`;
+                        console.log(`🔄 Trying fallback navigation: ${fallbackPath}`);
+                        navigate(fallbackPath);
+                    }
                 }
+            } catch (error) {
+                console.error('💥 Error during mention navigation:', error);
             }
         }
     };
@@ -83,29 +135,17 @@ export default function PostBody({ content, images, tags, onImageClick }) {
     };
 
     const showHoverCard = (mention, position) => {
-        // Clear any existing timeouts
+        // Clear any existing timeout
         if (hideTimeoutRef.current) {
             clearTimeout(hideTimeoutRef.current);
             hideTimeoutRef.current = null;
         }
-        if (showTimeoutRef.current) {
-            clearTimeout(showTimeoutRef.current);
-            showTimeoutRef.current = null;
-        }
 
-        // Show immediately (no delay)
         setHoveredMention(mention);
         setHoverPosition(position);
     };
 
     const hideHoverCard = () => {
-        // Clear any show timeout
-        if (showTimeoutRef.current) {
-            clearTimeout(showTimeoutRef.current);
-            showTimeoutRef.current = null;
-        }
-
-        // Hide with small delay
         hideTimeoutRef.current = setTimeout(() => {
             if (!isHoveringRef.current) {
                 setHoveredMention(null);
@@ -115,17 +155,10 @@ export default function PostBody({ content, images, tags, onImageClick }) {
     };
 
     const forceHideHoverCard = () => {
-        // Clear all timeouts
         if (hideTimeoutRef.current) {
             clearTimeout(hideTimeoutRef.current);
             hideTimeoutRef.current = null;
         }
-        if (showTimeoutRef.current) {
-            clearTimeout(showTimeoutRef.current);
-            showTimeoutRef.current = null;
-        }
-        
-        // Hide immediately
         setHoveredMention(null);
         setHoverPosition(null);
         isHoveringRef.current = false;
@@ -139,7 +172,7 @@ export default function PostBody({ content, images, tags, onImageClick }) {
         const handleMouseMove = (e) => {
             const target = e.target;
             
-            // Check if we're over a mention - enhanced detection
+            // Check if we're over a mention
             if (target.tagName === 'SPAN' && 
                 (target.classList.contains('mention') || target.dataset.type)) {
                 
@@ -151,7 +184,7 @@ export default function PostBody({ content, images, tags, onImageClick }) {
 
                 if (!mentionId || !mentionType) return;
 
-                // Only update if this is a different mention or no mention is shown
+                // Only update if this is a different mention
                 const isSameMention = hoveredMention && 
                     hoveredMention.id === mentionId && 
                     hoveredMention.entityType === mentionType;
@@ -184,18 +217,12 @@ export default function PostBody({ content, images, tags, onImageClick }) {
             }
         };
 
-        // Single mousemove listener
         currentPostBodyRef.addEventListener('mousemove', handleMouseMove);
 
         return () => {
             currentPostBodyRef.removeEventListener('mousemove', handleMouseMove);
-            
-            // Cleanup timeouts
             if (hideTimeoutRef.current) {
                 clearTimeout(hideTimeoutRef.current);
-            }
-            if (showTimeoutRef.current) {
-                clearTimeout(showTimeoutRef.current);
             }
         };
     }, [hoveredMention]);
@@ -267,7 +294,6 @@ export default function PostBody({ content, images, tags, onImageClick }) {
                     }}
                     onMouseEnter={() => {
                         isHoveringRef.current = true;
-                        // Clear hide timeout when entering hover card
                         if (hideTimeoutRef.current) {
                             clearTimeout(hideTimeoutRef.current);
                             hideTimeoutRef.current = null;

@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { ThumbsUp, MessageSquare, Share2, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '../../supabaseClient';
 import { timeAgo } from '../../utils/time';
 import { reactions } from './constants';
 import Avatar from '../Avatar';
@@ -38,6 +39,29 @@ export default function ImageViewer({
         return () => { document.body.style.overflow = 'unset'; };
     }, [isOpen]);
 
+    // Function to get organization slug from ID
+    const getOrganizationSlug = async (orgType, orgId) => {
+        try {
+            const tableName = orgType === 'nonprofit' ? 'nonprofits' : 'funders';
+            const { data, error } = await supabase
+                .from(tableName)
+                .select('slug')
+                .eq('id', parseInt(orgId))
+                .single();
+
+            if (error) {
+                console.error(`❌ Error fetching ${orgType} slug:`, error);
+                return null;
+            }
+
+            console.log(`✅ Found ${orgType} slug:`, data?.slug);
+            return data?.slug;
+        } catch (error) {
+            console.error(`💥 Exception fetching ${orgType} slug:`, error);
+            return null;
+        }
+    };
+
     // Process content to properly render mentions
     const processContentForDisplay = (htmlContent) => {
         if (!htmlContent) return '';
@@ -60,7 +84,7 @@ export default function ImageViewer({
     };
 
     // Handle mention clicks
-    const handleMentionClick = (e) => {
+    const handleMentionClick = async (e) => {
         const target = e.target;
         
         if (target.tagName === 'SPAN' && 
@@ -80,20 +104,42 @@ export default function ImageViewer({
             // Close the image viewer first
             onClose();
 
-            // Navigate based on mention type
-            if (mentionType === 'user') {
-                navigate(`/profile/${mentionId}`);
-            } else if (mentionType === 'organization') {
-                const [orgType, orgId] = mentionId.split('-');
-                if (orgId) {
-                    if (orgType === 'nonprofit') {
-                        navigate(`/nonprofits/${orgId}`);
-                    } else if (orgType === 'funder') {
-                        navigate(`/funders/${orgId}`);
+            try {
+                // Navigate based on mention type
+                if (mentionType === 'user') {
+                    console.log(`👤 Navigating to user profile: /profile/members/${mentionId}`);
+                    navigate(`/profile/members/${mentionId}`);
+                } else if (mentionType === 'organization') {
+                    const [orgType, orgId] = mentionId.split('-');
+                    
+                    if (!orgId) {
+                        console.warn('⚠️ Invalid organization ID format:', mentionId);
+                        return;
                     }
-                } else {
-                    console.warn('Invalid organization ID format:', mentionId);
+
+                    console.log(`🏢 Organization navigation:`, { mentionId, orgType, orgId });
+
+                    // Get the organization slug from the database
+                    const slug = await getOrganizationSlug(orgType, orgId);
+                    
+                    if (slug) {
+                        if (orgType === 'nonprofit') {
+                            console.log(`🏛️ Navigating to nonprofit: /nonprofits/${slug}`);
+                            navigate(`/nonprofits/${slug}`);
+                        } else if (orgType === 'funder') {
+                            console.log(`💰 Navigating to funder: /funders/${slug}`);
+                            navigate(`/funders/${slug}`);
+                        }
+                    } else {
+                        console.error(`❌ Could not find slug for ${orgType} with ID ${orgId}`);
+                        // Fallback: try to navigate anyway (might show "not found" page)
+                        const fallbackPath = orgType === 'nonprofit' ? `/nonprofits/${orgId}` : `/funders/${orgId}`;
+                        console.log(`🔄 Trying fallback navigation: ${fallbackPath}`);
+                        navigate(fallbackPath);
+                    }
                 }
+            } catch (error) {
+                console.error('💥 Error during mention navigation:', error);
             }
         }
     };

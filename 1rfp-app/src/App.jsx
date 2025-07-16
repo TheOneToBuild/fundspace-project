@@ -1,4 +1,4 @@
-// src/App.jsx - FIXED WITH OMEGA ADMIN FUNCTIONALITY AND MOBILE RESPONSIVE HEADER
+// src/App.jsx - FIXED WITH MISSING PROFILE ROUTES
 import React, { useState, useEffect, createContext, useRef } from 'react';
 import { BrowserRouter, Routes, Route, Link, NavLink, Outlet, useOutletContext, useLocation } from 'react-router-dom';
 import ScrollToTop from './components/ScrollToTop.jsx';
@@ -354,6 +354,11 @@ export default function App() {
             <Route path="faq" element={<FaqPage />} />
             <Route path="submit-grant" element={<SubmitGrantPage />} />
             <Route path="roadmap" element={<RoadmapPage />} />
+            
+            {/* ⭐ FIXED: MISSING DIRECT PROFILE ROUTES FOR MENTIONS */}
+            <Route path="profile/:profileId" element={<MemberProfilePage />} />
+            
+            {/* ORGANIZATION ROUTES - Need to handle ID to slug conversion */}
             <Route path="funders/:funderSlug" element={<FunderProfilePage />} />
             <Route path="nonprofits/:slug" element={<NonprofitProfilePage />} />
             
