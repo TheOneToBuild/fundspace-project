@@ -68,3 +68,103 @@
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+
+/* --- COMPREHENSIVE TIPTAP MENTION STYLING --- */
+
+/* Remove tippy.js default styling */
+.tippy-box[data-placement^='bottom'] > .tippy-arrow {
+  display: none;
+}
+
+.tippy-box {
+  background-color: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}
+
+/* Styling for the main mention dropdown container */
+.mention-dropdown {
+  border: 1px solid #e1e5e9 !important;
+  background-color: white !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1) !important;
+  border-radius: 8px !important;
+  overflow: hidden;
+}
+
+/* Individual item separators */
+.mention-dropdown .mention-item {
+  border-bottom: 1px solid #f0f2f5;
+}
+.mention-dropdown .mention-item:last-child {
+  border-bottom: none;
+}
+
+/* CRITICAL: Styling for mentions within the Tiptap editor (while typing) */
+.ProseMirror .mention {
+  background-color: #e3f2fd !important; /* Light blue background */
+  color: #1976d2 !important; /* Blue text color */
+  padding: 0.15rem 0.4rem !important; /* Small padding around the text */
+  border-radius: 0.25rem !important; /* Rounded corners */
+  font-weight: 600 !important; /* Medium bold */
+  cursor: pointer !important;
+  text-decoration: none !important; /* Remove underline if any */
+  display: inline !important;
+  line-height: inherit !important;
+  vertical-align: baseline !important;
+  border: 1px solid #bbdefb !important; /* Light blue border */
+  /* NO TRANSITIONS - prevents flickering */
+}
+
+/* CRITICAL: Styling for mentions in PostBody (after posting) */
+/* This targets the mentions in the rendered post content */
+span.mention,
+[data-type="user"].mention,
+[data-type="organization"].mention {
+  background-color: #e3f2fd !important; /* Light blue background */
+  color: #1976d2 !important; /* Blue text color */
+  padding: 0.15rem 0.4rem !important; /* Small padding around the text */
+  border-radius: 0.25rem !important; /* Rounded corners */
+  font-weight: 600 !important; /* Medium bold */
+  cursor: pointer !important;
+  text-decoration: none !important;
+  display: inline !important;
+  line-height: inherit !important;
+  vertical-align: baseline !important;
+  border: 1px solid #bbdefb !important; /* Light blue border */
+  /* NO TRANSITIONS - prevents flickering */
+}
+
+/* Hover effects for mentions in posts - NO FLICKERING */
+span.mention:hover,
+[data-type="user"].mention:hover,
+[data-type="organization"].mention:hover {
+  background-color: #bbdefb !important; /* Darker blue on hover */
+  color: #0d47a1 !important; /* Darker text on hover */
+  /* NO transform, NO box-shadow, NO transitions */
+}
+
+/* Active/click state for mentions */
+span.mention:active,
+[data-type="user"].mention:active,
+[data-type="organization"].mention:active {
+  background-color: #90caf9 !important; /* Even darker blue when clicked */
+}
+
+/* --- MENTION HOVER CARD STYLING --- */
+.mention-hover-card-wrapper {
+  z-index: 10000 !important;
+  pointer-events: auto !important;
+}
+
+/* Ensure hover card content is interactive */
+.mention-hover-card-wrapper * {
+  pointer-events: auto !important;
+}
+
+/* Prevent any animations that might cause issues */
+.mention-hover-card-wrapper,
+.mention-hover-card-wrapper * {
+  animation: none !important;
+  transition: none !important;
+}

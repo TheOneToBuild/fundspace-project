@@ -1,106 +1,248 @@
-// Enhanced PostBody component with fixed navigation
-import React from 'react';
+// src/components/post/PostBody.jsx
+import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ImageMosaic from './ImageMosaic';
 import TagDisplay from './TagDisplay';
+import MentionHoverCard from './MentionHoverCard';
 
 export default function PostBody({ content, images, tags, onImageClick }) {
     const navigate = useNavigate();
     const MAX_CHARS = 300;
-    const shouldTruncate = content && content.length > MAX_CHARS;
 
-    const handleMentionClick = (mention) => {
-        // Navigate to user or organization profile with correct routes
-        if (mention.entityType === 'user') {
-            // For users, navigate to member profile page within the profile section
-            navigate(`/profile/members/${mention.id}`);
-        } else if (mention.entityType === 'organization') {
-            // Parse organization ID from format like "funder-123" or "nonprofit-456"
-            const [orgType, orgId] = mention.id.split('-');
-            if (orgType === 'nonprofit') {
-                // Navigate to nonprofit profile page using the orgId as slug
-                navigate(`/nonprofits/${orgId}`);
-            } else if (orgType === 'funder') {
-                // Navigate to funder profile page using the orgId as slug
-                navigate(`/funders/${orgId}`);
+    // Enhanced shouldTruncate logic - don't truncate content with mentions
+    const containsMentions = content && content.includes('<span') && content.includes('data-type');
+    const shouldTruncate = content && content.length > MAX_CHARS && !content.includes('<img') && !containsMentions;
+
+    // Single hover state
+    const [hoveredMention, setHoveredMention] = useState(null);
+    const [hoverPosition, setHoverPosition] = useState(null);
+    
+    const hideTimeoutRef = useRef(null);
+    const showTimeoutRef = useRef(null);
+    const postBodyRef = useRef(null);
+    const isHoveringRef = useRef(false);
+
+    const handleMentionClick = (e) => {
+        const target = e.target;
+        
+        // Check if clicked element is a mention
+        if (target.tagName === 'SPAN' && 
+            (target.classList.contains('mention') || target.dataset.type)) {
+            
+            e.preventDefault();
+            e.stopPropagation();
+            
+            const mentionId = target.dataset.id;
+            const mentionType = target.dataset.type;
+
+            if (!mentionId || !mentionType) {
+                console.warn('Missing mention data for click navigation');
+                return;
+            }
+
+            // Navigate based on mention type
+            if (mentionType === 'user') {
+                navigate(`/profile/${mentionId}`);
+            } else if (mentionType === 'organization') {
+                const [orgType, orgId] = mentionId.split('-');
+                if (orgId) {
+                    if (orgType === 'nonprofit') {
+                        navigate(`/nonprofits/${orgId}`);
+                    } else if (orgType === 'funder') {
+                        navigate(`/funders/${orgId}`);
+                    }
+                } else {
+                    console.warn('Invalid organization ID format:', mentionId);
+                }
             }
         }
     };
 
-    const renderTextWithMentions = (text) => {
-        if (!text) return null;
+    const processContentForDisplay = (htmlContent) => {
+        if (!htmlContent) return '';
         
-        const mentionRegex = /@\[([^\]]+)\]\(([^:]+):([^)]+)\)/g;
-        const parts = [];
-        let lastIndex = 0;
-        let match;
-
-        while ((match = mentionRegex.exec(text)) !== null) {
-            const [fullMatch, displayName, id, type] = match;
+        // Create a temporary div to parse and modify HTML
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = htmlContent;
+        
+        // Find all spans and ensure mentions have proper classes
+        const allSpans = tempDiv.querySelectorAll('span');
+        
+        allSpans.forEach(span => {
+            const hasDataType = span.dataset.type;
+            const hasDataId = span.dataset.id;
+            const hasMentionClass = span.classList.contains('mention');
             
-            // Add text before mention
-            if (match.index > lastIndex) {
-                parts.push(text.slice(lastIndex, match.index));
+            // If it looks like a mention, ensure it has the mention class
+            if ((hasDataType || hasDataId) && !hasMentionClass) {
+                span.classList.add('mention');
             }
-            
-            // Add mention as clickable element
-            parts.push({
-                type: 'mention',
-                displayName,
-                id,
-                entityType: type,
-                key: `mention-${id}-${match.index}`
-            });
-            
-            lastIndex = match.index + fullMatch.length;
+        });
+        
+        return tempDiv.innerHTML;
+    };
+
+    const showHoverCard = (mention, position) => {
+        // Clear any existing timeouts
+        if (hideTimeoutRef.current) {
+            clearTimeout(hideTimeoutRef.current);
+            hideTimeoutRef.current = null;
+        }
+        if (showTimeoutRef.current) {
+            clearTimeout(showTimeoutRef.current);
+            showTimeoutRef.current = null;
+        }
+
+        // Show immediately (no delay)
+        setHoveredMention(mention);
+        setHoverPosition(position);
+    };
+
+    const hideHoverCard = () => {
+        // Clear any show timeout
+        if (showTimeoutRef.current) {
+            clearTimeout(showTimeoutRef.current);
+            showTimeoutRef.current = null;
+        }
+
+        // Hide with small delay
+        hideTimeoutRef.current = setTimeout(() => {
+            if (!isHoveringRef.current) {
+                setHoveredMention(null);
+                setHoverPosition(null);
+            }
+        }, 100);
+    };
+
+    const forceHideHoverCard = () => {
+        // Clear all timeouts
+        if (hideTimeoutRef.current) {
+            clearTimeout(hideTimeoutRef.current);
+            hideTimeoutRef.current = null;
+        }
+        if (showTimeoutRef.current) {
+            clearTimeout(showTimeoutRef.current);
+            showTimeoutRef.current = null;
         }
         
-        // Add remaining text
-        if (lastIndex < text.length) {
-            parts.push(text.slice(lastIndex));
+        // Hide immediately
+        setHoveredMention(null);
+        setHoverPosition(null);
+        isHoveringRef.current = false;
+    };
+
+    // Enhanced hover implementation
+    useEffect(() => {
+        const currentPostBodyRef = postBodyRef.current;
+        if (!currentPostBodyRef) return;
+
+        const handleMouseMove = (e) => {
+            const target = e.target;
+            
+            // Check if we're over a mention - enhanced detection
+            if (target.tagName === 'SPAN' && 
+                (target.classList.contains('mention') || target.dataset.type)) {
+                
+                isHoveringRef.current = true;
+                
+                const mentionId = target.dataset.id;
+                const mentionLabel = target.dataset.label;
+                const mentionType = target.dataset.type;
+
+                if (!mentionId || !mentionType) return;
+
+                // Only update if this is a different mention or no mention is shown
+                const isSameMention = hoveredMention && 
+                    hoveredMention.id === mentionId && 
+                    hoveredMention.entityType === mentionType;
+
+                if (!isSameMention) {
+                    const mention = {
+                        id: mentionId,
+                        displayName: mentionLabel,
+                        entityType: mentionType
+                    };
+
+                    const rect = target.getBoundingClientRect();
+                    const position = {
+                        top: rect.bottom + window.scrollY + 8,
+                        left: rect.left + window.scrollX
+                    };
+
+                    showHoverCard(mention, position);
+                }
+            } else {
+                // Not over a mention
+                isHoveringRef.current = false;
+                
+                // Check if we're over the hover card itself
+                const isOverHoverCard = target.closest('.mention-hover-card-wrapper');
+                
+                if (!isOverHoverCard) {
+                    hideHoverCard();
+                }
+            }
+        };
+
+        // Single mousemove listener
+        currentPostBodyRef.addEventListener('mousemove', handleMouseMove);
+
+        return () => {
+            currentPostBodyRef.removeEventListener('mousemove', handleMouseMove);
+            
+            // Cleanup timeouts
+            if (hideTimeoutRef.current) {
+                clearTimeout(hideTimeoutRef.current);
+            }
+            if (showTimeoutRef.current) {
+                clearTimeout(showTimeoutRef.current);
+            }
+        };
+    }, [hoveredMention]);
+
+    const renderTruncatedContent = (htmlContent) => {
+        if (!htmlContent) return null;
+
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = htmlContent;
+        let plainText = tempDiv.textContent || tempDiv.innerText || '';
+
+        plainText = plainText.replace(/\s+/g, ' ').trim();
+
+        if (plainText.length > MAX_CHARS) {
+            const truncatedText = plainText.substring(0, MAX_CHARS).replace(/\s+\S*$/, '');
+            return (
+                <>
+                    {truncatedText}...{' '}
+                    <button
+                        onClick={() => onImageClick && onImageClick(0)}
+                        className="text-blue-600 hover:text-blue-700 text-sm font-medium inline"
+                    >
+                        View more
+                    </button>
+                </>
+            );
         }
-        
-        return (
-            <span>
-                {parts.map((part, index) => {
-                    if (typeof part === 'string') {
-                        return <span key={index}>{part}</span>;
-                    } else if (part.type === 'mention') {
-                        return (
-                            <span
-                                key={part.key}
-                                className="inline-flex items-center px-1 py-0.5 rounded text-blue-600 bg-blue-50 hover:bg-blue-100 cursor-pointer font-medium transition-colors"
-                                onClick={() => handleMentionClick(part)}
-                                title={`Go to ${part.displayName}'s profile`}
-                            >
-                                @{part.displayName}
-                            </span>
-                        );
-                    }
-                    return null;
-                })}
-            </span>
-        );
+        return plainText;
     };
 
     return (
         <div className="mb-4">
             {content && (
                 <div className="mb-4">
-                    <div className="text-slate-700 leading-relaxed whitespace-pre-wrap">
+                    <div
+                        ref={postBodyRef}
+                        className="text-slate-700 leading-relaxed whitespace-pre-wrap"
+                        onClick={handleMentionClick}
+                    >
                         {shouldTruncate ? (
-                            <>
-                                {renderTextWithMentions(`${content.substring(0, MAX_CHARS).replace(/\s+\S*$/, '')}...`)}
-                                {' '}
-                                <button 
-                                    onClick={() => onImageClick && onImageClick(0)} 
-                                    className="text-blue-600 hover:text-blue-700 text-sm font-medium inline"
-                                >
-                                    View more
-                                </button>
-                            </>
+                            renderTruncatedContent(content)
                         ) : (
-                            renderTextWithMentions(content)
+                            <div 
+                                dangerouslySetInnerHTML={{ 
+                                    __html: processContentForDisplay(content) 
+                                }} 
+                            />
                         )}
                     </div>
                 </div>
@@ -110,6 +252,37 @@ export default function PostBody({ content, images, tags, onImageClick }) {
             )}
             {tags && (
                 <TagDisplay tags={tags} />
+            )}
+
+            {/* Hover card */}
+            {hoveredMention && hoverPosition && (
+                <div
+                    className="mention-hover-card-wrapper"
+                    style={{
+                        position: 'absolute',
+                        top: hoverPosition.top,
+                        left: hoverPosition.left,
+                        zIndex: 10000,
+                        pointerEvents: 'auto'
+                    }}
+                    onMouseEnter={() => {
+                        isHoveringRef.current = true;
+                        // Clear hide timeout when entering hover card
+                        if (hideTimeoutRef.current) {
+                            clearTimeout(hideTimeoutRef.current);
+                            hideTimeoutRef.current = null;
+                        }
+                    }}
+                    onMouseLeave={() => {
+                        isHoveringRef.current = false;
+                        forceHideHoverCard();
+                    }}
+                >
+                    <MentionHoverCard
+                        mention={hoveredMention}
+                        position={{ top: 0, left: 0 }}
+                    />
+                </div>
             )}
         </div>
     );

@@ -289,7 +289,9 @@ export default function DashboardHomePage() {
           <CreatePost profile={profile} onNewPost={handleNewPost} channel="hello-world" />
           {posts.length > 0 && (
             <div className="space-y-6">
-              {posts.map(post => post.profiles && <PostCard key={`post-${post.id}`} post={post} onDelete={handleDeletePost} />)}
+              {posts.filter(post => post.profiles).map(post => (
+                <PostCard key={post.id} post={post} onDelete={handleDeletePost} />
+              ))}
             </div>
           )}
           <div ref={loaderRef} className="h-10 text-center">

@@ -1,6 +1,7 @@
 // src/components/post/ImageViewer.jsx
 import React, { useState, useEffect } from 'react';
 import { ThumbsUp, MessageSquare, Share2, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { timeAgo } from '../../utils/time';
 import { reactions } from './constants';
 import Avatar from '../Avatar';
@@ -27,6 +28,7 @@ export default function ImageViewer({
     reactors = [],
     onViewReactions
 }) {
+    const navigate = useNavigate();
     const [currentIndex, setCurrentIndex] = useState(initialIndex);
     const [showReactionPanel, setShowReactionPanel] = useState(false);
 
@@ -35,6 +37,66 @@ export default function ImageViewer({
         document.body.style.overflow = isOpen ? 'hidden' : 'unset';
         return () => { document.body.style.overflow = 'unset'; };
     }, [isOpen]);
+
+    // Process content to properly render mentions
+    const processContentForDisplay = (htmlContent) => {
+        if (!htmlContent) return '';
+        
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = htmlContent;
+        
+        const allSpans = tempDiv.querySelectorAll('span');
+        allSpans.forEach(span => {
+            const hasDataType = span.dataset.type;
+            const hasDataId = span.dataset.id;
+            const hasMentionClass = span.classList.contains('mention');
+            
+            if ((hasDataType || hasDataId) && !hasMentionClass) {
+                span.classList.add('mention');
+            }
+        });
+        
+        return tempDiv.innerHTML;
+    };
+
+    // Handle mention clicks
+    const handleMentionClick = (e) => {
+        const target = e.target;
+        
+        if (target.tagName === 'SPAN' && 
+            (target.classList.contains('mention') || target.dataset.type)) {
+            
+            e.preventDefault();
+            e.stopPropagation();
+            
+            const mentionId = target.dataset.id;
+            const mentionType = target.dataset.type;
+
+            if (!mentionId || !mentionType) {
+                console.warn('Missing mention data for click navigation');
+                return;
+            }
+
+            // Close the image viewer first
+            onClose();
+
+            // Navigate based on mention type
+            if (mentionType === 'user') {
+                navigate(`/profile/${mentionId}`);
+            } else if (mentionType === 'organization') {
+                const [orgType, orgId] = mentionId.split('-');
+                if (orgId) {
+                    if (orgType === 'nonprofit') {
+                        navigate(`/nonprofits/${orgId}`);
+                    } else if (orgType === 'funder') {
+                        navigate(`/funders/${orgId}`);
+                    }
+                } else {
+                    console.warn('Invalid organization ID format:', mentionId);
+                }
+            }
+        }
+    };
 
     if (!isOpen) return null;
 
@@ -67,7 +129,17 @@ export default function ImageViewer({
                     <div className="p-6 border-b">
                         <PostHeader author={post.profiles} createdAt={post.created_at} isAuthor={currentUserProfile?.id === post.profiles?.id} />
                     </div>
-                    {post.content && <div className="px-6 py-4 border-b"><p className="text-gray-800 leading-relaxed text-base">{post.content}</p></div>}
+                    {post.content && (
+                        <div className="px-6 py-4 border-b">
+                            <div 
+                                className="text-gray-800 leading-relaxed text-base"
+                                onClick={handleMentionClick}
+                                dangerouslySetInnerHTML={{ 
+                                    __html: processContentForDisplay(post.content) 
+                                }}
+                            />
+                        </div>
+                    )}
                     {post.tags?.length > 0 && <div className="px-6 py-3 border-b"><TagDisplay tags={post.tags} /></div>}
                     <div className="px-6 py-4 border-b">
                         <div className="flex items-center justify-between">
