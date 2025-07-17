@@ -3,6 +3,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { supabase } from '../supabaseClient';
 import { Camera, X, Smile, AtSign } from 'lucide-react';
 import Avatar from './Avatar.jsx';
+import { processMentionsForNotifications } from '../utils/notificationUtils';
 
 // --- TIPTAP IMPORTS ---
 import { useEditor, EditorContent, ReactRenderer } from '@tiptap/react';
@@ -426,6 +427,21 @@ export default function CreatePost({
 
             if (mentionsForStorage.length > 0) {
                 await createMentionRecords(newPost.id, mentionsForStorage);
+                
+                // CREATE MENTION NOTIFICATIONS - THIS IS THE NEW PART
+                console.log('🔔 Creating mention notifications...');
+                const notificationResult = await processMentionsForNotifications(
+                    newPost.id, 
+                    editorHtmlContent, 
+                    profile.id
+                );
+                
+                if (notificationResult.success) {
+                    console.log(`✅ Created ${notificationResult.count} mention notifications`);
+                } else {
+                    console.error('❌ Failed to create mention notifications:', notificationResult.error);
+                    // Don't fail the entire post creation if notifications fail
+                }
             }
 
             // Clean up

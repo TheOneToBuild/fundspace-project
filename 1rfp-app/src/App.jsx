@@ -1,8 +1,9 @@
-// src/App.jsx - FIXED WITH MISSING PROFILE ROUTES
+// src/App.jsx - ENHANCED WITH NOTIFICATION CLEANUP AND POST VIEWING
 import React, { useState, useEffect, createContext, useRef } from 'react';
 import { BrowserRouter, Routes, Route, Link, NavLink, Outlet, useOutletContext, useLocation } from 'react-router-dom';
 import ScrollToTop from './components/ScrollToTop.jsx';
 import { supabase } from './supabaseClient';
+import { clearAllNotifications, markAllAsRead } from './utils/notificationCleanup';
 
 // --- Import Page Components ---
 import GrantsPageContent from './GrantsPageContent.jsx';
@@ -208,8 +209,8 @@ const PublicHeader = () => {
 
 // --- Main App Layout (conditionally renders header) ---
 const AppLayout = () => {
-    const { session, profile, notifications, unreadCount, markNotificationsAsRead, refreshProfile } = useOutletContext();
-    const outletContext = { session, profile, notifications, unreadCount, markNotificationsAsRead, refreshProfile };
+    const { session, profile, notifications, unreadCount, markNotificationsAsRead, handleClearAllNotifications, handleViewPost, refreshProfile } = useOutletContext();
+    const outletContext = { session, profile, notifications, unreadCount, markNotificationsAsRead, handleClearAllNotifications, handleViewPost, refreshProfile };
     
     const [pageBgColor, setPageBgColor] = useState('bg-white');
 
@@ -222,6 +223,8 @@ const AppLayout = () => {
                         notifications={notifications}
                         unreadCount={unreadCount}
                         onPanelToggle={markNotificationsAsRead}
+                        onClearAllNotifications={handleClearAllNotifications}
+                        onViewPost={handleViewPost}
                     />
                 ) : (
                     <PublicHeader />
@@ -283,6 +286,44 @@ export default function App() {
     }
   };
 
+  // Enhanced notification handlers
+  const handleClearAllNotifications = async () => {
+    if (!session?.user?.id) return;
+    
+    try {
+      const result = await clearAllNotifications(session.user.id);
+      if (result.success) {
+        setNotifications([]);
+        setUnreadCount(0);
+        console.log('✅ All notifications cleared');
+      }
+    } catch (error) {
+      console.error('❌ Error clearing notifications:', error);
+    }
+  };
+
+  const handleViewPost = (postId) => {
+    // Scroll to specific post or highlight it
+    console.log('🎯 Viewing post:', postId);
+    
+    // Add URL parameter to highlight the post
+    const currentUrl = new URL(window.location);
+    currentUrl.searchParams.set('highlight', postId);
+    window.history.pushState({}, '', currentUrl);
+    
+    // Scroll to post if it exists on the page
+    setTimeout(() => {
+      const postElement = document.querySelector(`[data-post-id="${postId}"]`);
+      if (postElement) {
+        postElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        postElement.classList.add('highlight-post');
+        setTimeout(() => postElement.classList.remove('highlight-post'), 3000);
+      } else {
+        console.log('📄 Post element not found on current page');
+      }
+    }, 100);
+  };
+
   useEffect(() => {
     const getInitialSession = async () => {
       setLoading(true);
@@ -311,6 +352,7 @@ export default function App() {
             const newNotification = { ...payload.new, actor_id: actor };
             setNotifications(current => [newNotification, ...current]);
             setUnreadCount(current => current + 1);
+            console.log('🔔 New notification received:', newNotification);
           }
         })
         .subscribe();
@@ -329,8 +371,18 @@ export default function App() {
     }
   };
 
-  // Updated outlet context to include refreshProfile
-  const outletContext = { session, profile, loading, notifications, unreadCount, markNotificationsAsRead, refreshProfile };
+  // Updated outlet context to include new notification handlers
+  const outletContext = { 
+    session, 
+    profile, 
+    loading, 
+    notifications, 
+    unreadCount, 
+    markNotificationsAsRead,
+    handleClearAllNotifications,
+    handleViewPost,
+    refreshProfile 
+  };
 
   return (
     <BrowserRouter>

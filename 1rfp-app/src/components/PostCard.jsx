@@ -17,7 +17,6 @@ import { reactions } from './post/constants';
 const ReactionsModal = lazy(() => import('./post/ReactionsModal'));
 const ImageViewer = lazy(() => import('./post/ImageViewer'));
 
-
 function PostCard({ post, onDelete, disabled = false }) {
     const { profile: currentUserProfile } = useOutletContext();
     const [likeCount, setLikeCount] = useState(post.likes_count || 0);
@@ -165,7 +164,10 @@ function PostCard({ post, onDelete, disabled = false }) {
     if (!post || !author) return null;
 
     return (
-        <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+        <div 
+            className="post-card bg-white p-5 rounded-xl shadow-sm border border-slate-200 transition-all duration-300"
+            data-post-id={post.id}
+        >
             <PostHeader author={author} createdAt={created_at} isAuthor={isAuthor} onEdit={() => setIsEditing(true)} onDelete={handleDeletePost} />
 
             {isEditing ? (

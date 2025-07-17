@@ -69,6 +69,40 @@
   overflow: hidden;
 }
 
+/* Post Highlighting Styles */
+.highlight-post {
+  animation: highlightPulse 3s ease-in-out;
+  transform: scale(1.02);
+  transition: transform 0.3s ease;
+  border: 2px solid #3b82f6 !important;
+  border-radius: 12px !important;
+  box-shadow: 0 10px 25px rgba(59, 130, 246, 0.2) !important;
+}
+
+@keyframes highlightPulse {
+  0% { 
+    background-color: transparent; 
+    box-shadow: 0 10px 25px rgba(59, 130, 246, 0.2);
+  }
+  20% { 
+    background-color: rgba(59, 130, 246, 0.1); 
+    box-shadow: 0 15px 35px rgba(59, 130, 246, 0.3);
+  }
+  80% { 
+    background-color: rgba(59, 130, 246, 0.1); 
+    box-shadow: 0 15px 35px rgba(59, 130, 246, 0.3);
+  }
+  100% { 
+    background-color: transparent; 
+    box-shadow: 0 10px 25px rgba(59, 130, 246, 0.2);
+  }
+}
+
+/* Smooth transitions for all post elements */
+.post-card {
+  transition: all 0.3s ease;
+}
+
 /* --- COMPREHENSIVE TIPTAP MENTION STYLING --- */
 
 /* Remove tippy.js default styling */

@@ -27,7 +27,14 @@ const HeaderNavLink = ({ to, children, Icon, mobile = false, onClick }) => {
     );
 };
 
-export default function DashboardHeader({ profile, notifications, unreadCount, onPanelToggle }) {
+export default function DashboardHeader({ 
+    profile, 
+    notifications, 
+    unreadCount, 
+    onPanelToggle,
+    onClearAllNotifications,
+    onViewPost 
+}) {
     const [isPanelOpen, setIsPanelOpen] = useState(false);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [isSearchFocused, setIsSearchFocused] = useState(false);
@@ -43,6 +50,10 @@ export default function DashboardHeader({ profile, notifications, unreadCount, o
 
     const closeMobileMenu = () => {
         setIsMobileMenuOpen(false);
+    };
+
+    const closeNotificationsPanel = () => {
+        setIsPanelOpen(false);
     };
     
     useEffect(() => {
@@ -128,7 +139,14 @@ export default function DashboardHeader({ profile, notifications, unreadCount, o
                                         <span className="absolute top-1 right-1 block h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-white"></span>
                                     )}
                                 </button>
-                                {isPanelOpen && <NotificationsPanel notifications={notifications} onClose={() => setIsPanelOpen(false)} />}
+                                {isPanelOpen && (
+                                    <NotificationsPanel 
+                                        notifications={notifications} 
+                                        onClose={closeNotificationsPanel}
+                                        onViewPost={onViewPost}
+                                        onClearAll={onClearAllNotifications}
+                                    />
+                                )}
                             </div>
                             
                             {/* User Menu */}
