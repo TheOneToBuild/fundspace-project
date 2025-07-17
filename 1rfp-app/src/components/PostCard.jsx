@@ -1,9 +1,9 @@
-// src/components/PostCard.jsx
-import React, { useState, useEffect, memo, lazy, Suspense } from 'react';
+// MODIFIED: Added 'useMemo' to the import statement
+import React, { useState, useEffect, useMemo, memo, lazy, Suspense } from 'react';
 import { supabase } from '../supabaseClient';
 import { useOutletContext } from 'react-router-dom';
 
-// Import components that are always visible
+// Import components
 import PostHeader from './post/PostHeader';
 import PostBody from './post/PostBody';
 import PostActions from './post/PostActions';
@@ -13,11 +13,10 @@ import ReactorsText from './post/ReactorsText';
 import ReactionsPreview from './post/ReactionsPreview';
 import { reactions } from './post/constants';
 
-// Lazily import components that are only shown after user interaction
 const ReactionsModal = lazy(() => import('./post/ReactionsModal'));
 const ImageViewer = lazy(() => import('./post/ImageViewer'));
 
-function PostCard({ post, onDelete, disabled = false }) {
+function PostCard({ post, onDelete, disabled = false, showOrganizationAsAuthor = false, organization }) {
     const { profile: currentUserProfile } = useOutletContext();
     const [likeCount, setLikeCount] = useState(post.likes_count || 0);
     const [commentCount, setCommentCount] = useState(post.comments_count || 0);
@@ -33,11 +32,22 @@ function PostCard({ post, onDelete, disabled = false }) {
     const [showReactorsPreview, setShowReactorsPreview] = useState(false);
     const reactorsTimeoutRef = React.useRef(null);
 
-    const { content, created_at, profiles: author, image_url, image_urls, tags } = post;
-    const isAuthor = currentUserProfile?.id === author?.id;
+    const { content, created_at, profiles: individualAuthor, image_url, image_urls, tags } = post;
+    const isAuthor = currentUserProfile?.id === individualAuthor?.id;
     const displayImages = image_urls && image_urls.length > 0 ? image_urls : (image_url ? [image_url] : []);
 
-    // --- DATA FETCHING AND STATE SYNC ---
+    const displayAuthor = useMemo(() => {
+        if (showOrganizationAsAuthor && organization) {
+            return {
+                full_name: organization.name,
+                avatar_url: organization.logo_url,
+                organization_name: organization.funder_type?.name || 'Funder'
+            };
+        }
+        return individualAuthor;
+    }, [showOrganizationAsAuthor, organization, individualAuthor]);
+
+
     useEffect(() => {
         setCommentCount(post.comments_count || 0);
         setLikeCount(post.likes_count || 0);
@@ -80,7 +90,6 @@ function PostCard({ post, onDelete, disabled = false }) {
         checkReactionStatus();
     }, [post.id, currentUserProfile]);
 
-    // --- HANDLER FUNCTIONS ---
     const refreshPostData = async () => {
         if (!post?.id) return;
         try {
@@ -115,6 +124,32 @@ function PostCard({ post, onDelete, disabled = false }) {
         await refreshPostData();
     };
 
+    const updateMentionRecords = async (postId, mentions) => {
+        try {
+            await supabase.from('post_mentions').delete().eq('post_id', postId);
+
+            if (!mentions || mentions.length === 0) return;
+
+            const mentionRecords = mentions.map(mention => {
+                const record = { post_id: postId, mention_type: mention.type };
+                if (mention.type === 'user') {
+                    record.mentioned_profile_id = mention.id;
+                } else if (mention.type === 'organization') {
+                    const [orgType, orgId] = mention.id.split('-');
+                    record.mentioned_organization_id = parseInt(orgId);
+                    record.mentioned_organization_type = orgType;
+                }
+                return record;
+            });
+
+            const { error } = await supabase.from('post_mentions').insert(mentionRecords);
+            if (error) throw error;
+
+        } catch (error) {
+            console.error('Error updating mention records:', error);
+        }
+    };
+
     const handleEditPost = async (editData) => {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user || user.id !== post.user_id) return;
@@ -124,16 +159,28 @@ function PostCard({ post, onDelete, disabled = false }) {
             tags: editData.tags.length > 0 ? JSON.stringify(editData.tags) : null,
             image_urls: editData.images.length > 0 ? editData.images : null,
             image_url: editData.images.length === 1 ? editData.images[0] : null,
+            mentions: editData.mentions.length > 0 ? JSON.stringify(editData.mentions) : null,
         };
 
-        const { error } = await supabase.from('posts').update(updateData).eq('id', post.id);
+        const { data: updatedPost, error } = await supabase
+            .from('posts')
+            .update(updateData)
+            .eq('id', post.id)
+            .select()
+            .single();
+        
         if (error) {
             alert('Failed to update post. Please try again.');
+            console.error("Post update error:", error);
         } else {
-            post.content = updateData.content;
-            post.tags = editData.tags;
-            post.image_urls = updateData.image_urls;
-            post.image_url = updateData.image_url;
+            post.content = updatedPost.content;
+            post.tags = updatedPost.tags ? JSON.parse(updatedPost.tags) : [];
+            post.image_urls = updatedPost.image_urls;
+            post.image_url = updatedPost.image_url;
+            post.mentions = updatedPost.mentions ? JSON.parse(updatedPost.mentions) : [];
+            
+            await updateMentionRecords(post.id, editData.mentions);
+            
             setIsEditing(false);
         }
     };
@@ -161,14 +208,14 @@ function PostCard({ post, onDelete, disabled = false }) {
         reactorsTimeoutRef.current = setTimeout(() => { setShowReactorsPreview(false); }, 300);
     };
 
-    if (!post || !author) return null;
+    if (!post || !displayAuthor) return null;
 
     return (
         <div 
             className="post-card bg-white p-5 rounded-xl shadow-sm border border-slate-200 transition-all duration-300"
             data-post-id={post.id}
         >
-            <PostHeader author={author} createdAt={created_at} isAuthor={isAuthor} onEdit={() => setIsEditing(true)} onDelete={handleDeletePost} />
+            <PostHeader author={displayAuthor} createdAt={created_at} isAuthor={isAuthor} onEdit={() => setIsEditing(true)} onDelete={handleDeletePost} />
 
             {isEditing ? (
                 <EditPost post={post} onSave={handleEditPost} onCancel={() => setIsEditing(false)} />

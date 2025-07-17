@@ -1,216 +1,121 @@
-// src/utils/notificationUtils.js - Fixed Version
+// src/utils/notificationUtils.js
+
 import { supabase } from '../supabaseClient';
 
 /**
- * Extract mentions directly from HTML content
+ * Extracts user and organization mentions from HTML content.
+ * @param {string} htmlContent - The HTML content of the post.
+ * @returns {Array<Object>} An array of mention objects, each with id, displayName, and type.
  */
 const extractMentionsFromHTML = (htmlContent) => {
-  if (!htmlContent) return [];
-  
-  console.log('🔍 Extracting mentions from HTML:', htmlContent);
-  
+  if (!htmlContent) {
+    return [];
+  }
+
   const tempDiv = document.createElement('div');
   tempDiv.innerHTML = htmlContent;
-  
-  const mentionSpans = tempDiv.querySelectorAll('span.mention, span[data-type], span[data-id]');
-  const mentions = [];
-  
-  mentionSpans.forEach(span => {
-    const id = span.getAttribute('data-id');
-    const label = span.getAttribute('data-label');
-    const type = span.getAttribute('data-type');
-    
-    console.log('🔍 Found mention span:', { id, label, type, element: span });
-    
-    if (id && type) {
-      mentions.push({
-        id,
-        displayName: label || span.textContent.replace('@', ''),
-        type
-      });
-    }
-  });
-  
-  console.log('✅ Extracted mentions:', mentions);
-  return mentions;
+
+  const mentionNodes = tempDiv.querySelectorAll('span.mention[data-id][data-type]');
+
+  return Array.from(mentionNodes).map(node => ({
+    id: node.getAttribute('data-id'),
+    displayName: node.getAttribute('data-label') || node.textContent.replace('@', ''),
+    type: node.getAttribute('data-type'),
+  }));
 };
 
 /**
- * Create notifications for mentioned users and organization members
+ * Creates notification records in the database for mentioned users.
+ * @param {string} postId - The ID of the post containing the mentions.
+ * @param {Array<Object>} mentions - An array of mention objects from extractMentionsFromHTML.
+ * @param {string} actorId - The ID of the user who created the post.
+ * @returns {Promise<{success: boolean, count: number, error?: string}>} An object indicating success and the number of notifications created.
  */
 export const createMentionNotifications = async (postId, mentions, actorId) => {
+  if (!mentions?.length) {
+    return { success: true, count: 0 };
+  }
+
   try {
-    console.log('🔔 Creating mention notifications for post:', postId);
-    console.log('📋 Mentions to process:', mentions);
-    console.log('👤 Actor ID:', actorId);
-    
-    if (!mentions || mentions.length === 0) {
-      console.log('ℹ️ No mentions to process');
-      return { success: true, count: 0 };
-    }
-    
-    const notifications = [];
-    const processedUserIds = new Set();
-    
-    for (const mention of mentions) {
-      console.log(`🔄 Processing mention:`, mention);
-      
-      if (mention.type === 'user') {
-        const mentionedUserId = mention.id;
-        
-        if (mentionedUserId === actorId) {
-          console.log('⏭️ Skipping self-mention notification');
-          continue;
-        }
-        
-        if (processedUserIds.has(mentionedUserId)) {
-          console.log('⏭️ Skipping duplicate user mention notification');
-          continue;
-        }
-        
-        processedUserIds.add(mentionedUserId);
-        
-        // Verify the user exists
-        const { data: profileData, error: profileError } = await supabase
-          .from('profiles')
-          .select('id, full_name')
-          .eq('id', mentionedUserId)
-          .single();
-          
-        if (profileError || !profileData) {
-          console.error('❌ Could not find mentioned user profile:', mentionedUserId, profileError);
-          continue;
-        }
-        
-        console.log('✅ Found user profile:', profileData);
-        
-        notifications.push({
-          user_id: mentionedUserId,
+    const processedUserIds = new Set([actorId]);
+    const notificationPromises = [];
+
+    // Process user mentions first to populate processedUserIds
+    const userMentions = mentions.filter(m => m.type === 'user');
+    for (const mention of userMentions) {
+      if (!processedUserIds.has(mention.id)) {
+        processedUserIds.add(mention.id);
+        notificationPromises.push({
+          user_id: mention.id,
           actor_id: actorId,
           type: 'mention',
           post_id: postId,
-          is_read: false
+          is_read: false,
         });
-        
-        console.log('✅ Prepared user mention notification for:', mentionedUserId);
-        
-      } else if (mention.type === 'organization') {
+      }
+    }
+
+    // Process organization mentions
+    const organizationMentions = mentions.filter(m => m.type === 'organization');
+    if (organizationMentions.length > 0) {
+      const orgMemberQueries = organizationMentions.map(mention => {
         const [orgType, orgId] = mention.id.split('-');
-        
-        if (!orgId) {
-          console.warn('⚠️ Invalid organization mention format:', mention.id);
-          continue;
-        }
-        
-        console.log(`🏢 Processing organization mention: ${orgType}-${orgId}`);
-        
-        // Get organization members
-        const { data: members, error: membersError } = await supabase
+        return supabase
           .from('organization_memberships')
-          .select(`
-            profile_id,
-            profiles!organization_memberships_profile_id_fkey(
-              id,
-              full_name,
-              email_alerts_enabled
-            )
-          `)
+          .select('profile_id')
           .eq('organization_id', parseInt(orgId))
           .eq('organization_type', orgType);
-        
-        if (membersError) {
-          console.error('❌ Error fetching organization members:', membersError);
-          continue;
-        }
-        
-        if (!members || members.length === 0) {
-          console.log('ℹ️ No members found for organization:', mention.id);
-          continue;
-        }
-        
-        console.log(`👥 Found ${members.length} members for ${orgType}-${orgId}:`, members);
-        
-        for (const member of members) {
-          const memberId = member.profile_id;
-          
-          if (memberId === actorId) {
-            console.log('⏭️ Skipping organization mention notification for actor');
-            continue;
-          }
-          
-          if (processedUserIds.has(memberId)) {
-            console.log('⏭️ Skipping duplicate organization member notification');
-            continue;
-          }
-          
-          processedUserIds.add(memberId);
-          
-          notifications.push({
-            user_id: memberId,
-            actor_id: actorId,
-            type: 'organization_mention',
-            post_id: postId,
-            is_read: false
+      });
+
+      const results = await Promise.all(orgMemberQueries);
+
+      results.forEach(result => {
+        if (result.data) {
+          result.data.forEach(member => {
+            if (!processedUserIds.has(member.profile_id)) {
+              processedUserIds.add(member.profile_id);
+              notificationPromises.push({
+                user_id: member.profile_id,
+                actor_id: actorId,
+                type: 'organization_mention',
+                post_id: postId,
+                is_read: false,
+              });
+            }
           });
-          
-          console.log('✅ Prepared organization mention notification for:', memberId);
         }
-      }
+      });
     }
-    
-    console.log('📝 Final notifications to insert:', notifications);
-    
-    // Insert notifications
-    if (notifications.length > 0) {
-      const { data: insertedNotifications, error: insertError } = await supabase
-        .from('notifications')
-        .insert(notifications)
-        .select();
-      
-      if (insertError) {
-        console.error('❌ Error inserting mention notifications:', insertError);
-        console.error('❌ Full error details:', insertError);
-        throw insertError;
-      }
-      
-      console.log(`🎉 Successfully created ${notifications.length} mention notifications:`, insertedNotifications);
-    } else {
-      console.log('ℹ️ No mention notifications to create');
+
+    if (notificationPromises.length > 0) {
+      const { error } = await supabase.from('notifications').insert(notificationPromises);
+      if (error) throw error;
     }
-    
-    return { success: true, count: notifications.length };
-    
+
+    return { success: true, count: notificationPromises.length };
+
   } catch (error) {
-    console.error('💥 Error creating mention notifications:', error);
+    console.error('Error creating mention notifications:', error);
     return { success: false, error: error.message };
   }
 };
 
 /**
- * Extract mentions from post content and create notifications
+ * Processes a post's content to find mentions and create notifications.
+ * @param {string} postId - The ID of the post.
+ * @param {string} content - The HTML content of the post.
+ * @param {string} actorId - The ID of the user who created the post.
+ * @returns {Promise<{success: boolean, count: number, error?: string}>} An object indicating success and count of created notifications.
  */
 export const processMentionsForNotifications = async (postId, content, actorId) => {
   try {
-    console.log('🔍 Processing mentions for notifications...');
-    console.log('📄 Post ID:', postId);
-    console.log('📝 Content:', content);
-    console.log('👤 Actor ID:', actorId);
-    
-    // Extract mentions from HTML content
     const mentions = extractMentionsFromHTML(content);
-    
     if (mentions.length === 0) {
-      console.log('ℹ️ No mentions found in post content');
       return { success: true, count: 0 };
     }
-    
-    console.log(`📝 Found ${mentions.length} mentions in post:`, mentions);
-    
-    // Create notifications
     return await createMentionNotifications(postId, mentions, actorId);
-    
   } catch (error) {
-    console.error('💥 Error processing mentions for notifications:', error);
+    console.error('Error processing mentions for notifications:', error);
     return { success: false, error: error.message };
   }
 };
