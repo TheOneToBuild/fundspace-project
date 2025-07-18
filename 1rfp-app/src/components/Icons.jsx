@@ -84,4 +84,9 @@ export {
   MessageCircle,
   Plus,
   Sparkles,
+  Building2, 
+  Crown,
+  Edit, 
+  Shield, 
+  UserCog
 } from 'lucide-react';

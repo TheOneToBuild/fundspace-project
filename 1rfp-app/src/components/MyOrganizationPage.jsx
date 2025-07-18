@@ -2,13 +2,13 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useOutletContext, Link } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
-import { Users, Shield, MapPin, Globe, Building2, Edit, AlertTriangle, LogOut, Search, Crown, UserPlus, UserMinus, Settings, Star, MessageSquare } from 'lucide-react';
+import { Users, Shield, MapPin, Globe, Building2, Edit, AlertTriangle, LogOut, Search, Crown, UserPlus, UserMinus, Settings, Star, MessageSquare, BarChart3, ClipboardList, TrendingUp } from 'lucide-react';
 import Avatar from './Avatar.jsx';
 import EnhancedOrganizationSetupPage from './OrganizationSetupPage.jsx';
 import OmegaAdminOrgSelector from './OmegaAdminOrgSelector.jsx';
 import AdminManagementModal from './AdminManagementModal.jsx';
 import SocialMetricsCard from './SocialMetricsCard.jsx';
-import OrganizationPosts from './OrganizationPosts.jsx'; // NEW: Import OrganizationPosts component
+import OrganizationPosts from './OrganizationPosts.jsx';
 // Import our permission utilities
 import { hasPermission, PERMISSIONS, ROLES, getRoleDisplayName, getRoleBadgeColor, canManageUser } from '../utils/permissions.js';
 
@@ -36,6 +36,90 @@ export default function MyOrganizationPage() {
 
     // Check if user is Omega Admin
     const isOmegaAdmin = profile?.is_omega_admin === true;
+
+    // NEW: Enhanced Tab configuration based on organization type - MOVED TO TOP LEVEL
+    const getTabsForOrganizationType = useCallback((orgType, canViewAnalytics) => {
+        const baseTabs = [
+            { id: 'overview', label: 'Overview', icon: Building2 },
+            { id: 'team', label: 'Team', icon: Users }
+        ];
+
+        // Add analytics tab for admins
+        if (canViewAnalytics) {
+            baseTabs.splice(1, 0, { id: 'analytics', label: 'Analytics', icon: BarChart3 });
+        }
+
+        // Add organization-type specific tabs
+        if (orgType === 'nonprofit') {
+            return [
+                ...baseTabs,
+                { id: 'programs', label: 'Programs', icon: ClipboardList },
+                { id: 'impact', label: 'Impact Stories', icon: TrendingUp },
+                { id: 'supporters', label: 'Supporters', icon: Star }
+            ];
+        } else if (orgType === 'funder') {
+            return [
+                ...baseTabs,
+                { id: 'grants', label: 'Active Grants', icon: ClipboardList },
+                { id: 'grantees', label: 'Our Grantees', icon: Users },
+                { id: 'impact', label: 'Impact Stories', icon: TrendingUp }
+            ];
+        }
+
+        return baseTabs;
+    }, []);
+
+    // Calculate permissions early
+    const userRole = userMembership?.role;
+    const canEditOrg = hasPermission(userRole, PERMISSIONS.EDIT_ORGANIZATION, isOmegaAdmin);
+    const canManageMembers = hasPermission(userRole, PERMISSIONS.MANAGE_MEMBERS, isOmegaAdmin);
+    const canManageAdmins = hasPermission(userRole, PERMISSIONS.MANAGE_ADMINS, isOmegaAdmin);
+    const canViewAnalytics = ['super_admin', 'admin'].includes(userRole) || isOmegaAdmin;
+    const canSubmitUpdates = ['super_admin', 'admin'].includes(userRole) || isOmegaAdmin;
+    const canLeave = !isOmegaAdmin && userMembership;
+
+    // Tabs configuration - now always calculated
+    const tabs = useMemo(() => 
+        getTabsForOrganizationType(userMembership?.organization_type, canViewAnalytics), 
+        [userMembership?.organization_type, canViewAnalytics, getTabsForOrganizationType]
+    );
+
+    // Filter and search members - moved up
+    const filteredMembers = useMemo(() => {
+        return members.filter(member => {
+            const matchesSearch = !searchQuery || 
+                member.profiles?.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                member.profiles?.title?.toLowerCase().includes(searchQuery.toLowerCase());
+            
+            const matchesRole = roleFilter === 'all' || member.role === roleFilter;
+            
+            return matchesSearch && matchesRole;
+        });
+    }, [members, searchQuery, roleFilter]);
+
+    // Enhanced team member organization for Team tab - moved up
+    const organizedMembers = useMemo(() => {
+        const filtered = filteredMembers;
+
+        // Organize into sections
+        const leadership = filtered.filter(m => 
+            ['super_admin', 'admin'].includes(m.role) || 
+            m.profiles?.title?.toLowerCase().includes('director') ||
+            m.profiles?.title?.toLowerCase().includes('ceo') ||
+            m.profiles?.title?.toLowerCase().includes('president')
+        );
+
+        const boardMembers = filtered.filter(m => 
+            m.profiles?.title?.toLowerCase().includes('board') ||
+            m.profiles?.title?.toLowerCase().includes('trustee')
+        );
+
+        const staff = filtered.filter(m => 
+            !leadership.includes(m) && !boardMembers.includes(m)
+        );
+
+        return { leadership, staff, boardMembers };
+    }, [filteredMembers]);
 
     const checkMembership = useCallback(async () => {
         console.log('=== MEMBERSHIP CHECK STARTED ===');
@@ -239,7 +323,7 @@ export default function MyOrganizationPage() {
             setLoading(false);
         }
     };
-
+    
     // Handle member actions (promote, demote, remove)
     const handleMemberAction = async (member, action) => {
         if (!userMembership) return;
@@ -293,19 +377,6 @@ export default function MyOrganizationPage() {
         }
     };
 
-    // Filter and search members
-    const filteredMembers = useMemo(() => {
-        return members.filter(member => {
-            const matchesSearch = !searchQuery || 
-                member.profiles?.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                member.profiles?.title?.toLowerCase().includes(searchQuery.toLowerCase());
-            
-            const matchesRole = roleFilter === 'all' || member.role === roleFilter;
-            
-            return matchesSearch && matchesRole;
-        });
-    }, [members, searchQuery, roleFilter]);
-
     if (loading) {
         return <div className="p-6 text-center text-slate-500">Loading organization details...</div>;
     }
@@ -324,21 +395,88 @@ export default function MyOrganizationPage() {
         return <div className="p-6 text-center text-slate-500">Loading organization details...</div>;
     }
     
-    // Use new permission system with omega admin support
-    const userRole = userMembership.role;
-    const canEditOrg = hasPermission(userRole, PERMISSIONS.EDIT_ORGANIZATION, isOmegaAdmin);
-    const canManageMembers = hasPermission(userRole, PERMISSIONS.MANAGE_MEMBERS, isOmegaAdmin);
-    const canManageAdmins = hasPermission(userRole, PERMISSIONS.MANAGE_ADMINS, isOmegaAdmin);
+    // NEW: Render team member card without join date
+    const renderTeamMemberCard = (member) => {
+        const getRoleIcon = (role) => {
+            switch (role) {
+                case 'super_admin': return <Crown className="text-yellow-500" size={16} />;
+                case 'admin': return <Shield className="text-blue-500" size={16} />;
+                case 'member': return <Users className="text-green-500" size={16} />;
+                default: return <Users className="text-slate-400" size={16} />;
+            }
+        };
 
-    // All users can leave (except omega admins who don't join organizations)
-    const canLeave = !isOmegaAdmin && userMembership;
+        return (
+            <div key={member.profile_id} className="flex items-center justify-between p-4 border border-slate-200 rounded-lg hover:bg-slate-50">
+                <div className="flex items-center space-x-3">
+                    <Avatar 
+                        src={member.profiles?.avatar_url} 
+                        fullName={member.profiles?.full_name} 
+                        size="md" 
+                    />
+                    <div>
+                        <div className="flex items-center space-x-2">
+                            <h3 className="font-medium text-slate-800">{member.profiles?.full_name || 'Unknown User'}</h3>
+                            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getRoleBadgeColor(member.role, member.profiles?.is_omega_admin)}`}>
+                                {getRoleIcon(member.role)}
+                                <span className="ml-1">{getRoleDisplayName(member.role, member.profiles?.is_omega_admin)}</span>
+                            </span>
+                        </div>
+                        {member.profiles?.title && (
+                            <p className="text-sm text-slate-500">{member.profiles.title}</p>
+                        )}
+                    </div>
+                </div>
 
-    // NEW: Tab configuration
-    const tabs = [
-        { id: 'overview', label: 'Overview', icon: Building2 },
-        { id: 'posts', label: 'Updates', icon: MessageSquare },
-        { id: 'team', label: 'Team', icon: Users }
-    ];
+                {/* Member Actions */}
+                {canManageMembers && member.profile_id !== profile.id && (
+                    <div className="flex items-center space-x-2">
+                        {member.role === ROLES.MEMBER && canManageAdmins && (
+                            <button
+                                onClick={() => handleMemberAction(member, 'promote')}
+                                className="text-green-600 hover:text-green-800 p-1 rounded"
+                                title="Promote to Admin"
+                            >
+                                <UserPlus className="w-4 h-4" />
+                            </button>
+                        )}
+                        {(member.role === ROLES.ADMIN || member.role === ROLES.SUPER_ADMIN) && canManageAdmins && (
+                            <button
+                                onClick={() => handleMemberAction(member, 'demote')}
+                                className="text-orange-600 hover:text-orange-800 p-1 rounded"
+                                title="Demote to Member"
+                            >
+                                <UserMinus className="w-4 h-4" />
+                            </button>
+                        )}
+                        <button
+                            onClick={() => handleMemberAction(member, 'remove')}
+                            className="text-red-600 hover:text-red-800 p-1 rounded"
+                            title="Remove from Organization"
+                        >
+                            <UserMinus className="w-4 h-4" />
+                        </button>
+                    </div>
+                )}
+            </div>
+        );
+    };
+
+    // NEW: Render team section
+    const renderTeamSection = (title, members, emptyMessage) => {
+        if (members.length === 0) return null;
+
+        return (
+            <div className="mb-8">
+                <h3 className="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                    {title} ({members.length})
+                </h3>
+                <div className="space-y-3">
+                    {members.map(member => renderTeamMemberCard(member))}
+                </div>
+            </div>
+        );
+    };
 
     return (
         <div className="space-y-6">
@@ -400,7 +538,7 @@ export default function MyOrganizationPage() {
                     </div>
                 )}
 
-                {/* NEW: Tab Navigation */}
+                {/* NEW: Enhanced Tab Navigation */}
                 <div className="mt-6 pt-6 border-t border-slate-200">
                     <nav className="flex space-x-8">
                         {tabs.map((tab) => {
@@ -426,30 +564,62 @@ export default function MyOrganizationPage() {
 
             {/* Tab Content */}
             {activeTab === 'overview' && (
-                <>
-                    {/* Social Metrics Card */}
+                <div>
+                    {/* UPDATED: The outer "Organization Updates" heading and the bottom "Quick Stats" have been removed.
+                      The OrganizationPosts component is now the only item in the overview.
+                      The padding from the container has also been removed to allow the post box to expand.
+                    */}
+                    <div className="bg-white rounded-xl shadow-sm border border-slate-200">
+                        <OrganizationPosts
+                            organization={organization}
+                            organizationType={userMembership.organization_type}
+                            userRole={userRole}
+                            isOmegaAdmin={isOmegaAdmin}
+                            profile={profile}
+                        />
+                    </div>
+                </div>
+            )}
+
+            {/* NEW: Analytics Tab - Only for Admins */}
+            {activeTab === 'analytics' && (
+                <div className="space-y-6">
+                    {/* Social Engagement Section - Moved from Overview */}
                     <SocialMetricsCard 
                         organization={organization} 
                         organizationType={userMembership.organization_type}
                         userRole={userRole}
                         isOmegaAdmin={isOmegaAdmin}
                     />
-                </>
+                    
+                    {/* Additional Analytics Components */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                            <h3 className="text-lg font-semibold text-slate-800 mb-4">Profile Performance</h3>
+                            <div className="space-y-4">
+                                <div className="flex justify-between items-center">
+                                    <span className="text-slate-600">Profile Views (30 days)</span>
+                                    <span className="font-semibold">1,234</span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                    <span className="text-slate-600">Followers Growth</span>
+                                    <span className="font-semibold text-green-600">+12%</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                            <h3 className="text-lg font-semibold text-slate-800 mb-4">Engagement Trends</h3>
+                            <p className="text-slate-600">Detailed engagement analytics and trends...</p>
+                        </div>
+                    </div>
+                </div>
             )}
 
-            {activeTab === 'posts' && (
-                <OrganizationPosts
-                    organization={organization}
-                    organizationType={userMembership.organization_type}
-                    userRole={userRole}
-                    isOmegaAdmin={isOmegaAdmin}
-                    profile={profile}
-                />
-            )}
-
+            {/* NEW: Enhanced Team Tab with organized sections */}
             {activeTab === 'team' && (
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                    <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center justify-between mb-6">
                         <h2 className="text-lg font-semibold text-slate-800">Team Members ({members.length})</h2>
                         <div className="flex items-center space-x-3">
                             <div className="relative">
@@ -475,67 +645,11 @@ export default function MyOrganizationPage() {
                         </div>
                     </div>
 
-                    <div className="space-y-3">
-                        {filteredMembers.map((member) => (
-                            <div key={member.profile_id} className="flex items-center justify-between p-4 border border-slate-200 rounded-lg hover:bg-slate-50">
-                                <div className="flex items-center space-x-3">
-                                    <Avatar 
-                                        src={member.profiles?.avatar_url} 
-                                        fullName={member.profiles?.full_name} 
-                                        size="md" 
-                                    />
-                                    <div>
-                                        <div className="flex items-center space-x-2">
-                                            <h3 className="font-medium text-slate-800">{member.profiles?.full_name || 'Unknown User'}</h3>
-                                            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getRoleBadgeColor(member.role, member.profiles?.is_omega_admin)}`}>
-                                                {member.role === ROLES.SUPER_ADMIN && <Crown className="w-3 h-3 mr-1" />}
-                                                {member.role === ROLES.ADMIN && <Shield className="w-3 h-3 mr-1" />}
-                                                {member.role === ROLES.MEMBER && <Users className="w-3 h-3 mr-1" />}
-                                                {member.profiles?.is_omega_admin && <Star className="w-3 h-3 mr-1" />}
-                                                {getRoleDisplayName(member.role, member.profiles?.is_omega_admin)}
-                                            </span>
-                                        </div>
-                                        {member.profiles?.title && (
-                                            <p className="text-sm text-slate-500">{member.profiles.title}</p>
-                                        )}
-                                        <p className="text-xs text-slate-400">
-                                            Joined {new Date(member.joined_at).toLocaleDateString()}
-                                        </p>
-                                    </div>
-                                </div>
-
-                                {/* Member Actions */}
-                                {canManageMembers && member.profile_id !== profile.id && (
-                                    <div className="flex items-center space-x-2">
-                                        {member.role === ROLES.MEMBER && canManageAdmins && (
-                                            <button
-                                                onClick={() => handleMemberAction(member, 'promote')}
-                                                className="text-green-600 hover:text-green-800 p-1 rounded"
-                                                title="Promote to Admin"
-                                            >
-                                                <UserPlus className="w-4 h-4" />
-                                            </button>
-                                        )}
-                                        {(member.role === ROLES.ADMIN || member.role === ROLES.SUPER_ADMIN) && canManageAdmins && (
-                                            <button
-                                                onClick={() => handleMemberAction(member, 'demote')}
-                                                className="text-orange-600 hover:text-orange-800 p-1 rounded"
-                                                title="Demote to Member"
-                                            >
-                                                <UserMinus className="w-4 h-4" />
-                                            </button>
-                                        )}
-                                        <button
-                                            onClick={() => handleMemberAction(member, 'remove')}
-                                            className="text-red-600 hover:text-red-800 p-1 rounded"
-                                            title="Remove from Organization"
-                                        >
-                                            <UserMinus className="w-4 h-4" />
-                                        </button>
-                                    </div>
-                                )}
-                            </div>
-                        ))}
+                    {/* NEW: Organized Team Sections - No joined dates */}
+                    <div className="space-y-8">
+                        {renderTeamSection("Leadership", organizedMembers.leadership, "No leadership members found")}
+                        {renderTeamSection("Staff", organizedMembers.staff, "No staff members found")}
+                        {renderTeamSection("Board Members", organizedMembers.boardMembers, "No board members found")}
                     </div>
 
                     {filteredMembers.length === 0 && (
@@ -544,6 +658,57 @@ export default function MyOrganizationPage() {
                         </div>
                     )}
                 </div>
+            )}
+
+            {/* Organization-specific tabs */}
+            {userMembership.organization_type === 'nonprofit' && (
+                <>
+                    {activeTab === 'programs' && (
+                        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                            <h2 className="text-lg font-semibold text-slate-800 mb-4">Programs & Services</h2>
+                            <p className="text-slate-600">Manage your organization's programs and services.</p>
+                        </div>
+                    )}
+                    
+                    {activeTab === 'impact' && (
+                        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                            <h2 className="text-lg font-semibold text-slate-800 mb-4">Impact Stories</h2>
+                            <p className="text-slate-600">Share and manage your organization's impact stories.</p>
+                        </div>
+                    )}
+                    
+                    {activeTab === 'supporters' && (
+                        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                            <h2 className="text-lg font-semibold text-slate-800 mb-4">Supporters & Donors</h2>
+                            <p className="text-slate-600">Manage relationships with your supporters and donors.</p>
+                        </div>
+                    )}
+                </>
+            )}
+
+            {userMembership.organization_type === 'funder' && (
+                <>
+                    {activeTab === 'grants' && (
+                        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                            <h2 className="text-lg font-semibold text-slate-800 mb-4">Active Grants</h2>
+                            <p className="text-slate-600">Manage your active grant opportunities.</p>
+                        </div>
+                    )}
+                    
+                    {activeTab === 'grantees' && (
+                        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                            <h2 className="text-lg font-semibold text-slate-800 mb-4">Our Grantees</h2>
+                            <p className="text-slate-600">View and manage your current and past grantees.</p>
+                        </div>
+                    )}
+                    
+                    {activeTab === 'impact' && (
+                        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                            <h2 className="text-lg font-semibold text-slate-800 mb-4">Impact Stories</h2>
+                            <p className="text-slate-600">Showcase the impact of your funding.</p>
+                        </div>
+                    )}
+                </>
             )}
 
             {/* UPDATED: Confirmation Modal for Leaving Organization */}
