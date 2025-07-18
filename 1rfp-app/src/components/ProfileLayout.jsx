@@ -1,4 +1,4 @@
-// src/components/ProfileLayout.jsx
+// src/components/ProfileLayout.jsx - COMPLETE FILE WITH FULL STICKY FOOTER FIX
 import React from 'react';
 // MODIFIED: Removed DashboardHeader and Footer imports
 import ProfileNav from './ProfileNav.jsx';
@@ -62,33 +62,40 @@ export default function ProfileLayout({
   const columnSpans = { left: 'lg:col-span-2', main: 'lg:col-span-8', right: 'lg:col-span-2' };
 
   return (
-    // MODIFIED: Removed the outer div and the DashboardHeader component.
-    // The main layout is now controlled by App.jsx
-    <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        
-        <aside className={columnSpans.left}>
-          <div className="lg:sticky lg:top-24">
-            <ProfileNav user={user} profile={profile} />
-          </div>
-        </aside>
+    // ✅ CRITICAL FIX: This is the missing piece! Full height flex layout
+    <div className="min-h-full flex flex-col">
+      {/* ✅ CRITICAL FIX: Container now has flex-1 to expand */}
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1">
+        {/* ✅ CRITICAL FIX: Grid now has min-h-full to take full height */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 min-h-full">
+          
+          <aside className={columnSpans.left}>
+            <div className="lg:sticky lg:top-24">
+              <ProfileNav user={user} profile={profile} />
+            </div>
+          </aside>
 
-        <main className={columnSpans.main}>
-          {children}
-        </main>
+          {/* ✅ CRITICAL FIX: Main content area with flex layout */}
+          <main className={`${columnSpans.main} flex flex-col min-h-full`}>
+            {/* ✅ CRITICAL FIX: Children wrapper with flex-1 */}
+            <div className="flex-1">
+              {children}
+            </div>
+          </main>
 
-        <aside className={columnSpans.right}>
-           <div className="lg:sticky lg:top-24">
-            <RightSidebar 
-              savedGrants={savedGrants} 
-              trendingGrants={trendingGrants} 
-              handleTrendingGrantClick={handleTrendingGrantClick}
-            />
-          </div>
-        </aside>
+          <aside className={columnSpans.right}>
+             <div className="lg:sticky lg:top-24">
+              <RightSidebar 
+                savedGrants={savedGrants} 
+                trendingGrants={trendingGrants} 
+                handleTrendingGrantClick={handleTrendingGrantClick}
+              />
+            </div>
+          </aside>
 
+        </div>
       </div>
-       {/* MODIFIED: Removed the Footer component */}
+      {/* MODIFIED: Removed the Footer component - it's now handled by App.jsx */}
     </div>
   );
 }

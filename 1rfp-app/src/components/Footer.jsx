@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import footerLogoImage from '../assets/1rfp-footer-logo.png';
 import { Facebook, Twitter, Linkedin, Youtube, Instagram } from './Icons.jsx';
 
-export default function Footer({ session }) {
+export default function Footer() {
   const productLinks = [
     { to: "/how-it-works", text: "How 1RFP Works" },
     { to: "/for-nonprofits", text: "For Nonprofits" },
@@ -33,7 +33,7 @@ export default function Footer({ session }) {
   ];
 
   return (
-    // ✅ FIXED: Optimized for sticky footer layout
+    // ✅ STICKY FOOTER: Uses mt-auto to push footer to bottom, proper background and border
     <footer className="bg-white border-t border-slate-200 py-8 mt-auto">
       <div className="container mx-auto px-6">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">

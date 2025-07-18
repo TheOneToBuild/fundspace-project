@@ -1,6 +1,6 @@
-// src/components/NotificationsPanel.jsx - FIXED WITH ORGANIZATION POST NAVIGATION
+// components/NotificationsPanel.jsx - Enhanced with Follower Navigation
 import React from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { UserPlus, ThumbsUp, MessageSquare, AtSign, Building } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 
@@ -19,7 +19,29 @@ const timeAgo = (date) => {
     return "Just now";
 };
 
-const NotificationIcon = ({ type }) => {
+const NotificationIcon = ({ type, actor }) => {
+    // For follower notifications, show the follower's avatar
+    if (type === 'new_follower' && actor?.avatar_url) {
+        return (
+            <img 
+                src={actor.avatar_url} 
+                alt={actor.full_name}
+                className="w-8 h-8 rounded-full object-cover border-2 border-blue-200"
+            />
+        );
+    }
+    
+    // For follower notifications without avatar, show initials
+    if (type === 'new_follower' && actor?.full_name) {
+        const initials = actor.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+        return (
+            <div className="w-8 h-8 rounded-full bg-blue-500 text-white flex items-center justify-center text-sm font-medium border-2 border-blue-200">
+                {initials}
+            </div>
+        );
+    }
+    
+    // Default icons for other notification types
     switch (type) {
         case 'new_follower':
             return <UserPlus className="w-5 h-5 text-blue-500" />;
@@ -43,7 +65,7 @@ const NotificationItem = ({ notification, onClick, onViewPost }) => {
         type, 
         created_at, 
         post_id, 
-        organization_post_id  // ✅ Now we check for this!
+        organization_post_id
     } = notification;
 
     const notificationText = () => {
@@ -63,7 +85,7 @@ const NotificationItem = ({ notification, onClick, onViewPost }) => {
         }
     };
 
-    // ✅ NEW: Function to get organization details and navigate to org profile
+    // Function to get organization details and navigate to org profile
     const getOrganizationDetailsAndNavigate = async (orgPostId) => {
         try {
             console.log('🔍 Fetching organization details for post ID:', orgPostId);
@@ -105,50 +127,31 @@ const NotificationItem = ({ notification, onClick, onViewPost }) => {
                 ? `/nonprofits/${orgData.slug}` 
                 : `/funders/${orgData.slug}`;
             
-            console.log(`🎯 Navigating to organization: ${orgPath}`);
+            console.log('🎯 Navigating to organization:', orgPath);
             navigate(orgPath);
-            
-            // Highlight the post after navigation
-            setTimeout(() => {
-                if (onViewPost) {
-                    onViewPost(orgPostId, true); // true indicates it's an organization post
-                }
-            }, 100);
-            
             return true;
-            
         } catch (error) {
-            console.error('💥 Error in organization navigation:', error);
+            console.error('💥 Error in getOrganizationDetailsAndNavigate:', error);
             return false;
         }
     };
 
     const handleViewPost = (e) => {
-        e.preventDefault();
-        e.stopPropagation();
+        e.stopPropagation(); // Prevent the notification click handler from firing
         
-        console.log('🎯 View Post clicked:', { 
-            post_id, 
-            organization_post_id,
-            type 
-        });
-        
-        // ✅ FIXED: Check if it's an organization post first
         if (organization_post_id) {
-            console.log('🏢 Handling organization post notification');
-            onClick(); // Close notifications panel
+            console.log('🏢 Viewing organization post:', organization_post_id);
             getOrganizationDetailsAndNavigate(organization_post_id);
-        } else if (post_id && onViewPost) {
-            console.log('👤 Handling regular post notification');
-            // Close the notifications panel first
-            onClick();
-            
-            // Navigate to profile page (where posts are displayed)
+        } else if (post_id) {
+            console.log('👤 Viewing user post:', post_id);
+            onClick(); // Close notifications panel
             navigate('/profile');
             
             // Small delay to ensure navigation completes, then highlight the post
             setTimeout(() => {
-                onViewPost(post_id);
+                if (onViewPost) {
+                    onViewPost(post_id);
+                }
             }, 100);
         }
     };
@@ -158,11 +161,22 @@ const NotificationItem = ({ notification, onClick, onViewPost }) => {
             type, 
             post_id, 
             organization_post_id,
-            actor: actor?.full_name 
+            actor: actor?.full_name,
+            actorId: actor?.id 
         });
         
-        // ✅ FIXED: Handle organization posts vs regular posts
-        if (organization_post_id) {
+        // Mark notification as read when clicked
+        markAsRead();
+        
+        // Handle different notification types
+        if (type === 'new_follower') {
+            // For follower notifications, navigate to the follower's profile
+            console.log('👥 New follower notification - navigating to follower profile:', actor?.id);
+            onClick(); // Close notifications panel
+            const profileUrl = `/profile/members/${actor.id}`;
+            console.log('🔗 Navigating to:', profileUrl);
+            navigate(profileUrl);
+        } else if (organization_post_id) {
             console.log('🏢 Organization post notification - navigating to org profile');
             onClick(); // Close notifications panel
             getOrganizationDetailsAndNavigate(organization_post_id);
@@ -178,9 +192,28 @@ const NotificationItem = ({ notification, onClick, onViewPost }) => {
                 }
             }, 100);
         } else {
-            // For non-post notifications (like follows), go to actor's profile
+            // For other notifications (like mentions without posts), go to actor's profile
             onClick();
-            navigate(`/profile/members/${actor.id}`);
+            const profileUrl = `/profile/members/${actor.id}`;
+            console.log('🔗 Fallback navigation to:', profileUrl);
+            navigate(profileUrl);
+        }
+    };
+
+    const markAsRead = async () => {
+        if (notification.is_read) return;
+        
+        try {
+            const { error } = await supabase
+                .from('notifications')
+                .update({ is_read: true })
+                .eq('id', notification.id);
+            
+            if (error) {
+                console.error('Error marking notification as read:', error);
+            }
+        } catch (error) {
+            console.error('Error in markAsRead:', error);
         }
     };
 
@@ -191,11 +224,13 @@ const NotificationItem = ({ notification, onClick, onViewPost }) => {
         >
             <div className="flex items-start space-x-3">
                 <div className="flex-shrink-0 pt-1">
-                    <NotificationIcon type={type} />
+                    <NotificationIcon type={type} actor={actor} />
                 </div>
                 <div className="flex-grow">
                     <p className="text-sm text-slate-700">{notificationText()}</p>
                     <p className="text-xs text-slate-500 mt-1">{timeAgo(created_at)}</p>
+                    
+                    {/* Show "View Post" button only for post-related notifications */}
                     {(post_id || organization_post_id) && (
                         <div className="mt-2">
                             <button 
@@ -203,6 +238,22 @@ const NotificationItem = ({ notification, onClick, onViewPost }) => {
                                 className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full hover:bg-blue-200 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
                             >
                                 View Post
+                            </button>
+                        </div>
+                    )}
+                    
+                    {/* Show "View Profile" button for follower notifications */}
+                    {type === 'new_follower' && (
+                        <div className="mt-2">
+                            <button 
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onClick(); // Close notifications panel
+                                    navigate(`/profile/members/${actor.id}`);
+                                }}
+                                className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full hover:bg-green-200 transition-colors focus:outline-none focus:ring-2 focus:ring-green-500"
+                            >
+                                View Profile
                             </button>
                         </div>
                     )}
@@ -219,35 +270,42 @@ export default function NotificationsPanel({ notifications, onClose, onViewPost,
     console.log('🔔 NotificationsPanel props:', { 
         notificationsCount: notifications?.length, 
         hasOnViewPost: !!onViewPost,
-        hasOnClearAll: !!onClearAll 
+        hasOnClearAll: !!onClearAll
     });
 
+    if (!notifications || notifications.length === 0) {
+        return (
+            <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-lg shadow-lg border border-slate-200 z-50">
+                <div className="p-4 text-center text-slate-500">
+                    <UserPlus className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+                    <p>No notifications yet</p>
+                </div>
+            </div>
+        );
+    }
+
     return (
-        <div className="absolute right-0 mt-3 w-80 max-w-sm bg-white rounded-xl shadow-lg border border-slate-200 z-50 overflow-hidden">
-            <div className="p-3 border-b border-slate-200 flex items-center justify-between">
-                <h4 className="font-semibold text-slate-800">Notifications</h4>
-                {notifications.length > 0 && onClearAll && (
+        <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-lg shadow-lg border border-slate-200 z-50 max-h-96 overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between">
+                <h3 className="font-semibold text-slate-900">Notifications</h3>
+                {onClearAll && (
                     <button
                         onClick={onClearAll}
-                        className="text-xs text-slate-500 hover:text-slate-700 px-2 py-1 rounded hover:bg-slate-100 transition-colors"
+                        className="text-xs text-slate-500 hover:text-slate-700 transition-colors"
                     >
                         Clear All
                     </button>
                 )}
             </div>
-            <div className="max-h-96 overflow-y-auto custom-scrollbar">
-                {notifications.length > 0 ? (
-                    notifications.map(notif => (
-                        <NotificationItem 
-                            key={notif.id} 
-                            notification={notif} 
-                            onClick={onClose}
-                            onViewPost={onViewPost}
-                        />
-                    ))
-                ) : (
-                    <p className="p-6 text-center text-sm text-slate-500">You have no new notifications.</p>
-                )}
+            <div className="divide-y divide-slate-100">
+                {notifications.map(notification => (
+                    <NotificationItem
+                        key={notification.id}
+                        notification={notification}
+                        onClick={onClose}
+                        onViewPost={onViewPost}
+                    />
+                ))}
             </div>
         </div>
     );

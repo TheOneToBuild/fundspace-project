@@ -1,4 +1,4 @@
-// src/App.jsx - ENHANCED WITH ORGANIZATION POST NOTIFICATION SUPPORT
+// src/App.jsx - ENHANCED WITH ORGANIZATION POST NOTIFICATION SUPPORT AND STICKY FOOTER
 import React, { useState, useEffect, createContext, useRef } from 'react';
 import { BrowserRouter, Routes, Route, Link, NavLink, Outlet, useOutletContext, useLocation } from 'react-router-dom';
 import ScrollToTop from './components/ScrollToTop.jsx';
@@ -216,8 +216,9 @@ const AppLayout = () => {
 
     return (
         <LayoutContext.Provider value={{ setPageBgColor }}>
-            {/* ✅ FIXED: Changed to use min-h-screen and flex flex-col for sticky footer */}
+            {/* ✅ CORRECTED: Proper sticky footer with min-h-screen and flex flex-col */}
             <div className={`min-h-screen ${pageBgColor} font-sans text-slate-800 flex flex-col`}>
+                {/* Header */}
                 {session && profile ? (
                     <DashboardHeader
                         profile={profile}
@@ -231,13 +232,13 @@ const AppLayout = () => {
                     <PublicHeader />
                 )}
                 
-                {/* ✅ FIXED: Main content area that grows to fill available space */}
+                {/* ✅ CORRECTED: Main content area that grows to fill available space */}
                 <main className="flex-1">
                     <Outlet context={outletContext} />
                 </main>
                 
-                {/* ✅ FIXED: Footer will now stick to bottom */}
-                <Footer session={session} />
+                {/* ✅ CORRECTED: Footer will now stick to bottom with mt-auto */}
+                <Footer />
             </div>
         </LayoutContext.Provider>
     );

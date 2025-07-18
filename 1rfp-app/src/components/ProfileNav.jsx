@@ -1,4 +1,4 @@
-// src/components/ProfileNav.jsx - Compact Version
+// src/components/ProfileNav.jsx - Compact Version with Real-Time Follow Updates
 import React, { useState, useEffect } from 'react';
 import { NavLink, useOutletContext } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
@@ -18,6 +18,62 @@ export default function ProfileNav() {
         if (profile?.id) {
             fetchProfileStats();
         }
+    }, [profile?.id]);
+
+    // NEW: Listen for real-time follow updates
+    useEffect(() => {
+        if (!profile?.id) return;
+
+        const handleFollowUpdate = (event) => {
+            const { action, followerId, followingId } = event.detail;
+            
+            console.log('🔄 ProfileNav received follow update:', { action, followerId, followingId, currentUserId: profile.id });
+            
+            // Only update if this affects the current user
+            if (followerId === profile.id || followingId === profile.id) {
+                console.log('📊 Updating follow stats for current user');
+                
+                setStats(prevStats => {
+                    const newStats = { ...prevStats };
+                    
+                    if (followerId === profile.id) {
+                        // Current user followed someone else
+                        if (action === 'follow') {
+                            newStats.followingCount += 1;
+                        } else if (action === 'unfollow') {
+                            newStats.followingCount = Math.max(0, newStats.followingCount - 1);
+                        }
+                    }
+                    
+                    if (followingId === profile.id) {
+                        // Someone followed/unfollowed the current user
+                        if (action === 'follow') {
+                            newStats.followersCount += 1;
+                        } else if (action === 'unfollow') {
+                            newStats.followersCount = Math.max(0, newStats.followersCount - 1);
+                        }
+                    }
+                    
+                    console.log('📈 Updated stats:', { 
+                        previous: prevStats, 
+                        new: newStats,
+                        action,
+                        followerId,
+                        followingId 
+                    });
+                    
+                    return newStats;
+                });
+            }
+        };
+
+        // Add event listener for follow updates
+        window.addEventListener('followUpdate', handleFollowUpdate);
+
+        // Cleanup event listener
+        return () => {
+            window.removeEventListener('followUpdate', handleFollowUpdate);
+        };
     }, [profile?.id]);
 
     const fetchProfileStats = async () => {
@@ -44,10 +100,13 @@ export default function ProfileNav() {
                 console.error('Error fetching following count:', followingError);
             }
 
-            setStats({
+            const newStats = {
                 followersCount: followersCount || 0,
                 followingCount: followingCount || 0
-            });
+            };
+
+            console.log('📊 Initial profile stats loaded:', newStats);
+            setStats(newStats);
 
         } catch (err) {
             console.error('Error fetching profile stats:', err);
@@ -97,16 +156,16 @@ export default function ProfileNav() {
                     </p>
                 </div>
                 
-                {/* Compact Stats */}
+                {/* Compact Stats - ENHANCED: Now with real-time updates */}
                 <div className="flex justify-center space-x-6 border-t border-slate-100 pt-3">
                     <div className="text-center">
-                        <p className="text-lg font-bold text-blue-600">
+                        <p className="text-lg font-bold text-blue-600 transition-all duration-300">
                             {loading ? '...' : stats.followersCount}
                         </p>
                         <p className="text-xs text-slate-500 uppercase tracking-wide">Followers</p>
                     </div>
                     <div className="text-center">
-                        <p className="text-lg font-bold text-purple-600">
+                        <p className="text-lg font-bold text-purple-600 transition-all duration-300">
                             {loading ? '...' : stats.followingCount}
                         </p>
                         <p className="text-xs text-slate-500 uppercase tracking-wide">Following</p>
