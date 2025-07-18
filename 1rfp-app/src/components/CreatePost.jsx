@@ -19,7 +19,10 @@ export default function CreatePost({
   profile,
   onNewPost,
   channel = 'hello-world',
-  placeholder = null
+  placeholder = null,
+  organizationId = null,
+  organizationType = null,
+  organization = null // Pass full organization object for display
 }) {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
@@ -41,6 +44,12 @@ export default function CreatePost({
         '😊', '😂', '❤️', '👍', '🎉', '🔥', '💡', '🚀',
         '💯', '⭐', '🌟', '💪', '🙌', '👏', '🎯', '💝'
     ];
+
+    // Check if this is an organization post
+    const isOrganizationPost = channel === 'organization' && organizationId && organizationType;
+
+    // Determine which table to use
+    const postsTable = isOrganizationPost ? 'organization_posts' : 'posts';
 
     const availableTags = [
         { id: 'education', label: 'Education', color: 'bg-blue-100 text-blue-800 border-blue-200' },
@@ -355,6 +364,42 @@ export default function CreatePost({
         return Promise.all(uploadPromises);
     };
 
+    // --- CREATE MENTION RECORDS FOR DATABASE ---
+    const createMentionRecords = async (postId, mentions) => {
+        const mentionTable = isOrganizationPost ? 'organization_post_mentions' : 'post_mentions';
+        const postIdField = isOrganizationPost ? 'organization_post_id' : 'post_id';
+        
+        try {
+            const mentionRecords = mentions.map(mention => {
+                const record = {
+                    [postIdField]: postId,
+                    mention_type: mention.type
+                };
+
+                if (mention.type === 'user') {
+                    record.mentioned_profile_id = mention.id;
+                } else if (mention.type === 'organization') {
+                    const [orgType, orgId] = mention.id.split('-');
+                    record.mentioned_organization_id = parseInt(orgId);
+                    record.mentioned_organization_type = orgType;
+                }
+
+                return record;
+            });
+
+            const { error } = await supabase
+                .from(mentionTable)
+                .insert(mentionRecords);
+
+            if (error) {
+                console.error('Error creating mention records:', error);
+            }
+        } catch (error) {
+            console.error('Error processing mentions:', error);
+        }
+    };
+
+    // --- MAIN SUBMIT HANDLER ---
     const handlePostSubmit = async () => {
         if (!editor || (isEditorContentEmpty && selectedImages.length === 0) || !profile) return;
 
@@ -402,19 +447,36 @@ export default function CreatePost({
                 });
             }
 
-            const postData = {
-                content: editorHtmlContent.trim() || '',
-                user_id: user.id,
-                profile_id: profile.id,
-                image_urls: imageUrls.length > 0 ? imageUrls : null,
-                image_url: imageUrls.length === 1 ? imageUrls[0] : null,
-                tags: selectedTags.length > 0 ? JSON.stringify(selectedTags) : null,
-                channel: channel,
-                mentions: mentionsForStorage.length > 0 ? JSON.stringify(mentionsForStorage) : null,
-            };
+            // Prepare post data based on post type
+            let postData;
+            
+            if (isOrganizationPost) {
+                // Organization post data
+                postData = {
+                    content: editorHtmlContent.trim() || '',
+                    organization_id: organizationId,
+                    organization_type: organizationType,
+                    created_by_user_id: user.id,
+                    image_urls: imageUrls.length > 0 ? imageUrls : null,
+                    tags: selectedTags.length > 0 ? JSON.stringify(selectedTags) : null,
+                    mentions: mentionsForStorage.length > 0 ? JSON.stringify(mentionsForStorage) : null,
+                };
+            } else {
+                // Regular post data
+                postData = {
+                    content: editorHtmlContent.trim() || '',
+                    user_id: user.id,
+                    profile_id: profile.id,
+                    image_urls: imageUrls.length > 0 ? imageUrls : null,
+                    image_url: imageUrls.length === 1 ? imageUrls[0] : null,
+                    tags: selectedTags.length > 0 ? JSON.stringify(selectedTags) : null,
+                    channel: channel,
+                    mentions: mentionsForStorage.length > 0 ? JSON.stringify(mentionsForStorage) : null,
+                };
+            }
 
             const { data: newPost, error: postError } = await supabase
-                .from('posts')
+                .from(postsTable)
                 .insert(postData)
                 .select()
                 .single();
@@ -428,19 +490,20 @@ export default function CreatePost({
             if (mentionsForStorage.length > 0) {
                 await createMentionRecords(newPost.id, mentionsForStorage);
                 
-                // CREATE MENTION NOTIFICATIONS - THIS IS THE NEW PART
-                console.log('🔔 Creating mention notifications...');
-                const notificationResult = await processMentionsForNotifications(
-                    newPost.id, 
-                    editorHtmlContent, 
-                    profile.id
-                );
-                
-                if (notificationResult.success) {
-                    console.log(`✅ Created ${notificationResult.count} mention notifications`);
-                } else {
-                    console.error('❌ Failed to create mention notifications:', notificationResult.error);
-                    // Don't fail the entire post creation if notifications fail
+                // CREATE MENTION NOTIFICATIONS - Only for regular posts for now
+                if (!isOrganizationPost) {
+                    console.log('🔔 Creating mention notifications...');
+                    const notificationResult = await processMentionsForNotifications(
+                        newPost.id, 
+                        editorHtmlContent, 
+                        profile.id
+                    );
+                    
+                    if (notificationResult.success) {
+                        console.log(`✅ Created ${notificationResult.count} mention notifications`);
+                    } else {
+                        console.error('❌ Failed to create mention notifications:', notificationResult.error);
+                    }
                 }
             }
 
@@ -465,46 +528,53 @@ export default function CreatePost({
         }
     };
 
-    const createMentionRecords = async (postId, mentions) => {
-        try {
-            const mentionRecords = mentions.map(mention => {
-                const record = {
-                    post_id: postId,
-                    mention_type: mention.type
-                };
-
-                if (mention.type === 'user') {
-                    record.mentioned_profile_id = mention.id;
-                } else if (mention.type === 'organization') {
-                    const [orgType, orgId] = mention.id.split('-');
-                    record.mentioned_organization_id = parseInt(orgId);
-                    record.mentioned_organization_type = orgType;
-                }
-
-                return record;
-            });
-
-            const { error } = await supabase
-                .from('post_mentions')
-                .insert(mentionRecords);
-
-            if (error) {
-                console.error('Error creating mention records:', error);
-            }
-        } catch (error) {
-            console.error('Error processing mentions:', error);
-        }
-    };
+    // Cleanup on unmount
+    useEffect(() => {
+        return () => {
+            selectedImages.forEach(img => URL.revokeObjectURL(img.preview));
+        };
+    }, []);
 
     if (!editor) {
         return null;
     }
 
+    const defaultPlaceholder = isOrganizationPost 
+        ? `Share an update for ${organization?.name || 'your organization'}...`
+        : `What's on your mind, ${profile?.full_name?.split(' ')[0] || 'there'}?`;
+
     return (
         <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
             <div className="flex items-start space-x-3">
-                <Avatar src={profile?.avatar_url} fullName={profile?.full_name} size="md" />
+                <div className="flex-shrink-0">
+                    {isOrganizationPost && organization ? (
+                        // Show organization avatar for org posts
+                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+                            {organization.logo_url || organization.image_url ? (
+                                <img 
+                                    src={organization.logo_url || organization.image_url} 
+                                    alt={organization.name}
+                                    className="w-12 h-12 rounded-full object-cover"
+                                />
+                            ) : (
+                                <span className="text-white font-bold text-lg">
+                                    {organization.name?.charAt(0)?.toUpperCase()}
+                                </span>
+                            )}
+                        </div>
+                    ) : (
+                        // Show user avatar for regular posts
+                        <Avatar src={profile?.avatar_url} fullName={profile?.full_name} size="md" />
+                    )}
+                </div>
+                
                 <div className="flex-1">
+                    {isOrganizationPost && organization && (
+                        <div className="mb-3">
+                            <p className="font-medium text-slate-900">{organization.name}</p>
+                        </div>
+                    )}
+                    
                     <div className="relative">
                         {/* TIPTAP EDITOR */}
                         <EditorContent editor={editor} />
@@ -706,7 +776,7 @@ export default function CreatePost({
                             className={`
                                 bg-blue-600 text-white px-6 py-2 rounded-lg font-medium
                                 hover:bg-blue-700 transition-colors shadow-sm
-                                ${(isLoading || (isEditorContentEmpty && selectedImages.length === 0)) ? 'is-disabled' : ''}
+                                disabled:opacity-50 disabled:cursor-not-allowed
                             `}
                             type="button"
                         >

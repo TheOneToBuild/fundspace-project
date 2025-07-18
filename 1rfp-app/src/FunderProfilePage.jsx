@@ -85,8 +85,15 @@ const FunderProfilePage = () => {
           const [grantsRes, orgPostsRes, activitiesRes, storiesRes, membersRes] = await Promise.all([
             // Fetch Grants
             supabase.from('grants').select(`*, funders(name, logo_url, slug), grant_categories(categories(id, name)), grant_locations(locations(id, name))`).eq('funder_id', funderId).order('deadline', { ascending: true, nullsFirst: false }),
-            // Fetch Organization Posts
-            supabase.from('posts').select(`*, profiles!posts_profile_id_fkey(*)`).eq('organization_id', funderId).eq('organization_type', 'funder').order('created_at', { ascending: false }).limit(10),
+            
+            // Fetch Organization Posts - UPDATED TO USE NEW TABLE
+            supabase.from('organization_posts')
+              .select('*')
+              .eq('organization_id', funderId)
+              .eq('organization_type', 'funder')
+              .order('created_at', { ascending: false })
+              .limit(10),
+            
             // Fetch Recent Activities (using mock for now as per original code)
             Promise.resolve({ data: [{ id: 1, type: 'grant_awarded', description: 'Awarded $50,000 to Bay Area Food Bank', date: '2024-01-15', amount: '$50,000' }] }),
             // Fetch Impact Stories (using mock for now)
@@ -96,9 +103,18 @@ const FunderProfilePage = () => {
           ]);
 
           // Set Grants
-          setFunderGrants((grantsRes.data || []).map(grant => ({ ...grant, foundationName: grant.funders?.name, funderLogoUrl: grant.funders?.logo_url, fundingAmount: grant.max_funding_amount, dueDate: grant.deadline, grantType: grant.grant_type, categories: grant.grant_categories.map(gc => gc.categories), locations: grant.grant_locations.map(gl => gl.locations) })));
+          setFunderGrants((grantsRes.data || []).map(grant => ({ 
+            ...grant, 
+            foundationName: grant.funders?.name, 
+            funderLogoUrl: grant.funders?.logo_url, 
+            fundingAmount: grant.max_funding_amount, 
+            dueDate: grant.deadline, 
+            grantType: grant.grant_type, 
+            categories: grant.grant_categories.map(gc => gc.categories), 
+            locations: grant.grant_locations.map(gl => gl.locations) 
+          })));
           
-          // Set Organization Posts
+          // Set Organization Posts - UPDATED FOR NEW STRUCTURE
           setOrganizationPosts(orgPostsRes.data || []);
           
           // Set Other Mock/Fetched Data
@@ -106,7 +122,16 @@ const FunderProfilePage = () => {
           setImpactStories(storiesRes.data || []);
           setTeamMembers(membersRes.data || []);
           // Set mock grantees and kudos as in original file
-          setGrantees([{ id: 1, name: "Bay Area Food Bank", grantAmount: "$50,000", focusAreas: [], location: "Oakland, CA", grantYear: "2023", tagline: "", imageUrl: "https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?w=400" }]);
+          setGrantees([{ 
+            id: 1, 
+            name: "Bay Area Food Bank", 
+            grantAmount: "$50,000", 
+            focusAreas: [], 
+            location: "Oakland, CA", 
+            grantYear: "2023", 
+            tagline: "", 
+            imageUrl: "https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?w=400" 
+          }]);
           setKudos([]);
         }
 
@@ -124,8 +149,16 @@ const FunderProfilePage = () => {
   // All handler functions remain in the parent component
   const handleDeletePost = async (postId) => {
     if (!funder || !session) return;
-    const { error } = await supabase.from('posts').delete().eq('id', postId).eq('organization_id', funder.id);
+    
+    // UPDATED TO USE NEW ORGANIZATION POSTS TABLE
+    const { error } = await supabase
+      .from('organization_posts')
+      .delete()
+      .eq('id', postId)
+      .eq('organization_id', funder.id);
+      
     if (error) {
+      console.error('Error deleting organization post:', error);
       setError('Failed to delete the post.');
     } else {
       setOrganizationPosts(prevPosts => prevPosts.filter(p => p.id !== postId));
@@ -149,7 +182,14 @@ const FunderProfilePage = () => {
   const renderActiveTab = () => {
     switch (activeTab) {
       case 'home':
-            return <FunderProfileHome posts={organizationPosts} onDelete={handleDeletePost} funder={funder} />;
+        return (
+          <FunderProfileHome 
+            posts={organizationPosts} 
+            onDelete={handleDeletePost} 
+            funder={funder}
+            currentUserId={session?.user?.id}
+          />
+        );
       case 'overview':
         return <FunderProfileOverview funder={funder} recentActivities={recentActivities} />;
       case 'grants':
@@ -163,7 +203,14 @@ const FunderProfilePage = () => {
       case 'team':
         return <FunderProfileTeam members={teamMembers} />;
       default:
-        return <FunderProfileHome posts={organizationPosts} onDelete={handleDeletePost} />;
+        return (
+          <FunderProfileHome 
+            posts={organizationPosts} 
+            onDelete={handleDeletePost} 
+            funder={funder}
+            currentUserId={session?.user?.id}
+          />
+        );
     }
   };
 

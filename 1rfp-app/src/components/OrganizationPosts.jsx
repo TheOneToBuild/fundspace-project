@@ -4,7 +4,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../supabaseClient';
 import { MessageSquare, AlertTriangle } from 'lucide-react';
 import CreatePost from './CreatePost.jsx';
-import PostCard from './PostCard.jsx';
+import OrganizationPostCard from './OrganizationPostCard.jsx';
+import OrganizationPostDetailModal from './OrganizationPostDetailModal.jsx';
 import { hasPermission, PERMISSIONS } from '../utils/permissions.js';
 
 export default function OrganizationPosts({ 
@@ -17,21 +18,27 @@ export default function OrganizationPosts({
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [selectedPost, setSelectedPost] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const canCreatePosts = hasPermission(userRole, PERMISSIONS.MANAGE_MEMBERS, isOmegaAdmin) || 
-                         hasPermission(userRole, PERMISSIONS.EDIT_ORGANIZATION, isOmegaAdmin);
+  // Only super_admins and omega_admins can create/edit/delete posts
+  // Regular admins and members can only view and interact
+  const canCreatePosts = hasPermission(userRole, PERMISSIONS.EDIT_ORGANIZATION, isOmegaAdmin);
+  const canEditPosts = hasPermission(userRole, PERMISSIONS.EDIT_ORGANIZATION, isOmegaAdmin);
+  const canInteractWithPosts = hasPermission(userRole, PERMISSIONS.VIEW_ORGANIZATION, isOmegaAdmin);
 
   const fetchOrganizationPosts = useCallback(async () => {
     if (!organization?.id) return;
+    
     try {
       setLoading(true);
       setError('');
+      
       const { data: postsData, error: postsError } = await supabase
-        .from('posts')
-        .select(`*, profiles!posts_profile_id_fkey(*)`)
+        .from('organization_posts')
+        .select('*')
         .eq('organization_id', organization.id)
         .eq('organization_type', organizationType)
-        .eq('channel', 'organization')
         .order('created_at', { ascending: false })
         .limit(20);
 
@@ -49,33 +56,85 @@ export default function OrganizationPosts({
     fetchOrganizationPosts();
   }, [fetchOrganizationPosts]);
 
+  // Set up real-time subscriptions for organization posts
+  useEffect(() => {
+    if (!organization?.id) return;
+
+    const channel = supabase.channel(`organization_posts:${organization.id}`);
+    
+    channel
+      .on('postgres_changes', { 
+        event: 'INSERT', 
+        schema: 'public', 
+        table: 'organization_posts',
+        filter: `organization_id=eq.${organization.id}`
+      }, (payload) => {
+        setPosts(currentPosts => [payload.new, ...currentPosts]);
+      })
+      .on('postgres_changes', { 
+        event: 'UPDATE', 
+        schema: 'public', 
+        table: 'organization_posts',
+        filter: `organization_id=eq.${organization.id}`
+      }, (payload) => {
+        setPosts(currentPosts => currentPosts.map(p => 
+          p.id === payload.new.id ? { ...p, ...payload.new } : p
+        ));
+      })
+      .on('postgres_changes', { 
+        event: 'DELETE', 
+        schema: 'public', 
+        table: 'organization_posts',
+        filter: `organization_id=eq.${organization.id}`
+      }, (payload) => {
+        setPosts(currentPosts => currentPosts.filter(p => p.id !== payload.old.id));
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [organization?.id]);
+
   const handleNewPost = useCallback((newPostData) => {
-    const postWithProfile = { 
+    // For organization posts, we don't need to attach profile info
+    // since the post belongs to the organization
+    const postWithMetadata = { 
         ...newPostData, 
-        profiles: profile,
         likes_count: 0,
         comments_count: 0,
-        reactions: { summary: [], sample: [] }
     };
-    setPosts(prev => [postWithProfile, ...prev]);
-  }, [profile]);
-
+    setPosts(prev => [postWithMetadata, ...prev]);
+  }, []);
 
   const handleDeletePost = useCallback(async (postId) => {
-    if (!canCreatePosts) return;
+    if (!canEditPosts) return;
+    
     try {
       const { error } = await supabase
-        .from('posts')
+        .from('organization_posts')
         .delete()
         .eq('id', postId)
         .eq('organization_id', organization.id);
+        
       if (error) throw error;
+      
       setPosts(prev => prev.filter(post => post.id !== postId));
     } catch (err) {
       console.error('Error deleting post:', err);
       setError('Failed to delete post');
     }
-  }, [canCreatePosts, organization?.id]);
+  }, [canEditPosts, organization?.id]);
+
+  const handleOpenDetail = useCallback((post) => {
+    setSelectedPost(post);
+    setIsModalOpen(true);
+  }, []);
+
+  const handleCloseDetail = useCallback(() => {
+    setSelectedPost(null);
+    setIsModalOpen(false);
+  }, []);
 
   if (loading) {
     return (
@@ -93,57 +152,49 @@ export default function OrganizationPosts({
 
   return (
     <div className="space-y-6">
-      <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-            <MessageSquare className="text-blue-500" />
-            Organization Updates
-          </h3>
+      {error && (
+        <div className="p-4 bg-red-50 text-red-700 border border-red-200 rounded-lg flex items-center">
+          <AlertTriangle className="w-5 h-5 mr-3 flex-shrink-0"/>
+          <span>{error}</span>
         </div>
+      )}
 
-        {error && (
-          <div className="mb-6 p-4 bg-red-50 text-red-700 border border-red-200 rounded-lg flex items-center">
-            <AlertTriangle className="w-5 h-5 mr-3 flex-shrink-0"/>
-            <span>{error}</span>
+      {canCreatePosts && (
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+              <MessageSquare className="text-blue-500" />
+              Organization Updates
+            </h3>
           </div>
-        )}
+          
+          <CreatePost 
+            profile={profile} 
+            onNewPost={handleNewPost}
+            channel="organization"
+            placeholder={`Share an update for ${organization.name}...`}
+            organizationId={organization.id}
+            organizationType={organizationType}
+            organization={organization}
+          />
+        </div>
+      )}
 
-        {canCreatePosts && (
-          <div className="mb-6">
-            <CreatePost 
-              profile={profile} 
-              onNewPost={handleNewPost}
-              channel="organization"
-              placeholder={`Share an update for ${organization.name}...`}
-              // MODIFIED: Pass the organization details down to CreatePost
-              organizationId={organization.id}
-              organizationType={organizationType}
-            />
-          </div>
-        )}
-
-        {!canCreatePosts && (
-          <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <p className="text-blue-800 text-sm">
-              Only organization admins can create posts. Contact your organization admin to share updates.
-            </p>
-          </div>
-        )}
-      </div>
-
-      {posts.length > 0 ? (
+      {canInteractWithPosts && posts.length > 0 ? (
         <div className="space-y-6">
           {posts.map((post) => (
-            <PostCard 
+            <OrganizationPostCard 
               key={post.id} 
               post={post} 
-              onDelete={canCreatePosts ? handleDeletePost : null}
-              showOrganizationAsAuthor={true}
               organization={organization}
+              onDelete={canEditPosts ? handleDeletePost : null}
+              canEdit={canEditPosts}
+              currentUserId={profile?.id}
+              onOpenDetail={handleOpenDetail}
             />
           ))}
         </div>
-      ) : (
+      ) : canInteractWithPosts ? (
         <div className="bg-white p-12 rounded-xl shadow-sm border border-slate-200 text-center">
           <MessageSquare className="w-16 h-16 mx-auto text-slate-300 mb-4" />
           <h3 className="text-lg font-medium text-slate-900 mb-2">No Updates Yet</h3>
@@ -154,7 +205,24 @@ export default function OrganizationPosts({
             }
           </p>
         </div>
+      ) : (
+        <div className="bg-white p-12 rounded-xl shadow-sm border border-slate-200 text-center">
+          <MessageSquare className="w-16 h-16 mx-auto text-slate-300 mb-4" />
+          <h3 className="text-lg font-medium text-slate-900 mb-2">Access Restricted</h3>
+          <p className="text-slate-600">
+            You don't have permission to view organization updates.
+          </p>
+        </div>
       )}
+
+      {/* Organization Post Detail Modal */}
+      <OrganizationPostDetailModal
+        post={selectedPost}
+        organization={organization}
+        isOpen={isModalOpen}
+        onClose={handleCloseDetail}
+        currentUserId={profile?.id}
+      />
     </div>
   );
 }
