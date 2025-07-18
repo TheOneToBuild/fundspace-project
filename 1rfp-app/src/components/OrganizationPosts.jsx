@@ -13,7 +13,8 @@ export default function OrganizationPosts({
   organizationType, 
   userRole, 
   isOmegaAdmin, 
-  profile 
+  profile,
+  className = '' // Added to allow custom styling from parent
 }) {
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -100,9 +101,9 @@ export default function OrganizationPosts({
     // For organization posts, we don't need to attach profile info
     // since the post belongs to the organization
     const postWithMetadata = { 
-        ...newPostData, 
-        likes_count: 0,
-        comments_count: 0,
+      ...newPostData, 
+      likes_count: 0,
+      comments_count: 0,
     };
     setPosts(prev => [postWithMetadata, ...prev]);
   }, []);
@@ -138,7 +139,7 @@ export default function OrganizationPosts({
 
   if (loading) {
     return (
-      <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+      <div className={`p-6 rounded-xl shadow-sm border border-slate-200 ${className}`}>
         <div className="animate-pulse space-y-4">
           <div className="h-4 bg-slate-200 rounded w-1/3"></div>
           <div className="space-y-3">
@@ -151,7 +152,7 @@ export default function OrganizationPosts({
   }
 
   return (
-    <div className="space-y-6">
+    <div className={`space-y-6 ${className}`}>
       {error && (
         <div className="p-4 bg-red-50 text-red-700 border border-red-200 rounded-lg flex items-center">
           <AlertTriangle className="w-5 h-5 mr-3 flex-shrink-0"/>
@@ -160,24 +161,16 @@ export default function OrganizationPosts({
       )}
 
       {canCreatePosts && (
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-              <MessageSquare className="text-blue-500" />
-              Organization Updates
-            </h3>
-          </div>
-          
-          <CreatePost 
-            profile={profile} 
-            onNewPost={handleNewPost}
-            channel="organization"
-            placeholder={`Share an update for ${organization.name}...`}
-            organizationId={organization.id}
-            organizationType={organizationType}
-            organization={organization}
-          />
-        </div>
+        <CreatePost 
+          profile={profile} 
+          onNewPost={handleNewPost}
+          channel="organization"
+          placeholder={`Share an update for ${organization.name}...`}
+          organizationId={organization.id}
+          organizationType={organizationType}
+          organization={organization}
+          className="p-6 rounded-xl shadow-sm border border-slate-200" // Match OrganizationPostCard styling
+        />
       )}
 
       {canInteractWithPosts && posts.length > 0 ? (
@@ -191,11 +184,12 @@ export default function OrganizationPosts({
               canEdit={canEditPosts}
               currentUserId={profile?.id}
               onOpenDetail={handleOpenDetail}
+              currentUserProfile={profile}
             />
           ))}
         </div>
       ) : canInteractWithPosts ? (
-        <div className="bg-white p-12 rounded-xl shadow-sm border border-slate-200 text-center">
+        <div className="p-12 rounded-xl shadow-sm border border-slate-200 text-center">
           <MessageSquare className="w-16 h-16 mx-auto text-slate-300 mb-4" />
           <h3 className="text-lg font-medium text-slate-900 mb-2">No Updates Yet</h3>
           <p className="text-slate-600">
@@ -206,7 +200,7 @@ export default function OrganizationPosts({
           </p>
         </div>
       ) : (
-        <div className="bg-white p-12 rounded-xl shadow-sm border border-slate-200 text-center">
+        <div className="p-12 rounded-xl shadow-sm border border-slate-200 text-center">
           <MessageSquare className="w-16 h-16 mx-auto text-slate-300 mb-4" />
           <h3 className="text-lg font-medium text-slate-900 mb-2">Access Restricted</h3>
           <p className="text-slate-600">

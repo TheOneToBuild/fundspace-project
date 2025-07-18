@@ -481,7 +481,7 @@ export default function MyOrganizationPage() {
     return (
         <div className="space-y-6">
             {error && (
-                <div className="p-4 bg-red-50 text-red-700 border border-red-200 rounded-lg flex items-center">
+                <div className="p-6 bg-red-50 text-red-700 border border-red-200 rounded-lg flex items-center">
                     <AlertTriangle className="w-5 h-5 mr-3 flex-shrink-0"/>
                     <span>{error}</span>
                 </div>
@@ -565,19 +565,15 @@ export default function MyOrganizationPage() {
             {/* Tab Content */}
             {activeTab === 'overview' && (
                 <div>
-                    {/* UPDATED: The outer "Organization Updates" heading and the bottom "Quick Stats" have been removed.
-                      The OrganizationPosts component is now the only item in the overview.
-                      The padding from the container has also been removed to allow the post box to expand.
-                    */}
-                    <div className="bg-white rounded-xl shadow-sm border border-slate-200">
-                        <OrganizationPosts
-                            organization={organization}
-                            organizationType={userMembership.organization_type}
-                            userRole={userRole}
-                            isOmegaAdmin={isOmegaAdmin}
-                            profile={profile}
-                        />
-                    </div>
+                    {/* Removed bg-white, rounded-xl, shadow-sm, border, and added p-6 to match post card padding */}
+                    <OrganizationPosts
+                        organization={organization}
+                        organizationType={userMembership.organization_type}
+                        userRole={userRole}
+                        isOmegaAdmin={isOmegaAdmin}
+                        profile={profile}
+                        className="p-6" // Maintains padding to match post cards
+                    />
                 </div>
             )}
 
