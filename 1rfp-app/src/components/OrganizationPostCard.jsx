@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
-import { useOutletContext } from 'react-router-dom';  // Add this import
+import { useOutletContext } from 'react-router-dom';
 import { MoreHorizontal, Edit, Trash2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -12,7 +12,7 @@ import ReactorsText from './post/ReactorsText';
 import ReactionsPreview from './post/ReactionsPreview';
 import CommentSection from './CommentSection';
 import EditPost from './post/EditPost';
-import ImageMosaic from './post/ImageMosaic';
+import PostBody from './post/PostBody';  // ADD THIS IMPORT
 import { reactions } from './post/constants';
 
 export default function OrganizationPostCard({ 
@@ -43,7 +43,12 @@ export default function OrganizationPostCard({
   // Anyone with currentUserId can interact (like/comment)
   const canInteract = !!currentUserId;
 
-  // Load user's reaction and reaction summary
+  // Parse images from image_urls array and tags
+  const images = post?.image_urls || [];
+  const organizationAvatar = organization?.logo_url || organization?.image_url;
+  const parsedTags = post?.tags ? JSON.parse(post.tags) : [];
+
+  // Load user's reaction and reaction summary - KEEP ORIGINAL WORKING LOGIC
   useEffect(() => {
     const loadReactions = async () => {
       if (!post?.id) return;
@@ -233,10 +238,6 @@ export default function OrganizationPostCard({
     }, 300);
   };
 
-  // Parse images from image_urls array
-  const images = post?.image_urls || [];
-  const organizationAvatar = organization?.logo_url || organization?.image_url;
-
   if (!post || !organization) return null;
 
   return (
@@ -316,37 +317,17 @@ export default function OrganizationPostCard({
           className="cursor-pointer"
           onClick={() => onOpenDetail && onOpenDetail(post)}
         >
-          {/* Post text content */}
-          <div 
-            className="text-slate-800 mb-4"
-            dangerouslySetInnerHTML={{ __html: post?.content || '' }}
+          {/* REPLACE THE OLD CONTENT RENDERING WITH PostBody COMPONENT */}
+          <PostBody 
+            content={post?.content || ''}
+            images={images}
+            tags={parsedTags}
+            onImageClick={handleImageClick}
           />
-
-          {/* Images - FIXED: Use ImageMosaic component like PostCard */}
-          {images.length > 0 && (
-            <ImageMosaic 
-              images={images} 
-              onImageClick={handleImageClick}
-            />
-          )}
-
-          {/* Tags */}
-          {post?.tags && JSON.parse(post.tags).length > 0 && (
-            <div className="mb-4 flex flex-wrap gap-2">
-              {JSON.parse(post.tags).map((tag, index) => (
-                <span
-                  key={index}
-                  className="inline-flex items-center px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium"
-                >
-                  #{tag.label || tag}
-                </span>
-              ))}
-            </div>
-          )}
         </div>
       )}
 
-      {/* Reaction Summary and Comment Count - SAME as PostCard */}
+      {/* Reaction Summary and Comment Count - KEEP ORIGINAL WORKING DISPLAY */}
       <div className="flex items-center justify-between text-sm text-slate-500 my-2 min-h-[20px]">
         <div 
           className="relative" 

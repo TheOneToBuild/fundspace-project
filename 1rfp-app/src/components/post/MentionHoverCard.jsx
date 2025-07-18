@@ -90,8 +90,9 @@ export default function MentionHoverCard({ mention, position }) {
 
         try {
             if (mention.entityType === 'user') {
+                // FIXED: Use the same navigation pattern as PostBody
                 console.log(`🔗 Navigating to user profile:`, mention.id);
-                navigate(`/profile/${mention.id}`);
+                navigate(`/profile/members/${mention.id}`);
             } else if (mention.entityType === 'organization') {
                 const [orgType, orgId] = mention.id.split('-');
                 console.log(`🔗 Navigating to ${orgType} profile:`, orgId);
@@ -107,16 +108,15 @@ export default function MentionHoverCard({ mention, position }) {
                     }
                 } else {
                     console.error(`Could not find slug for ${orgType} with ID ${orgId}`);
-                    // Fallback: try to navigate anyway (might show "not found" page)
-                    if (orgType === 'nonprofit') {
-                        navigate(`/nonprofits/${orgId}`);
-                    } else if (orgType === 'funder') {
-                        navigate(`/funders/${orgId}`);
-                    }
+                    // FIXED: Use the same fallback logic as PostBody
+                    const fallbackPath = orgType === 'nonprofit' ? 
+                        `/nonprofits/${orgId}` : `/funders/${orgId}`;
+                    console.log(`🔄 Trying fallback navigation: ${fallbackPath}`);
+                    navigate(fallbackPath);
                 }
             }
         } catch (error) {
-            console.error('Error navigating from hover card:', error);
+            console.error('💥 Error navigating from hover card:', error);
         }
     };
 
