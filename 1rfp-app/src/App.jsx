@@ -216,6 +216,7 @@ const AppLayout = () => {
 
     return (
         <LayoutContext.Provider value={{ setPageBgColor }}>
+            {/* ✅ FIXED: Changed to use min-h-screen and flex flex-col for sticky footer */}
             <div className={`min-h-screen ${pageBgColor} font-sans text-slate-800 flex flex-col`}>
                 {session && profile ? (
                     <DashboardHeader
@@ -229,9 +230,13 @@ const AppLayout = () => {
                 ) : (
                     <PublicHeader />
                 )}
-                <main className="flex-grow">
+                
+                {/* ✅ FIXED: Main content area that grows to fill available space */}
+                <main className="flex-1">
                     <Outlet context={outletContext} />
                 </main>
+                
+                {/* ✅ FIXED: Footer will now stick to bottom */}
                 <Footer session={session} />
             </div>
         </LayoutContext.Provider>

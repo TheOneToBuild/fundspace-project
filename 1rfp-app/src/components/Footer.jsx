@@ -1,11 +1,10 @@
-// src/components/Footer.jsx
+// src/components/Footer.jsx - COMPLETE FILE WITH STICKY LAYOUT
 import React from 'react';
 import { Link } from 'react-router-dom';
 import footerLogoImage from '../assets/1rfp-footer-logo.png';
 import { Facebook, Twitter, Linkedin, Youtube, Instagram } from './Icons.jsx';
 
-// MODIFIED: Removed the "bgColor" prop.
-export default function Footer() {
+export default function Footer({ session }) {
   const productLinks = [
     { to: "/how-it-works", text: "How 1RFP Works" },
     { to: "/for-nonprofits", text: "For Nonprofits" },
@@ -34,8 +33,8 @@ export default function Footer() {
   ];
 
   return (
-    // MODIFIED: Changed the background to be permanently transparent.
-    <footer className="py-12 bg-transparent">
+    // ✅ FIXED: Optimized for sticky footer layout
+    <footer className="bg-white border-t border-slate-200 py-8 mt-auto">
       <div className="container mx-auto px-6">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
           <div>
@@ -67,7 +66,7 @@ export default function Footer() {
             </ul>
           </div>
         </div>
-        <div className="pt-8 flex flex-col sm:flex-row justify-between items-center">
+        <div className="pt-8 border-t border-slate-100 flex flex-col sm:flex-row justify-between items-center">
           <p className="text-base text-slate-500 mb-4 sm:mb-0">&copy; {new Date().getFullYear()} 1RFP. All rights reserved.</p>
           <div className="flex space-x-4 text-slate-500">
             <a href="#" aria-label="Facebook" className="hover:text-blue-600 transition-colors"><Facebook size={18} /></a>
@@ -77,7 +76,7 @@ export default function Footer() {
             <a href="#" aria-label="YouTube" className="hover:text-blue-600 transition-colors"><Youtube size={18} /></a>
           </div>
         </div>
-    </div>
-  </footer>
+      </div>
+    </footer>
   );
 }

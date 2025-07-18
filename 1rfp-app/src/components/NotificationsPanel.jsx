@@ -1,7 +1,8 @@
-// src/components/NotificationsPanel.jsx - Fixed with Working View Post
+// src/components/NotificationsPanel.jsx - FIXED WITH ORGANIZATION POST NAVIGATION
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { UserPlus, ThumbsUp, MessageSquare, AtSign, Building } from 'lucide-react';
+import { supabase } from '../supabaseClient';
 
 const timeAgo = (date) => {
     const seconds = Math.floor((new Date() - new Date(date)) / 1000);
@@ -37,7 +38,13 @@ const NotificationIcon = ({ type }) => {
 
 const NotificationItem = ({ notification, onClick, onViewPost }) => {
     const navigate = useNavigate();
-    const { actor_id: actor, type, created_at, post_id } = notification;
+    const { 
+        actor_id: actor, 
+        type, 
+        created_at, 
+        post_id, 
+        organization_post_id  // ✅ Now we check for this!
+    } = notification;
 
     const notificationText = () => {
         switch (type) {
@@ -56,13 +63,83 @@ const NotificationItem = ({ notification, onClick, onViewPost }) => {
         }
     };
 
+    // ✅ NEW: Function to get organization details and navigate to org profile
+    const getOrganizationDetailsAndNavigate = async (orgPostId) => {
+        try {
+            console.log('🔍 Fetching organization details for post ID:', orgPostId);
+            
+            // Query the organization_posts table to get org info
+            const { data: orgPost, error } = await supabase
+                .from('organization_posts')
+                .select('organization_id, organization_type')
+                .eq('id', orgPostId)
+                .single();
+
+            if (error) {
+                console.error('❌ Error fetching organization post:', error);
+                return false;
+            }
+
+            if (!orgPost) {
+                console.error('❌ Organization post not found');
+                return false;
+            }
+
+            const { organization_id, organization_type } = orgPost;
+            
+            // Query the appropriate organization table for the slug
+            const tableName = organization_type === 'nonprofit' ? 'nonprofits' : 'funders';
+            const { data: orgData, error: orgError } = await supabase
+                .from(tableName)
+                .select('slug, name')
+                .eq('id', organization_id)
+                .single();
+
+            if (orgError || !orgData?.slug) {
+                console.error(`❌ Error fetching ${organization_type} details:`, orgError);
+                return false;
+            }
+
+            // Navigate to the organization profile page
+            const orgPath = organization_type === 'nonprofit' 
+                ? `/nonprofits/${orgData.slug}` 
+                : `/funders/${orgData.slug}`;
+            
+            console.log(`🎯 Navigating to organization: ${orgPath}`);
+            navigate(orgPath);
+            
+            // Highlight the post after navigation
+            setTimeout(() => {
+                if (onViewPost) {
+                    onViewPost(orgPostId, true); // true indicates it's an organization post
+                }
+            }, 100);
+            
+            return true;
+            
+        } catch (error) {
+            console.error('💥 Error in organization navigation:', error);
+            return false;
+        }
+    };
+
     const handleViewPost = (e) => {
         e.preventDefault();
         e.stopPropagation();
         
-        console.log('🎯 View Post clicked for post ID:', post_id);
+        console.log('🎯 View Post clicked:', { 
+            post_id, 
+            organization_post_id,
+            type 
+        });
         
-        if (post_id && onViewPost) {
+        // ✅ FIXED: Check if it's an organization post first
+        if (organization_post_id) {
+            console.log('🏢 Handling organization post notification');
+            onClick(); // Close notifications panel
+            getOrganizationDetailsAndNavigate(organization_post_id);
+        } else if (post_id && onViewPost) {
+            console.log('👤 Handling regular post notification');
             // Close the notifications panel first
             onClick();
             
@@ -77,10 +154,21 @@ const NotificationItem = ({ notification, onClick, onViewPost }) => {
     };
 
     const handleNotificationClick = () => {
-        console.log('📱 Notification clicked:', { type, post_id, actor: actor?.full_name });
+        console.log('📱 Notification clicked:', { 
+            type, 
+            post_id, 
+            organization_post_id,
+            actor: actor?.full_name 
+        });
         
-        if (post_id) {
-            // For post-related notifications, navigate to profile and highlight post
+        // ✅ FIXED: Handle organization posts vs regular posts
+        if (organization_post_id) {
+            console.log('🏢 Organization post notification - navigating to org profile');
+            onClick(); // Close notifications panel
+            getOrganizationDetailsAndNavigate(organization_post_id);
+        } else if (post_id) {
+            console.log('👤 Regular post notification - navigating to user profile');
+            // For regular post-related notifications, navigate to profile and highlight post
             onClick(); // Close notifications panel
             navigate('/profile');
             
@@ -108,7 +196,7 @@ const NotificationItem = ({ notification, onClick, onViewPost }) => {
                 <div className="flex-grow">
                     <p className="text-sm text-slate-700">{notificationText()}</p>
                     <p className="text-xs text-slate-500 mt-1">{timeAgo(created_at)}</p>
-                    {post_id && (
+                    {(post_id || organization_post_id) && (
                         <div className="mt-2">
                             <button 
                                 onClick={handleViewPost}

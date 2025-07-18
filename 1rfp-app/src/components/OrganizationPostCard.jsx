@@ -182,11 +182,9 @@ export default function OrganizationPostCard({
   };
 
   const handleDelete = () => {
-    if (window.confirm('Are you sure you want to delete this post?')) {
       onDelete(post.id);
-    }
-    setShowMenu(false);
-  };
+  setShowMenu(false);
+};
 
   // Add edit functionality for organization posts
   const handleEditPost = async (editData) => {
