@@ -69,7 +69,7 @@
   overflow: hidden;
 }
 
-/* Post Highlighting Styles */
+/* ENHANCED Post Highlighting Styles for both regular and organization posts */
 .highlight-post {
   animation: highlightPulse 3s ease-in-out;
   transform: scale(1.02);
@@ -103,6 +103,23 @@
   transition: all 0.3s ease;
 }
 
+/* ENHANCED: Organization post card highlighting support */
+.organization-post-card {
+  transition: all 0.3s ease;
+}
+
+.organization-post-card.highlight-post {
+  background-color: #eff6ff !important;
+}
+
+/* Ensure both regular and organization posts can be highlighted from notifications */
+[data-post-id].highlight-post,
+[data-organization-post-id].highlight-post {
+  background-color: #eff6ff !important;
+  border: 2px solid #3b82f6 !important;
+  box-shadow: 0 15px 35px rgba(59, 130, 246, 0.3) !important;
+}
+
 /* --- COMPREHENSIVE TIPTAP MENTION STYLING --- */
 
 /* Remove tippy.js default styling */
@@ -134,47 +151,70 @@
   border-bottom: none;
 }
 
-/* CRITICAL: Styling for mentions within the Tiptap editor (while typing) */
+/* FIXED: Styling for mentions within the Tiptap editor (while typing) */
 .ProseMirror .mention {
-  background-color: #e3f2fd !important; /* Light blue background */
-  color: #1976d2 !important; /* Blue text color */
-  padding: 0.15rem 0.4rem !important; /* Small padding around the text */
-  border-radius: 0.25rem !important; /* Rounded corners */
-  font-weight: 600 !important; /* Medium bold */
+  background-color: #e3f2fd !important;
+  color: #1976d2 !important;
+  padding: 0.15rem 0.4rem !important;
+  border-radius: 0.25rem !important;
+  font-weight: 600 !important;
   cursor: pointer !important;
-  text-decoration: none !important; /* Remove underline if any */
-  display: inline !important;
+  text-decoration: none !important;
+  display: inline !important; /* Force inline display */
   line-height: inherit !important;
   vertical-align: baseline !important;
-  border: 1px solid #bbdefb !important; /* Light blue border */
+  border: 1px solid #bbdefb !important;
+  white-space: nowrap !important; /* Prevent text wrapping inside mentions */
   /* NO TRANSITIONS - prevents flickering */
 }
 
-/* CRITICAL: Styling for mentions in PostBody (after posting) */
-/* This targets the mentions in the rendered post content */
+/* FIXED: Styling for mentions in PostBody (after posting) */
 span.mention,
 [data-type="user"].mention,
 [data-type="organization"].mention {
-  background-color: #e3f2fd !important; /* Light blue background */
-  color: #1976d2 !important; /* Blue text color */
-  padding: 0.15rem 0.4rem !important; /* Small padding around the text */
-  border-radius: 0.25rem !important; /* Rounded corners */
-  font-weight: 600 !important; /* Medium bold */
+  background-color: #e3f2fd !important;
+  color: #1976d2 !important;
+  padding: 0.15rem 0.4rem !important;
+  border-radius: 0.25rem !important;
+  font-weight: 600 !important;
   cursor: pointer !important;
   text-decoration: none !important;
-  display: inline !important;
+  display: inline !important; /* Force inline display */
   line-height: inherit !important;
   vertical-align: baseline !important;
-  border: 1px solid #bbdefb !important; /* Light blue border */
+  border: 1px solid #bbdefb !important;
+  white-space: nowrap !important; /* Prevent text wrapping inside mentions */
   /* NO TRANSITIONS - prevents flickering */
+}
+
+/* FIXED: Ensure mentions stay inline in all contexts */
+.ProseMirror p .mention,
+.post-content .mention,
+.mention {
+  display: inline !important;
+  white-space: nowrap !important;
+  word-break: keep-all !important;
+}
+
+/* FIXED: Prevent mentions from causing line breaks */
+.ProseMirror p,
+.post-content p {
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+.ProseMirror p .mention,
+.post-content p .mention {
+  word-break: keep-all !important;
+  overflow-wrap: normal !important;
 }
 
 /* Hover effects for mentions in posts - NO FLICKERING */
 span.mention:hover,
 [data-type="user"].mention:hover,
 [data-type="organization"].mention:hover {
-  background-color: #bbdefb !important; /* Darker blue on hover */
-  color: #0d47a1 !important; /* Darker text on hover */
+  background-color: #bbdefb !important;
+  color: #0d47a1 !important;
   /* NO transform, NO box-shadow, NO transitions */
 }
 
@@ -182,7 +222,7 @@ span.mention:hover,
 span.mention:active,
 [data-type="user"].mention:active,
 [data-type="organization"].mention:active {
-  background-color: #90caf9 !important; /* Even darker blue when clicked */
+  background-color: #90caf9 !important;
 }
 
 /* --- MENTION HOVER CARD STYLING --- */

@@ -1,4 +1,4 @@
-// src/App.jsx - ENHANCED WITH NOTIFICATION CLEANUP AND POST VIEWING
+// src/App.jsx - ENHANCED WITH ORGANIZATION POST NOTIFICATION SUPPORT
 import React, { useState, useEffect, createContext, useRef } from 'react';
 import { BrowserRouter, Routes, Route, Link, NavLink, Outlet, useOutletContext, useLocation } from 'react-router-dom';
 import ScrollToTop from './components/ScrollToTop.jsx';
@@ -250,7 +250,22 @@ export default function App() {
     if (session) {
       const [profileRes, notificationsRes] = await Promise.all([
         supabase.from('profiles').select('*').eq('id', session.user.id).single(),
-        supabase.from('notifications').select('*, actor_id(*)', { count: 'exact' }).eq('user_id', session.user.id).order('created_at', { ascending: false })
+        // UPDATED: Include organization_post_id in notification query
+        supabase.from('notifications').select(`
+          id,
+          type,
+          post_id,
+          organization_post_id,
+          is_read,
+          created_at,
+          actor_id:profiles!notifications_actor_id_fkey (
+            id,
+            full_name,
+            avatar_url,
+            title,
+            organization_name
+          )
+        `, { count: 'exact' }).eq('user_id', session.user.id).order('created_at', { ascending: false }).limit(50)
       ]);
       
       if (profileRes.data) setProfile(profileRes.data);
@@ -302,26 +317,42 @@ export default function App() {
     }
   };
 
-  const handleViewPost = (postId) => {
-    // Scroll to specific post or highlight it
-    console.log('🎯 Viewing post:', postId);
+  // UPDATED: Enhanced handleViewPost to support organization posts
+  const handleViewPost = async (postId, isOrganizationPost = false) => {
+    console.log('🎯 Viewing post:', { postId, isOrganizationPost });
     
-    // Add URL parameter to highlight the post
-    const currentUrl = new URL(window.location);
-    currentUrl.searchParams.set('highlight', postId);
-    window.history.pushState({}, '', currentUrl);
-    
-    // Scroll to post if it exists on the page
-    setTimeout(() => {
-      const postElement = document.querySelector(`[data-post-id="${postId}"]`);
-      if (postElement) {
-        postElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        postElement.classList.add('highlight-post');
-        setTimeout(() => postElement.classList.remove('highlight-post'), 3000);
-      } else {
-        console.log('📄 Post element not found on current page');
-      }
-    }, 100);
+    if (isOrganizationPost) {
+      // Organization posts are handled by the NotificationsPanel navigation logic
+      // This function is called after navigation has occurred, so we just need to highlight
+      setTimeout(() => {
+        const postElement = document.querySelector(`[data-organization-post-id="${postId}"]`);
+        if (postElement) {
+          postElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          postElement.classList.add('highlight-post');
+          setTimeout(() => postElement.classList.remove('highlight-post'), 3000);
+        } else {
+          console.log('📄 Organization post element not found on current page');
+        }
+      }, 100);
+    } else {
+      // Regular post handling
+      // Add URL parameter to highlight the post
+      const currentUrl = new URL(window.location);
+      currentUrl.searchParams.set('highlight', postId);
+      window.history.pushState({}, '', currentUrl);
+      
+      // Scroll to post if it exists on the page
+      setTimeout(() => {
+        const postElement = document.querySelector(`[data-post-id="${postId}"]`);
+        if (postElement) {
+          postElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          postElement.classList.add('highlight-post');
+          setTimeout(() => postElement.classList.remove('highlight-post'), 3000);
+        } else {
+          console.log('📄 Regular post element not found on current page');
+        }
+      }, 100);
+    }
   };
 
   useEffect(() => {

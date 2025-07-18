@@ -29,9 +29,10 @@ const extractMentionsFromHTML = (htmlContent) => {
  * @param {string} postId - The ID of the post containing the mentions.
  * @param {Array<Object>} mentions - An array of mention objects from extractMentionsFromHTML.
  * @param {string} actorId - The ID of the user who created the post.
+ * @param {boolean} isOrganizationPost - Whether this is an organization post or regular post.
  * @returns {Promise<{success: boolean, count: number, error?: string}>} An object indicating success and the number of notifications created.
  */
-export const createMentionNotifications = async (postId, mentions, actorId) => {
+export const createMentionNotifications = async (postId, mentions, actorId, isOrganizationPost = false) => {
   if (!mentions?.length) {
     return { success: true, count: 0 };
   }
@@ -45,13 +46,23 @@ export const createMentionNotifications = async (postId, mentions, actorId) => {
     for (const mention of userMentions) {
       if (!processedUserIds.has(mention.id)) {
         processedUserIds.add(mention.id);
-        notificationPromises.push({
+        
+        // Create notification object with correct post reference
+        const notificationData = {
           user_id: mention.id,
           actor_id: actorId,
           type: 'mention',
-          post_id: postId,
           is_read: false,
-        });
+        };
+
+        // Set the appropriate post ID field based on post type
+        if (isOrganizationPost) {
+          notificationData.organization_post_id = postId;
+        } else {
+          notificationData.post_id = postId;
+        }
+
+        notificationPromises.push(notificationData);
       }
     }
 
@@ -74,13 +85,23 @@ export const createMentionNotifications = async (postId, mentions, actorId) => {
           result.data.forEach(member => {
             if (!processedUserIds.has(member.profile_id)) {
               processedUserIds.add(member.profile_id);
-              notificationPromises.push({
+              
+              // Create notification object with correct post reference
+              const notificationData = {
                 user_id: member.profile_id,
                 actor_id: actorId,
                 type: 'organization_mention',
-                post_id: postId,
                 is_read: false,
-              });
+              };
+
+              // Set the appropriate post ID field based on post type
+              if (isOrganizationPost) {
+                notificationData.organization_post_id = postId;
+              } else {
+                notificationData.post_id = postId;
+              }
+
+              notificationPromises.push(notificationData);
             }
           });
         }
@@ -105,15 +126,16 @@ export const createMentionNotifications = async (postId, mentions, actorId) => {
  * @param {string} postId - The ID of the post.
  * @param {string} content - The HTML content of the post.
  * @param {string} actorId - The ID of the user who created the post.
+ * @param {boolean} isOrganizationPost - Whether this is an organization post or regular post.
  * @returns {Promise<{success: boolean, count: number, error?: string}>} An object indicating success and count of created notifications.
  */
-export const processMentionsForNotifications = async (postId, content, actorId) => {
+export const processMentionsForNotifications = async (postId, content, actorId, isOrganizationPost = false) => {
   try {
     const mentions = extractMentionsFromHTML(content);
     if (mentions.length === 0) {
       return { success: true, count: 0 };
     }
-    return await createMentionNotifications(postId, mentions, actorId);
+    return await createMentionNotifications(postId, mentions, actorId, isOrganizationPost);
   } catch (error) {
     console.error('Error processing mentions for notifications:', error);
     return { success: false, error: error.message };

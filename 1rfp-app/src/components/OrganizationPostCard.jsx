@@ -1,4 +1,4 @@
-// src/components/OrganizationPostCard.jsx
+// src/components/OrganizationPostCard.jsx - Updated with highlighting support
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
@@ -241,7 +241,11 @@ export default function OrganizationPostCard({
   if (!post || !organization) return null;
 
   return (
-    <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+    <div 
+      className="organization-post-card bg-white p-6 rounded-xl shadow-sm border border-slate-200 transition-all duration-300"
+      data-organization-post-id={post?.id} // CRITICAL: Add this for notification highlighting
+      data-post-id={post?.id} // Also add regular data-post-id as fallback
+    >
       {/* Header - Organization info and timestamp */}
       <div className="flex items-start space-x-3 mb-4">
         <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0">

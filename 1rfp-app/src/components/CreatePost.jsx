@@ -487,23 +487,23 @@ export default function CreatePost({
                 return;
             }
 
+            // UPDATED: Create mention records and notifications for BOTH post types
             if (mentionsForStorage.length > 0) {
                 await createMentionRecords(newPost.id, mentionsForStorage);
                 
-                // CREATE MENTION NOTIFICATIONS - Only for regular posts for now
-                if (!isOrganizationPost) {
-                    console.log('🔔 Creating mention notifications...');
-                    const notificationResult = await processMentionsForNotifications(
-                        newPost.id, 
-                        editorHtmlContent, 
-                        profile.id
-                    );
-                    
-                    if (notificationResult.success) {
-                        console.log(`✅ Created ${notificationResult.count} mention notifications`);
-                    } else {
-                        console.error('❌ Failed to create mention notifications:', notificationResult.error);
-                    }
+                // CREATE MENTION NOTIFICATIONS - Now works for both regular and organization posts
+                console.log('🔔 Creating mention notifications for', isOrganizationPost ? 'organization' : 'regular', 'post...');
+                const notificationResult = await processMentionsForNotifications(
+                    newPost.id, 
+                    editorHtmlContent, 
+                    profile.id,
+                    isOrganizationPost  // Pass the post type flag - THIS IS THE KEY CHANGE
+                );
+                
+                if (notificationResult.success) {
+                    console.log(`✅ Created ${notificationResult.count} mention notifications for ${isOrganizationPost ? 'organization' : 'regular'} post`);
+                } else {
+                    console.error('❌ Failed to create mention notifications:', notificationResult.error);
                 }
             }
 
@@ -533,7 +533,7 @@ export default function CreatePost({
         return () => {
             selectedImages.forEach(img => URL.revokeObjectURL(img.preview));
         };
-    }, []);
+    }, [selectedImages]);
 
     if (!editor) {
         return null;
