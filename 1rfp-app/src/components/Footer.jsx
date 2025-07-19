@@ -1,4 +1,4 @@
-// src/components/Footer.jsx - COMPLETE FILE WITH STICKY LAYOUT
+// src/components/Footer.jsx - COMPLETE FILE WITH TRANSPARENT BACKGROUND
 import React from 'react';
 import { Link } from 'react-router-dom';
 import footerLogoImage from '../assets/1rfp-footer-logo.png';
@@ -33,8 +33,8 @@ export default function Footer() {
   ];
 
   return (
-    // ✅ STICKY FOOTER: Uses mt-auto to push footer to bottom, proper background and border
-    <footer className="bg-white border-t border-slate-200 py-8 mt-auto">
+    // ✅ UPDATED: Changed from bg-white to bg-transparent and removed border-t to eliminate separation line
+    <footer className="bg-transparent py-8 mt-auto">
       <div className="container mx-auto px-6">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
           <div>
