@@ -1,4 +1,4 @@
-// src/components/ProfileNav.jsx - Compact Version with Real-Time Follow Updates
+// src/components/ProfileNav.jsx - Enhanced with Organization Info and Real-Time Updates
 import React, { useState, useEffect } from 'react';
 import { NavLink, useOutletContext } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
@@ -10,6 +10,7 @@ export default function ProfileNav() {
         followersCount: 0,
         followingCount: 0
     });
+    const [organizationInfo, setOrganizationInfo] = useState(null);
     const [loading, setLoading] = useState(true);
 
     const isOmegaAdmin = isPlatformAdmin(profile?.is_omega_admin);
@@ -17,6 +18,7 @@ export default function ProfileNav() {
     useEffect(() => {
         if (profile?.id) {
             fetchProfileStats();
+            fetchOrganizationInfo();
         }
     }, [profile?.id]);
 
@@ -115,6 +117,77 @@ export default function ProfileNav() {
         }
     };
 
+    const fetchOrganizationInfo = async () => {
+        try {
+            // Check if user has organization membership
+            const { data: membership, error: membershipError } = await supabase
+                .from('organization_memberships')
+                .select(`
+                    organization_id,
+                    organization_type,
+                    role,
+                    nonprofits:organization_id!inner(id, name, tagline),
+                    funders:organization_id!inner(id, name, tagline)
+                `)
+                .eq('profile_id', profile.id)
+                .single();
+
+            if (!membershipError && membership) {
+                let orgData = null;
+                if (membership.organization_type === 'nonprofit' && membership.nonprofits) {
+                    orgData = {
+                        id: membership.nonprofits.id,
+                        name: membership.nonprofits.name,
+                        tagline: membership.nonprofits.tagline,
+                        type: 'nonprofit',
+                        role: membership.role
+                    };
+                } else if (membership.organization_type === 'funder' && membership.funders) {
+                    orgData = {
+                        id: membership.funders.id,
+                        name: membership.funders.name,
+                        tagline: membership.funders.tagline,
+                        type: 'funder',
+                        role: membership.role
+                    };
+                }
+                
+                setOrganizationInfo(orgData);
+                console.log('🏢 Organization info loaded:', orgData);
+            } else {
+                console.log('👤 No organization membership found');
+                setOrganizationInfo(null);
+            }
+        } catch (err) {
+            console.error('Error fetching organization info:', err);
+            setOrganizationInfo(null);
+        }
+    };
+
+    const getDisplayOrganization = () => {
+        // Priority: organizationInfo from membership > profile.organization_name > null
+        if (organizationInfo) {
+            return {
+                name: organizationInfo.name,
+                role: organizationInfo.role,
+                hasManagementAccess: ['super_admin', 'admin'].includes(organizationInfo.role)
+            };
+        }
+        
+        if (profile?.organization_name) {
+            return {
+                name: profile.organization_name,
+                role: profile.title || 'Member',
+                hasManagementAccess: false
+            };
+        }
+        
+        return null;
+    };
+
+    const displayOrg = getDisplayOrganization();
+    const canAccessCommunity = profile?.role && ['Nonprofit', 'Funder', 'Government', 'For-profit'].includes(profile.role);
+
     const navLinkClass = ({ isActive }) =>
         `flex items-center space-x-2 w-full px-3 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
             isActive 
@@ -150,8 +223,14 @@ export default function ProfileNav() {
                         {profile?.full_name || 'Your Name'}
                     </h2>
                     <p className="text-xs text-slate-600 mb-3 leading-tight">
-                        {profile?.organization_name && (
-                            <span className="font-medium">{profile.organization_name}</span>
+                        {displayOrg ? (
+                            <>
+                                <span className="font-medium text-blue-600">{displayOrg.role}</span>
+                                <br />
+                                <span className="text-slate-500">{displayOrg.name}</span>
+                            </>
+                        ) : (
+                            <span className="text-slate-500">{profile?.role || 'Community Member'}</span>
                         )}
                     </p>
                 </div>
@@ -189,12 +268,22 @@ export default function ProfileNav() {
                         <span className="flex-1 font-medium">Hello World</span>
                     </NavLink>
                     
-                    <NavLink to="/profile/hello-community" className={communityNavLinkClass}>
-                        <div className="w-6 h-6 bg-pink-200 rounded-md flex items-center justify-center text-xs shadow-sm">
-                            🤝
+                    {canAccessCommunity ? (
+                        <NavLink to="/profile/hello-community" className={communityNavLinkClass}>
+                            <div className="w-6 h-6 bg-pink-200 rounded-md flex items-center justify-center text-xs shadow-sm">
+                                🤝
+                            </div>
+                            <span className="flex-1 font-medium">Hello Community</span>
+                        </NavLink>
+                    ) : (
+                        <div className="flex items-center space-x-2 w-full px-3 py-2 text-sm font-medium text-slate-400 cursor-not-allowed">
+                            <div className="w-6 h-6 bg-gray-200 rounded-md flex items-center justify-center text-xs opacity-60">
+                                🤝
+                            </div>
+                            <span className="flex-1">Hello Community</span>
+                            <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">Org Required</span>
                         </div>
-                        <span className="flex-1 font-medium">Hello Community</span>
-                    </NavLink>
+                    )}
                     
                     <div className="flex items-center space-x-2 w-full px-3 py-2 text-sm font-medium text-slate-500 cursor-not-allowed">
                         <div className="w-6 h-6 bg-orange-200 rounded-md flex items-center justify-center text-xs opacity-60">
@@ -242,7 +331,12 @@ export default function ProfileNav() {
                             <div className="w-6 h-6 bg-red-200 rounded-md flex items-center justify-center text-xs shadow-sm">
                                 🏢
                             </div>
-                            <span className="font-medium">My Organization</span>
+                            <span className="font-medium">
+                                {displayOrg ? displayOrg.name : 'My Organization'}
+                            </span>
+                            {displayOrg?.hasManagementAccess && (
+                                <span className="text-xs bg-blue-100 text-blue-700 px-1 py-0.5 rounded">Admin</span>
+                            )}
                         </NavLink>
                     )}
                     

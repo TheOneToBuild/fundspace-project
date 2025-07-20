@@ -1,6 +1,6 @@
-// src/App.jsx - ENHANCED WITH ORGANIZATION POST NOTIFICATION SUPPORT AND STICKY FOOTER
+// src/App.jsx - Enhanced with Auto-Redirect for Authenticated Users
 import React, { useState, useEffect, createContext, useRef } from 'react';
-import { BrowserRouter, Routes, Route, Link, NavLink, Outlet, useOutletContext, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Link, NavLink, Outlet, useOutletContext, useLocation, Navigate } from 'react-router-dom';
 import ScrollToTop from './components/ScrollToTop.jsx';
 import { supabase } from './supabaseClient';
 import { clearAllNotifications, markAllAsRead } from './utils/notificationCleanup';
@@ -55,6 +55,47 @@ import { PlusCircle, Menu, X } from './components/Icons.jsx';
 export const LayoutContext = createContext({
   setPageBgColor: () => {},
 });
+
+// NEW: Auto-redirect component for authenticated users
+const AuthRedirect = ({ children }) => {
+  const { session, profile, loading } = useOutletContext();
+  const location = useLocation();
+  
+  // Don't redirect if still loading
+  if (loading) return children;
+  
+  // If user is authenticated and on homepage, redirect to profile
+  if (session && profile && location.pathname === '/') {
+    return <Navigate to="/profile" replace />;
+  }
+  
+  return children;
+};
+
+// NEW: Protected Route component for authenticated pages
+const ProtectedRoute = ({ children }) => {
+  const { session, profile, loading } = useOutletContext();
+  
+  // Still loading - show loading state
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-slate-600">Loading your dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+  
+  // Not authenticated - redirect to login
+  if (!session || !profile) {
+    return <Navigate to="/login" replace />;
+  }
+  
+  // Authenticated - show the protected content
+  return children;
+};
 
 // --- Layout for PUBLIC pages (Header for logged-out users) ---
 const PublicHeader = () => {
@@ -299,7 +340,7 @@ export default function App() {
         
         if (!error && freshProfile) {
           setProfile(freshProfile);
-          console.log('Profile refreshed:', freshProfile.profile_view_privacy);
+          console.log('Profile refreshed:', freshProfile);
         }
       } catch (err) {
         console.error('Error refreshing profile:', err);
@@ -429,7 +470,7 @@ export default function App() {
 
         <Route element={<Outlet context={outletContext} />}>
           <Route path="/" element={<AppLayout />}>
-            <Route index element={<GrantsPageContent />} />
+            <Route index element={<AuthRedirect><GrantsPageContent /></AuthRedirect>} />
             <Route path="funders" element={<ExploreFunders />} />
             <Route path="nonprofits" element={<ExploreNonprofits />} />
             <Route path="spotlight" element={<SpotlightLandingPage />} />
@@ -451,7 +492,7 @@ export default function App() {
             <Route path="funders/:funderSlug" element={<FunderProfilePage />} />
             <Route path="nonprofits/:slug" element={<NonprofitProfilePage />} />
             
-            <Route path="profile" element={<ProfilePage />}>
+            <Route path="profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>}>
               <Route index element={<DashboardHomePage />} />
               <Route path="grants" element={<GrantsPageContent hideHero={true} isProfileView={true} />} />
               <Route path="funders" element={<ExploreFunders isProfileView={true} />} />

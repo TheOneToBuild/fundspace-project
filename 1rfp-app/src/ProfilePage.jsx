@@ -1,6 +1,7 @@
+// src/ProfilePage.jsx - Complete version combining current functionality with auth fix
 import React, { useState, useEffect, useCallback, useContext, useMemo } from 'react';
 import { supabase } from './supabaseClient';
-import { useNavigate, Outlet, useOutletContext } from 'react-router-dom';
+import { Outlet, useOutletContext } from 'react-router-dom';
 import ProfileLayout from './components/ProfileLayout.jsx';
 import GrantDetailModal from './GrantDetailModal.jsx';
 import { LayoutContext } from './App.jsx';
@@ -8,7 +9,6 @@ import { LayoutContext } from './App.jsx';
 export default function ProfilePage() {
     const appContext = useOutletContext();
     const { session, profile, loading, notifications, unreadCount, markNotificationsAsRead, refreshProfile } = appContext;
-    const navigate = useNavigate();
     const { setPageBgColor } = useContext(LayoutContext);
 
     const [appState, setAppState] = useState({
@@ -42,7 +42,10 @@ export default function ProfilePage() {
     }, [setPageBgColor]);
 
     const fetchPageData = useCallback(async (userId) => {
+        if (!userId) return;
+        
         setAppState(prev => ({ ...prev, dataLoading: true, error: null }));
+        
         try {
             const fetchPostsWithReactions = async () => {
                 const { data: basicPosts, error: postsError } = await supabase
@@ -156,6 +159,7 @@ export default function ProfilePage() {
                 ]
             }));
         } catch (error) {
+            console.error('Error fetching page data:', error);
             setAppState(prev => ({ ...prev, dataLoading: false, error: 'Failed to load data. Please try again.' }));
         }
     }, []);
@@ -164,29 +168,55 @@ export default function ProfilePage() {
         setAppState(prev => ({ ...prev, activeTab: newTab }));
     }, []);
 
-    const handleFollowUser = useCallback(async userId => {
-        await supabase.from('followers').insert({ follower_id: session.user.id, following_id: userId });
-        fetchPageData(session.user.id);
+    const handleFollowUser = useCallback(async (userId, action) => {
+        if (!session?.user?.id) return;
+        
+        try {
+            if (action === 'follow') {
+                await supabase.from('followers').insert({
+                    follower_id: session.user.id,
+                    following_id: userId
+                });
+            } else {
+                await supabase.from('followers').delete()
+                    .eq('follower_id', session.user.id)
+                    .eq('following_id', userId);
+            }
+            
+            // Dispatch custom event for real-time UI updates
+            window.dispatchEvent(new CustomEvent('followUpdate', {
+                detail: { action, followerId: session.user.id, followingId: userId }
+            }));
+            
+            // Refresh the page data to update UI
+            fetchPageData(session.user.id);
+            
+        } catch (error) {
+            console.error('Error updating follow status:', error);
+        }
     }, [session, fetchPageData]);
 
-    const handleUnfollowUser = useCallback(async userId => {
-        await supabase.from('followers').delete().match({ follower_id: session.user.id, following_id: userId });
-        fetchPageData(session.user.id);
-    }, [session, fetchPageData]);
+    const handleUnfollowUser = useCallback(userId => {
+        handleFollowUser(userId, 'unfollow');
+    }, [handleFollowUser]);
 
     const handleStoryClick = useCallback(storyId => {
         setAppState(prev => ({
             ...prev,
-            stories: prev.stories.map(story => story.id === storyId ? { ...story, viewed: true } : story)
+            stories: prev.stories.map(story => 
+                story.id === storyId ? { ...story, viewed: true } : story)
         }));
     }, []);
 
     const handleCreateStory = useCallback(() => {}, []);
 
+    // FIXED: Removed the problematic auth redirect logic
+    // The ProtectedRoute wrapper in App.jsx now handles authentication
     useEffect(() => {
-        if (!loading && !session) navigate('/login');
-        else if (session) fetchPageData(session.user.id);
-    }, [session, loading, navigate, fetchPageData]);
+        if (session?.user?.id) {
+            fetchPageData(session.user.id);
+        }
+    }, [session?.user?.id, fetchPageData]);
 
     const handleNewPost = useCallback(newPostData => {
         setAppState(prev => ({
@@ -268,6 +298,7 @@ export default function ProfilePage() {
         socialStats: { totalPosts, totalFollowers, totalFollowing }
     }), [appContext, profile, posts, handleNewPost, handleDeletePost, savedGrants, session, handleSaveGrant, handleUnsaveGrant, openDetail, activeTab, handleTabChange, impactMetrics, stories, handleStoryClick, handleCreateStory, communityMembers, suggestedConnections, handleFollowUser, handleUnfollowUser, totalPosts, totalFollowers, totalFollowing]);
 
+    // FIXED: Let ProtectedRoute handle authentication, simplified loading states
     if (loading || !profile) {
         return (
             <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20 flex items-center justify-center">

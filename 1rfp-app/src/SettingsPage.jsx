@@ -1,4 +1,4 @@
-// src/components/SettingsPage.jsx
+// src/components/SettingsPage.jsx - Enhanced with Signup Data Integration
 import React, { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
 import { useOutletContext } from 'react-router-dom';
@@ -29,7 +29,7 @@ export default function SettingsPage() {
   const [profileError, setProfileError] = useState('');
 
   // --- Notification State ---
-  const [profile, setProfile] = useState(null); // Used for live updates
+  const [profile, setProfile] = useState(null);
   const [newKeyword, setNewKeyword] = useState('');
   
   // --- Privacy State ---
@@ -38,11 +38,39 @@ export default function SettingsPage() {
   const [privacyMessage, setPrivacyMessage] = useState('');
   const [privacyError, setPrivacyError] = useState('');
 
+  // NEW: Enhanced role mapping based on organization_type
+  const mapRoleFromProfile = (profile) => {
+    if (!profile) return 'Community member';
+    
+    // Use the role field if it exists and is not generic
+    if (profile.role && profile.role !== 'Community member') {
+      return profile.role;
+    }
+    
+    // Map from organization_type if role is generic
+    const roleMapping = {
+      'nonprofit': 'Nonprofit',
+      'government': 'Government',
+      'foundation': 'Funder',
+      'for-profit': 'For-profit',
+      'community-member': 'Community member'
+    };
+    
+    return roleMapping[profile.organization_type] || profile.role || 'Community member';
+  };
+
+  // Enhanced useEffect to properly map all profile data
   useEffect(() => {
     if (initialProfile) {
+      console.log('📋 Loading profile data:', initialProfile);
+      
       setProfile(initialProfile);
       setFullName(initialProfile.full_name || '');
-      setRole(initialProfile.role || 'Nonprofit');
+      
+      // Enhanced role mapping
+      const mappedRole = mapRoleFromProfile(initialProfile);
+      setRole(mappedRole);
+      
       setTitle(initialProfile.title || '');
       setOrganizationName(initialProfile.organization_name || '');
       setLocation(initialProfile.location || '');
@@ -52,6 +80,8 @@ export default function SettingsPage() {
       // Clear any previous messages when profile changes
       setPrivacyMessage('');
       setPrivacyError('');
+      
+      console.log('✅ Profile loaded with role:', mappedRole);
     }
   }, [initialProfile]);
 
@@ -61,24 +91,33 @@ export default function SettingsPage() {
     setProfileMessage('');
     setProfileError('');
 
-    const { error } = await supabase
-      .from('profiles')
-      .update({
-        full_name: fullName,
-        role: role,
-        title: (role === 'Funder' || role === 'Nonprofit') ? title : null,
-        organization_name: (role === 'Funder' || role === 'Nonprofit') ? organizationName : null,
-        location: location,
-        updated_at: new Date(),
-      })
-      .eq('id', session.user.id);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          full_name: fullName,
+          role: role,
+          title: (role === 'Funder' || role === 'Nonprofit' || role === 'Government' || role === 'For-profit') ? title : null,
+          organization_name: (role === 'Funder' || role === 'Nonprofit' || role === 'Government' || role === 'For-profit') ? organizationName : null,
+          location: location,
+          updated_at: new Date(),
+        })
+        .eq('id', session.user.id);
 
-    if (error) {
-      setProfileError(error.message);
-    } else {
-      setProfileMessage('Profile updated successfully!');
+      if (error) {
+        setProfileError(error.message);
+      } else {
+        setProfileMessage('Profile updated successfully!');
+        // Refresh the profile in the parent context
+        if (typeof refreshProfile === 'function') {
+          await refreshProfile();
+        }
+      }
+    } catch (err) {
+      setProfileError(`Failed to update profile: ${err.message}`);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
   
   const uploadAvatar = async (event) => {
@@ -104,6 +143,11 @@ export default function SettingsPage() {
         if (updateError) throw updateError;
         setAvatarUrl(publicUrl);
         setProfileMessage("Avatar updated successfully!");
+        
+        // Refresh the profile in the parent context
+        if (typeof refreshProfile === 'function') {
+          await refreshProfile();
+        }
     } catch (error) {
         setProfileError(error.message);
     } finally {
@@ -256,12 +300,14 @@ export default function SettingsPage() {
             <div>
                 <label htmlFor="role" className="text-sm font-medium text-slate-700 block mb-1">Your Role</label>
                 <select id="role" required className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white" value={role} onChange={(e) => setRole(e.target.value)}>
-                    <option>Nonprofit</option>
-                    <option>Funder</option>
-                    <option>Community member</option>
+                    <option value="Nonprofit">Nonprofit</option>
+                    <option value="Funder">Funder</option>
+                    <option value="Government">Government</option>
+                    <option value="For-profit">For-profit</option>
+                    <option value="Community member">Community member</option>
                 </select>
             </div>
-            {(role === 'Funder' || role === 'Nonprofit') && (
+            {(role === 'Funder' || role === 'Nonprofit' || role === 'Government' || role === 'For-profit') && (
                 <>
                     <div>
                         <label htmlFor="title" className="text-sm font-medium text-slate-700 block mb-1">Your Title</label>
