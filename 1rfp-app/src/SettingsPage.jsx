@@ -1,9 +1,9 @@
-// src/components/SettingsPage.jsx - Enhanced with Signup Data Integration
+// src/SettingsPage.jsx - Enhanced with Fixed Image Upload Integration
 import React, { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
 import { useOutletContext } from 'react-router-dom';
 
-// Icons
+// Icons - keeping your existing ones
 const PlusIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>;
 const XIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>;
 const UploadIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>;
@@ -12,6 +12,212 @@ const EyeOffIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 
 const BuildingIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-2-5V3" /></svg>;
 const UserCheckIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>;
 const InfoIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>;
+const CameraIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>;
+const LoaderIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>;
+
+// Enhanced Avatar Component with better error handling
+const EnhancedAvatar = ({ src, fullName, size = "20", className = "" }) => {
+  const [imageError, setImageError] = useState(false);
+  const [imageLoading, setImageLoading] = useState(!!src);
+
+  useEffect(() => {
+    if (src) {
+      setImageError(false);
+      setImageLoading(true);
+    }
+  }, [src]);
+
+  const getInitials = (name) => {
+    if (!name) return '?';
+    return name.split(' ').map(word => word.charAt(0)).join('').toUpperCase().slice(0, 2);
+  };
+
+  const getBackgroundColor = (name) => {
+    if (!name) return 'bg-slate-500';
+    const colors = ['bg-red-500', 'bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-orange-500', 'bg-teal-500'];
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) {
+      hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    return colors[Math.abs(hash) % colors.length];
+  };
+
+  const handleImageLoad = () => {
+    setImageLoading(false);
+    setImageError(false);
+  };
+
+  const handleImageError = () => {
+    console.log('Avatar image failed to load, falling back to initials');
+    setImageError(true);
+    setImageLoading(false);
+  };
+
+  const shouldShowImage = src && !imageError && src.trim() !== '';
+
+  return (
+    <div className={`w-${size} h-${size} rounded-full overflow-hidden ${className}`}>
+      {shouldShowImage ? (
+        <img
+          src={src}
+          alt={fullName || 'Avatar'}
+          className={`w-full h-full object-cover ${imageLoading ? 'opacity-50' : 'opacity-100'} transition-opacity`}
+          onLoad={handleImageLoad}
+          onError={handleImageError}
+        />
+      ) : (
+        <div className={`w-full h-full ${getBackgroundColor(fullName)} flex items-center justify-center text-white font-semibold text-sm`}>
+          {getInitials(fullName)}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Enhanced Image Uploader Component
+const EnhancedImageUploader = ({ currentImageUrl, onImageUploaded, uploading, setUploading }) => {
+  const [dragOver, setDragOver] = useState(false);
+  const [error, setError] = useState('');
+
+  const validateAndUploadFile = async (file) => {
+    try {
+      setError('');
+      
+      // Validate file type
+      const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+      if (!allowedTypes.includes(file.type)) {
+        throw new Error('Please select a valid image file (JPG, PNG, WebP).');
+      }
+
+      // Validate file size (5MB limit)
+      if (file.size > 5 * 1024 * 1024) {
+        throw new Error('Image file size must be less than 5MB.');
+      }
+
+      setUploading(true);
+
+      // Generate unique filename
+      const fileExt = file.name.split('.').pop();
+      const fileName = `avatar-${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+
+      console.log('🔧 Uploading to avatars bucket:', fileName);
+
+      // Upload to Supabase storage
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
+
+      if (uploadError) {
+        console.error('❌ Upload error:', uploadError);
+        throw new Error(`Upload failed: ${uploadError.message}`);
+      }
+
+      console.log('✅ Upload successful:', uploadData);
+
+      // Get public URL
+      const { data: urlData } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(fileName);
+
+      if (!urlData?.publicUrl) {
+        throw new Error('Failed to get public URL for uploaded image');
+      }
+
+      const imageUrl = urlData.publicUrl;
+      console.log('🔗 Public URL generated:', imageUrl);
+
+      // Test if the URL is accessible
+      try {
+        const testResponse = await fetch(imageUrl, { method: 'HEAD' });
+        if (!testResponse.ok) {
+          throw new Error(`Image not accessible: ${testResponse.status}`);
+        }
+      } catch (fetchError) {
+        console.warn('⚠️ Image accessibility test failed:', fetchError);
+        // Continue anyway, might be a CORS issue
+      }
+
+      // Call the parent callback
+      await onImageUploaded(imageUrl);
+
+      return imageUrl;
+    } catch (err) {
+      console.error('❌ Image upload error:', err);
+      setError(err.message || 'Failed to upload image');
+      throw err;
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleFileInput = async (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      await validateAndUploadFile(file);
+    }
+  };
+
+  const handleDrop = async (e) => {
+    e.preventDefault();
+    setDragOver(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      await validateAndUploadFile(file);
+    }
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    setDragOver(true);
+  };
+
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    setDragOver(false);
+  };
+
+  return (
+    <div>
+      <label 
+        htmlFor="avatarUpload" 
+        className={`cursor-pointer inline-flex items-center px-4 py-2 border border-slate-300 rounded-md shadow-sm text-sm font-medium transition-all
+          ${uploading ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'text-slate-700 bg-white hover:bg-slate-50'}
+          ${dragOver ? 'border-blue-400 bg-blue-50' : ''}
+        `}
+        onDrop={handleDrop}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+      >
+        {uploading ? (
+          <>
+            <LoaderIcon />
+            Uploading...
+          </>
+        ) : (
+          <>
+            <UploadIcon />
+            Upload Picture
+          </>
+        )}
+      </label>
+      <input 
+        id="avatarUpload" 
+        type="file" 
+        className="hidden" 
+        accept="image/jpeg,image/jpg,image/png,image/webp" 
+        onChange={handleFileInput} 
+        disabled={uploading} 
+      />
+      <p className="text-xs text-slate-500 mt-2">PNG, JPG, WebP up to 5MB.</p>
+      {error && (
+        <p className="text-xs text-red-600 mt-1">{error}</p>
+      )}
+    </div>
+  );
+};
 
 export default function SettingsPage() {
   const { profile: initialProfile, session, refreshProfile } = useOutletContext(); 
@@ -24,6 +230,7 @@ export default function SettingsPage() {
   const [title, setTitle] = useState('');
   const [organizationName, setOrganizationName] = useState('');
   const [location, setLocation] = useState('');
+  const [bio, setBio] = useState('');
   const [avatarUrl, setAvatarUrl] = useState(null);
   const [profileMessage, setProfileMessage] = useState('');
   const [profileError, setProfileError] = useState('');
@@ -38,7 +245,7 @@ export default function SettingsPage() {
   const [privacyMessage, setPrivacyMessage] = useState('');
   const [privacyError, setPrivacyError] = useState('');
 
-  // NEW: Enhanced role mapping based on organization_type
+  // Enhanced role mapping based on organization_type
   const mapRoleFromProfile = (profile) => {
     if (!profile) return 'Community member';
     
@@ -74,12 +281,15 @@ export default function SettingsPage() {
       setTitle(initialProfile.title || '');
       setOrganizationName(initialProfile.organization_name || '');
       setLocation(initialProfile.location || '');
+      setBio(initialProfile.bio || '');
       setAvatarUrl(initialProfile.avatar_url);
       setPrivacySetting(initialProfile.profile_view_privacy || 'public');
       
       // Clear any previous messages when profile changes
       setPrivacyMessage('');
       setPrivacyError('');
+      setProfileMessage('');
+      setProfileError('');
       
       console.log('✅ Profile loaded with role:', mappedRole);
     }
@@ -100,6 +310,7 @@ export default function SettingsPage() {
           title: (role === 'Funder' || role === 'Nonprofit' || role === 'Government' || role === 'For-profit') ? title : null,
           organization_name: (role === 'Funder' || role === 'Nonprofit' || role === 'Government' || role === 'For-profit') ? organizationName : null,
           location: location,
+          bio: bio,
           updated_at: new Date(),
         })
         .eq('id', session.user.id);
@@ -112,6 +323,8 @@ export default function SettingsPage() {
         if (typeof refreshProfile === 'function') {
           await refreshProfile();
         }
+        // Auto-clear message after 3 seconds
+        setTimeout(() => setProfileMessage(''), 3000);
       }
     } catch (err) {
       setProfileError(`Failed to update profile: ${err.message}`);
@@ -120,38 +333,33 @@ export default function SettingsPage() {
     }
   };
   
-  const uploadAvatar = async (event) => {
+  const handleAvatarUploaded = async (imageUrl) => {
     try {
-        setUploading(true);
-        if (!event.target.files || event.target.files.length === 0) {
-            throw new Error('You must select an image to upload.');
-        }
-        const file = event.target.files[0];
-        if (file.size > 2 * 1024 * 1024) {
-            throw new Error('Image file size must be less than 2MB.');
-        }
-        const fileExt = file.name.split('.').pop();
-        const fileName = `${session.user.id}-${Math.random()}.${fileExt}`;
-        const filePath = `${fileName}`;
-        let { error: uploadError } = await supabase.storage.from('avatars').upload(filePath, file);
-        if (uploadError) throw uploadError;
-        const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(filePath);
-        const { error: updateError } = await supabase
-            .from('profiles')
-            .update({ avatar_url: publicUrl, updated_at: new Date() })
-            .eq('id', session.user.id);
-        if (updateError) throw updateError;
-        setAvatarUrl(publicUrl);
-        setProfileMessage("Avatar updated successfully!");
-        
-        // Refresh the profile in the parent context
-        if (typeof refreshProfile === 'function') {
-          await refreshProfile();
-        }
+      console.log('💾 Updating avatar URL in profile:', imageUrl);
+      
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ 
+          avatar_url: imageUrl, 
+          updated_at: new Date() 
+        })
+        .eq('id', session.user.id);
+
+      if (updateError) throw updateError;
+
+      setAvatarUrl(imageUrl);
+      setProfileMessage("Avatar updated successfully!");
+      
+      // Refresh the profile in the parent context
+      if (typeof refreshProfile === 'function') {
+        await refreshProfile();
+      }
+
+      // Auto-clear message after 3 seconds
+      setTimeout(() => setProfileMessage(''), 3000);
     } catch (error) {
-        setProfileError(error.message);
-    } finally {
-        setUploading(false);
+      console.error('❌ Error updating avatar:', error);
+      setProfileError(`Failed to update avatar: ${error.message}`);
     }
   };
 
@@ -170,6 +378,7 @@ export default function SettingsPage() {
     } else if (data) {
       setProfile(data); // Update local state to reflect changes
       setProfileMessage('Notification settings updated!');
+      setTimeout(() => setProfileMessage(''), 3000);
     }
     setLoading(false);
   };
@@ -266,7 +475,17 @@ export default function SettingsPage() {
   ];
 
   if (!profile) {
-    return <div>Loading settings...</div>;
+    return (
+      <div className="space-y-8">
+        <div className="bg-white p-6 rounded-xl shadow-md border border-slate-200 animate-pulse">
+          <div className="h-8 bg-slate-200 rounded w-1/3 mb-4"></div>
+          <div className="space-y-3">
+            <div className="h-4 bg-slate-200 rounded"></div>
+            <div className="h-4 bg-slate-200 rounded w-2/3"></div>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -277,29 +496,41 @@ export default function SettingsPage() {
         <p className="text-slate-500 mt-1 mb-6">Update your personal and professional information.</p>
         
         <div className="flex items-center space-x-4 mb-6">
-          <img 
-            src={avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(fullName)}&background=random`} 
-            alt="Profile Avatar"
-            className="w-20 h-20 rounded-full object-cover"
+          <EnhancedAvatar 
+            src={avatarUrl} 
+            fullName={fullName}
+            size="20"
+            className="flex-shrink-0"
           />
-          <div>
-            <label htmlFor="avatarUpload" className="cursor-pointer inline-flex items-center px-4 py-2 border border-slate-300 rounded-md shadow-sm text-sm font-medium text-slate-700 bg-white hover:bg-slate-100">
-                <UploadIcon />
-                {uploading ? 'Uploading...' : 'Upload Picture'}
-            </label>
-            <input id="avatarUpload" type="file" className="hidden" accept="image/*" onChange={uploadAvatar} disabled={uploading} />
-            <p className="text-xs text-slate-500 mt-2">PNG, JPG, GIF up to 2MB.</p>
-          </div>
+          <EnhancedImageUploader
+            currentImageUrl={avatarUrl}
+            onImageUploaded={handleAvatarUploaded}
+            uploading={uploading}
+            setUploading={setUploading}
+          />
         </div>
 
         <form onSubmit={handleUpdateProfile} className="space-y-4">
             <div>
                 <label htmlFor="fullName" className="text-sm font-medium text-slate-700 block mb-1">Full Name</label>
-                <input id="fullName" required className="w-full px-3 py-2 border border-slate-300 rounded-lg" type="text" value={fullName} onChange={(e) => setFullName(e.target.value)} />
+                <input 
+                  id="fullName" 
+                  required 
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors" 
+                  type="text" 
+                  value={fullName} 
+                  onChange={(e) => setFullName(e.target.value)} 
+                />
             </div>
             <div>
                 <label htmlFor="role" className="text-sm font-medium text-slate-700 block mb-1">Your Role</label>
-                <select id="role" required className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white" value={role} onChange={(e) => setRole(e.target.value)}>
+                <select 
+                  id="role" 
+                  required 
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors" 
+                  value={role} 
+                  onChange={(e) => setRole(e.target.value)}
+                >
                     <option value="Nonprofit">Nonprofit</option>
                     <option value="Funder">Funder</option>
                     <option value="Government">Government</option>
@@ -311,21 +542,60 @@ export default function SettingsPage() {
                 <>
                     <div>
                         <label htmlFor="title" className="text-sm font-medium text-slate-700 block mb-1">Your Title</label>
-                        <input id="title" required className="w-full px-3 py-2 border border-slate-300 rounded-lg" type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g., Executive Director" />
+                        <input 
+                          id="title" 
+                          required 
+                          className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors" 
+                          type="text" 
+                          value={title} 
+                          onChange={(e) => setTitle(e.target.value)} 
+                          placeholder="e.g., Executive Director" 
+                        />
                     </div>
                     <div>
                         <label htmlFor="organization" className="text-sm font-medium text-slate-700 block mb-1">Organization Name</label>
-                        <input id="organization" required className="w-full px-3 py-2 border border-slate-300 rounded-lg" type="text" value={organizationName} onChange={(e) => setOrganizationName(e.target.value)} placeholder="e.g., The Community Foundation" />
+                        <input 
+                          id="organization" 
+                          required 
+                          className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors" 
+                          type="text" 
+                          value={organizationName} 
+                          onChange={(e) => setOrganizationName(e.target.value)} 
+                          placeholder="e.g., The Community Foundation" 
+                        />
                     </div>
                 </>
             )}
             <div>
                 <label htmlFor="location" className="text-sm font-medium text-slate-700 block mb-1">Location (Optional)</label>
-                <input id="location" className="w-full px-3 py-2 border border-slate-300 rounded-lg" type="text" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="e.g., San Francisco, CA" />
+                <input 
+                  id="location" 
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors" 
+                  type="text" 
+                  value={location} 
+                  onChange={(e) => setLocation(e.target.value)} 
+                  placeholder="e.g., San Francisco, CA" 
+                />
+            </div>
+            <div>
+                <label htmlFor="bio" className="text-sm font-medium text-slate-700 block mb-1">Bio</label>
+                <textarea
+                  id="bio"
+                  rows={4}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors resize-vertical"
+                  value={bio}
+                  onChange={(e) => setBio(e.target.value)}
+                  placeholder="Tell others about yourself and your work..."
+                />
+                <p className="text-xs text-slate-500 mt-1">{bio.length}/500 characters</p>
             </div>
 
             <div className="pt-4">
-                <button type="submit" disabled={loading} className="bg-blue-600 text-white py-2.5 px-6 rounded-lg hover:bg-blue-700 disabled:bg-blue-400 font-semibold shadow-sm">
+                <button 
+                  type="submit" 
+                  disabled={loading || uploading} 
+                  className="bg-blue-600 text-white py-2.5 px-6 rounded-lg hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed font-semibold shadow-sm transition-colors"
+                >
                     {loading ? 'Saving...' : 'Save Profile Changes'}
                 </button>
             </div>
@@ -412,7 +682,7 @@ export default function SettingsPage() {
         {privacyLoading && (
           <div className="mt-4 p-3 bg-slate-50 border border-slate-200 rounded-lg">
             <div className="text-sm text-slate-600 flex items-center gap-2">
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-slate-600"></div>
+              <LoaderIcon />
               Updating privacy setting...
             </div>
           </div>
@@ -453,6 +723,7 @@ export default function SettingsPage() {
             className={`relative inline-flex flex-shrink-0 h-6 w-11 border-2 border-transparent rounded-full cursor-pointer transition-colors ease-in-out duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${
               profile.email_alerts_enabled ? 'bg-blue-600' : 'bg-slate-200'
             }`}
+            disabled={loading}
           >
             <span
               className={`inline-block h-5 w-5 rounded-full bg-white shadow transform ring-0 transition ease-in-out duration-200 ${
@@ -468,13 +739,18 @@ export default function SettingsPage() {
           <form onSubmit={handleAddKeyword} className="flex items-center gap-2">
             <input
               id="keywords"
-              className="flex-grow px-3 py-2 border border-slate-300 rounded-lg"
+              className="flex-grow px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
               type="text"
               value={newKeyword}
               onChange={(e) => setNewKeyword(e.target.value)}
               placeholder="e.g., Environment"
+              disabled={loading}
             />
-            <button type="submit" className="flex-shrink-0 bg-blue-100 text-blue-700 p-2.5 rounded-lg hover:bg-blue-200">
+            <button 
+              type="submit" 
+              className="flex-shrink-0 bg-blue-100 text-blue-700 p-2.5 rounded-lg hover:bg-blue-200 transition-colors disabled:opacity-50"
+              disabled={loading}
+            >
               <PlusIcon />
             </button>
           </form>
@@ -487,7 +763,11 @@ export default function SettingsPage() {
               {profile.alert_keywords.map((keyword) => (
                 <div key={keyword} className="flex items-center bg-slate-100 text-slate-800 text-sm font-medium px-3 py-1 rounded-full">
                   <span>{keyword}</span>
-                  <button onClick={() => handleRemoveKeyword(keyword)} className="ml-2 text-slate-500 hover:text-slate-800">
+                  <button 
+                    onClick={() => handleRemoveKeyword(keyword)} 
+                    className="ml-2 text-slate-500 hover:text-slate-800 transition-colors disabled:opacity-50"
+                    disabled={loading}
+                  >
                     <XIcon />
                   </button>
                 </div>

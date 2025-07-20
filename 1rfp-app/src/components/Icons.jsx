@@ -88,5 +88,9 @@ export {
   Crown,
   Edit, 
   Shield, 
-  UserCog
+  UserCog, 
+  Camera, 
+  Upload, 
+  EyeOff, 
+  Save,
 } from 'lucide-react';

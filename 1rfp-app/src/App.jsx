@@ -41,6 +41,8 @@ import OmegaAdminManageMembers from './components/OmegaAdminManageMembers.jsx';
 // --- ORGANIZATION IMPORTS ---
 import MyOrganizationPage from './components/MyOrganizationPage.jsx';
 import EditOrganizationPage from './components/EditOrganizationPage.jsx';
+// --- AUTH COMPONENTS ---
+import SignUpWizard from './components/auth/SignUpWizard.jsx';
 
 // --- Import Shared Components ---
 import AuthButton from './components/AuthButton.jsx';
@@ -94,6 +96,33 @@ const ProtectedRoute = ({ children }) => {
   }
   
   // Authenticated - show the protected content
+  return children;
+};
+
+// NEW: Public Route component (redirects authenticated users)
+const PublicRoute = ({ children }) => {
+  const { session, profile, loading } = useOutletContext();
+  const location = useLocation();
+
+  // Still loading - show loading state
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-rose-50 via-orange-50 to-yellow-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-slate-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // If user is authenticated, redirect to profile (except from specific locations)
+  if (session && profile) {
+    // Get the intended destination from state, default to profile
+    const from = location.state?.from?.pathname || '/profile';
+    return <Navigate to={from} replace />;
+  }
+
   return children;
 };
 
@@ -466,9 +495,20 @@ export default function App() {
     <BrowserRouter>
       <ScrollToTop />
       <Routes>
-        <Route path="/login" element={<LoginPage />} />
-
+        {/* Authentication routes with context */}
         <Route element={<Outlet context={outletContext} />}>
+          <Route path="/login" element={
+            <PublicRoute>
+              <LoginPage />
+            </PublicRoute>
+          } />
+          
+          <Route path="/signup" element={
+            <PublicRoute>
+              <SignUpWizard />
+            </PublicRoute>
+          } />
+
           <Route path="/" element={<AppLayout />}>
             <Route index element={<AuthRedirect><GrantsPageContent /></AuthRedirect>} />
             <Route path="funders" element={<ExploreFunders />} />
