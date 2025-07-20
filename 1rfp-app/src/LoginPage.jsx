@@ -1,4 +1,4 @@
-// src/LoginPage.jsx
+// src/LoginPage.jsx - Updated to Handle Signup URL Parameter
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation, useOutletContext } from 'react-router-dom';
 import AuthLayout from './components/auth/AuthLayout';
@@ -6,13 +6,30 @@ import LoginForm from './components/auth/LoginForm';
 import SignUpWizard from './components/auth/SignUpWizard';
 
 export default function LoginPage() {
-  const [view, setView] = useState('sign_in'); // 'sign_in' or 'sign_up'
   const navigate = useNavigate();
   const location = useLocation();
   const { session, profile, loading } = useOutletContext();
 
+  // Check URL parameters to determine initial view
+  const urlParams = new URLSearchParams(location.search);
+  const viewParam = urlParams.get('view');
+  const initialView = viewParam === 'signup' ? 'sign_up' : 'sign_in';
+  
+  const [view, setView] = useState(initialView);
+
   // Get the intended destination from state, default to profile
   const from = location.state?.from?.pathname || '/profile';
+
+  // Update view when URL parameters change
+  useEffect(() => {
+    const urlParams = new URLSearchParams(location.search);
+    const viewParam = urlParams.get('view');
+    if (viewParam === 'signup') {
+      setView('sign_up');
+    } else {
+      setView('sign_in');
+    }
+  }, [location.search]);
 
   // If already logged in, redirect immediately
   useEffect(() => {
@@ -32,6 +49,20 @@ export default function LoginPage() {
   const handleSignupSuccess = () => {
     console.log('Signup successful, redirecting to profile');
     navigate('/profile', { replace: true });
+  };
+
+  // Handler to switch to signup view
+  const handleSwitchToSignUp = () => {
+    setView('sign_up');
+    // Update URL to reflect the view change
+    navigate('/login?view=signup', { replace: true });
+  };
+
+  // Handler to switch to login view
+  const handleSwitchToLogin = () => {
+    setView('sign_in');
+    // Clear URL parameters when switching back to login
+    navigate('/login', { replace: true });
   };
 
   // Don't render anything while loading or if already authenticated
@@ -54,12 +85,12 @@ export default function LoginPage() {
     <AuthLayout>
       {view === 'sign_in' ? (
         <LoginForm 
-          onSwitchToSignUp={() => setView('sign_up')}
+          onSwitchToSignUp={handleSwitchToSignUp}
           onLoginSuccess={handleLoginSuccess}
         />
       ) : (
         <SignUpWizard 
-          onSwitchToLogin={() => setView('sign_in')}
+          onSwitchToLogin={handleSwitchToLogin}
           onSignupSuccess={handleSignupSuccess}
         />
       )}

@@ -1,4 +1,4 @@
-// src/components/Avatar.jsx - Fixed Avatar Display Component
+// src/components/Avatar.jsx - Fixed with Consistent Rounded Styling
 import React, { useState, useEffect } from 'react';
 
 const Avatar = ({ 
@@ -11,53 +11,72 @@ const Avatar = ({
   isOnline = false 
 }) => {
   const [imageError, setImageError] = useState(false);
-  const [imageLoading, setImageLoading] = useState(true);
+  const [imageLoading, setImageLoading] = useState(false);
+  const [imageSrc, setImageSrc] = useState(null);
 
-  // Reset error state when src changes
+  // Reset state when src changes and validate src
   useEffect(() => {
-    if (src) {
+    const newSrc = src?.trim();
+    
+    if (!newSrc || newSrc === '') {
+      setImageSrc(null);
+      setImageError(false);
+      setImageLoading(false);
+      return;
+    }
+
+    // If src changed, reset states and start loading
+    if (newSrc !== imageSrc) {
       setImageError(false);
       setImageLoading(true);
+      setImageSrc(newSrc);
+      
+      // Test if the image can be loaded
+      const img = new Image();
+      img.onload = () => {
+        setImageLoading(false);
+        setImageError(false);
+      };
+      img.onerror = () => {
+        console.warn('Avatar image failed to load:', newSrc);
+        setImageLoading(false);
+        setImageError(true);
+      };
+      img.src = newSrc;
     }
-  }, [src]);
+  }, [src, imageSrc]);
 
-  // Size configurations
+  // Size configurations with explicit pixel values for consistency
   const sizeConfig = {
     xs: { 
-      container: 'w-6 h-6', 
+      size: 'w-6 h-6',
       text: 'text-xs', 
-      status: 'w-2 h-2 bottom-0 right-0',
-      border: 'border'
+      status: 'w-2 h-2 -bottom-0.5 -right-0.5'
     },
     sm: { 
-      container: 'w-8 h-8', 
+      size: 'w-8 h-8',
       text: 'text-sm', 
-      status: 'w-2.5 h-2.5 bottom-0 right-0',
-      border: 'border'
+      status: 'w-2.5 h-2.5 -bottom-0.5 -right-0.5'
     },
     md: { 
-      container: 'w-10 h-10', 
+      size: 'w-10 h-10',
       text: 'text-base', 
-      status: 'w-3 h-3 bottom-0 right-0',
-      border: 'border-2'
+      status: 'w-3 h-3 -bottom-0.5 -right-0.5'
     },
     lg: { 
-      container: 'w-16 h-16', 
+      size: 'w-16 h-16',
       text: 'text-lg', 
-      status: 'w-4 h-4 bottom-0.5 right-0.5',
-      border: 'border-2'
+      status: 'w-4 h-4 -bottom-1 -right-1'
     },
     xl: { 
-      container: 'w-20 h-20', 
+      size: 'w-20 h-20',
       text: 'text-xl', 
-      status: 'w-5 h-5 bottom-1 right-1',
-      border: 'border-2'
+      status: 'w-5 h-5 -bottom-1 -right-1'
     },
     '2xl': { 
-      container: 'w-24 h-24', 
+      size: 'w-24 h-24',
       text: 'text-2xl', 
-      status: 'w-6 h-6 bottom-1 right-1',
-      border: 'border-2'
+      status: 'w-6 h-6 -bottom-1 -right-1'
     }
   };
 
@@ -69,6 +88,7 @@ const Avatar = ({
     
     return name
       .split(' ')
+      .filter(word => word.length > 0)
       .map(word => word.charAt(0))
       .join('')
       .toUpperCase()
@@ -107,71 +127,70 @@ const Avatar = ({
     return colors[Math.abs(hash) % colors.length];
   };
 
-  const handleImageLoad = () => {
-    setImageLoading(false);
-    setImageError(false);
-  };
-
-  const handleImageError = (e) => {
-    console.warn('Avatar image failed to load:', src);
-    setImageError(true);
-    setImageLoading(false);
-  };
-
   // Check if we should show the image
-  const shouldShowImage = src && !imageError && src.trim() !== '';
+  const shouldShowImage = imageSrc && !imageError && !imageLoading;
 
-  const containerClasses = `
-    relative inline-block ${config.container} rounded-full overflow-hidden
-    ${onClick ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}
-    ${className}
-  `;
+  // CRITICAL: Always ensure rounded-full and proper overflow
+  const containerClasses = [
+    'relative',
+    'inline-block',
+    config.size,
+    'rounded-full',           // ALWAYS round
+    'overflow-hidden',        // ALWAYS hide overflow
+    'flex-shrink-0',         // Prevent squashing
+    onClick ? 'cursor-pointer hover:opacity-80 transition-opacity' : '',
+    className
+  ].filter(Boolean).join(' ');
 
-  const initialsClasses = `
-    ${config.container} rounded-full flex items-center justify-center
-    ${getBackgroundColor(fullName)} text-white font-semibold ${config.text}
-    select-none
-  `;
+  const initialsClasses = [
+    'w-full',
+    'h-full',
+    'rounded-full',           // ALWAYS round
+    'flex',
+    'items-center',
+    'justify-center',
+    getBackgroundColor(fullName),
+    'text-white',
+    'font-semibold',
+    config.text,
+    'select-none'
+  ].join(' ');
 
-  const imageClasses = `
-    ${config.container} rounded-full object-cover
-    ${config.border} border-white
-    ${imageLoading ? 'opacity-0' : 'opacity-100'}
-    transition-opacity duration-200
-  `;
+  const imageClasses = [
+    'w-full',
+    'h-full',
+    'object-cover',          // Maintain aspect ratio
+    'rounded-full'           // ALWAYS round
+  ].join(' ');
 
-  const statusClasses = `
-    absolute ${config.status} rounded-full ${config.border} border-white
-    ${isOnline ? 'bg-green-500' : 'bg-slate-400'}
-  `;
+  const statusClasses = [
+    'absolute',
+    config.status,
+    'rounded-full',
+    'border-2',
+    'border-white',
+    isOnline ? 'bg-green-500' : 'bg-slate-400'
+  ].join(' ');
 
   return (
     <div className={containerClasses} onClick={onClick}>
       {shouldShowImage ? (
-        <>
-          {/* Loading placeholder while image loads */}
-          {imageLoading && (
-            <div className={initialsClasses}>
-              <div className="animate-pulse">
-                {getInitials(fullName)}
-              </div>
-            </div>
-          )}
-          
-          {/* Actual image */}
-          <img
-            src={src}
-            alt={fullName || 'Avatar'}
-            className={imageClasses}
-            onLoad={handleImageLoad}
-            onError={handleImageError}
-            loading="lazy"
-          />
-        </>
+        <img
+          src={imageSrc}
+          alt={fullName || 'Avatar'}
+          className={imageClasses}
+          loading="lazy"
+        />
       ) : (
-        // Fallback initials
+        // Fallback initials (shown when loading, error, or no image)
         <div className={initialsClasses}>
-          {getInitials(fullName)}
+          {imageLoading ? (
+            <div className="animate-pulse">
+              {getInitials(fullName)}
+            </div>
+          ) : (
+            getInitials(fullName)
+          )}
         </div>
       )}
 

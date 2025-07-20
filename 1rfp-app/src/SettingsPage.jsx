@@ -1,4 +1,4 @@
-// src/SettingsPage.jsx - Enhanced with Fixed Image Upload Integration
+// src/SettingsPage.jsx - Complete SettingsPage with Fixed Avatar Upload
 import React, { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
 import { useOutletContext } from 'react-router-dom';
@@ -12,7 +12,6 @@ const EyeOffIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 
 const BuildingIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-2-5V3" /></svg>;
 const UserCheckIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>;
 const InfoIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>;
-const CameraIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>;
 const LoaderIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>;
 
 // Enhanced Avatar Component with better error handling
@@ -29,7 +28,12 @@ const EnhancedAvatar = ({ src, fullName, size = "20", className = "" }) => {
 
   const getInitials = (name) => {
     if (!name) return '?';
-    return name.split(' ').map(word => word.charAt(0)).join('').toUpperCase().slice(0, 2);
+    return name.split(' ')
+      .filter(word => word.length > 0)
+      .map(word => word.charAt(0))
+      .join('')
+      .toUpperCase()
+      .slice(0, 2);
   };
 
   const getBackgroundColor = (name) => {
@@ -128,17 +132,6 @@ const EnhancedImageUploader = ({ currentImageUrl, onImageUploaded, uploading, se
 
       const imageUrl = urlData.publicUrl;
       console.log('🔗 Public URL generated:', imageUrl);
-
-      // Test if the URL is accessible
-      try {
-        const testResponse = await fetch(imageUrl, { method: 'HEAD' });
-        if (!testResponse.ok) {
-          throw new Error(`Image not accessible: ${testResponse.status}`);
-        }
-      } catch (fetchError) {
-        console.warn('⚠️ Image accessibility test failed:', fetchError);
-        // Continue anyway, might be a CORS issue
-      }
 
       // Call the parent callback
       await onImageUploaded(imageUrl);
@@ -295,6 +288,20 @@ export default function SettingsPage() {
     }
   }, [initialProfile]);
 
+  // Add event listener for global avatar updates
+  useEffect(() => {
+    const handleAvatarUpdate = (event) => {
+      const { newAvatarUrl, userId } = event.detail;
+      if (userId === session?.user?.id) {
+        console.log('🔄 Received global avatar update event');
+        setAvatarUrl(newAvatarUrl);
+      }
+    };
+
+    window.addEventListener('avatar-updated', handleAvatarUpdate);
+    return () => window.removeEventListener('avatar-updated', handleAvatarUpdate);
+  }, [session?.user?.id]);
+
   const handleUpdateProfile = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -333,30 +340,46 @@ export default function SettingsPage() {
     }
   };
   
+  // Enhanced avatar upload handler
   const handleAvatarUploaded = async (imageUrl) => {
     try {
       console.log('💾 Updating avatar URL in profile:', imageUrl);
       
+      // Add cache busting parameter to ensure fresh image loads
+      const cacheBustedUrl = `${imageUrl}?v=${Date.now()}`;
+      
       const { error: updateError } = await supabase
         .from('profiles')
         .update({ 
-          avatar_url: imageUrl, 
+          avatar_url: cacheBustedUrl, 
           updated_at: new Date() 
         })
         .eq('id', session.user.id);
 
       if (updateError) throw updateError;
 
-      setAvatarUrl(imageUrl);
+      // Update local state immediately
+      setAvatarUrl(cacheBustedUrl);
       setProfileMessage("Avatar updated successfully!");
       
-      // Refresh the profile in the parent context
+      // CRITICAL: Refresh the profile in the parent context
+      // This ensures ALL components throughout the app get the new avatar
       if (typeof refreshProfile === 'function') {
         await refreshProfile();
+        console.log('✅ Profile context refreshed with new avatar');
       }
 
-      // Auto-clear message after 3 seconds
+      // Optional: Force a small delay to ensure all components have updated
+      setTimeout(() => {
+        // Trigger a re-render of all Avatar components by updating a global state
+        window.dispatchEvent(new CustomEvent('avatar-updated', { 
+          detail: { newAvatarUrl: cacheBustedUrl, userId: session.user.id }
+        }));
+      }, 100);
+
+      // Auto-clear success message after 3 seconds
       setTimeout(() => setProfileMessage(''), 3000);
+      
     } catch (error) {
       console.error('❌ Error updating avatar:', error);
       setProfileError(`Failed to update avatar: ${error.message}`);
@@ -501,6 +524,7 @@ export default function SettingsPage() {
             fullName={fullName}
             size="20"
             className="flex-shrink-0"
+            key={avatarUrl} // Force re-render when URL changes
           />
           <EnhancedImageUploader
             currentImageUrl={avatarUrl}

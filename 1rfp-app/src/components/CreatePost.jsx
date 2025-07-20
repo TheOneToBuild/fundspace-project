@@ -1,4 +1,4 @@
-// src/components/CreatePost.jsx
+// src/components/CreatePost.jsx - Complete with Placeholder Extension
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { supabase } from '../supabaseClient';
 import { Camera, X, Smile, AtSign } from 'lucide-react';
@@ -9,6 +9,7 @@ import { processMentionsForNotifications } from '../utils/notificationUtils';
 import { useEditor, EditorContent, ReactRenderer } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Mention from '@tiptap/extension-mention';
+import Placeholder from '@tiptap/extension-placeholder'; // ADD THIS IMPORT
 import tippy from 'tippy.js';
 import 'tippy.js/dist/tippy.css';
 
@@ -112,10 +113,24 @@ export default function CreatePost({
         setSelectedTags(prev => prev.filter(tag => tag.id !== tagId));
     };
 
-    // --- TIPTAP EDITOR HOOK WITH ENHANCED MENTION EXTENSION ---
+    // Generate the placeholder text
+    const defaultPlaceholder = isOrganizationPost 
+        ? `Share an update for ${organization?.name || 'your organization'}...`
+        : `What's on your mind, ${profile?.full_name?.split(' ')[0] || 'there'}?`;
+    
+    const placeholderText = placeholder || defaultPlaceholder;
+
+    // --- TIPTAP EDITOR HOOK WITH PLACEHOLDER EXTENSION ---
     const editor = useEditor({
         extensions: [
             StarterKit,
+            // ADD PLACEHOLDER EXTENSION
+            Placeholder.configure({
+                placeholder: placeholderText,
+                showOnlyWhenEditable: true,
+                showOnlyCurrent: false,
+                includeChildren: true,
+            }),
             Mention.extend({
                 name: 'mention',
                 
@@ -265,7 +280,6 @@ export default function CreatePost({
                 style: 'resize: vertical; white-space: pre-wrap;'
             },
         },
-        placeholder: placeholder || `What's on your mind, ${profile?.full_name?.split(' ')[0] || 'there'}?`,
     });
 
     const editorRef = useRef(editor);
@@ -487,17 +501,16 @@ export default function CreatePost({
                 return;
             }
 
-            // UPDATED: Create mention records and notifications for BOTH post types
             if (mentionsForStorage.length > 0) {
                 await createMentionRecords(newPost.id, mentionsForStorage);
                 
                 // CREATE MENTION NOTIFICATIONS - Now works for both regular and organization posts
-                console.log('🔔 Creating mention notifications for', isOrganizationPost ? 'organization' : 'regular', 'post...');
+                console.log('🔔 Creating mention notifications...');
                 const notificationResult = await processMentionsForNotifications(
                     newPost.id, 
                     editorHtmlContent, 
                     profile.id,
-                    isOrganizationPost  // Pass the post type flag - THIS IS THE KEY CHANGE
+                    isOrganizationPost  // Pass the post type flag
                 );
                 
                 if (notificationResult.success) {
@@ -533,15 +546,11 @@ export default function CreatePost({
         return () => {
             selectedImages.forEach(img => URL.revokeObjectURL(img.preview));
         };
-    }, [selectedImages]);
+    }, []);
 
     if (!editor) {
         return null;
     }
-
-    const defaultPlaceholder = isOrganizationPost 
-        ? `Share an update for ${organization?.name || 'your organization'}...`
-        : `What's on your mind, ${profile?.full_name?.split(' ')[0] || 'there'}?`;
 
     return (
         <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
