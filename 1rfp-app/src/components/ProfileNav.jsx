@@ -1,4 +1,4 @@
-// src/components/ProfileNav.jsx - Enhanced with Organization Info and Real-Time Updates
+// src/components/ProfileNav.jsx - Updated for Unified Organizations Table
 import React, { useState, useEffect } from 'react';
 import { NavLink, useOutletContext } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
@@ -117,40 +117,45 @@ export default function ProfileNav() {
         }
     };
 
+    // 🔄 UPDATED: Fetch organization info from unified organizations table
     const fetchOrganizationInfo = async () => {
         try {
-            // Check if user has organization membership
-            const { data: membership, error: membershipError } = await supabase
+            console.log('📊 Fetching organization info for profile:', profile?.id);
+            
+            // Query organization memberships with unified organizations table
+            const { data: memberships, error } = await supabase
                 .from('organization_memberships')
                 .select(`
-                    organization_id,
-                    organization_type,
-                    role,
-                    nonprofits:organization_id!inner(id, name, tagline),
-                    funders:organization_id!inner(id, name, tagline)
+                    *,
+                    organizations!inner(
+                        id,
+                        name,
+                        tagline,
+                        type,
+                        image_url
+                    )
                 `)
                 .eq('profile_id', profile.id)
-                .single();
+                .order('joined_at', { ascending: false })
+                .limit(1);
 
-            if (!membershipError && membership) {
-                let orgData = null;
-                if (membership.organization_type === 'nonprofit' && membership.nonprofits) {
-                    orgData = {
-                        id: membership.nonprofits.id,
-                        name: membership.nonprofits.name,
-                        tagline: membership.nonprofits.tagline,
-                        type: 'nonprofit',
-                        role: membership.role
-                    };
-                } else if (membership.organization_type === 'funder' && membership.funders) {
-                    orgData = {
-                        id: membership.funders.id,
-                        name: membership.funders.name,
-                        tagline: membership.funders.tagline,
-                        type: 'funder',
-                        role: membership.role
-                    };
-                }
+            if (error) {
+                console.error('Error fetching organization memberships:', error);
+                return;
+            }
+
+            if (memberships && memberships.length > 0) {
+                const membership = memberships[0];
+                const org = membership.organizations;
+                
+                const orgData = {
+                    id: org.id,
+                    name: org.name,
+                    tagline: org.tagline,
+                    type: org.type,
+                    image_url: org.image_url,
+                    role: membership.role
+                };
                 
                 setOrganizationInfo(orgData);
                 console.log('🏢 Organization info loaded:', orgData);
@@ -170,6 +175,7 @@ export default function ProfileNav() {
             return {
                 name: organizationInfo.name,
                 role: organizationInfo.role,
+                type: organizationInfo.type,
                 hasManagementAccess: ['super_admin', 'admin'].includes(organizationInfo.role)
             };
         }
@@ -178,6 +184,7 @@ export default function ProfileNav() {
             return {
                 name: profile.organization_name,
                 role: profile.title || 'Member',
+                type: profile.organization_type || 'unknown',
                 hasManagementAccess: false
             };
         }
@@ -186,7 +193,56 @@ export default function ProfileNav() {
     };
 
     const displayOrg = getDisplayOrganization();
-    const canAccessCommunity = profile?.role && ['Nonprofit', 'Funder', 'Government', 'For-profit'].includes(profile.role);
+    
+    // 🔄 UPDATED: Include all new organization types for community access
+    const canAccessCommunity = profile?.role && [
+        'Nonprofit', 
+        'Funder', 
+        'Government', 
+        'For-profit',
+        'Education',
+        'Healthcare', 
+        'Religious',
+        'Foundation',
+        'International'
+    ].includes(profile.role);
+
+    const getOrganizationTypeDisplay = (type) => {
+        const typeMap = {
+            'nonprofit': 'Nonprofit',
+            'foundation': 'Foundation',
+            'government': 'Government',
+            'for-profit': 'For-Profit',
+            'education': 'Education',
+            'healthcare': 'Healthcare',
+            'religious': 'Religious',
+            'international': 'International'
+        };
+        return typeMap[type] || type;
+    };
+
+    const getOrganizationIcon = (type) => {
+        switch (type) {
+            case 'nonprofit':
+                return '🏛️';
+            case 'foundation':
+                return '💰';
+            case 'government':
+                return '🏛️';
+            case 'for-profit':
+                return '🏢';
+            case 'education':
+                return '🎓';
+            case 'healthcare':
+                return '🏥';
+            case 'religious':
+                return '⛪';
+            case 'international':
+                return '🌍';
+            default:
+                return '🏢';
+        }
+    };
 
     const navLinkClass = ({ isActive }) =>
         `flex items-center space-x-2 w-full px-3 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
@@ -227,7 +283,14 @@ export default function ProfileNav() {
                             <>
                                 <span className="font-medium text-blue-600">{displayOrg.role}</span>
                                 <br />
-                                <span className="text-slate-500">{displayOrg.name}</span>
+                                <span className="text-slate-500 flex items-center justify-center">
+                                    <span className="mr-1">{getOrganizationIcon(displayOrg.type)}</span>
+                                    {displayOrg.name}
+                                </span>
+                                <br />
+                                <span className="text-xs text-slate-400">
+                                    {getOrganizationTypeDisplay(displayOrg.type)}
+                                </span>
                             </>
                         ) : (
                             <span className="text-slate-500">{profile?.role || 'Community Member'}</span>
@@ -329,7 +392,7 @@ export default function ProfileNav() {
                     {!isOmegaAdmin && (
                         <NavLink to="/profile/my-organization" className={navLinkClass}>
                             <div className="w-6 h-6 bg-red-200 rounded-md flex items-center justify-center text-xs shadow-sm">
-                                🏢
+                                {displayOrg ? getOrganizationIcon(displayOrg.type) : '🏢'}
                             </div>
                             <span className="font-medium">
                                 {displayOrg ? displayOrg.name : 'My Organization'}

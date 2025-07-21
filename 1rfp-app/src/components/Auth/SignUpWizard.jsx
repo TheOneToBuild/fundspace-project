@@ -1,9 +1,10 @@
-// src/components/Auth/SignUpWizard.jsx - UPDATED WITH FIXES
-import React, { useState, useCallback } from 'react';
+// src/components/Auth/SignUpWizard.jsx - Updated with New Flow
+import React, { useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../supabaseClient';
 import PersonalInfoStep from './steps/PersonalInfoStep';
-import OrganizationTypeStep from './steps/OrganizationTypeStep';
+import OrganizationSearchStep from './steps/OrganizationSearchStep';
+import OrganizationTypeSelectionStep from './steps/OrganizationTypeSelectionStep';
 import OrganizationSetupStep from './steps/OrganizationSetupStep';
 import LocationStep from './steps/LocationStep';
 import InterestsStep from './steps/InterestsStep';
@@ -27,15 +28,22 @@ export default function SignUpWizard({ onSwitchToLogin }) {
     avatar: null,
     avatarPreview: null,
     
-    // Organization info
-    organizationType: '',
-    organizationChoice: '', // 'join' or 'create'
+    // Organization search/choice
+    organizationChoice: '', // 'join', 'create', or 'community'
     selectedOrgData: null,
+    
+    // Organization creation (only for create choice)
+    organizationType: '', // Set after organization search or type selection
     newOrganization: {
       name: '',
       description: '',
-      funderTypeId: '',
-      taxonomyCode: '',
+      tagline: '',
+      website: '',
+      location: '',
+      contactEmail: '',
+      budget: '',
+      staffCount: '',
+      yearFounded: '',
       capabilities: []
     },
     taxonomyCode: '',
@@ -49,7 +57,36 @@ export default function SignUpWizard({ onSwitchToLogin }) {
     followUsers: []
   });
 
-  // FIXED: Use useCallback to prevent function recreation on every render
+  // Session storage for persistence
+  useEffect(() => {
+    // Load saved form data on component mount
+    const savedData = sessionStorage.getItem('signupFormData');
+    const savedStep = sessionStorage.getItem('signupCurrentStep');
+    
+    if (savedData) {
+      try {
+        const parsedData = JSON.parse(savedData);
+        setFormData(parsedData);
+      } catch (error) {
+        console.warn('Failed to parse saved form data:', error);
+      }
+    }
+    
+    if (savedStep) {
+      const step = parseInt(savedStep, 10);
+      if (step >= 1 && step <= 7) {
+        setCurrentStep(step);
+      }
+    }
+  }, []);
+
+  // Save form data to session storage whenever it changes
+  useEffect(() => {
+    sessionStorage.setItem('signupFormData', JSON.stringify(formData));
+    sessionStorage.setItem('signupCurrentStep', currentStep.toString());
+  }, [formData, currentStep]);
+
+  // Form data update handler
   const updateFormData = useCallback((field, value) => {
     console.log('SignUpWizard updateFormData called:', field, value);
     
@@ -71,7 +108,7 @@ export default function SignUpWizard({ onSwitchToLogin }) {
         return newData;
       }
     });
-  }, []); // Empty dependency array to prevent recreation
+  }, []);
 
   // Helper functions
   const validateEmail = (email) => {
@@ -201,8 +238,8 @@ export default function SignUpWizard({ onSwitchToLogin }) {
       const membershipData = {
         profile_id: userId,
         organization_id: selectedOrgData.id,
-        organization_type: selectedOrgData.type, // Use the actual type from the organization
-        role: 'member' // New members start as regular members
+        organization_type: selectedOrgData.type,
+        role: 'member'
       };
 
       const { error } = await supabase
@@ -246,20 +283,48 @@ export default function SignUpWizard({ onSwitchToLogin }) {
 
   // Navigation handlers
   const handleNext = useCallback(() => {
-    if (formData.organizationType === 'community-member' && currentStep === 2) {
-      setCurrentStep(4); // Skip organization setup for community members (go from step 2 to step 4)
+    // Dynamic step navigation based on user choices
+    if (currentStep === 2) {
+      // After organization search step
+      if (formData.organizationChoice === 'community' || formData.organizationChoice === 'join') {
+        setCurrentStep(5); // Skip to location step for community members and joiners
+      } else if (formData.organizationChoice === 'create') {
+        setCurrentStep(3); // Go to organization type selection
+      }
+    } else if (currentStep === 3) {
+      // After organization type selection (only for create)
+      setCurrentStep(4); // Go to organization setup
+    } else if (currentStep === 5 && (formData.organizationChoice === 'community' || formData.organizationChoice === 'join')) {
+      setCurrentStep(6); // From location to interests for community/join
+    } else if (currentStep === 6 && (formData.organizationChoice === 'community' || formData.organizationChoice === 'join')) {
+      setCurrentStep(7); // From interests to follow for community/join
     } else {
       setCurrentStep(prev => prev + 1);
     }
-  }, [formData.organizationType, currentStep]);
+    
+    // Scroll to top of page
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [formData.organizationChoice, currentStep]);
 
   const handlePrev = useCallback(() => {
-    if (formData.organizationType === 'community-member' && currentStep === 4) {
-      setCurrentStep(2); // Skip organization setup when going back (go from step 4 to step 2)
+    // Dynamic step navigation going backwards
+    if (currentStep === 5 && (formData.organizationChoice === 'community' || formData.organizationChoice === 'join')) {
+      setCurrentStep(2); // Back to organization search
+    } else if (currentStep === 6 && (formData.organizationChoice === 'community' || formData.organizationChoice === 'join')) {
+      setCurrentStep(5); // Back to location for community/join
+    } else if (currentStep === 7 && (formData.organizationChoice === 'community' || formData.organizationChoice === 'join')) {
+      setCurrentStep(6); // Back to interests for community/join
+    } else if (currentStep === 4 && formData.organizationChoice === 'create') {
+      setCurrentStep(3); // Back to organization type selection
+    } else if (currentStep === 3 && formData.organizationChoice === 'create') {
+      setCurrentStep(2); // Back to organization search
     } else {
       setCurrentStep(prev => prev - 1);
     }
-  }, [formData.organizationType, currentStep]);
+    
+    // Scroll to top of page
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [formData.organizationChoice, currentStep]);
 
   // Form submission
   const handleSubmit = async () => {
@@ -292,14 +357,6 @@ export default function SignUpWizard({ onSwitchToLogin }) {
       const userId = authData.user.id;
       console.log('✅ User account created:', userId);
 
-      // Check if a session was created (email confirmation not required)
-      const { data: sessionData } = await supabase.auth.getSession();
-      if (sessionData.session) {
-        console.log('✅ Session created, no email confirmation required');
-      } else {
-        console.log('📧 Email confirmation required');
-      }
-
       // Upload avatar if provided
       let avatarUrl = null;
       if (formData.avatar) {
@@ -328,7 +385,7 @@ export default function SignUpWizard({ onSwitchToLogin }) {
         'community-member': 'Community member'
       };
 
-      // Create user profile with all signup data
+      // Create user profile
       console.log('👤 Creating profile...');
       const profileData = {
         id: userId,
@@ -344,77 +401,42 @@ export default function SignUpWizard({ onSwitchToLogin }) {
         selected_organization_type: formData.selectedOrgData?.type || null,
         follow_users: Array.isArray(formData.followUsers) && formData.followUsers.length > 0 ? formData.followUsers : null,
         onboarding_completed: true,
-        signup_step_completed: 6
+        signup_step_completed: 7
       };
-      
-      console.log('Profile data to insert:', profileData);
 
-      // Check if profile already exists (from trigger)
-      const { data: existingProfile, error: checkError } = await supabase
+      // Check if profile already exists and update or create
+      const { data: existingProfile } = await supabase
         .from('profiles')
         .select('id')
         .eq('id', userId)
         .single();
 
-      console.log('Existing profile check:', { existingProfile, checkError });
-
       if (existingProfile) {
-        console.log('Profile already exists from trigger, updating with full data...');
         const { error: updateError } = await supabase
           .from('profiles')
           .update(profileData)
           .eq('id', userId);
 
-        if (updateError) {
-          console.error('Profile update error:', updateError);
-          if (updateError.code === '42501' || (updateError.message && updateError.message.includes('row-level security'))) {
-            setMessage('🎉 Account created! Please check your email to verify your account, then you can complete your profile setup.');
-            setTimeout(() => {
-              navigate('/login');
-            }, 3000);
-            return;
-          } else {
-            throw new Error(`Profile update failed: ${updateError.message}`);
-          }
+        if (updateError && updateError.code !== '42501') {
+          throw new Error(`Profile update failed: ${updateError.message}`);
         }
-        console.log('✅ Profile updated successfully');
       } else {
-        console.log('Creating new profile...');
-        const { error: authProfileError } = await supabase
+        const { error: createError } = await supabase
           .from('profiles')
           .insert(profileData);
 
-        if (authProfileError) {
-          console.error('Authenticated profile creation failed:', authProfileError);
-          
-          if (authProfileError.code === '42501' || 
-              (authProfileError.message && (
-                authProfileError.message.includes('row-level security') ||
-                authProfileError.message.includes('foreign key constraint')
-              )) ||
-              authProfileError.code === '23503' ||
-              authProfileError.code === '23505') {
-            setMessage('🎉 Account created! Please check your email to verify your account, then you can complete your profile setup.');
-            setTimeout(() => {
-              navigate('/login');
-            }, 3000);
-            return;
-          } else {
-            throw new Error(`Profile creation failed: ${authProfileError.message}`);
-          }
+        if (createError && createError.code !== '42501') {
+          throw new Error(`Profile creation failed: ${createError.message}`);
         }
-        console.log('✅ Profile created successfully');
       }
 
-      // Handle organization creation/joining (skip for community members)
-      if (formData.organizationType !== 'community-member') {
-        if (formData.organizationChoice === 'create' && formData.newOrganization && formData.newOrganization.name) {
-          console.log('🏢 Creating organization...');
-          await createOrganization(formData.newOrganization, userId);
-        } else if (formData.organizationChoice === 'join' && formData.selectedOrgData) {
-          console.log('🤝 Joining organization...');
-          await createOrganizationMembership(userId, formData.selectedOrgData);
-        }
+      // Handle organization creation/joining
+      if (formData.organizationChoice === 'create' && formData.newOrganization?.name) {
+        console.log('🏢 Creating organization...');
+        await createOrganization(formData.newOrganization, userId);
+      } else if (formData.organizationChoice === 'join' && formData.selectedOrgData) {
+        console.log('🤝 Joining organization...');
+        await createOrganizationMembership(userId, formData.selectedOrgData);
       }
 
       // Create follow relationships
@@ -427,10 +449,13 @@ export default function SignUpWizard({ onSwitchToLogin }) {
         }
       }
 
+      // Clear session storage on successful signup
+      sessionStorage.removeItem('signupFormData');
+      sessionStorage.removeItem('signupCurrentStep');
+
       // Success message
       setMessage('🎉 Welcome to 1RFP! Your account has been created successfully. Please check your email to verify your account.');
       
-      // Force a page refresh to ensure all components load with the new user data
       setTimeout(() => {
         window.location.href = '/profile';
       }, 2000);
@@ -443,7 +468,7 @@ export default function SignUpWizard({ onSwitchToLogin }) {
     }
   };
 
-  // FIXED: Form validation
+  // Form validation
   const isStepValid = useCallback(() => {
     switch (currentStep) {
       case 1: 
@@ -453,85 +478,82 @@ export default function SignUpWizard({ onSwitchToLogin }) {
                formData.password && 
                formData.password.length >= 6);
       case 2: 
-        return !!formData.organizationType;
+        return !!formData.organizationChoice;
       case 3: 
-        // Skip organization setup validation for community members
-        if (formData.organizationType === 'community-member') {
-          return true;
-        }
-        
-        if (!formData.organizationChoice) return false;
-        if (formData.organizationChoice === 'join') {
-          return !!formData.selectedOrgData;
-        }
-        if (formData.organizationChoice === 'create') {
-          // Validate required fields for organization creation
-          const orgValid = !!(formData.newOrganization && formData.newOrganization.name);
-          // For all organization types, just require name and taxonomy selection
-          return orgValid && !!formData.taxonomyCode;
-        }
-        return false;
+        // Organization type selection (only for create)
+        return formData.organizationChoice !== 'create' || !!formData.organizationType;
       case 4: 
+        // Organization setup (only for create)
+        if (formData.organizationChoice !== 'create') return true;
+        return !!(formData.newOrganization?.name && formData.taxonomyCode);
+      case 5: 
         return !!(formData.location && Array.isArray(formData.location) && formData.location.length > 0);
-      case 5:
-        return true; // Interests are optional
       case 6:
+        return true; // Interests are optional
+      case 7:
         return true; // Follow users is optional
       default: 
         return false;
     }
   }, [formData, currentStep]);
 
-  const totalSteps = useCallback(() => {
-    if (formData.organizationType === 'community-member') return 5;
-    return 6;
-  }, [formData.organizationType]);
+  // Calculate total steps based on user choices
+  const getTotalSteps = useCallback(() => {
+    if (formData.organizationChoice === 'community' || formData.organizationChoice === 'join') {
+      return 5; // Steps: 1(account), 2(org search), 5(location), 6(interests), 7(follow) = 5 total
+    }
+    return 7; // Full flow for create
+  }, [formData.organizationChoice]);
 
+  // Get current step number for display
   const getCurrentStepNumber = useCallback(() => {
-    if (formData.organizationType === 'community-member') {
-      if (currentStep === 4) return 3;
-      if (currentStep === 5) return 4;
-      if (currentStep === 6) return 5;
+    if (formData.organizationChoice === 'community' || formData.organizationChoice === 'join') {
+      if (currentStep === 5) return 3; // Location becomes step 3
+      if (currentStep === 6) return 4; // Interests becomes step 4  
+      if (currentStep === 7) return 5; // Follow becomes step 5
     }
     return currentStep;
-  }, [formData.organizationType, currentStep]);
+  }, [formData.organizationChoice, currentStep]);
 
   const renderStep = useCallback(() => {
     switch (currentStep) {
       case 1:
         return <PersonalInfoStep formData={formData} updateFormData={updateFormData} />;
       case 2:
-        return <OrganizationTypeStep formData={formData} updateFormData={updateFormData} />;
+        return <OrganizationSearchStep formData={formData} updateFormData={updateFormData} />;
       case 3:
-        // Skip organization setup for community members
-        if (formData.organizationType === 'community-member') {
-          return <LocationStep formData={formData} updateFormData={updateFormData} />;
-        }
-        return <OrganizationSetupStep formData={formData} updateFormData={updateFormData} />;
+        return <OrganizationTypeSelectionStep formData={formData} updateFormData={updateFormData} />;
       case 4:
-        if (formData.organizationType === 'community-member') {
-          return <InterestsStep formData={formData} updateFormData={updateFormData} />;
-        }
-        return <LocationStep formData={formData} updateFormData={updateFormData} />;
+        return <OrganizationSetupStep formData={formData} updateFormData={updateFormData} />;
       case 5:
-        if (formData.organizationType === 'community-member') {
-          return <FollowUsersStep formData={formData} updateFormData={updateFormData} />;
-        }
-        return <InterestsStep formData={formData} updateFormData={updateFormData} />;
+        return <LocationStep formData={formData} updateFormData={updateFormData} />;
       case 6:
+        return <InterestsStep formData={formData} updateFormData={updateFormData} />;
+      case 7:
         return <FollowUsersStep formData={formData} updateFormData={updateFormData} />;
       default:
         return <PersonalInfoStep formData={formData} updateFormData={updateFormData} />;
     }
   }, [currentStep, formData, updateFormData]);
 
-  console.log('SignUpWizard render - currentStep:', currentStep, 'formData.fullName:', formData.fullName);
+  const getStepTitle = () => {
+    switch (currentStep) {
+      case 1: return 'Account Information';
+      case 2: return 'Find Your Organization';
+      case 3: return 'Organization Type';
+      case 4: return 'Organization Setup';
+      case 5: return 'Location';
+      case 6: return 'Interests';
+      case 7: return 'Follow Users';
+      default: return 'Setup';
+    }
+  };
 
   return (
     <div className="w-full">
       <div className="text-center mb-8">
         <h2 className="text-sm font-medium text-slate-500 tracking-wide uppercase">
-          Step {getCurrentStepNumber()} of {totalSteps()}
+          Step {getCurrentStepNumber()} of {getTotalSteps()} • {getStepTitle()}
         </h2>
       </div>
 
@@ -539,7 +561,7 @@ export default function SignUpWizard({ onSwitchToLogin }) {
         <div className="w-full bg-slate-200 rounded-full h-2">
           <div 
             className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-            style={{ width: `${(getCurrentStepNumber() / totalSteps()) * 100}%` }}
+            style={{ width: `${(getCurrentStepNumber() / getTotalSteps()) * 100}%` }}
           />
         </div>
       </div>
@@ -548,13 +570,13 @@ export default function SignUpWizard({ onSwitchToLogin }) {
       
       <NavigationButtons
         currentStep={currentStep}
-        totalSteps={totalSteps()}
+        totalSteps={getTotalSteps()}
         onPrev={currentStep === 1 ? onSwitchToLogin : handlePrev}
-        onNext={currentStep === 6 ? handleSubmit : handleNext}
+        onNext={getCurrentStepNumber() === getTotalSteps() ? handleSubmit : handleNext}
         isValid={isStepValid()}
         loading={loading}
         prevLabel={currentStep === 1 ? 'Back to Sign In' : 'Back'}
-        nextLabel={currentStep === 6 ? '🚀 Create Account' : 'Next'}
+        nextLabel={getCurrentStepNumber() === getTotalSteps() ? '🚀 Create Account' : 'Next'}
       />
 
       <MessageDisplay message={message} error={error} />

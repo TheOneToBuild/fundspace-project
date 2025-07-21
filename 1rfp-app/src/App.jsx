@@ -1,10 +1,9 @@
-// src/App.jsx - Enhanced with Auto-Redirect for Authenticated Users
+// src/App.jsx - Updated for Unified Organizations Table
 import React, { useState, useEffect, createContext, useRef } from 'react';
 import { BrowserRouter, Routes, Route, Link, NavLink, Outlet, useOutletContext, useLocation, Navigate } from 'react-router-dom';
 import ScrollToTop from './components/ScrollToTop.jsx';
 import { supabase } from './supabaseClient';
 import { clearAllNotifications, markAllAsRead } from './utils/notificationCleanup';
-
 
 // --- Import Page Components ---
 import GrantsPageContent from './GrantsPageContent.jsx';
@@ -30,8 +29,10 @@ import SavedGrantsPage from './SavedGrantsPage.jsx';
 import ExploreMembersPage from './ExploreMembersPage.jsx';
 import MemberProfilePage from './MemberProfilePage.jsx';
 import DashboardHomePage from './components/DashboardHomePage.jsx';
+
 // --- HELLO COMMUNITY IMPORT ---
 import HelloCommunityRoute from './components/HelloCommunityRoute.jsx';
+
 // --- OMEGA ADMIN IMPORTS ---
 import OmegaAdminDashboard from './components/OmegaAdminDashboard.jsx';
 import OmegaAdminAnalytics from './components/OmegaAdminAnalytics.jsx';
@@ -39,11 +40,19 @@ import AdminClaimsPage from './components/AdminClaimsPage.jsx';
 import OmegaAdminOrgSelector from './components/OmegaAdminOrgSelector.jsx';
 import OmegaAdminEditOrg from './components/OmegaAdminEditOrg.jsx';
 import OmegaAdminManageMembers from './components/OmegaAdminManageMembers.jsx';
+
 // --- ORGANIZATION IMPORTS ---
 import MyOrganizationPage from './components/MyOrganizationPage.jsx';
 import EditOrganizationPage from './components/EditOrganizationPage.jsx';
+
 // --- AUTH COMPONENTS ---
 import SignUpWizard from './components/auth/SignUpWizard.jsx';
+
+// --- NEW: UNIFIED ORGANIZATION PROFILE COMPONENTS ---
+// TODO: Create these components for unified organization routing
+// import UnifiedOrganizationProfilePage from './components/UnifiedOrganizationProfilePage.jsx';
+// import LegacyFunderRedirect from './components/LegacyFunderRedirect.jsx';
+// import LegacyNonprofitRedirect from './components/LegacyNonprofitRedirect.jsx';
 
 // --- Import Shared Components ---
 import AuthButton from './components/AuthButton.jsx';
@@ -529,9 +538,16 @@ export default function App() {
             {/* ⭐ FIXED: MISSING DIRECT PROFILE ROUTES FOR MENTIONS */}
             <Route path="profile/:profileId" element={<MemberProfilePage />} />
             
-            {/* ORGANIZATION ROUTES - Need to handle ID to slug conversion */}
+            {/* 🔄 UPDATED: UNIFIED ORGANIZATION ROUTES */}
+            {/* TODO: Implement unified organization routing */}
+            {/* <Route path="organizations/:organizationId" element={<UnifiedOrganizationProfilePage />} /> */}
+            
+            {/* 🔄 LEGACY ROUTES - Current working routes */}
             <Route path="funders/:funderSlug" element={<FunderProfilePage />} />
             <Route path="nonprofits/:slug" element={<NonprofitProfilePage />} />
+            {/* TODO: Replace with legacy redirects when unified routing is implemented */}
+            {/* <Route path="funders/:funderSlug" element={<LegacyFunderRedirect />} /> */}
+            {/* <Route path="nonprofits/:slug" element={<LegacyNonprofitRedirect />} /> */}
             
             <Route path="profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>}>
               <Route index element={<DashboardHomePage />} />

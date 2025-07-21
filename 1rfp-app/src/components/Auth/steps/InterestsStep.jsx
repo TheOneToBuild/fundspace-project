@@ -36,6 +36,15 @@ export default function InterestsStep({ formData, updateFormData }) {
       <div className="text-center mb-8">
         <h1 className="text-3xl font-bold text-slate-900 mb-2">What interests you? 💡</h1>
         <p className="text-slate-600">Choose areas you're passionate about</p>
+        
+        {/* Brief setup notice - only for organization creators */}
+        {formData.organizationChoice === 'create' && (
+          <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-sm text-blue-700">
+              This is a brief setup form. You can add more detailed information after joining the platform.
+            </p>
+          </div>
+        )}
       </div>
       
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
