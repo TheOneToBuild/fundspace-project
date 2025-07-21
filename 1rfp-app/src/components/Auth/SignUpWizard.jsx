@@ -103,81 +103,91 @@ export default function SignUpWizard({ onSwitchToLogin }) {
     }
   };
 
+  // Helper function for type-specific extended_data
+  const buildExtendedData = (orgType, orgData) => {
+    const extended = {};
+    
+    switch (orgType) {
+      case 'nonprofit':
+        if (orgData.ein) extended.ein = orgData.ein;
+        if (orgData.programs) extended.programs = orgData.programs;
+        break;
+      case 'foundation':
+        if (orgData.endowmentSize) extended.endowment_size = orgData.endowmentSize;
+        if (orgData.payoutRate) extended.payout_rate = orgData.payoutRate;
+        break;
+      case 'government':
+        if (orgData.agencyCode) extended.agency_code = orgData.agencyCode;
+        if (orgData.parentDepartment) extended.parent_department = orgData.parentDepartment;
+        break;
+      case 'education':
+        if (orgData.studentCount) extended.student_count = orgData.studentCount;
+        if (orgData.researchFocus) extended.research_focus = orgData.researchFocus;
+        break;
+      case 'healthcare':
+        if (orgData.specialties) extended.specialties = orgData.specialties;
+        if (orgData.bedCount) extended.bed_count = orgData.bedCount;
+        break;
+      case 'religious':
+        if (orgData.denomination) extended.denomination = orgData.denomination;
+        if (orgData.congregationSize) extended.congregation_size = orgData.congregationSize;
+        break;
+      case 'for-profit':
+        if (orgData.revenue) extended.revenue = orgData.revenue;
+        if (orgData.industry) extended.industry = orgData.industry;
+        break;
+    }
+    
+    return extended;
+  };
+
   const createOrganization = async (organizationData, userId) => {
     console.log('Creating organization with data:', organizationData);
     
     try {
-      if (formData.organizationType === 'nonprofit') {
-        // Create nonprofit
-        const nonprofitData = {
-          name: organizationData.name,
-          description: organizationData.description || '',
-          admin_profile_id: userId,
-          taxonomy_code: organizationData.taxonomyCode || formData.taxonomyCode || 'nonprofit.501c3',
-          capabilities: organizationData.capabilities || formData.capabilities || ['can_apply_for_grants']
-        };
+      // Build the unified organization data
+      const orgData = {
+        name: organizationData.name,
+        type: formData.organizationType,
+        taxonomy_code: organizationData.taxonomyCode || formData.taxonomyCode,
+        tagline: organizationData.tagline,
+        description: organizationData.description || '',
+        website: organizationData.website,
+        location: organizationData.location,
+        contact_email: organizationData.contactEmail,
+        annual_budget: organizationData.budget,
+        staff_count: organizationData.staffCount ? parseInt(organizationData.staffCount.split('-')[0]) : null,
+        year_founded: organizationData.yearFounded ? parseInt(organizationData.yearFounded) : null,
+        admin_profile_id: userId,
+        capabilities: organizationData.capabilities || formData.capabilities || [],
+        extended_data: buildExtendedData(formData.organizationType, organizationData)
+      };
 
-        const { data: nonprofit, error: nonprofitError } = await supabase
-          .from('nonprofits')
-          .insert(nonprofitData)
-          .select()
-          .single();
+      // Create organization in unified table
+      const { data: organization, error: orgError } = await supabase
+        .from('organizations')
+        .insert(orgData)
+        .select()
+        .single();
 
-        if (nonprofitError) throw nonprofitError;
+      if (orgError) throw orgError;
 
-        // Create organization membership
-        const membershipData = {
-          profile_id: userId,
-          organization_id: nonprofit.id,
-          organization_type: 'nonprofit',
-          role: 'super_admin'
-        };
+      // Create organization membership
+      const membershipData = {
+        profile_id: userId,
+        organization_id: organization.id,
+        organization_type: organization.type,
+        role: 'super_admin'
+      };
 
-        const { error: membershipError } = await supabase
-          .from('organization_memberships')
-          .insert(membershipData);
+      const { error: membershipError } = await supabase
+        .from('organization_memberships')
+        .insert(membershipData);
 
-        if (membershipError) throw membershipError;
+      if (membershipError) throw membershipError;
 
-        console.log('✅ Nonprofit created successfully:', nonprofit);
-        return nonprofit;
-
-      } else {
-        // Create funder
-        const funderData = {
-          name: organizationData.name,
-          description: organizationData.description || '',
-          admin_profile_id: userId,
-          funder_type_id: organizationData.funderTypeId || null,
-          taxonomy_code: organizationData.taxonomyCode || formData.taxonomyCode || 'foundation.private.independent',
-          capabilities: organizationData.capabilities || formData.capabilities || ['can_grant_funds', 'publishes_rfps']
-        };
-
-        const { data: funder, error: funderError } = await supabase
-          .from('funders')
-          .insert(funderData)
-          .select()
-          .single();
-
-        if (funderError) throw funderError;
-
-        // Create organization membership
-        const membershipData = {
-          profile_id: userId,
-          organization_id: funder.id,
-          organization_type: 'funder',
-          role: 'super_admin'
-        };
-
-        const { error: membershipError } = await supabase
-          .from('organization_memberships')
-          .insert(membershipData);
-
-        if (membershipError) throw membershipError;
-
-        console.log('✅ Funder created successfully:', funder);
-        return funder;
-      }
+      console.log('✅ Organization created successfully:', organization);
+      return organization;
     } catch (error) {
       console.error('❌ Error creating organization:', error);
       throw error;
@@ -191,7 +201,7 @@ export default function SignUpWizard({ onSwitchToLogin }) {
       const membershipData = {
         profile_id: userId,
         organization_id: selectedOrgData.id,
-        organization_type: selectedOrgData.type,
+        organization_type: selectedOrgData.type, // Use the actual type from the organization
         role: 'member' // New members start as regular members
       };
 
@@ -311,6 +321,10 @@ export default function SignUpWizard({ onSwitchToLogin }) {
         'government': 'Government', 
         'foundation': 'Funder',
         'for-profit': 'For-profit',
+        'education': 'Education',
+        'healthcare': 'Healthcare', 
+        'religious': 'Religious',
+        'international': 'International',
         'community-member': 'Community member'
       };
 
