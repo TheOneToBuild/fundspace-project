@@ -1,5 +1,5 @@
-// src/components/auth/SignUpWizard.jsx - Enhanced with Complete Organization Integration and Auth Fix
-import React, { useState } from 'react';
+// src/components/Auth/SignUpWizard.jsx - UPDATED WITH FIXES
+import React, { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../supabaseClient';
 import PersonalInfoStep from './steps/PersonalInfoStep';
@@ -15,259 +15,285 @@ export default function SignUpWizard({ onSwitchToLogin }) {
   const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
   const [message, setMessage] = useState('');
-  
+  const [error, setError] = useState('');
+
+  // Form data state
   const [formData, setFormData] = useState({
+    // Personal info
     fullName: '',
     email: '',
     password: '',
     avatar: null,
+    avatarPreview: null,
+    
+    // Organization info
     organizationType: '',
-    organizationChoice: '',
-    existingOrganization: '',
+    organizationChoice: '', // 'join' or 'create'
     selectedOrgData: null,
     newOrganization: {
       name: '',
-      tagline: '',
       description: '',
-      location: '',
-      website: '',
-      contactEmail: '',
-      image: null,
       funderTypeId: '',
-      totalFundingAnnually: '',
-      averageGrantSize: '',
-      budget: '',
-      staffCount: '',
-      yearFounded: '',
-      ein: ''
+      taxonomyCode: '',
+      capabilities: []
     },
+    taxonomyCode: '',
+    capabilities: [],
+    
+    // Location and interests
     location: [],
     interests: [],
+    
+    // Follow users
     followUsers: []
   });
 
-  const updateFormData = (field, value) => {
-    if (field.includes('.')) {
-      const [parent, child] = field.split('.');
-      setFormData(prev => ({
-        ...prev,
-        [parent]: {
-          ...prev[parent],
-          [child]: value
-        }
-      }));
-    } else {
-      setFormData(prev => ({ ...prev, [field]: value }));
-    }
-  };
+  // FIXED: Use useCallback to prevent function recreation on every render
+  const updateFormData = useCallback((field, value) => {
+    console.log('SignUpWizard updateFormData called:', field, value);
+    
+    setFormData(prevData => {
+      if (field.includes('.')) {
+        const [parent, child] = field.split('.');
+        const newData = {
+          ...prevData,
+          [parent]: {
+            ...prevData[parent],
+            [child]: value
+          }
+        };
+        console.log('SignUpWizard state updated (nested):', newData);
+        return newData;
+      } else {
+        const newData = { ...prevData, [field]: value };
+        console.log('SignUpWizard state updated:', newData);
+        return newData;
+      }
+    });
+  }, []); // Empty dependency array to prevent recreation
 
+  // Helper functions
   const validateEmail = (email) => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email || '');
   };
 
-  const handleNext = () => {
-    if (currentStep === 2 && formData.organizationType === 'community-member') {
-      setCurrentStep(4);
-    } else {
-      setCurrentStep(prev => prev + 1);
-    }
-  };
-
-  const handlePrev = () => {
-    if (currentStep === 4 && formData.organizationType === 'community-member') {
-      setCurrentStep(2);
-    } else {
-      setCurrentStep(prev => prev - 1);
-    }
-  };
-
-  const uploadAvatar = async (avatarFile) => {
-    if (!avatarFile) return null;
-
+  const uploadAvatar = async (file) => {
     try {
-      const fileExt = avatarFile.name?.split('.').pop() || 'jpg';
-      const fileName = `avatar-${Math.random()}.${fileExt}`;
-      // Remove the extra 'avatars/' prefix since the bucket is already 'avatars'
-      const filePath = fileName;
+      const fileExt = file.name?.split('.').pop() || 'jpg';
+      const fileName = `${Math.random()}.${fileExt}`;
+      const filePath = `avatars/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
         .from('avatars')
-        .upload(filePath, avatarFile);
+        .upload(filePath, file);
 
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        throw uploadError;
+      }
 
-      const { data: { publicUrl } } = supabase.storage
+      const { data } = supabase.storage
         .from('avatars')
         .getPublicUrl(filePath);
 
-      return publicUrl;
+      return data.publicUrl;
     } catch (error) {
       console.error('Error uploading avatar:', error);
       throw error;
     }
   };
 
-  const createOrganization = async (orgData, userId) => {
+  const createOrganization = async (organizationData, userId) => {
+    console.log('Creating organization with data:', organizationData);
+    
     try {
-      const isNonprofit = formData.organizationType === 'nonprofit';
-      const table = isNonprofit ? 'nonprofits' : 'funders';
-      
-      // Prepare organization record based on type
-      const orgRecord = {
-        name: orgData.name,
-        tagline: orgData.tagline,
-        description: orgData.description,
-        location: orgData.location,
-        website: orgData.website,
-        contact_email: orgData.contactEmail,
-        admin_profile_id: userId,
-        ...(isNonprofit ? {
-          // Nonprofit-specific fields
-          image_url: orgData.image,
-          budget: orgData.budget,
-          staff_count: orgData.staffCount ? parseInt(orgData.staffCount) : null,
-          year_founded: orgData.yearFounded ? parseInt(orgData.yearFounded) : null,
-          ein: orgData.ein
-        } : {
-          // Funder-specific fields
-          logo_url: orgData.image,
-          funder_type_id: orgData.funderTypeId ? parseInt(orgData.funderTypeId) : null,
-          total_funding_annually: orgData.totalFundingAnnually,
-          average_grant_size: orgData.averageGrantSize
-        })
-      };
+      if (formData.organizationType === 'nonprofit') {
+        // Create nonprofit
+        const nonprofitData = {
+          name: organizationData.name,
+          description: organizationData.description || '',
+          admin_profile_id: userId,
+          taxonomy_code: organizationData.taxonomyCode || formData.taxonomyCode || 'nonprofit.501c3',
+          capabilities: organizationData.capabilities || formData.capabilities || ['can_apply_for_grants']
+        };
 
-      console.log('Creating organization:', { table, orgRecord });
+        const { data: nonprofit, error: nonprofitError } = await supabase
+          .from('nonprofits')
+          .insert(nonprofitData)
+          .select()
+          .single();
 
-      // Create organization
-      const { data: newOrg, error: orgError } = await supabase
-        .from(table)
-        .insert(orgRecord)
-        .select()
-        .single();
+        if (nonprofitError) throw nonprofitError;
 
-      if (orgError) {
-        console.error('Organization creation error:', orgError);
-        throw new Error(`Failed to create organization: ${orgError.message}`);
+        // Create organization membership
+        const membershipData = {
+          profile_id: userId,
+          organization_id: nonprofit.id,
+          organization_type: 'nonprofit',
+          role: 'super_admin'
+        };
+
+        const { error: membershipError } = await supabase
+          .from('organization_memberships')
+          .insert(membershipData);
+
+        if (membershipError) throw membershipError;
+
+        console.log('✅ Nonprofit created successfully:', nonprofit);
+        return nonprofit;
+
+      } else {
+        // Create funder
+        const funderData = {
+          name: organizationData.name,
+          description: organizationData.description || '',
+          admin_profile_id: userId,
+          funder_type_id: organizationData.funderTypeId || null,
+          taxonomy_code: organizationData.taxonomyCode || formData.taxonomyCode || 'foundation.private.independent',
+          capabilities: organizationData.capabilities || formData.capabilities || ['can_grant_funds', 'publishes_rfps']
+        };
+
+        const { data: funder, error: funderError } = await supabase
+          .from('funders')
+          .insert(funderData)
+          .select()
+          .single();
+
+        if (funderError) throw funderError;
+
+        // Create organization membership
+        const membershipData = {
+          profile_id: userId,
+          organization_id: funder.id,
+          organization_type: 'funder',
+          role: 'super_admin'
+        };
+
+        const { error: membershipError } = await supabase
+          .from('organization_memberships')
+          .insert(membershipData);
+
+        if (membershipError) throw membershipError;
+
+        console.log('✅ Funder created successfully:', funder);
+        return funder;
       }
-
-      console.log('Organization created successfully:', newOrg);
-
-      // Create organization membership
-      const membershipData = {
-        profile_id: userId,
-        organization_id: newOrg.id,
-        organization_type: isNonprofit ? 'nonprofit' : 'funder',
-        role: 'super_admin'
-      };
-
-      console.log('Creating membership:', membershipData);
-
-      const { error: membershipError } = await supabase
-        .from('organization_memberships')
-        .insert(membershipData);
-
-      if (membershipError) {
-        console.error('Membership creation error:', membershipError);
-        throw new Error(`Failed to create organization membership: ${membershipError.message}`);
-      }
-
-      console.log('Membership created successfully');
-      return newOrg;
     } catch (error) {
-      console.error('Error in createOrganization:', error);
+      console.error('❌ Error creating organization:', error);
       throw error;
     }
   };
 
-  const createOrganizationMembership = async (userId, orgData) => {
-    const { error } = await supabase
-      .from('organization_memberships')
-      .insert({
+  const createOrganizationMembership = async (userId, selectedOrgData) => {
+    console.log('Creating organization membership:', { userId, selectedOrgData });
+    
+    try {
+      const membershipData = {
         profile_id: userId,
-        organization_id: orgData.id,
-        organization_type: orgData.type,
-        role: 'member'
-      });
+        organization_id: selectedOrgData.id,
+        organization_type: selectedOrgData.type,
+        role: 'member' // New members start as regular members
+      };
 
-    if (error) throw error;
+      const { error } = await supabase
+        .from('organization_memberships')
+        .insert(membershipData);
+
+      if (error) throw error;
+      
+      console.log('✅ Organization membership created successfully');
+    } catch (error) {
+      console.error('❌ Error creating organization membership:', error);
+      throw error;
+    }
   };
 
-  const createFollowRelationships = async (userId, followUserIds) => {
-    if (!followUserIds || followUserIds.length === 0) return;
+  const createFollowRelationships = async (userId, followUsers) => {
+    if (!followUsers || !Array.isArray(followUsers) || followUsers.length === 0) {
+      return;
+    }
 
+    console.log('Creating follow relationships:', { userId, followUsers });
+    
     try {
-      const followRecords = followUserIds.map(followingId => ({
+      const followData = followUsers.map(followUserId => ({
         follower_id: userId,
-        following_id: followingId
+        following_id: followUserId
       }));
 
       const { error } = await supabase
         .from('followers')
-        .insert(followRecords);
+        .insert(followData);
 
-      if (error) {
-        console.error('Follow relationships error:', error);
-        throw new Error(`Failed to create follow relationships: ${error.message}`);
-      }
+      if (error) throw error;
+      
+      console.log('✅ Follow relationships created successfully');
     } catch (error) {
-      console.error('Error in createFollowRelationships:', error);
+      console.error('❌ Error creating follow relationships:', error);
       throw error;
     }
   };
 
+  // Navigation handlers
+  const handleNext = useCallback(() => {
+    if (formData.organizationType === 'community-member' && currentStep === 2) {
+      setCurrentStep(4); // Skip organization setup for community members (go from step 2 to step 4)
+    } else {
+      setCurrentStep(prev => prev + 1);
+    }
+  }, [formData.organizationType, currentStep]);
+
+  const handlePrev = useCallback(() => {
+    if (formData.organizationType === 'community-member' && currentStep === 4) {
+      setCurrentStep(2); // Skip organization setup when going back (go from step 4 to step 2)
+    } else {
+      setCurrentStep(prev => prev - 1);
+    }
+  }, [formData.organizationType, currentStep]);
+
+  // Form submission
   const handleSubmit = async () => {
     setLoading(true);
+    setMessage('');
     setError('');
-    
+
     try {
-      console.log('Starting signup process...');
-      
-      // Create user account with metadata
-      const { data: authData, error: authError } = await supabase.auth.signUp({
+      console.log('🚀 Starting signup process with data:', formData);
+
+      // Create user account
+      const { data: authData, error: signUpError } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
         options: {
           data: {
-            full_name: formData.fullName,
-            avatar_url: null // Will be updated later
+            full_name: formData.fullName
           }
         }
       });
 
-      if (authError) throw authError;
-      const userId = authData.user.id;
-      console.log('User created:', userId);
-
-      // Wait a moment for auth to fully establish
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      // Try to get the session, but don't fail if it's not available (email confirmation might be required)
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      
-      if (sessionError) {
-        console.warn('Session error:', sessionError);
+      if (signUpError) {
+        throw new Error(`Account creation failed: ${signUpError.message}`);
       }
-      
-      if (session && session.user.id === userId) {
-        console.log('Session verified:', session.user.id);
-      } else if (session) {
-        console.log('Session exists but for different user. Signing out old session...');
-        await supabase.auth.signOut();
-        console.log('Using new user ID for profile creation:', userId);
+
+      if (!authData.user) {
+        throw new Error('No user data returned from signup');
+      }
+
+      const userId = authData.user.id;
+      console.log('✅ User account created:', userId);
+
+      // Check if a session was created (email confirmation not required)
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (sessionData.session) {
+        console.log('✅ Session created, no email confirmation required');
       } else {
-        console.log('No session found - email confirmation may be required');
-        // For now, we'll continue with the signup process using the user ID from signup
-        // The user will need to confirm their email before they can log in
+        console.log('📧 Email confirmation required');
       }
 
       // Upload avatar if provided
       let avatarUrl = null;
       if (formData.avatar) {
-        console.log('Uploading avatar...');
+        console.log('📸 Uploading avatar...');
         if (typeof formData.avatar === 'string' && formData.avatar.startsWith('data:')) {
           const response = await fetch(formData.avatar);
           const blob = await response.blob();
@@ -276,7 +302,7 @@ export default function SignUpWizard({ onSwitchToLogin }) {
         } else if (formData.avatar instanceof File) {
           avatarUrl = await uploadAvatar(formData.avatar);
         }
-        console.log('Avatar uploaded:', avatarUrl);
+        console.log('✅ Avatar uploaded:', avatarUrl);
       }
 
       // Map organization types to role display names
@@ -289,27 +315,27 @@ export default function SignUpWizard({ onSwitchToLogin }) {
       };
 
       // Create user profile with all signup data
-      console.log('Creating profile...');
+      console.log('👤 Creating profile...');
       const profileData = {
         id: userId,
         full_name: formData.fullName,
         avatar_url: avatarUrl,
         role: roleMapping[formData.organizationType] || 'Community member',
-        location: formData.location?.join(', ') || '',
-        bio: formData.interests?.length > 0 ? 'Interested in: ' + formData.interests.join(', ') : null,
-        interests: formData.interests?.length > 0 ? formData.interests : null,
+        location: Array.isArray(formData.location) ? formData.location.join(', ') : (formData.location || ''),
+        bio: Array.isArray(formData.interests) && formData.interests.length > 0 ? 'Interested in: ' + formData.interests.join(', ') : null,
+        interests: Array.isArray(formData.interests) && formData.interests.length > 0 ? formData.interests : null,
         organization_type: formData.organizationType,
         organization_choice: formData.organizationChoice,
         selected_organization_id: formData.selectedOrgData?.id || null,
         selected_organization_type: formData.selectedOrgData?.type || null,
-        follow_users: formData.followUsers?.length > 0 ? formData.followUsers : null,
+        follow_users: Array.isArray(formData.followUsers) && formData.followUsers.length > 0 ? formData.followUsers : null,
         onboarding_completed: true,
         signup_step_completed: 6
       };
       
-      console.log('Profile data:', profileData);
+      console.log('Profile data to insert:', profileData);
 
-      // First check if profile already exists (from trigger)
+      // Check if profile already exists (from trigger)
       const { data: existingProfile, error: checkError } = await supabase
         .from('profiles')
         .select('id')
@@ -320,7 +346,6 @@ export default function SignUpWizard({ onSwitchToLogin }) {
 
       if (existingProfile) {
         console.log('Profile already exists from trigger, updating with full data...');
-        // Update existing profile with full signup data
         const { error: updateError } = await supabase
           .from('profiles')
           .update(profileData)
@@ -328,8 +353,7 @@ export default function SignUpWizard({ onSwitchToLogin }) {
 
         if (updateError) {
           console.error('Profile update error:', updateError);
-          // If update fails due to RLS, show email confirmation message
-          if (updateError.code === '42501' || updateError.message.includes('row-level security')) {
+          if (updateError.code === '42501' || (updateError.message && updateError.message.includes('row-level security'))) {
             setMessage('🎉 Account created! Please check your email to verify your account, then you can complete your profile setup.');
             setTimeout(() => {
               navigate('/login');
@@ -339,10 +363,9 @@ export default function SignUpWizard({ onSwitchToLogin }) {
             throw new Error(`Profile update failed: ${updateError.message}`);
           }
         }
-        console.log('Profile updated successfully');
+        console.log('✅ Profile updated successfully');
       } else {
         console.log('Creating new profile...');
-        // Try to create profile with authenticated client
         const { error: authProfileError } = await supabase
           .from('profiles')
           .insert(profileData);
@@ -350,45 +373,43 @@ export default function SignUpWizard({ onSwitchToLogin }) {
         if (authProfileError) {
           console.error('Authenticated profile creation failed:', authProfileError);
           
-          // Handle various error scenarios
           if (authProfileError.code === '42501' || 
-              authProfileError.message.includes('row-level security') ||
-              authProfileError.message.includes('foreign key constraint') ||
+              (authProfileError.message && (
+                authProfileError.message.includes('row-level security') ||
+                authProfileError.message.includes('foreign key constraint')
+              )) ||
               authProfileError.code === '23503' ||
-              authProfileError.code === '23505') { // Duplicate key error
+              authProfileError.code === '23505') {
             setMessage('🎉 Account created! Please check your email to verify your account, then you can complete your profile setup.');
             setTimeout(() => {
               navigate('/login');
             }, 3000);
-            return; // Exit early - user needs to confirm email first
+            return;
           } else {
             throw new Error(`Profile creation failed: ${authProfileError.message}`);
           }
         }
-        console.log('Profile created successfully');
+        console.log('✅ Profile created successfully');
       }
 
       // Handle organization creation/joining (skip for community members)
       if (formData.organizationType !== 'community-member') {
-        if (formData.organizationChoice === 'create' && formData.newOrganization.name) {
-          console.log('Creating organization...');
-          // Create new organization with all the detailed information
+        if (formData.organizationChoice === 'create' && formData.newOrganization && formData.newOrganization.name) {
+          console.log('🏢 Creating organization...');
           await createOrganization(formData.newOrganization, userId);
         } else if (formData.organizationChoice === 'join' && formData.selectedOrgData) {
-          console.log('Joining organization...');
-          // Join existing organization
+          console.log('🤝 Joining organization...');
           await createOrganizationMembership(userId, formData.selectedOrgData);
         }
       }
 
-      // Create follow relationships (temporarily skip to avoid RLS issues)
-      if (formData.followUsers?.length > 0) {
-        console.log('Creating follow relationships...');
+      // Create follow relationships
+      if (Array.isArray(formData.followUsers) && formData.followUsers.length > 0) {
+        console.log('👥 Creating follow relationships...');
         try {
           await createFollowRelationships(userId, formData.followUsers);
         } catch (followError) {
           console.warn('Follow relationships failed, but continuing signup:', followError);
-          // Don't throw error - let signup continue without follows
         }
       }
 
@@ -408,33 +429,36 @@ export default function SignUpWizard({ onSwitchToLogin }) {
     }
   };
 
-  const isStepValid = () => {
+  // FIXED: Form validation
+  const isStepValid = useCallback(() => {
     switch (currentStep) {
       case 1: 
-        return formData.fullName && 
+        return !!(formData.fullName && 
                formData.email && 
                validateEmail(formData.email) &&
                formData.password && 
-               formData.password.length >= 6;
+               formData.password.length >= 6);
       case 2: 
-        return formData.organizationType;
+        return !!formData.organizationType;
       case 3: 
+        // Skip organization setup validation for community members
+        if (formData.organizationType === 'community-member') {
+          return true;
+        }
+        
         if (!formData.organizationChoice) return false;
         if (formData.organizationChoice === 'join') {
           return !!formData.selectedOrgData;
         }
         if (formData.organizationChoice === 'create') {
           // Validate required fields for organization creation
-          const orgValid = !!formData.newOrganization.name;
-          // For funders, also require organization type selection
-          if (formData.organizationType !== 'nonprofit') {
-            return orgValid && !!formData.newOrganization.funderTypeId;
-          }
-          return orgValid;
+          const orgValid = !!(formData.newOrganization && formData.newOrganization.name);
+          // For all organization types, just require name and taxonomy selection
+          return orgValid && !!formData.taxonomyCode;
         }
         return false;
       case 4: 
-        return formData.location && formData.location.length > 0;
+        return !!(formData.location && Array.isArray(formData.location) && formData.location.length > 0);
       case 5:
         return true; // Interests are optional
       case 6:
@@ -442,40 +466,52 @@ export default function SignUpWizard({ onSwitchToLogin }) {
       default: 
         return false;
     }
-  };
+  }, [formData, currentStep]);
 
-  const totalSteps = () => {
+  const totalSteps = useCallback(() => {
     if (formData.organizationType === 'community-member') return 5;
     return 6;
-  };
+  }, [formData.organizationType]);
 
-  const getCurrentStepNumber = () => {
+  const getCurrentStepNumber = useCallback(() => {
     if (formData.organizationType === 'community-member') {
       if (currentStep === 4) return 3;
       if (currentStep === 5) return 4;
       if (currentStep === 6) return 5;
     }
     return currentStep;
-  };
+  }, [formData.organizationType, currentStep]);
 
-  const renderStep = () => {
+  const renderStep = useCallback(() => {
     switch (currentStep) {
       case 1:
         return <PersonalInfoStep formData={formData} updateFormData={updateFormData} />;
       case 2:
         return <OrganizationTypeStep formData={formData} updateFormData={updateFormData} />;
       case 3:
+        // Skip organization setup for community members
+        if (formData.organizationType === 'community-member') {
+          return <LocationStep formData={formData} updateFormData={updateFormData} />;
+        }
         return <OrganizationSetupStep formData={formData} updateFormData={updateFormData} />;
       case 4:
+        if (formData.organizationType === 'community-member') {
+          return <InterestsStep formData={formData} updateFormData={updateFormData} />;
+        }
         return <LocationStep formData={formData} updateFormData={updateFormData} />;
       case 5:
+        if (formData.organizationType === 'community-member') {
+          return <FollowUsersStep formData={formData} updateFormData={updateFormData} />;
+        }
         return <InterestsStep formData={formData} updateFormData={updateFormData} />;
       case 6:
         return <FollowUsersStep formData={formData} updateFormData={updateFormData} />;
       default:
         return <PersonalInfoStep formData={formData} updateFormData={updateFormData} />;
     }
-  };
+  }, [currentStep, formData, updateFormData]);
+
+  console.log('SignUpWizard render - currentStep:', currentStep, 'formData.fullName:', formData.fullName);
 
   return (
     <div className="w-full">

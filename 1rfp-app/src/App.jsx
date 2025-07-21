@@ -5,6 +5,7 @@ import ScrollToTop from './components/ScrollToTop.jsx';
 import { supabase } from './supabaseClient';
 import { clearAllNotifications, markAllAsRead } from './utils/notificationCleanup';
 
+
 // --- Import Page Components ---
 import GrantsPageContent from './GrantsPageContent.jsx';
 import ExploreFunders from './ExploreFunders.jsx';

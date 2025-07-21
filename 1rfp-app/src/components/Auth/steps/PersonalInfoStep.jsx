@@ -1,5 +1,5 @@
-// src/components/auth/steps/PersonalInfoStep.jsx - Real Data Integration
-import React, { useState } from 'react';
+// src/components/Auth/steps/PersonalInfoStep.jsx - Clean Final Version
+import React, { useState, useCallback } from 'react';
 import { Upload, X, Eye, EyeOff } from 'lucide-react';
 
 export default function PersonalInfoStep({ formData, updateFormData }) {
@@ -12,17 +12,25 @@ export default function PersonalInfoStep({ formData, updateFormData }) {
     return emailRegex.test(email);
   };
 
-  const handleEmailChange = (e) => {
-    const email = e.target.value;
-    updateFormData('email', email);
+  const handleNameChange = useCallback((e) => {
+    updateFormData('fullName', e.target.value);
+  }, [updateFormData]);
+
+  const handleEmailChange = useCallback((e) => {
+    const value = e.target.value;
+    updateFormData('email', value);
     
     // Validate email in real-time
-    if (email && !validateEmail(email)) {
+    if (value && !validateEmail(value)) {
       setEmailError('Please enter a valid email address');
     } else {
       setEmailError('');
     }
-  };
+  }, [updateFormData]);
+
+  const handlePasswordChange = useCallback((e) => {
+    updateFormData('password', e.target.value);
+  }, [updateFormData]);
 
   const handleFileChange = async (e) => {
     const file = e.target.files[0];
@@ -42,8 +50,6 @@ export default function PersonalInfoStep({ formData, updateFormData }) {
       setUploading(true);
       
       try {
-        // For now, we'll store the file object directly
-        // The actual upload happens during account creation
         updateFormData('avatar', file);
         
         // Create preview URL for display
@@ -117,7 +123,7 @@ export default function PersonalInfoStep({ formData, updateFormData }) {
             type="text"
             required
             value={formData.fullName || ''}
-            onChange={(e) => updateFormData('fullName', e.target.value)}
+            onChange={handleNameChange}
             className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
             placeholder="Your full name"
           />
@@ -153,7 +159,7 @@ export default function PersonalInfoStep({ formData, updateFormData }) {
               type={showPassword ? "text" : "password"}
               required
               value={formData.password || ''}
-              onChange={(e) => updateFormData('password', e.target.value)}
+              onChange={handlePasswordChange}
               className="w-full px-4 py-3 pr-12 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
               placeholder="Create a strong password"
               minLength="6"
