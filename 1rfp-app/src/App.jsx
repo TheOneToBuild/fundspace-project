@@ -1,4 +1,3 @@
-// src/App.jsx - Updated for Unified Organizations Table
 import React, { useState, useEffect, createContext, useRef } from 'react';
 import { BrowserRouter, Routes, Route, Link, NavLink, Outlet, useOutletContext, useLocation, Navigate } from 'react-router-dom';
 import ScrollToTop from './components/ScrollToTop.jsx';
@@ -6,6 +5,7 @@ import { supabase } from './supabaseClient';
 import { clearAllNotifications, markAllAsRead } from './utils/notificationCleanup';
 
 // --- Import Page Components ---
+import HomePage from './HomePage.jsx'; // NEW: Added HomePage
 import GrantsPageContent from './GrantsPageContent.jsx';
 import ExploreFunders from './ExploreFunders.jsx';
 import ExploreNonprofits from './ExploreNonprofits.jsx';
@@ -47,12 +47,6 @@ import EditOrganizationPage from './components/EditOrganizationPage.jsx';
 
 // --- AUTH COMPONENTS ---
 import SignUpWizard from './components/auth/SignUpWizard.jsx';
-
-// --- NEW: UNIFIED ORGANIZATION PROFILE COMPONENTS ---
-// TODO: Create these components for unified organization routing
-// import UnifiedOrganizationProfilePage from './components/UnifiedOrganizationProfilePage.jsx';
-// import LegacyFunderRedirect from './components/LegacyFunderRedirect.jsx';
-// import LegacyNonprofitRedirect from './components/LegacyNonprofitRedirect.jsx';
 
 // --- Import Shared Components ---
 import AuthButton from './components/AuthButton.jsx';
@@ -142,7 +136,7 @@ const PublicHeader = () => {
   const mobileMenuRef = useRef(null);
   
   const mainNavLinks = [
-    { to: "/", text: "Find Grants", active: "text-blue-600 font-semibold" },
+    { to: "/grants", text: "Find Grants", active: "text-blue-600 font-semibold" },
     { to: "/funders", text: "Explore Funders", active: "text-green-600 font-semibold" },
     { to: "/nonprofits", text: "Explore Nonprofits", active: "text-purple-600 font-semibold" },
     { to: "/spotlight", text: "Spotlight", active: "text-rose-600 font-semibold" },
@@ -520,7 +514,8 @@ export default function App() {
           } />
 
           <Route path="/" element={<AppLayout />}>
-            <Route index element={<AuthRedirect><GrantsPageContent /></AuthRedirect>} />
+            <Route index element={<AuthRedirect><HomePage /></AuthRedirect>} />
+            <Route path="grants" element={<GrantsPageContent />} />
             <Route path="funders" element={<ExploreFunders />} />
             <Route path="nonprofits" element={<ExploreNonprofits />} />
             <Route path="spotlight" element={<SpotlightLandingPage />} />
@@ -570,7 +565,6 @@ export default function App() {
               <Route path="omega-admin/claims" element={<AdminClaimsPage />} />
               <Route path="omega-admin/organizations" element={<OmegaAdminOrgSelector />} />
               <Route path="omega-admin/organizations/edit/:orgType/:orgId" element={<OmegaAdminEditOrg />} />
-              {/* NEW: Manage Members Route */}
               <Route path="omega-admin/organizations/members/:orgType/:orgId" element={<OmegaAdminManageMembers />} />
             </Route>
           </Route>

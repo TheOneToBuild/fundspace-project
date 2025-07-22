@@ -1,24 +1,24 @@
-// src/components/Auth/steps/OrganizationSetupStep.jsx - Clean Fixed Version
+// src/components/Auth/steps/OrganizationSetupStep.jsx - Integrated with Fixed SignUpWizard
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../../supabaseClient';
 import { ChevronDown, Search, Building2, Users, X, CheckCircle, Upload, MapPin } from 'lucide-react';
 
-export default function OrganizationSetupStep({ formData, updateFormData }) {
+export default function OrganizationSetupStep({ formData, setFormData }) {
   const [existingOrganizations, setExistingOrganizations] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [filteredOrganizations, setFilteredOrganizations] = useState([]);
   const [taxonomyOptions, setTaxonomyOptions] = useState([]);
   const [loadingTaxonomy, setLoadingTaxonomy] = useState(false);
-  const [selectedTaxonomy, setSelectedTaxonomy] = useState('');
-  const [showForm, setShowForm] = useState(false);
+  const [selectedTaxonomy, setSelectedTaxonomy] = useState(formData.taxonomyCode || '');
+  const [showForm, setShowForm] = useState(!!formData.taxonomyCode);
   
   // New state for categories and locations
   const [categories, setCategories] = useState([]);
   const [locations, setLocations] = useState([]);
-  const [selectedCategories, setSelectedCategories] = useState([]);
-  const [selectedLocations, setSelectedLocations] = useState([]);
+  const [selectedCategories, setSelectedCategories] = useState(formData.focusAreas || []);
+  const [selectedLocations, setSelectedLocations] = useState(formData.serviceAreas || []);
   const [logoFile, setLogoFile] = useState(null);
-  const [logoPreview, setLogoPreview] = useState(null);
+  const [logoPreview, setLogoPreview] = useState(formData.newOrganization?.logoPreview || null);
 
   // Search states
   const [categorySearch, setCategorySearch] = useState('');
@@ -84,58 +84,20 @@ export default function OrganizationSetupStep({ formData, updateFormData }) {
       'nonprofit.501c7': 'Country clubs, Hobby clubs, Social clubs, Recreation clubs',
       'nonprofit.501c8': 'Knights of Columbus, Masonic lodges, Fraternal orders',
       'nonprofit.501c10': 'Fraternal societies (no insurance), Domestic fraternal societies',
-      'nonprofit.501c19': 'American Legion, VFW, Veterans organizations, War veterans groups',
-      
-      // Government examples
-      'government.federal': 'EPA, Department of Education, USAID',
-      'government.state': 'California Department of Health, State Universities',
-      'government.local': 'City Council, County Board, School Districts',
-      
-      // Education examples
-      'education.university': 'Stanford University, UC Berkeley, Santa Clara University',
-      'education.k12': 'San Francisco Unified School District, Charter Schools',
-      'education.research': 'SRI International, RAND Corporation',
-      'education.community-college': 'City College of San Francisco, Foothill College',
-      'education.vocational': 'Trade schools, Coding bootcamps',
-      
-      // Healthcare examples
-      'healthcare.hospital': 'UCSF Medical Center, Stanford Health Care',
-      'healthcare.clinic': 'Community Health Centers, Planned Parenthood',
-      'healthcare.research': 'National Institutes of Health, Medical Research',
-      'healthcare.mental': 'Mental health clinics, Therapy centers',
-      'healthcare.public': 'Public health departments, Health districts',
-      
-      // For-profit examples
-      'for-profit.startup': 'Tech startups, Social ventures',
-      'for-profit.bcorp': 'Patagonia, Ben & Jerry\'s, Warby Parker',
-      'for-profit.social-enterprise': 'TOMS Shoes, Grameen Bank',
-      'for-profit.csr': 'Corporate social responsibility programs',
-      
-      // Religious examples
-      'religious.christian': 'Catholic Charities, Salvation Army, World Vision',
-      'religious.interfaith': 'Interfaith Council, United Religions Initiative',
-      'religious.jewish': 'Jewish Federation, Jewish Community Centers',
-      'religious.islamic': 'Islamic Society, Muslim Community Centers',
-      'religious.other': 'Buddhist temples, Hindu centers, Sikh gurdwaras',
-      
-      // International examples
-      'international.un': 'UNICEF, World Health Organization, UNESCO',
-      'international.ngo': 'Doctors Without Borders, Oxfam, Save the Children',
-      'international.embassy': 'Consulates, Diplomatic missions',
-      'international.development': 'USAID, World Bank projects'
+      'nonprofit.501c19': 'American Legion, VFW, Veterans organizations, War veterans groups'
     };
     return examples[code] || '';
   };
 
   // Popular suggestions
   const popularCategories = [
-    'Education', 'Health', 'Environment', 'Housing', 'Arts & Culture',
-    'Social Services', 'Youth Programs', 'Community Development'
+    'Education', 'Health', 'Environment', 'Social Services',
+    'Arts & Culture', 'Community Development', 'Research'
   ];
 
   const popularLocations = [
-    'San Francisco County', 'Alameda County', 'Santa Clara County', 'San Mateo County',
-    'All Bay Area Counties', 'California Statewide'
+    'San Francisco, CA', 'Oakland, CA', 'San Jose, CA', 'Berkeley, CA',
+    'California', 'Bay Area', 'United States', 'Global'
   ];
 
   // Fetch functions
@@ -287,18 +249,30 @@ export default function OrganizationSetupStep({ formData, updateFormData }) {
 
   // Handler functions
   const handleExistingOrgSelect = useCallback((org) => {
-    updateFormData('selectedOrgData', org);
-  }, [updateFormData]);
+    setFormData(prev => ({
+      ...prev,
+      selectedOrgData: org
+    }));
+  }, [setFormData]);
 
   const handleTaxonomySelect = useCallback((taxonomyCode) => {
     setSelectedTaxonomy(taxonomyCode);
-    updateFormData('taxonomyCode', taxonomyCode);
+    setFormData(prev => ({
+      ...prev,
+      taxonomyCode: taxonomyCode
+    }));
     setShowForm(true);
-  }, [updateFormData]);
+  }, [setFormData]);
 
   const handleInputChange = useCallback((field, value) => {
-    updateFormData(`newOrganization.${field}`, value);
-  }, [updateFormData]);
+    setFormData(prev => ({
+      ...prev,
+      newOrganization: {
+        ...prev.newOrganization,
+        [field]: value
+      }
+    }));
+  }, [setFormData]);
 
   const handleLogoUpload = (e) => {
     const file = e.target.files[0];
@@ -316,22 +290,42 @@ export default function OrganizationSetupStep({ formData, updateFormData }) {
       const reader = new FileReader();
       reader.onload = (e) => setLogoPreview(e.target.result);
       reader.readAsDataURL(file);
-      handleInputChange('logoFile', file);
+      
+      // Update formData with logo
+      setFormData(prev => ({
+        ...prev,
+        newOrganization: {
+          ...prev.newOrganization,
+          logo: file,
+          logoPreview: e.target.result
+        }
+      }));
     }
   };
 
   const removeLogo = () => {
     setLogoFile(null);
     setLogoPreview(null);
-    handleInputChange('logoFile', null);
+    setFormData(prev => ({
+      ...prev,
+      newOrganization: {
+        ...prev.newOrganization,
+        logo: null,
+        logoPreview: null
+      }
+    }));
   };
 
   const handleCategorySearch = (category) => {
     const newSelected = selectedCategories.includes(category.id)
       ? selectedCategories.filter(id => id !== category.id)
       : [...selectedCategories, category.id];
+    
     setSelectedCategories(newSelected);
-    handleInputChange('focusAreas', newSelected);
+    setFormData(prev => ({
+      ...prev,
+      focusAreas: newSelected
+    }));
     setCategorySearch('');
     setShowCategoryDropdown(false);
   };
@@ -340,8 +334,12 @@ export default function OrganizationSetupStep({ formData, updateFormData }) {
     const newSelected = selectedLocations.includes(location.id)
       ? selectedLocations.filter(id => id !== location.id)
       : [...selectedLocations, location.id];
+    
     setSelectedLocations(newSelected);
-    handleInputChange('serviceAreas', newSelected);
+    setFormData(prev => ({
+      ...prev,
+      serviceAreas: newSelected
+    }));
     setLocationSearch('');
     setShowLocationDropdown(false);
   };
@@ -358,8 +356,12 @@ export default function OrganizationSetupStep({ formData, updateFormData }) {
       if (error) throw error;
       
       setCategories(prev => [...prev, data]);
-      setSelectedCategories(prev => [...prev, data.id]);
-      handleInputChange('focusAreas', [...selectedCategories, data.id]);
+      const newSelected = [...selectedCategories, data.id];
+      setSelectedCategories(newSelected);
+      setFormData(prev => ({
+        ...prev,
+        focusAreas: newSelected
+      }));
       setCategorySearch('');
       setShowCategoryDropdown(false);
     } catch (error) {
@@ -380,8 +382,12 @@ export default function OrganizationSetupStep({ formData, updateFormData }) {
       if (error) throw error;
       
       setLocations(prev => [...prev, data]);
-      setSelectedLocations(prev => [...prev, data.id]);
-      handleInputChange('serviceAreas', [...selectedLocations, data.id]);
+      const newSelected = [...selectedLocations, data.id];
+      setSelectedLocations(newSelected);
+      setFormData(prev => ({
+        ...prev,
+        serviceAreas: newSelected
+      }));
       setLocationSearch('');
       setShowLocationDropdown(false);
     } catch (error) {
@@ -846,6 +852,77 @@ export default function OrganizationSetupStep({ formData, updateFormData }) {
                       </div>
                     )}
                   </div>
+                </div>
+
+                {/* Additional Organization Details */}
+                <div>
+                  <label htmlFor="orgBudget" className="block text-sm font-medium text-gray-700 mb-2">
+                    Annual Budget
+                  </label>
+                  <select
+                    id="orgBudget"
+                    value={formData.newOrganization?.budget || ''}
+                    onChange={(e) => handleInputChange('budget', e.target.value)}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="">Select budget range</option>
+                    <option value="Under $100K">Under $100K</option>
+                    <option value="$100K - $500K">$100K - $500K</option>
+                    <option value="$500K - $1M">$500K - $1M</option>
+                    <option value="$1M - $5M">$1M - $5M</option>
+                    <option value="$5M - $10M">$5M - $10M</option>
+                    <option value="Over $10M">Over $10M</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label htmlFor="orgStaff" className="block text-sm font-medium text-gray-700 mb-2">
+                    Staff Size
+                  </label>
+                  <select
+                    id="orgStaff"
+                    value={formData.newOrganization?.staffCount || ''}
+                    onChange={(e) => handleInputChange('staffCount', e.target.value)}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="">Select staff size</option>
+                    <option value="1-5">1-5 staff</option>
+                    <option value="6-15">6-15 staff</option>
+                    <option value="16-50">16-50 staff</option>
+                    <option value="51-100">51-100 staff</option>
+                    <option value="101-500">101-500 staff</option>
+                    <option value="500+">500+ staff</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label htmlFor="orgFounded" className="block text-sm font-medium text-gray-700 mb-2">
+                    Year Founded
+                  </label>
+                  <input
+                    type="number"
+                    id="orgFounded"
+                    min="1800"
+                    max={new Date().getFullYear()}
+                    placeholder="e.g., 2010"
+                    value={formData.newOrganization?.yearFounded || ''}
+                    onChange={(e) => handleInputChange('yearFounded', e.target.value)}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="orgTagline" className="block text-sm font-medium text-gray-700 mb-2">
+                    Tagline
+                  </label>
+                  <input
+                    type="text"
+                    id="orgTagline"
+                    placeholder="A brief memorable phrase"
+                    value={formData.newOrganization?.tagline || ''}
+                    onChange={(e) => handleInputChange('tagline', e.target.value)}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
                 </div>
               </div>
             </div>

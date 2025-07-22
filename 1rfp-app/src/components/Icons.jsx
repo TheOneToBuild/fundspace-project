@@ -93,4 +93,5 @@ export {
   Upload, 
   EyeOff, 
   Save,
+  Quote,
 } from 'lucide-react';
