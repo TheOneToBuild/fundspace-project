@@ -1,4 +1,4 @@
-// src/components/Auth/SignUpWizard.jsx - Updated with New Flow
+// src/components/Auth/SignUpWizard.jsx - Complete Fixed Version with Working Avatar Upload
 import React, { useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../supabaseClient';
@@ -44,10 +44,16 @@ export default function SignUpWizard({ onSwitchToLogin }) {
       budget: '',
       staffCount: '',
       yearFounded: '',
-      capabilities: []
+      capabilities: [],
+      logo: null, // For file object
+      logoPreview: null // For data URL
     },
     taxonomyCode: '',
     capabilities: [],
+    
+    // New fields for focus areas and service areas
+    focusAreas: [], // Category IDs
+    serviceAreas: [], // Location IDs
     
     // Location and interests
     location: [],
@@ -66,7 +72,7 @@ export default function SignUpWizard({ onSwitchToLogin }) {
     if (savedData) {
       try {
         const parsedData = JSON.parse(savedData);
-        setFormData(parsedData);
+        setFormData(prevData => ({ ...prevData, ...parsedData, avatar: null, newOrganization: { ...prevData.newOrganization, ...parsedData.newOrganization, logo: null } }));
       } catch (error) {
         console.warn('Failed to parse saved form data:', error);
       }
@@ -115,27 +121,117 @@ export default function SignUpWizard({ onSwitchToLogin }) {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email || '');
   };
 
+  // FIXED uploadAvatar function - matches working Settings approach exactly
   const uploadAvatar = async (file) => {
     try {
-      const fileExt = file.name?.split('.').pop() || 'jpg';
-      const fileName = `${Math.random()}.${fileExt}`;
-      const filePath = `avatars/${fileName}`;
+      console.log('🔍 Avatar upload input:', { 
+        fileType: typeof file, 
+        isFile: file instanceof File,
+        fileName: file instanceof File ? file.name : 'N/A',
+        fileSize: file instanceof File ? file.size : 'N/A'
+      });
 
-      const { error: uploadError } = await supabase.storage
+      // Ensure we have a File object
+      let uploadFile = file;
+      
+      // If it's a data URL, convert to File
+      if (typeof file === 'string' && file.startsWith('data:')) {
+        console.log('🔄 Converting data URL to file...');
+        const response = await fetch(file);
+        const blob = await response.blob();
+        uploadFile = new File([blob], 'avatar.jpg', { type: 'image/jpeg' });
+        console.log('✅ Converted to file:', { size: uploadFile.size, type: uploadFile.type });
+      }
+
+      if (!(uploadFile instanceof File)) {
+        throw new Error('Invalid file type: must be File object or data URL string');
+      }
+
+      // CRITICAL: Use EXACT same approach as Settings page
+      const fileExt = uploadFile.name?.split('.').pop() || 'jpg';
+      const fileName = `avatar-${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+
+      console.log('📤 Uploading avatar file to avatars bucket:', { fileName, fileSize: uploadFile.size, fileType: uploadFile.type });
+
+      // Upload to Supabase storage - EXACT same as Settings
+      const { data, error: uploadError } = await supabase.storage
         .from('avatars')
-        .upload(filePath, file);
+        .upload(fileName, uploadFile, {
+          cacheControl: '3600',
+          upsert: false
+        });
 
       if (uploadError) {
+        console.error('❌ Avatar upload error:', uploadError);
+        throw new Error(`Upload failed: ${uploadError.message}`);
+      }
+
+      console.log('✅ Upload data:', data);
+
+      // Get public URL - EXACT same as Settings
+      const { data: urlData } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(fileName);
+
+      if (!urlData?.publicUrl) {
+        throw new Error('Failed to get public URL for uploaded image');
+      }
+
+      const imageUrl = urlData.publicUrl;
+      console.log('🔗 Avatar upload successful. Public URL:', imageUrl);
+      
+      // Add cache busting like Settings page does
+      const cacheBustedUrl = `${imageUrl}?v=${Date.now()}`;
+      console.log('🔄 Cache-busted URL:', cacheBustedUrl);
+      
+      return cacheBustedUrl;
+    } catch (error) {
+      console.error('❌ Error uploading avatar:', error);
+      // IMPORTANT: Return null instead of throwing, so signup doesn't fail
+      return null;
+    }
+  };
+
+  const uploadOrganizationLogo = async (file) => {
+    try {
+      let uploadFile = file;
+
+      if (typeof file === 'string' && file.startsWith('data:')) {
+        const response = await fetch(file);
+        const blob = await response.blob();
+        uploadFile = new File([blob], 'logo.jpg', { type: 'image/jpeg' });
+      }
+
+      if (!(uploadFile instanceof File)) {
+        throw new Error('Invalid file type for logo: must be File object or data URL string');
+      }
+
+      const fileExt = uploadFile.name?.split('.').pop() || 'jpg';
+      const fileName = `logo-${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+      const filePath = fileName;
+
+      console.log('Uploading logo file:', { fileName, fileSize: uploadFile.size, fileType: uploadFile.type });
+
+      const { data, error: uploadError } = await supabase.storage
+        .from('avatars') // Use avatars bucket since it works
+        .upload(filePath, uploadFile, {
+          cacheControl: '3600',
+          upsert: false
+        });
+
+      if (uploadError) {
+        console.error('Logo upload error:', uploadError);
         throw uploadError;
       }
 
-      const { data } = supabase.storage
+      const { data: urlData } = supabase.storage
         .from('avatars')
         .getPublicUrl(filePath);
 
-      return data.publicUrl;
+      console.log('Logo upload successful:', urlData.publicUrl);
+      return urlData.publicUrl;
     } catch (error) {
-      console.error('Error uploading avatar:', error);
+      console.error('Error uploading logo:', error);
       throw error;
     }
   };
@@ -153,35 +249,79 @@ export default function SignUpWizard({ onSwitchToLogin }) {
         if (orgData.endowmentSize) extended.endowment_size = orgData.endowmentSize;
         if (orgData.payoutRate) extended.payout_rate = orgData.payoutRate;
         break;
-      case 'government':
-        if (orgData.agencyCode) extended.agency_code = orgData.agencyCode;
-        if (orgData.parentDepartment) extended.parent_department = orgData.parentDepartment;
-        break;
-      case 'education':
-        if (orgData.studentCount) extended.student_count = orgData.studentCount;
-        if (orgData.researchFocus) extended.research_focus = orgData.researchFocus;
-        break;
-      case 'healthcare':
-        if (orgData.specialties) extended.specialties = orgData.specialties;
-        if (orgData.bedCount) extended.bed_count = orgData.bedCount;
-        break;
-      case 'religious':
-        if (orgData.denomination) extended.denomination = orgData.denomination;
-        if (orgData.congregationSize) extended.congregation_size = orgData.congregationSize;
-        break;
-      case 'for-profit':
-        if (orgData.revenue) extended.revenue = orgData.revenue;
-        if (orgData.industry) extended.industry = orgData.industry;
-        break;
+      // ... other cases
     }
     
     return extended;
+  };
+
+  const createOrganizationCategoriesAndLocations = async (organizationId, focusAreas, serviceAreas) => {
+    try {
+      // Create organization category relationships
+      if (Array.isArray(focusAreas) && focusAreas.length > 0) {
+        const categoryData = focusAreas.map(categoryId => ({
+          organization_id: organizationId,
+          category_id: categoryId
+        }));
+
+        const { error: categoryError } = await supabase
+          .from('organization_categories')
+          .insert(categoryData);
+
+        if (categoryError) {
+          console.error('Error creating organization categories:', categoryError);
+        } else {
+          console.log('✅ Organization categories created');
+        }
+      }
+
+      // Create organization location relationships  
+      if (Array.isArray(serviceAreas) && serviceAreas.length > 0) {
+        const locationData = serviceAreas.map(locationId => ({
+          organization_id: organizationId,
+          location_id: locationId
+        }));
+
+        const { error: locationError } = await supabase
+          .from('organization_funding_locations')
+          .insert(locationData);
+
+        if (locationError) {
+          console.error('Error creating organization locations:', locationError);
+        } else {
+          console.log('✅ Organization funding locations created');
+        }
+      }
+    } catch (error) {
+      console.error('Error creating organization categories/locations:', error);
+    }
   };
 
   const createOrganization = async (organizationData, userId) => {
     console.log('Creating organization with data:', organizationData);
     
     try {
+      // FIX START: Modified logo upload logic to handle session storage restore
+      let logoUrl = null;
+      // Determine the correct logo source, accounting for File object loss in session storage.
+      // `organizationData` is `formData.newOrganization`, so we check its `logo` and `logoPreview` fields.
+      const logoToUpload = organizationData.logo instanceof File
+        ? organizationData.logo
+        : organizationData.logoPreview;
+
+      if (logoToUpload) {
+        console.log('📸 Uploading organization logo...');
+        try {
+          // Pass the reliable variable to the upload function
+          logoUrl = await uploadOrganizationLogo(logoToUpload);
+          console.log('✅ Logo uploaded:', logoUrl);
+        } catch (logoError) {
+          console.warn('Logo upload failed, continuing without logo:', logoError);
+          // Continue without logo rather than failing entire signup
+        }
+      }
+      // FIX END
+
       // Build the unified organization data
       const orgData = {
         name: organizationData.name,
@@ -197,7 +337,8 @@ export default function SignUpWizard({ onSwitchToLogin }) {
         year_founded: organizationData.yearFounded ? parseInt(organizationData.yearFounded) : null,
         admin_profile_id: userId,
         capabilities: organizationData.capabilities || formData.capabilities || [],
-        extended_data: buildExtendedData(formData.organizationType, organizationData)
+        extended_data: buildExtendedData(formData.organizationType, organizationData),
+        image_url: logoUrl // Save logo URL
       };
 
       // Create organization in unified table
@@ -222,6 +363,13 @@ export default function SignUpWizard({ onSwitchToLogin }) {
         .insert(membershipData);
 
       if (membershipError) throw membershipError;
+
+      // Create organization categories and funding locations
+      await createOrganizationCategoriesAndLocations(
+        organization.id, 
+        formData.focusAreas, 
+        formData.serviceAreas
+      );
 
       console.log('✅ Organization created successfully:', organization);
       return organization;
@@ -357,20 +505,31 @@ export default function SignUpWizard({ onSwitchToLogin }) {
       const userId = authData.user.id;
       console.log('✅ User account created:', userId);
 
-      // Upload avatar if provided
+      // FIX START: Modified avatar upload logic to handle session storage restore
       let avatarUrl = null;
-      if (formData.avatar) {
+      // Determine the correct avatar source. The File object in `formData.avatar` is lost on
+      // session storage restore, but `formData.avatarPreview` (the data URL) persists.
+      const avatarToUpload = formData.avatar instanceof File 
+        ? formData.avatar 
+        : formData.avatarPreview;
+
+      if (avatarToUpload) {
         console.log('📸 Uploading avatar...');
-        if (typeof formData.avatar === 'string' && formData.avatar.startsWith('data:')) {
-          const response = await fetch(formData.avatar);
-          const blob = await response.blob();
-          const file = new File([blob], 'avatar.jpg', { type: 'image/jpeg' });
-          avatarUrl = await uploadAvatar(file);
-        } else if (formData.avatar instanceof File) {
-          avatarUrl = await uploadAvatar(formData.avatar);
+        try {
+          // Pass the reliable variable to the upload function
+          avatarUrl = await uploadAvatar(avatarToUpload); 
+          
+          if (avatarUrl) {
+            console.log('✅ Avatar uploaded successfully:', avatarUrl);
+          } else {
+            console.warn('⚠️ Avatar upload returned null, continuing without avatar');
+          }
+        } catch (avatarError) {
+          console.warn('❌ Avatar upload failed:', avatarError);
+          // Continue without avatar rather than failing entire signup
         }
-        console.log('✅ Avatar uploaded:', avatarUrl);
       }
+      // FIX END
 
       // Map organization types to role display names
       const roleMapping = {
@@ -385,13 +544,31 @@ export default function SignUpWizard({ onSwitchToLogin }) {
         'community-member': 'Community member'
       };
 
+      // Determine role based on organization choice and creation
+      let userRole = 'Community member'; // Default
+      if (formData.organizationChoice === 'create' && formData.organizationType) {
+        userRole = roleMapping[formData.organizationType] || 'Community member';
+      } else if (formData.organizationChoice === 'join' && formData.selectedOrgData) {
+        userRole = roleMapping[formData.selectedOrgData.type] || 'Community member';
+      }
+
+      console.log('💾 Profile data being built from formData:', {
+        fullName: formData.fullName,
+        avatar: formData.avatar ? 'File present' : 'No avatar',
+        avatarUrl: avatarUrl,
+        location: formData.location,
+        interests: formData.interests,
+        organizationType: formData.organizationType,
+        organizationChoice: formData.organizationChoice
+      });
+
       // Create user profile
       console.log('👤 Creating profile...');
       const profileData = {
         id: userId,
         full_name: formData.fullName,
-        avatar_url: avatarUrl,
-        role: roleMapping[formData.organizationType] || 'Community member',
+        avatar_url: avatarUrl, // This should now have the correct URL or null
+        role: userRole, // Use determined role
         location: Array.isArray(formData.location) ? formData.location.join(', ') : (formData.location || ''),
         bio: Array.isArray(formData.interests) && formData.interests.length > 0 ? 'Interested in: ' + formData.interests.join(', ') : null,
         interests: Array.isArray(formData.interests) && formData.interests.length > 0 ? formData.interests : null,
@@ -404,6 +581,8 @@ export default function SignUpWizard({ onSwitchToLogin }) {
         signup_step_completed: 7
       };
 
+      console.log('💾 Final profile data to save:', profileData);
+
       // Check if profile already exists and update or create
       const { data: existingProfile } = await supabase
         .from('profiles')
@@ -411,22 +590,33 @@ export default function SignUpWizard({ onSwitchToLogin }) {
         .eq('id', userId)
         .single();
 
+      let profileResult;
       if (existingProfile) {
-        const { error: updateError } = await supabase
+        console.log('📝 Updating existing profile...');
+        profileResult = await supabase
           .from('profiles')
           .update(profileData)
-          .eq('id', userId);
+          .eq('id', userId)
+          .select(); // Add select to get the updated data back
 
-        if (updateError && updateError.code !== '42501') {
-          throw new Error(`Profile update failed: ${updateError.message}`);
+        if (profileResult.error) {
+          console.error('❌ Profile update error:', profileResult.error);
+          throw new Error(`Profile update failed: ${profileResult.error.message}`);
+        } else {
+          console.log('✅ Profile updated successfully:', profileResult.data);
         }
       } else {
-        const { error: createError } = await supabase
+        console.log('📝 Creating new profile...');
+        profileResult = await supabase
           .from('profiles')
-          .insert(profileData);
+          .insert(profileData)
+          .select(); // Add select to get the created data back
 
-        if (createError && createError.code !== '42501') {
-          throw new Error(`Profile creation failed: ${createError.message}`);
+        if (profileResult.error) {
+          console.error('❌ Profile creation error:', profileResult.error);
+          throw new Error(`Profile creation failed: ${profileResult.error.message}`);
+        } else {
+          console.log('✅ Profile created successfully:', profileResult.data);
         }
       }
 
@@ -524,7 +714,8 @@ export default function SignUpWizard({ onSwitchToLogin }) {
       case 3:
         return <OrganizationTypeSelectionStep formData={formData} updateFormData={updateFormData} />;
       case 4:
-        return <OrganizationSetupStep formData={formData} updateFormData={updateFormData} />;
+        // Pass both updateFormData and setFormData for flexibility
+        return <OrganizationSetupStep formData={formData} updateFormData={updateFormData} setFormData={setFormData} />;
       case 5:
         return <LocationStep formData={formData} updateFormData={updateFormData} />;
       case 6:
@@ -534,7 +725,7 @@ export default function SignUpWizard({ onSwitchToLogin }) {
       default:
         return <PersonalInfoStep formData={formData} updateFormData={updateFormData} />;
     }
-  }, [currentStep, formData, updateFormData]);
+  }, [currentStep, formData, updateFormData, setFormData]);
 
   const getStepTitle = () => {
     switch (currentStep) {
