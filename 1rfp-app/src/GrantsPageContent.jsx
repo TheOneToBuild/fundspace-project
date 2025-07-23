@@ -1,6 +1,5 @@
 // src/GrantsPageContent.jsx
 import React, { useState, useEffect, useMemo, useCallback, useContext } from 'react';
-import { Link } from 'react-router-dom';
 import { supabase } from './supabaseClient.js';
 import { Search, Users, MapPin, Calendar, DollarSign, Info, ChevronDown, ExternalLink, Zap, Clock, Target, Briefcase as IconBriefcase, BarChart3, ClipboardList, TrendingUp, Loader, XCircle, Heart, Bot, Briefcase, LayoutGrid, List, SlidersHorizontal, Bookmark } from './components/Icons.jsx';
 import GrantCard from './components/GrantCard.jsx';
@@ -14,60 +13,6 @@ import usePaginatedFilteredData from './hooks/usePaginatedFilteredData.js';
 import { filterGrants } from './filtering.js';
 import { SearchResultsSkeleton } from './components/SkeletonLoader.jsx';
 import { LayoutContext } from './App.jsx';
-import prospectingImage from './assets/San Francisco.png';
-import fasterAppImage from './assets/nonprofit2.jpg';
-import toolkitImage from './assets/nonprofit1.jpg';
-import impactImage from './assets/nonprofit3.jpg';
-import nonprofitsImage from './assets/San Jose.jpg';
-import SFImage from './assets/San Francisco 1.jpg';
-import SJImage from './assets/San Jose 1.png';
-import nonprofitImage4 from './assets/nonprofit4.jpg';
-import nonprofitImage5 from './assets/nonprofit5.jpg';
-import nonprofitImage6 from './assets/nonprofit6.jpg';
-import nonprofitImage7 from './assets/nonprofit7.jpg';
-import nonprofitImage8 from './assets/nonprofit8.jpg';
-import nonprofitImage9 from './assets/nonprofit9.jpg';
-import nonprofitImage10 from './assets/nonprofit10.jpg';
-import nonprofitImage11 from './assets/nonprofit11.jpg';
-
-// --- Data ---
-const heroImpactCardsData = [
-  {
-    id: 'discover-time',
-    title: 'Discover in Minutes, Not Weeks',
-    description: 'Find relevant grants 90% faster.',
-    imageUrls: [prospectingImage, SFImage, SJImage],
-    imageAlt: 'Team collaborating on a project',
-  },
-  {
-    id: 'bay-area-nonprofits',
-    title: 'Built for the Bay Area',
-    description: 'The most comprehensive local database.',
-    imageUrls: [nonprofitsImage, nonprofitImage5, nonprofitImage6],
-    imageAlt: 'San Francisco cityscape',
-  },
-  {
-    id: 'faster-applications',
-    title: 'Faster Applications',
-    description: 'Streamlined insights for quicker proposals.',
-    imageUrls: [fasterAppImage, nonprofitImage7, nonprofitImage8],
-    imageAlt: 'Person writing at a desk',
-  },
-  {
-    id: 'tool-consolidation',
-    title: 'One Platform, Total Clarity',
-    description: 'Replace multiple tools with one.',
-    imageUrls: [toolkitImage, nonprofitImage9, nonprofitImage10],
-    imageAlt: 'Organized desk with laptop',
-  },
-  {
-    id: 'impact-stories',
-    title: 'Real Impact, Real Stories',
-    description: 'See how we help nonprofits thrive.',
-    imageUrls: [impactImage, nonprofitImage4, nonprofitImage11],
-    imageAlt: 'Nonprofit team working together',
-  },
-];
 
 // --- Helper functions ---
 const formatCurrency = (amount) => {
@@ -106,59 +51,6 @@ const sortGrants = (grants, sortCriteria) => {
                 return 0;
         }
     });
-};
-const HeroImageCard = ({ card, layoutClass, initialDelay = 0 }) => {
-  const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  useEffect(() => {
-    if (!card.imageUrls || card.imageUrls.length <= 1) return;
-    const interval = setInterval(() => { setCurrentImageIndex(prev => (prev + 1) % card.imageUrls.length); }, 10000 + initialDelay);
-    return () => clearInterval(interval);
-  }, [card.imageUrls, initialDelay]);
-  return ( <div className={`rounded-xl shadow-lg overflow-hidden relative group ${layoutClass}`}><img src={card.imageUrls[currentImageIndex]} alt={card.imageAlt} className="w-full h-full object-cover object-center" loading="lazy" /></div> );
-};
-const HeroImpactSection = ({ grants }) => {
-  const layoutClasses = [ 'col-span-1 row-span-2 h-full min-h-[300px] md:min-h-[400px]', 'col-span-1 row-span-1 h-full min-h-[140px] md:min-h-[190px]', 'col-span-1 row-span-1 h-full min-h-[140px] md:min-h-[190px]', 'col-span-1 row-span-1 h-full min-h-[140px] md:min-h-[190px]', 'col-span-1 row-span-1 h-full min-h-[140px] md:min-h-[190px]' ];
-  const totalAvailableFunding = useMemo(() => {
-    if (!Array.isArray(grants)) return 0;
-    return grants.filter(isGrantActive).reduce((sum, grant) => { const amount = grant.max_funding_amount || '0'; return sum + parseMaxFundingAmount(amount.toString()); }, 0);
-  }, [grants]);
-  const totalGrantsAvailable = useMemo(() => {
-    if (!Array.isArray(grants)) return 0;
-    return grants.filter(isGrantActive).length;
-  }, [grants]);
-  return (
-    <section className="py-16 md:py-24 bg-white border-b border-slate-200">
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid lg:grid-cols-2 gap-10 xl:gap-16 items-center">
-          <div className="text-center lg:text-left">
-            <div className="flex flex-col sm:flex-row gap-8 justify-center lg:justify-start mb-8">
-              {totalGrantsAvailable > 0 && (
-                <div className="text-center sm:text-left">
-                  <div className="flex items-center gap-3 justify-center sm:justify-start"><ClipboardList size={32} className="text-purple-500" /><AnimatedCounter targetValue={totalGrantsAvailable} duration={2500} step={1} className="text-purple-600 text-4xl md:text-5xl font-bold" /></div>
-                  <p className="text-sm font-medium text-slate-500 mt-1 ml-1">Active Grants Available</p>
-                </div>
-              )}
-              {totalAvailableFunding > 0 && (
-                <div className="text-center sm:text-left">
-                  <div className="flex items-center gap-3 justify-center sm:justify-start"><TrendingUp size={32} className="text-green-500" /><AnimatedCounter targetValue={totalAvailableFunding} duration={2500} step={1} prefix="$" formatValue={formatCurrency} className="text-green-600 text-4xl md:text-5xl font-bold" /></div>
-                  <p className="text-sm font-medium text-slate-500 mt-1 ml-1">Total Active Funding</p>
-                </div>
-              )}
-            </div>
-            <h1 className="text-4xl sm:text-5xl lg:text-[3.5rem] font-extrabold text-slate-900 mb-4 leading-tight"> A Smarter Path to <span className="text-blue-600">Funding.</span></h1>
-            <p className="text-lg text-slate-600 mb-6 max-w-xl mx-auto lg:mx-0 leading-relaxed">Our mission is to empower Bay Area nonprofits by transforming grant discovery. We combine AI-powered data aggregation with community-driven insights to create a single, comprehensive, and easy-to-use platform.</p>
-            <p className="text-lg text-slate-600 mb-10 max-w-xl mx-auto lg:mx-0 leading-relaxed">Spend less time searching and more time making an impact.</p>
-            <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4">
-              <a href="#funding-opportunity-intro" className="inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 shadow-md hover:shadow-lg transition-transform hover:scale-105 w-full sm:w-auto">Explore Grants Now <Search size={20} className="ml-2" /></a>
-              <Link to="/how-it-works" className="inline-flex items-center justify-center px-6 py-3 border border-purple-200 text-base font-medium rounded-lg text-purple-700 bg-purple-50 hover:bg-purple-100 shadow-sm hover:shadow-lg transition-all w-full sm:w-auto">How 1RFP Works <Zap size={18} className="ml-2 text-purple-500"/></Link>
-              <Link to="/about" className="inline-flex items-center justify-center px-6 py-3 border border-green-200 text-base font-medium rounded-lg text-green-700 bg-green-50 hover:bg-green-100 shadow-sm hover:shadow-lg transition-all w-full sm:w-auto">About Us <Users size={18} className="ml-2 text-green-500"/></Link>
-            </div>
-          </div>
-          <div className="w-full"><div className="grid grid-cols-2 gap-4 h-[500px] md:h-[600px]">{heroImpactCardsData.map((card, index) => ( <HeroImageCard key={card.id} card={card} layoutClass={layoutClasses[index]} initialDelay={index * 300} /> ))}</div></div>
-        </div>
-      </div>
-    </section>
-  );
 };
 
 const GrantListItem = ({ grant, onOpenDetailModal, isSaved, onSave, onUnsave, session }) => {
@@ -205,7 +97,7 @@ const GrantListItem = ({ grant, onOpenDetailModal, isSaved, onSave, onUnsave, se
     );
 };
 
-const GrantsPageContent = ({ hideHero = false, isProfileView = false }) => {
+const GrantsPageContent = ({ isProfileView = false }) => {
   const { setPageBgColor } = useContext(LayoutContext);
 
   useEffect(() => {
@@ -360,8 +252,6 @@ const GrantsPageContent = ({ hideHero = false, isProfileView = false }) => {
 
   return (
     <>
-      {!hideHero && <HeroImpactSection grants={grants} />}
-      
       <div className={isProfileView ? "" : "container mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12"}>
         {!isProfileView && (
           <section id="funding-opportunity-intro" className="text-center pt-8 pb-12 md:pt-12 md:pb-16 mb-10 md:mb-12 scroll-mt-20 bg-transparent p-6 sm:p-8 md:p-10 rounded-xl">

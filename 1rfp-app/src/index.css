@@ -312,3 +312,12 @@ span.mention:active,
   position: absolute;
   font-style: normal;
 }
+
+.magical-hover {
+  background-size: 200% auto;
+  transition: background-position 0.5s ease-in-out;
+}
+
+.magical-hover:hover {
+  background-position: right center;
+}

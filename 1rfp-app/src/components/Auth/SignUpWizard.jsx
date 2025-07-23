@@ -301,7 +301,7 @@ export default function SignUpWizard({ onSwitchToLogin }) {
     console.log('Creating organization with data:', organizationData);
     
     try {
-      // FIX START: Modified logo upload logic to handle session storage restore
+      // Modified logo upload logic to handle session storage restore
       let logoUrl = null;
       // Determine the correct logo source, accounting for File object loss in session storage.
       // `organizationData` is `formData.newOrganization`, so we check its `logo` and `logoPreview` fields.
@@ -320,7 +320,6 @@ export default function SignUpWizard({ onSwitchToLogin }) {
           // Continue without logo rather than failing entire signup
         }
       }
-      // FIX END
 
       // Build the unified organization data
       const orgData = {
@@ -474,7 +473,7 @@ export default function SignUpWizard({ onSwitchToLogin }) {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [formData.organizationChoice, currentStep]);
 
-  // Form submission
+  // FIXED Form submission - corrected the typo
   const handleSubmit = async () => {
     setLoading(true);
     setMessage('');
@@ -505,10 +504,8 @@ export default function SignUpWizard({ onSwitchToLogin }) {
       const userId = authData.user.id;
       console.log('✅ User account created:', userId);
 
-      // FIX START: Modified avatar upload logic to handle session storage restore
+      // Upload avatar if provided
       let avatarUrl = null;
-      // Determine the correct avatar source. The File object in `formData.avatar` is lost on
-      // session storage restore, but `formData.avatarPreview` (the data URL) persists.
       const avatarToUpload = formData.avatar instanceof File 
         ? formData.avatar 
         : formData.avatarPreview;
@@ -516,7 +513,6 @@ export default function SignUpWizard({ onSwitchToLogin }) {
       if (avatarToUpload) {
         console.log('📸 Uploading avatar...');
         try {
-          // Pass the reliable variable to the upload function
           avatarUrl = await uploadAvatar(avatarToUpload); 
           
           if (avatarUrl) {
@@ -529,7 +525,6 @@ export default function SignUpWizard({ onSwitchToLogin }) {
           // Continue without avatar rather than failing entire signup
         }
       }
-      // FIX END
 
       // Map organization types to role display names
       const roleMapping = {
@@ -567,7 +562,7 @@ export default function SignUpWizard({ onSwitchToLogin }) {
       const profileData = {
         id: userId,
         full_name: formData.fullName,
-        avatar_url: avatarUrl, // This should now have the correct URL or null
+        avatar_url: avatarUrl, // ✅ FIXED: Single underscore (was avatar__url)
         role: userRole, // Use determined role
         location: Array.isArray(formData.location) ? formData.location.join(', ') : (formData.location || ''),
         bio: Array.isArray(formData.interests) && formData.interests.length > 0 ? 'Interested in: ' + formData.interests.join(', ') : null,

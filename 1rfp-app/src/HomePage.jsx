@@ -158,9 +158,14 @@ function HomePage() {
           <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-extrabold text-slate-900 mb-6 leading-tight tracking-tighter">
             Where community <span className="inline-block min-w-[220px] text-transparent bg-clip-text bg-gradient-to-r from-purple-500 to-blue-600">{displayedText}</span> together.
           </h1>
-          <p className="max-w-xl md:max-w-2xl mx-auto text-lg md:text-xl text-slate-600 mb-10 leading-relaxed">
-            A dedicated space for the communities of the San Francisco Bay Area to connect, collaborate, and build a brighter future for all.
-          </p>
+          <p className="max-w-xl md:max-w-2xl mx-auto text-lg md:text-xl text-slate-700 mb-10 leading-relaxed font-display">
+  A space for Bay Area 🌉  changemakers to 
+  <span className="text-pink-500 font-semibold animate-bounce-slow"> connect </span> 🤝, 
+  <span className="text-emerald-500 font-semibold animate-bounce-slow"> collaborate </span> 🫶, and 
+  <span className="text-sky-500 font-semibold animate-bounce-slow"> build </span> 🏗️ 
+  something 
+  <span className="magical-hover font-semibold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-pink-500 to-yellow-400 transition-all duration-500 ease-in-out hover:brightness-125 hover:drop-shadow-[0_0_5px_rgba(255,255,255,0.8)]"> magical </span> 🌟 together.
+</p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <a href="#" className="inline-flex items-center justify-center px-8 py-3.5 font-semibold rounded-full text-white bg-blue-600 hover:bg-blue-700 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 w-full sm:w-auto">
               Explore Grants <Search className="ml-2" />
