@@ -2,9 +2,10 @@
 import React, { useState, useEffect, useRef, useCallback, memo } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
-import { ChevronLeft, ChevronRight, Clock, TrendingUp, ArrowRight, Users, MessageCircle, Globe } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Clock, ArrowRight, Users, MessageCircle, Globe } from 'lucide-react';
 import PostCard from './PostCard.jsx';
 import CreatePost from './CreatePost.jsx';
+import ProfileCompletionBanner from './ProfileCompletionBanner.jsx'; // 🎯 Import the separate component
 import { rssNewsService as newsService } from '../services/rssNewsService.js';
 import PropTypes from 'prop-types';
 
@@ -281,6 +282,9 @@ export default function DashboardHomePage() {
 
   return (
     <div className="space-y-6">
+      {/* 🎯 Use the separate ProfileCompletionBanner component (non-dismissible) */}
+      <ProfileCompletionBanner profile={profile} />
+      
       <TrendingNewsSection />
       {showWelcome && <HelloWorldWelcomeSection onEnterWorld={handleEnterWorld} hasEnteredWorld={hasEnteredWorld}/>}
       {(hasEnteredWorld || posts.length > 0) && (

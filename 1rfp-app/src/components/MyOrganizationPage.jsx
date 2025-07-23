@@ -34,6 +34,13 @@ export default function MyOrganizationPage() {
     // NEW: Tab state for managing different sections
     const [activeTab, setActiveTab] = useState('overview');
 
+    // NEW: Editing state for organization details
+    const [isEditing, setIsEditing] = useState(false);
+    const [editingData, setEditingData] = useState({});
+    const [saving, setSaving] = useState(false);
+    const [logoFile, setLogoFile] = useState(null);
+    const [logoPreview, setLogoPreview] = useState(null);
+
     // Check if user is Omega Admin
     const isOmegaAdmin = profile?.is_omega_admin === true;
 
@@ -57,7 +64,7 @@ export default function MyOrganizationPage() {
                 { id: 'impact', label: 'Impact Stories', icon: TrendingUp },
                 { id: 'supporters', label: 'Supporters', icon: Star }
             ];
-        } else if (orgType === 'funder') {
+        } else if (orgType === 'foundation') {
             return [
                 ...baseTabs,
                 { id: 'grants', label: 'Active Grants', icon: ClipboardList },
@@ -214,12 +221,12 @@ export default function MyOrganizationPage() {
         try {
             setLoading(true);
             
-            // Determine table name based on organization type
-            const table = userMembership.organization_type === 'nonprofit' ? 'nonprofits' : 'funders';
+            // ✅ FIXED: Use the unified 'organizations' table instead of separate tables
+            console.log('Fetching organization data for:', userMembership);
             
-            // Fetch organization data
+            // Fetch organization data from the unified organizations table
             const { data: orgData, error: orgError } = await supabase
-                .from(table)
+                .from('organizations')
                 .select('*')
                 .eq('id', userMembership.organization_id)
                 .single();
@@ -231,7 +238,27 @@ export default function MyOrganizationPage() {
                 return;
             }
 
-            setOrganization({ ...orgData, type: userMembership.organization_type });
+            if (!orgData) {
+                setError('Organization not found');
+                console.error('No organization found with ID:', userMembership.organization_id);
+                setLoading(false);
+                return;
+            }
+
+            console.log('✅ Organization data loaded:', orgData);
+            
+            // Set organization with the type from membership
+            setOrganization({ 
+                ...orgData, 
+                type: userMembership.organization_type,
+                // Map unified table fields to expected fields for backward compatibility
+                logo_url: orgData.image_url, // Map image_url to logo_url for existing components
+                tagline: orgData.tagline || '', // Ensure tagline exists
+                description: orgData.description || '', // Ensure description exists
+                location: orgData.location || '', // Ensure location exists
+                website: orgData.website || '', // Ensure website exists
+                admin_profile_id: orgData.admin_profile_id // Keep admin reference
+            });
 
             // Fetch organization members
             const { data: memberData, error: memberError } = await supabase
@@ -254,6 +281,7 @@ export default function MyOrganizationPage() {
             if (memberError) {
                 console.error('Member fetch error:', memberError);
             } else {
+                console.log('✅ Member data loaded:', memberData);
                 setMembers(memberData || []);
             }
 
@@ -321,6 +349,135 @@ export default function MyOrganizationPage() {
             setError('An unexpected error occurred while leaving the organization.');
             setConfirmingLeave(false);
             setLoading(false);
+        }
+    };
+
+    // NEW: Handle editing functions
+    const startEditing = () => {
+        setIsEditing(true);
+        setEditingData({
+            name: organization.name || '',
+            tagline: organization.tagline || '',
+            description: organization.description || '',
+            website: organization.website || '',
+            location: organization.location || '',
+            contact_email: organization.contact_email || ''
+        });
+        setLogoPreview(organization.logo_url);
+    };
+
+    const cancelEditing = () => {
+        setIsEditing(false);
+        setEditingData({});
+        setLogoFile(null);
+        setLogoPreview(null);
+        setError('');
+    };
+
+    const handleLogoUpload = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        if (file.size > 2 * 1024 * 1024) {
+            setError('Logo file size must be less than 2MB');
+            return;
+        }
+
+        if (!file.type.startsWith('image/')) {
+            setError('Please select an image file');
+            return;
+        }
+
+        setLogoFile(file);
+        const reader = new FileReader();
+        reader.onload = (e) => setLogoPreview(e.target.result);
+        reader.readAsDataURL(file);
+        setError(''); // Clear any previous errors
+    };
+
+    const saveChanges = async () => {
+        if (!canEditOrg) return;
+
+        try {
+            setSaving(true);
+            setError('');
+
+            let logoUrl = organization.image_url; // Keep existing logo by default
+
+            // Upload new logo if provided
+            if (logoFile) {
+                console.log('📷 Uploading new logo...');
+                const fileExt = logoFile.name.split('.').pop();
+                const fileName = `org-logo-${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+                
+                const { data: uploadData, error: uploadError } = await supabase.storage
+                    .from('avatars')
+                    .upload(fileName, logoFile, { 
+                        cacheControl: '3600',
+                        upsert: false 
+                    });
+
+                if (uploadError) {
+                    console.error('❌ Logo upload error:', uploadError);
+                    setError('Failed to upload logo. Please try again.');
+                    setSaving(false);
+                    return;
+                }
+
+                const { data: { publicUrl } } = supabase.storage
+                    .from('avatars')
+                    .getPublicUrl(uploadData.path);
+                
+                logoUrl = `${publicUrl}?v=${Date.now()}`;
+                console.log('✅ Logo uploaded:', logoUrl);
+            }
+
+            // Update organization in database
+            const updateData = {
+                name: editingData.name,
+                tagline: editingData.tagline || null,
+                description: editingData.description || null,
+                website: editingData.website || null,
+                location: editingData.location || null,
+                contact_email: editingData.contact_email || null,
+                image_url: logoUrl,
+                updated_at: new Date()
+            };
+
+            console.log('💾 Updating organization with:', updateData);
+
+            const { error: updateError } = await supabase
+                .from('organizations')
+                .update(updateData)
+                .eq('id', organization.id);
+
+            if (updateError) {
+                console.error('❌ Organization update error:', updateError);
+                setError('Failed to save changes. Please try again.');
+                setSaving(false);
+                return;
+            }
+
+            console.log('✅ Organization updated successfully');
+
+            // Update local state
+            setOrganization(prev => ({
+                ...prev,
+                ...updateData,
+                logo_url: logoUrl // Update the mapped field too
+            }));
+
+            // Exit editing mode
+            setIsEditing(false);
+            setEditingData({});
+            setLogoFile(null);
+            setLogoPreview(null);
+
+        } catch (err) {
+            console.error('❌ Error saving changes:', err);
+            setError('An unexpected error occurred. Please try again.');
+        } finally {
+            setSaving(false);
         }
     };
     
@@ -491,54 +648,188 @@ export default function MyOrganizationPage() {
             <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
                 <div className="flex items-start justify-between flex-wrap gap-4">
                     <div className="flex items-center space-x-4">
-                        <Avatar src={organization.logo_url} fullName={organization.name} size="lg" />
-                        <div>
-                            <h1 className="text-2xl font-bold text-slate-800">{organization.name}</h1>
-                            <p className="text-slate-600 mt-1">{organization.tagline}</p>
-                            <div className="flex items-center mt-2 text-sm text-slate-500">
-                                <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getRoleBadgeColor(userRole, isOmegaAdmin)}`}>
-                                    {userRole === ROLES.SUPER_ADMIN && <Crown className="w-3 h-3 mr-1.5" />}
-                                    {userRole === ROLES.ADMIN && <Shield className="w-3 h-3 mr-1.5" />}
-                                    {userRole === ROLES.MEMBER && <Users className="w-3 h-3 mr-1.5" />}
-                                    {isOmegaAdmin && <Star className="w-3 h-3 mr-1.5" />}
-                                    {getRoleDisplayName(userRole, isOmegaAdmin)}
-                                </span>
-                                {organization.location && <span className="ml-4 flex items-center"><MapPin className="w-4 h-4 mr-1.5" />{organization.location}</span>}
-                            </div>
+                        {/* Logo section with editing capability */}
+                        <div className="relative">
+                            {isEditing ? (
+                                <div className="flex flex-col items-center space-y-2">
+                                    <div className="w-16 h-16 rounded-full bg-slate-200 border-2 border-dashed border-slate-300 flex items-center justify-center overflow-hidden">
+                                        {logoPreview ? (
+                                            <img 
+                                                src={logoPreview} 
+                                                alt="Logo preview" 
+                                                className="w-full h-full object-cover"
+                                            />
+                                        ) : (
+                                            <span className="text-slate-500 text-xs">Logo</span>
+                                        )}
+                                    </div>
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={handleLogoUpload}
+                                        className="hidden"
+                                        id="logo-upload"
+                                    />
+                                    <label
+                                        htmlFor="logo-upload"
+                                        className="px-2 py-1 text-xs bg-blue-600 text-white rounded cursor-pointer hover:bg-blue-700"
+                                    >
+                                        Change Logo
+                                    </label>
+                                </div>
+                            ) : (
+                                <Avatar src={organization.logo_url} fullName={organization.name} size="lg" />
+                            )}
+                        </div>
+                        
+                        <div className="flex-1">
+                            {isEditing ? (
+                                <div className="space-y-3">
+                                    <input
+                                        type="text"
+                                        value={editingData.name}
+                                        onChange={(e) => setEditingData(prev => ({ ...prev, name: e.target.value }))}
+                                        className="text-2xl font-bold text-slate-800 bg-white border border-slate-300 rounded px-3 py-1 w-full max-w-md"
+                                        placeholder="Organization Name"
+                                        required
+                                    />
+                                    <input
+                                        type="text"
+                                        value={editingData.tagline}
+                                        onChange={(e) => setEditingData(prev => ({ ...prev, tagline: e.target.value }))}
+                                        className="text-slate-600 bg-white border border-slate-300 rounded px-3 py-1 w-full max-w-lg"
+                                        placeholder="Tagline"
+                                    />
+                                    <div className="flex items-center space-x-4">
+                                        <input
+                                            type="text"
+                                            value={editingData.location}
+                                            onChange={(e) => setEditingData(prev => ({ ...prev, location: e.target.value }))}
+                                            className="text-sm text-slate-500 bg-white border border-slate-300 rounded px-2 py-1"
+                                            placeholder="Location"
+                                        />
+                                        <input
+                                            type="url"
+                                            value={editingData.website}
+                                            onChange={(e) => setEditingData(prev => ({ ...prev, website: e.target.value }))}
+                                            className="text-sm text-slate-500 bg-white border border-slate-300 rounded px-2 py-1"
+                                            placeholder="Website URL"
+                                        />
+                                    </div>
+                                </div>
+                            ) : (
+                                <div>
+                                    <h1 className="text-2xl font-bold text-slate-800">{organization.name}</h1>
+                                    <p className="text-slate-600 mt-1">{organization.tagline}</p>
+                                    <div className="flex items-center mt-2 text-sm text-slate-500">
+                                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getRoleBadgeColor(userRole, isOmegaAdmin)}`}>
+                                            {userRole === ROLES.SUPER_ADMIN && <Crown className="w-3 h-3 mr-1.5" />}
+                                            {userRole === ROLES.ADMIN && <Shield className="w-3 h-3 mr-1.5" />}
+                                            {userRole === ROLES.MEMBER && <Users className="w-3 h-3 mr-1.5" />}
+                                            {isOmegaAdmin && <Star className="w-3 h-3 mr-1.5" />}
+                                            {getRoleDisplayName(userRole, isOmegaAdmin)}
+                                        </span>
+                                        {organization.location && <span className="ml-4 flex items-center"><MapPin className="w-4 h-4 mr-1.5" />{organization.location}</span>}
+                                        {organization.website && (
+                                            <span className="ml-4 flex items-center">
+                                                <Globe className="w-4 h-4 mr-1.5" />
+                                                <a href={organization.website} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800">
+                                                    Website
+                                                </a>
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
+                    
                     <div className="flex items-center space-x-3 flex-shrink-0">
-                        {organization.slug && (
-                            <Link to={`/${userMembership.organization_type === 'nonprofit' ? 'nonprofits' : 'funders'}/${organization.slug}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center px-4 py-2 border border-slate-300 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50">
-                                View Public Profile
-                            </Link>
-                        )}
-                        {canEditOrg && (
-                            <Link to="/profile/my-organization/edit" className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 shadow-sm">
-                                <Edit size={16} className="mr-2" />
-                                Edit Organization
-                            </Link>
-                        )}
-                        {canLeave && (
-                            <button
-                                onClick={() => setConfirmingLeave(true)}
-                                className="inline-flex items-center px-4 py-2 border border-red-300 text-red-700 text-sm font-medium rounded-lg hover:bg-red-50"
-                            >
-                                <LogOut size={16} className="mr-2" />
-                                Leave Organization
-                            </button>
+                        {isEditing ? (
+                            <div className="flex items-center space-x-2">
+                                <button
+                                    onClick={cancelEditing}
+                                    disabled={saving}
+                                    className="px-4 py-2 border border-slate-300 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 disabled:opacity-50"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={saveChanges}
+                                    disabled={saving || !editingData.name?.trim()}
+                                    className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center"
+                                >
+                                    {saving ? (
+                                        <>
+                                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                                            Saving...
+                                        </>
+                                    ) : (
+                                        'Save Changes'
+                                    )}
+                                </button>
+                            </div>
+                        ) : (
+                            <>
+                                {organization.slug && (
+                                    <Link to={`/${userMembership.organization_type === 'nonprofit' ? 'nonprofits' : 'funders'}/${organization.slug}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center px-4 py-2 border border-slate-300 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50">
+                                        View Public Profile
+                                    </Link>
+                                )}
+                                {canEditOrg && (
+                                    <button
+                                        onClick={startEditing}
+                                        className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 shadow-sm"
+                                    >
+                                        <Edit size={16} className="mr-2" />
+                                        Edit Organization
+                                    </button>
+                                )}
+                                {canLeave && (
+                                    <button
+                                        onClick={() => setConfirmingLeave(true)}
+                                        className="inline-flex items-center px-4 py-2 border border-red-300 text-red-700 text-sm font-medium rounded-lg hover:bg-red-50"
+                                    >
+                                        <LogOut size={16} className="mr-2" />
+                                        Leave Organization
+                                    </button>
+                                )}
+                            </>
                         )}
                     </div>
                 </div>
 
-                {/* About Us section - moved here and simplified */}
-                {organization.description && (
+                {/* About Us section - with editing capability */}
+                {isEditing ? (
                     <div className="mt-6 pt-6 border-t border-slate-200">
-                        <p className="text-slate-600 leading-relaxed">{organization.description}</p>
+                        <label className="block text-sm font-medium text-slate-700 mb-2">Description</label>
+                        <textarea
+                            value={editingData.description}
+                            onChange={(e) => setEditingData(prev => ({ ...prev, description: e.target.value }))}
+                            rows={4}
+                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            placeholder="Describe your organization's mission and activities..."
+                        />
+                        <div className="mt-4">
+                            <label className="block text-sm font-medium text-slate-700 mb-2">Contact Email</label>
+                            <input
+                                type="email"
+                                value={editingData.contact_email}
+                                onChange={(e) => setEditingData(prev => ({ ...prev, contact_email: e.target.value }))}
+                                className="w-full max-w-md px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                placeholder="contact@organization.org"
+                            />
+                        </div>
                     </div>
+                ) : (
+                    organization.description && (
+                        <div className="mt-6 pt-6 border-t border-slate-200">
+                            <p className="text-slate-600 leading-relaxed">{organization.description}</p>
+                        </div>
+                    )
                 )}
 
-                {/* NEW: Enhanced Tab Navigation */}
+                {/* Enhanced Tab Navigation */}
                 <div className="mt-6 pt-6 border-t border-slate-200">
                     <nav className="flex space-x-8">
                         {tabs.map((tab) => {
@@ -547,11 +838,12 @@ export default function MyOrganizationPage() {
                                 <button
                                     key={tab.id}
                                     onClick={() => setActiveTab(tab.id)}
+                                    disabled={isEditing}
                                     className={`flex items-center gap-2 py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
                                         activeTab === tab.id
                                             ? 'border-blue-500 text-blue-600'
                                             : 'border-transparent text-slate-500 hover:text-slate-700'
-                                    }`}
+                                    } ${isEditing ? 'opacity-50 cursor-not-allowed' : ''}`}
                                 >
                                     <Icon size={16} />
                                     {tab.label}
@@ -565,14 +857,13 @@ export default function MyOrganizationPage() {
             {/* Tab Content */}
             {activeTab === 'overview' && (
                 <div>
-                    {/* Removed bg-white, rounded-xl, shadow-sm, border, and added p-6 to match post card padding */}
                     <OrganizationPosts
                         organization={organization}
                         organizationType={userMembership.organization_type}
                         userRole={userRole}
                         isOmegaAdmin={isOmegaAdmin}
                         profile={profile}
-                        className="p-6" // Maintains padding to match post cards
+                        className="p-6"
                     />
                 </div>
             )}
@@ -580,7 +871,6 @@ export default function MyOrganizationPage() {
             {/* NEW: Analytics Tab - Only for Admins */}
             {activeTab === 'analytics' && (
                 <div className="space-y-6">
-                    {/* Social Engagement Section - Moved from Overview */}
                     <SocialMetricsCard 
                         organization={organization} 
                         organizationType={userMembership.organization_type}
@@ -588,7 +878,6 @@ export default function MyOrganizationPage() {
                         isOmegaAdmin={isOmegaAdmin}
                     />
                     
-                    {/* Additional Analytics Components */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
                             <h3 className="text-lg font-semibold text-slate-800 mb-4">Profile Performance</h3>
@@ -641,7 +930,6 @@ export default function MyOrganizationPage() {
                         </div>
                     </div>
 
-                    {/* NEW: Organized Team Sections - No joined dates */}
                     <div className="space-y-8">
                         {renderTeamSection("Leadership", organizedMembers.leadership, "No leadership members found")}
                         {renderTeamSection("Staff", organizedMembers.staff, "No staff members found")}
@@ -682,7 +970,7 @@ export default function MyOrganizationPage() {
                 </>
             )}
 
-            {userMembership.organization_type === 'funder' && (
+            {userMembership.organization_type === 'foundation' && (
                 <>
                     {activeTab === 'grants' && (
                         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">

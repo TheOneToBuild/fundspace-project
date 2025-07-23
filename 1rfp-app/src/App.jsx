@@ -47,6 +47,7 @@ import EditOrganizationPage from './components/EditOrganizationPage.jsx';
 
 // --- AUTH COMPONENTS ---
 import SignUpWizard from './components/auth/SignUpWizard.jsx';
+import OnboardingWizard from './components/OnboardingWizard.jsx'; // 🎯 NEW: Import OnboardingWizard
 
 // --- Import Shared Components ---
 import AuthButton from './components/AuthButton.jsx';
@@ -567,6 +568,13 @@ export default function App() {
               <Route path="omega-admin/organizations/edit/:orgType/:orgId" element={<OmegaAdminEditOrg />} />
               <Route path="omega-admin/organizations/members/:orgType/:orgId" element={<OmegaAdminManageMembers />} />
             </Route>
+            
+            {/* 🎯 NEW: Onboarding route for post-verification profile completion */}
+            <Route path="/onboarding" element={
+              <ProtectedRoute>
+                <OnboardingWizard />
+              </ProtectedRoute>
+            } />
           </Route>
         </Route>
       </Routes>

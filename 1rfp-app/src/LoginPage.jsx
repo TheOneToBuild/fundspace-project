@@ -1,8 +1,9 @@
-// src/LoginPage.jsx - Updated to Handle Signup URL Parameter
+// src/LoginPage.jsx - Updated to support both minimal and full signup
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation, useOutletContext } from 'react-router-dom';
 import AuthLayout from './components/auth/AuthLayout';
 import LoginForm from './components/auth/LoginForm';
+import MinimalSignupForm from './components/auth/MinimalSignupForm';
 import SignUpWizard from './components/auth/SignUpWizard';
 
 export default function LoginPage() {
@@ -13,9 +14,13 @@ export default function LoginPage() {
   // Check URL parameters to determine initial view
   const urlParams = new URLSearchParams(location.search);
   const viewParam = urlParams.get('view');
-  const initialView = viewParam === 'signup' ? 'sign_up' : 'sign_in';
   
-  const [view, setView] = useState(initialView);
+  // Determine initial view - simplified to just sign_in or signup
+  const getInitialView = () => {
+    return viewParam === 'signup' ? 'signup' : 'sign_in';
+  };
+  
+  const [view, setView] = useState(getInitialView());
 
   // Get the intended destination from state, default to profile
   const from = location.state?.from?.pathname || '/profile';
@@ -24,11 +29,8 @@ export default function LoginPage() {
   useEffect(() => {
     const urlParams = new URLSearchParams(location.search);
     const viewParam = urlParams.get('view');
-    if (viewParam === 'signup') {
-      setView('sign_up');
-    } else {
-      setView('sign_in');
-    }
+    
+    setView(viewParam === 'signup' ? 'signup' : 'sign_in');
   }, [location.search]);
 
   // If already logged in, redirect immediately
@@ -45,23 +47,22 @@ export default function LoginPage() {
     // Navigation will happen automatically via useEffect when session updates
   };
 
-  // Handler for successful signup - called by SignUpWizard  
+  // Handler for successful signup
   const handleSignupSuccess = () => {
-    console.log('Signup successful, redirecting to profile');
-    navigate('/profile', { replace: true });
+    console.log('Signup successful');
+    // Show success message and stay on this page
+    // User will need to verify email before proceeding
   };
 
   // Handler to switch to signup view
   const handleSwitchToSignUp = () => {
-    setView('sign_up');
-    // Update URL to reflect the view change
+    setView('signup');
     navigate('/login?view=signup', { replace: true });
   };
 
   // Handler to switch to login view
   const handleSwitchToLogin = () => {
     setView('sign_in');
-    // Clear URL parameters when switching back to login
     navigate('/login', { replace: true });
   };
 
@@ -81,19 +82,37 @@ export default function LoginPage() {
     return null; // Will redirect via useEffect
   }
 
+  const renderAuthForm = () => {
+    switch (view) {
+      case 'sign_in':
+        return (
+          <LoginForm 
+            onSwitchToSignUp={handleSwitchToSignUp}
+            onLoginSuccess={handleLoginSuccess}
+          />
+        );
+      
+      case 'signup':
+        return (
+          <MinimalSignupForm 
+            onSwitchToLogin={handleSwitchToLogin}
+            onSignupSuccess={handleSignupSuccess}
+          />
+        );
+      
+      default:
+        return (
+          <LoginForm 
+            onSwitchToSignUp={handleSwitchToSignUp}
+            onLoginSuccess={handleLoginSuccess}
+          />
+        );
+    }
+  };
+
   return (
     <AuthLayout>
-      {view === 'sign_in' ? (
-        <LoginForm 
-          onSwitchToSignUp={handleSwitchToSignUp}
-          onLoginSuccess={handleLoginSuccess}
-        />
-      ) : (
-        <SignUpWizard 
-          onSwitchToLogin={handleSwitchToLogin}
-          onSignupSuccess={handleSignupSuccess}
-        />
-      )}
+      {renderAuthForm()}
     </AuthLayout>
   );
 }
