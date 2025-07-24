@@ -159,7 +159,7 @@ function HomePage() {
             Where community <span className="inline-block min-w-[220px] text-transparent bg-clip-text bg-gradient-to-r from-purple-500 to-blue-600">{displayedText}</span> together.
           </h1>
           <p className="max-w-xl md:max-w-2xl mx-auto text-lg md:text-xl text-slate-700 mb-10 leading-relaxed font-display">
-  A space for Bay Area 🌉  changemakersto 
+  A space for Bay Area 🌉  changemakers to 
   <span className="text-pink-500 font-semibold animate-bounce-slow"> connect </span> 🤝, 
   <span className="text-emerald-500 font-semibold animate-bounce-slow"> collaborate </span> 🫶, and 
   <span className="text-sky-500 font-semibold animate-bounce-slow"> build </span> 🏗️ 
@@ -210,9 +210,9 @@ function HomePage() {
       <section className="py-20 md:py-28">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-slate-800 mb-4">Designed for Impact. Open to All.</h2>
+            <h2 className="text-4xl font-bold text-slate-800 mb-4">Designed by Community. Built for Community.</h2>
             <p className="text-lg text-slate-600 max-w-2xl mx-auto">
-              Our platform is built on open standards to foster a more connected and transparent social impact ecosystem.
+              Our platform is built by community members, for community members. We understand the unique challenges and opportunities in the Bay Area, and we're here to support you every step of the way.
             </p>
           </div>
           <div className="grid md:grid-cols-3 gap-8 h-[600px]">

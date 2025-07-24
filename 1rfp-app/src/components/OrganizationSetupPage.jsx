@@ -1,5 +1,5 @@
-// src/components/OrganizationSetupPage.jsx - Enhanced with Taxonomy & Focus Areas
-import React, { useState, useEffect, useCallback } from 'react';
+// src/components/OrganizationSetupPage.jsx - Fixed version with improvements
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../supabaseClient';
 import { Search, Building2, Users, Plus, ArrowRight, Star, MapPin, Globe, Mail, X, ChevronDown } from 'lucide-react';
 
@@ -16,39 +16,56 @@ function debounce(fn, delay) {
 }
 
 export default function StreamlinedOrganizationSetupPage({ onJoinSuccess }) {
-    const [activeTab, setActiveTab] = useState('join'); // 'join' or 'create'
+    // FIXED: Persist activeTab across page visibility changes
+    const [activeTab, setActiveTab] = useState(() => {
+        return localStorage.getItem('orgSetupActiveTab') || 'join';
+    });
+    
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [message, setMessage] = useState('');
     
-    // Create organization form state
-    const [createForm, setCreateForm] = useState({
-        name: '',
-        type: '',
-        taxonomy_code: '',
-        description: '',
-        website: '',
-        location: '',
-        ein: '',
-        contact_email: ''
+    // Create organization form state - FIXED: Persist form data
+    const [createForm, setCreateForm] = useState(() => {
+        const saved = localStorage.getItem('orgSetupFormData');
+        return saved ? JSON.parse(saved) : {
+            name: '',
+            type: '',
+            taxonomy_code: '',
+            description: '',
+            website: '',
+            location: '',
+            ein: '',
+            contact_email: ''
+        };
     });
     const [creating, setCreating] = useState(false);
 
-    // Focus areas and supported locations state
+    // Focus areas and supported locations state - FIXED: Persist selections
     const [categories, setCategories] = useState([]);
-    const [selectedCategories, setSelectedCategories] = useState([]);
-    const [selectedLocations, setSelectedLocations] = useState([]);
+    const [selectedCategories, setSelectedCategories] = useState(() => {
+        const saved = localStorage.getItem('orgSetupSelectedCategories');
+        return saved ? JSON.parse(saved) : [];
+    });
+    const [selectedLocations, setSelectedLocations] = useState(() => {
+        const saved = localStorage.getItem('orgSetupSelectedLocations');
+        return saved ? JSON.parse(saved) : [];
+    });
     const [taxonomyOptions, setTaxonomyOptions] = useState([]);
 
-    // UI state
+    // UI state for search interfaces
     const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
     const [showLocationDropdown, setShowLocationDropdown] = useState(false);
     const [categorySearch, setCategorySearch] = useState('');
     const [locationSearch, setLocationSearch] = useState('');
+    
+    // Refs for click outside detection
+    const categoryDropdownRef = useRef(null);
+    const locationDropdownRef = useRef(null);
 
-    // Organization types based on your database schema
+    // Organization types
     const ORGANIZATION_TYPES = [
         { id: 'nonprofit', label: 'Nonprofit Organization', icon: '🏛️', description: 'Tax-exempt organizations serving public benefit' },
         { id: 'foundation', label: 'Foundation', icon: '💰', description: 'Grantmaking organizations and foundations' },
@@ -80,6 +97,31 @@ export default function StreamlinedOrganizationSetupPage({ onJoinSuccess }) {
         'Senior Services', 'Community Development'
     ];
 
+    // FIXED: Save form data to localStorage whenever it changes
+    useEffect(() => {
+        localStorage.setItem('orgSetupFormData', JSON.stringify(createForm));
+    }, [createForm]);
+
+    useEffect(() => {
+        localStorage.setItem('orgSetupSelectedCategories', JSON.stringify(selectedCategories));
+    }, [selectedCategories]);
+
+    useEffect(() => {
+        localStorage.setItem('orgSetupSelectedLocations', JSON.stringify(selectedLocations));
+    }, [selectedLocations]);
+
+    useEffect(() => {
+        localStorage.setItem('orgSetupActiveTab', activeTab);
+    }, [activeTab]);
+
+    // Clear localStorage on successful completion
+    const clearPersistedData = () => {
+        localStorage.removeItem('orgSetupFormData');
+        localStorage.removeItem('orgSetupSelectedCategories');
+        localStorage.removeItem('orgSetupSelectedLocations');
+        localStorage.removeItem('orgSetupActiveTab');
+    };
+
     // Fetch categories for focus areas
     const fetchCategories = useCallback(async () => {
         try {
@@ -95,7 +137,7 @@ export default function StreamlinedOrganizationSetupPage({ onJoinSuccess }) {
         }
     }, []);
 
-    // Fetch taxonomy options based on organization type
+    // FIXED: Fetch taxonomy options - only show Level 2 (specific categories), not Level 1 (parent categories)
     const fetchTaxonomyOptions = useCallback(async (orgType) => {
         if (!orgType) return;
 
@@ -105,10 +147,37 @@ export default function StreamlinedOrganizationSetupPage({ onJoinSuccess }) {
                 .select('*')
                 .eq('organization_type', orgType)
                 .eq('is_active', true)
-                .order('level, sort_order');
+                .eq('level', 2) // FIXED: Only fetch Level 2 entries (specific categories)
+                .order('sort_order, display_name');
 
             if (error) throw error;
-            setTaxonomyOptions(data || []);
+            
+            // FIXED: Additional filtering and deduplication
+            let filteredOptions = data || [];
+            
+            // Remove any unwanted entries for nonprofit
+            if (orgType === 'nonprofit') {
+                filteredOptions = filteredOptions.filter(option => {
+                    const code = option.code.toLowerCase();
+                    const displayName = option.display_name.toLowerCase();
+                    
+                    // Exclude association and grassroots types as per your original requirements
+                    return !code.includes('association') && 
+                           !code.includes('grassroots') &&
+                           !displayName.includes('association') &&
+                           !displayName.includes('grassroots');
+                });
+            }
+            
+            // Remove duplicates based on display_name (final safeguard)
+            const uniqueOptions = filteredOptions.filter((option, index, self) => {
+                return index === self.findIndex(t => t.display_name === option.display_name);
+            });
+            
+            console.log(`Loaded ${uniqueOptions.length} taxonomy options for ${orgType}:`, 
+                       uniqueOptions.map(opt => opt.display_name));
+            
+            setTaxonomyOptions(uniqueOptions);
         } catch (err) {
             console.error('Error fetching taxonomy options:', err);
             setTaxonomyOptions([]);
@@ -163,6 +232,23 @@ export default function StreamlinedOrganizationSetupPage({ onJoinSuccess }) {
         }
     }, [createForm.type, fetchTaxonomyOptions]);
 
+    // Click outside handler for dropdowns
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (categoryDropdownRef.current && !categoryDropdownRef.current.contains(event.target)) {
+                setShowCategoryDropdown(false);
+            }
+            if (locationDropdownRef.current && !locationDropdownRef.current.contains(event.target)) {
+                setShowLocationDropdown(false);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, []);
+
     // Join an existing organization
     const handleJoinOrganization = async (organization) => {
         setLoading(true);
@@ -203,6 +289,7 @@ export default function StreamlinedOrganizationSetupPage({ onJoinSuccess }) {
                 .eq('id', session.user.id);
 
             setMessage(`Successfully joined ${organization.name}!`);
+            clearPersistedData(); // Clear form data on success
             
             setTimeout(() => {
                 if (onJoinSuccess) {
@@ -261,13 +348,14 @@ export default function StreamlinedOrganizationSetupPage({ onJoinSuccess }) {
                 website: createForm.website.trim(),
                 location: createForm.location.trim(),
                 contact_email: createForm.contact_email.trim() || null,
-                ein: createForm.type === 'nonprofit' ? createForm.ein.trim() : null,
+                ein: createForm.type === 'nonprofit' ? createForm.ein.trim() : null, // FIXED: Use dedicated ein column
                 admin_profile_id: session.user.id,
                 image_url: null,
                 is_verified: false,
                 extended_data: {
                     focus_areas: selectedCategories,
                     supported_locations: selectedLocations
+                    // Note: EIN is now in dedicated column, not in extended_data
                 }
             };
 
@@ -327,6 +415,7 @@ export default function StreamlinedOrganizationSetupPage({ onJoinSuccess }) {
                 .eq('id', session.user.id);
 
             setMessage(`Successfully created ${newOrg.name}! You are now the organization's administrator.`);
+            clearPersistedData(); // Clear form data on success
             
             setTimeout(() => {
                 if (onJoinSuccess) {
@@ -347,7 +436,7 @@ export default function StreamlinedOrganizationSetupPage({ onJoinSuccess }) {
         return orgType?.icon || '🏢';
     };
 
-    // Handle category selection
+    // FIXED: Improved category selection with search
     const handleCategorySelect = (categoryId) => {
         if (!selectedCategories.includes(categoryId)) {
             setSelectedCategories([...selectedCategories, categoryId]);
@@ -360,7 +449,7 @@ export default function StreamlinedOrganizationSetupPage({ onJoinSuccess }) {
         setSelectedCategories(selectedCategories.filter(id => id !== categoryId));
     };
 
-    // Handle location selection
+    // FIXED: Improved location selection with search
     const handleLocationSelect = (location) => {
         if (!selectedLocations.includes(location)) {
             setSelectedLocations([...selectedLocations, location]);
@@ -373,9 +462,10 @@ export default function StreamlinedOrganizationSetupPage({ onJoinSuccess }) {
         setSelectedLocations(selectedLocations.filter(loc => loc !== location));
     };
 
-    // Filter categories for dropdown
+    // FIXED: Better filtering for categories
     const filteredCategories = categories.filter(cat =>
-        cat.name.toLowerCase().includes(categorySearch.toLowerCase())
+        cat.name.toLowerCase().includes(categorySearch.toLowerCase()) &&
+        !selectedCategories.includes(cat.id)
     );
 
     // Sort categories with popular ones first
@@ -384,9 +474,10 @@ export default function StreamlinedOrganizationSetupPage({ onJoinSuccess }) {
         ...filteredCategories.filter(cat => !POPULAR_CATEGORIES.includes(cat.name))
     ];
 
-    // Filter locations for dropdown
+    // FIXED: Better filtering for locations
     const filteredLocations = BAY_AREA_COUNTIES.filter(loc =>
-        loc.toLowerCase().includes(locationSearch.toLowerCase())
+        loc.toLowerCase().includes(locationSearch.toLowerCase()) &&
+        !selectedLocations.includes(loc)
     );
 
     return (
@@ -612,7 +703,7 @@ export default function StreamlinedOrganizationSetupPage({ onJoinSuccess }) {
                                         >
                                             <option value="">Select specific category...</option>
                                             {taxonomyOptions.map((taxonomy) => (
-                                                <option key={taxonomy.code} value={taxonomy.code}>
+                                                <option key={`${taxonomy.code}-${taxonomy.id}`} value={taxonomy.code}>
                                                     {taxonomy.display_name}
                                                 </option>
                                             ))}
@@ -623,13 +714,13 @@ export default function StreamlinedOrganizationSetupPage({ onJoinSuccess }) {
                                     </div>
                                 )}
 
-                                {/* Focus Areas - Required */}
+                                {/* FIXED: Focus Areas with Search Interface */}
                                 <div className="md:col-span-2">
                                     <label className="block text-sm font-medium text-slate-700 mb-2">
                                         Focus Areas *
                                     </label>
                                     <p className="text-xs text-slate-500 mb-3">
-                                        Select the main areas your organization focuses on (at least one required)
+                                        Search and select the main areas your organization focuses on (at least one required)
                                     </p>
                                     
                                     {/* Selected Categories */}
@@ -656,64 +747,60 @@ export default function StreamlinedOrganizationSetupPage({ onJoinSuccess }) {
                                         </div>
                                     )}
 
-                                    {/* Category Dropdown */}
-                                    <div className="relative">
-                                        <button
-                                            type="button"
-                                            onClick={() => setShowCategoryDropdown(!showCategoryDropdown)}
-                                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors text-left flex items-center justify-between"
-                                        >
-                                            <span className={selectedCategories.length > 0 ? 'text-slate-900' : 'text-slate-500'}>
-                                                {selectedCategories.length > 0 
-                                                    ? `${selectedCategories.length} focus area${selectedCategories.length > 1 ? 's' : ''} selected`
-                                                    : 'Select focus areas...'
-                                                }
-                                            </span>
-                                            <ChevronDown className="w-4 h-4 text-slate-400" />
-                                        </button>
+                                    {/* FIXED: Search Input for Categories */}
+                                    <div className="relative" ref={categoryDropdownRef}>
+                                        <div className="relative">
+                                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                                            <input
+                                                type="text"
+                                                value={categorySearch}
+                                                onChange={(e) => {
+                                                    setCategorySearch(e.target.value);
+                                                    setShowCategoryDropdown(true);
+                                                }}
+                                                onFocus={() => setShowCategoryDropdown(true)}
+                                                placeholder="Search focus areas..."
+                                                className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors"
+                                            />
+                                        </div>
 
                                         {showCategoryDropdown && (
                                             <div className="absolute z-10 mt-1 w-full bg-white border border-slate-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                                                <div className="p-2">
-                                                    <input
-                                                        type="text"
-                                                        placeholder="Search focus areas..."
-                                                        value={categorySearch}
-                                                        onChange={(e) => setCategorySearch(e.target.value)}
-                                                        className="w-full px-2 py-1 text-sm border border-slate-200 rounded"
-                                                        onClick={(e) => e.stopPropagation()}
-                                                    />
-                                                </div>
-                                                <div className="max-h-48 overflow-y-auto">
-                                                    {sortedCategories.map((category) => (
-                                                        <button
-                                                            key={category.id}
-                                                            type="button"
-                                                            onClick={() => handleCategorySelect(category.id)}
-                                                            disabled={selectedCategories.includes(category.id)}
-                                                            className={`w-full px-3 py-2 text-left text-sm hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed ${
-                                                                POPULAR_CATEGORIES.includes(category.name) ? 'font-medium' : ''
-                                                            }`}
-                                                        >
-                                                            {category.name}
-                                                            {selectedCategories.includes(category.id) && (
-                                                                <span className="ml-2 text-green-600">✓</span>
-                                                            )}
-                                                        </button>
-                                                    ))}
-                                                </div>
+                                                {sortedCategories.length > 0 ? (
+                                                    <div className="max-h-48 overflow-y-auto">
+                                                        {sortedCategories.map((category) => (
+                                                            <button
+                                                                key={category.id}
+                                                                type="button"
+                                                                onClick={() => handleCategorySelect(category.id)}
+                                                                className={`w-full px-3 py-2 text-left text-sm hover:bg-slate-50 transition-colors ${
+                                                                    POPULAR_CATEGORIES.includes(category.name) ? 'font-medium' : ''
+                                                                }`}
+                                                            >
+                                                                {category.name}
+                                                                {POPULAR_CATEGORIES.includes(category.name) && (
+                                                                    <span className="ml-2 text-xs text-slate-500">Popular</span>
+                                                                )}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                ) : (
+                                                    <div className="px-3 py-2 text-sm text-slate-500">
+                                                        {categorySearch ? 'No matching focus areas found' : 'Start typing to search focus areas'}
+                                                    </div>
+                                                )}
                                             </div>
                                         )}
                                     </div>
                                 </div>
 
-                                {/* Geographic Areas Served */}
+                                {/* FIXED: Geographic Areas with Search Interface */}
                                 <div className="md:col-span-2">
                                     <label className="block text-sm font-medium text-slate-700 mb-2">
                                         Geographic Areas Served
                                     </label>
                                     <p className="text-xs text-slate-500 mb-3">
-                                        Select the Bay Area counties where your organization provides services (optional)
+                                        Search and select the Bay Area counties where your organization provides services (optional)
                                     </p>
                                     
                                     {/* Selected Locations */}
@@ -737,50 +824,43 @@ export default function StreamlinedOrganizationSetupPage({ onJoinSuccess }) {
                                         </div>
                                     )}
 
-                                    {/* Location Dropdown */}
-                                    <div className="relative">
-                                        <button
-                                            type="button"
-                                            onClick={() => setShowLocationDropdown(!showLocationDropdown)}
-                                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors text-left flex items-center justify-between"
-                                        >
-                                            <span className={selectedLocations.length > 0 ? 'text-slate-900' : 'text-slate-500'}>
-                                                {selectedLocations.length > 0 
-                                                    ? `${selectedLocations.length} location${selectedLocations.length > 1 ? 's' : ''} selected`
-                                                    : 'Select service areas...'
-                                                }
-                                            </span>
-                                            <ChevronDown className="w-4 h-4 text-slate-400" />
-                                        </button>
+                                    {/* FIXED: Search Input for Locations */}
+                                    <div className="relative" ref={locationDropdownRef}>
+                                        <div className="relative">
+                                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                                            <input
+                                                type="text"
+                                                value={locationSearch}
+                                                onChange={(e) => {
+                                                    setLocationSearch(e.target.value);
+                                                    setShowLocationDropdown(true);
+                                                }}
+                                                onFocus={() => setShowLocationDropdown(true)}
+                                                placeholder="Search Bay Area counties..."
+                                                className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors"
+                                            />
+                                        </div>
 
                                         {showLocationDropdown && (
                                             <div className="absolute z-10 mt-1 w-full bg-white border border-slate-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                                                <div className="p-2">
-                                                    <input
-                                                        type="text"
-                                                        placeholder="Search counties..."
-                                                        value={locationSearch}
-                                                        onChange={(e) => setLocationSearch(e.target.value)}
-                                                        className="w-full px-2 py-1 text-sm border border-slate-200 rounded"
-                                                        onClick={(e) => e.stopPropagation()}
-                                                    />
-                                                </div>
-                                                <div className="max-h-48 overflow-y-auto">
-                                                    {filteredLocations.map((location) => (
-                                                        <button
-                                                            key={location}
-                                                            type="button"
-                                                            onClick={() => handleLocationSelect(location)}
-                                                            disabled={selectedLocations.includes(location)}
-                                                            className="w-full px-3 py-2 text-left text-sm hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                                                        >
-                                                            {location}
-                                                            {selectedLocations.includes(location) && (
-                                                                <span className="ml-2 text-green-600">✓</span>
-                                                            )}
-                                                        </button>
-                                                    ))}
-                                                </div>
+                                                {filteredLocations.length > 0 ? (
+                                                    <div className="max-h-48 overflow-y-auto">
+                                                        {filteredLocations.map((location) => (
+                                                            <button
+                                                                key={location}
+                                                                type="button"
+                                                                onClick={() => handleLocationSelect(location)}
+                                                                className="w-full px-3 py-2 text-left text-sm hover:bg-slate-50 transition-colors"
+                                                            >
+                                                                {location}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                ) : (
+                                                    <div className="px-3 py-2 text-sm text-slate-500">
+                                                        {locationSearch ? 'No matching counties found' : 'Start typing to search counties'}
+                                                    </div>
+                                                )}
                                             </div>
                                         )}
                                     </div>
@@ -896,17 +976,6 @@ export default function StreamlinedOrganizationSetupPage({ onJoinSuccess }) {
                     )}
                 </div>
             </div>
-
-            {/* Click outside to close dropdowns */}
-            {(showCategoryDropdown || showLocationDropdown) && (
-                <div 
-                    className="fixed inset-0 z-5" 
-                    onClick={() => {
-                        setShowCategoryDropdown(false);
-                        setShowLocationDropdown(false);
-                    }}
-                />
-            )}
 
             {/* Info Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
