@@ -1,4 +1,4 @@
-// src/SettingsPage.jsx - Complete SettingsPage with Fixed Avatar Upload
+// src/SettingsPage.jsx - Updated for New Database Structure
 import React, { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
 import { useOutletContext } from 'react-router-dom';
@@ -9,12 +9,14 @@ const XIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" 
 const UploadIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>;
 const EyeIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>;
 const EyeOffIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21" /></svg>;
-const BuildingIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-2-5V3" /></svg>;
 const UserCheckIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>;
+const BuildingIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-2-5V3" /></svg>;
 const InfoIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>;
 const LoaderIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>;
+const HeartIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" /></svg>;
+const MapPinIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>;
 
-// Enhanced Avatar Component with better error handling
+// Enhanced Avatar Component
 const EnhancedAvatar = ({ src, fullName, size = "20", className = "" }) => {
   const [imageError, setImageError] = useState(false);
   const [imageLoading, setImageLoading] = useState(!!src);
@@ -212,6 +214,223 @@ const EnhancedImageUploader = ({ currentImageUrl, onImageUploaded, uploading, se
   );
 };
 
+// Interest Selection Component
+const InterestSelector = ({ interests, onChange, loading }) => {
+  const INTEREST_AREAS = [
+    { id: 'housing', name: 'Housing', emoji: '🏠', color: 'bg-blue-100 text-blue-800 border-blue-200', hoverColor: 'hover:bg-blue-200' },
+    { id: 'education', name: 'Education', emoji: '📚', color: 'bg-green-100 text-green-800 border-green-200', hoverColor: 'hover:bg-green-200' },
+    { id: 'health', name: 'Health', emoji: '🏥', color: 'bg-red-100 text-red-800 border-red-200', hoverColor: 'hover:bg-red-200' },
+    { id: 'environment', name: 'Environment', emoji: '🌱', color: 'bg-emerald-100 text-emerald-800 border-emerald-200', hoverColor: 'hover:bg-emerald-200' },
+    { id: 'arts', name: 'Arts & Culture', emoji: '🎨', color: 'bg-purple-100 text-purple-800 border-purple-200', hoverColor: 'hover:bg-purple-200' },
+    { id: 'technology', name: 'Technology', emoji: '💻', color: 'bg-indigo-100 text-indigo-800 border-indigo-200', hoverColor: 'hover:bg-indigo-200' },
+    { id: 'social-services', name: 'Social Services', emoji: '🤝', color: 'bg-orange-100 text-orange-800 border-orange-200', hoverColor: 'hover:bg-orange-200' },
+    { id: 'youth', name: 'Youth Programs', emoji: '👶', color: 'bg-pink-100 text-pink-800 border-pink-200', hoverColor: 'hover:bg-pink-200' },
+    { id: 'seniors', name: 'Senior Services', emoji: '👴', color: 'bg-teal-100 text-teal-800 border-teal-200', hoverColor: 'hover:bg-teal-200' },
+    { id: 'community', name: 'Community Development', emoji: '🏘️', color: 'bg-amber-100 text-amber-800 border-amber-200', hoverColor: 'hover:bg-amber-200' },
+    { id: 'research', name: 'Research & Science', emoji: '🔬', color: 'bg-cyan-100 text-cyan-800 border-cyan-200', hoverColor: 'hover:bg-cyan-200' },
+    { id: 'advocacy', name: 'Advocacy', emoji: '📢', color: 'bg-rose-100 text-rose-800 border-rose-200', hoverColor: 'hover:bg-rose-200' }
+  ];
+
+  const selectedInterests = Array.isArray(interests) ? interests : [];
+
+  const toggleInterest = (interestId) => {
+    const isSelected = selectedInterests.includes(interestId);
+    let newInterests;
+    
+    if (isSelected) {
+      newInterests = selectedInterests.filter(id => id !== interestId);
+    } else {
+      newInterests = [...selectedInterests, interestId];
+    }
+    
+    onChange(newInterests);
+  };
+
+  return (
+    <div>
+      <label className="text-sm font-medium text-slate-700 block mb-3">Your Interests</label>
+      <p className="text-xs text-slate-500 mb-4">Select the areas you're most interested in or work with.</p>
+      
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+        {INTEREST_AREAS.map((interest) => {
+          const isSelected = selectedInterests.includes(interest.id);
+          
+          return (
+            <button
+              key={interest.id}
+              type="button"
+              onClick={() => !loading && toggleInterest(interest.id)}
+              disabled={loading}
+              className={`
+                p-3 rounded-lg border-2 text-sm font-medium transition-all duration-200 text-left
+                ${isSelected 
+                  ? `${interest.color} border-current` 
+                  : 'bg-white text-slate-600 border-slate-200'
+                }
+                ${!loading ? `${interest.hoverColor} hover:border-current cursor-pointer` : 'cursor-not-allowed opacity-50'}
+              `}
+            >
+              <div className="flex items-center gap-2">
+                <span className="text-lg">{interest.emoji}</span>
+                <span>{interest.name}</span>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+      
+      {selectedInterests.length > 0 && (
+        <p className="text-xs text-slate-600 mt-3">
+          {selectedInterests.length} interest{selectedInterests.length !== 1 ? 's' : ''} selected
+        </p>
+      )}
+    </div>
+  );
+};
+
+// Location Selector Component  
+const LocationSelector = ({ location, onChange, loading }) => {
+  const BAY_AREA_LOCATIONS = [
+    'Alameda County', 
+    'Contra Costa County', 
+    'Marin County', 
+    'Napa County',
+    'San Francisco County', 
+    'San Mateo County', 
+    'Santa Clara County', 
+    'Solano County', 
+    'Sonoma County'
+  ];
+
+  const [customLocation, setCustomLocation] = useState('');
+  const [showCustomInput, setShowCustomInput] = useState(false);
+
+  // Clean location (remove parentheses and normalize)
+  const cleanLocation = location ? location.replace(/[()]/g, '').trim() : '';
+  
+  const isCustomLocation = cleanLocation && !BAY_AREA_LOCATIONS.includes(cleanLocation);
+
+  useEffect(() => {
+    if (isCustomLocation) {
+      setShowCustomInput(true);
+      setCustomLocation(cleanLocation);
+    }
+  }, [cleanLocation, isCustomLocation]);
+
+  const handleLocationSelect = (selectedLocation) => {
+    onChange(selectedLocation);
+    setShowCustomInput(false);
+    setCustomLocation('');
+  };
+
+  const handleCustomSubmit = (e) => {
+    e.preventDefault();
+    if (customLocation.trim()) {
+      onChange(customLocation.trim());
+      setShowCustomInput(false);
+    }
+  };
+
+  return (
+    <div>
+      <label className="text-sm font-medium text-slate-700 block mb-3">Which community are you part of? 🏡</label>
+      <p className="text-xs text-slate-500 mb-4">Select your Bay Area community</p>
+      
+      {/* Bay Area Counties Grid */}
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
+        {BAY_AREA_LOCATIONS.map((countyName) => {
+          const isSelected = cleanLocation === countyName;
+          
+          return (
+            <button
+              key={countyName}
+              type="button"
+              onClick={() => !loading && handleLocationSelect(countyName)}
+              disabled={loading}
+              className={`
+                p-3 rounded-lg border text-sm font-medium transition-all duration-200 hover:shadow-md
+                ${isSelected 
+                  ? 'bg-blue-600 text-white border-blue-600 shadow-md' 
+                  : 'bg-white text-slate-700 border-slate-300 hover:border-slate-400'
+                }
+                ${loading ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}
+              `}
+            >
+              {countyName}
+            </button>
+          );
+        })}
+        
+        {/* Other Location Button */}
+        <button
+          type="button"
+          onClick={() => !loading && setShowCustomInput(true)}
+          disabled={loading}
+          className={`
+            p-3 rounded-lg border text-sm font-medium transition-all duration-200 hover:shadow-md
+            ${showCustomInput || isCustomLocation
+              ? 'bg-purple-600 text-white border-purple-600 shadow-md' 
+              : 'bg-white text-slate-700 border-slate-300 hover:border-slate-400'
+            }
+            ${loading ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}
+          `}
+        >
+          Other Location
+        </button>
+      </div>
+
+      {/* Custom Location Input */}
+      {showCustomInput && (
+        <div className="mt-4 p-4 bg-slate-50 rounded-lg border border-slate-200">
+          <form onSubmit={handleCustomSubmit}>
+            <label className="text-sm font-medium text-slate-700 block mb-2">Custom Location</label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={customLocation}
+                onChange={(e) => setCustomLocation(e.target.value)}
+                placeholder="e.g., Los Angeles County, Portland, OR"
+                className="flex-grow px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                disabled={loading}
+              />
+              <button
+                type="submit"
+                disabled={loading || !customLocation.trim()}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors"
+              >
+                Set
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowCustomInput(false);
+                  setCustomLocation('');
+                }}
+                disabled={loading}
+                className="px-3 py-2 bg-slate-200 text-slate-600 rounded-lg hover:bg-slate-300 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+      
+      {/* Current Selection Display */}
+      <div className="mt-6 p-4 bg-slate-50 rounded-lg border border-slate-200">
+        <p className="text-sm text-slate-600">
+          <strong>Selected:</strong> {cleanLocation || 'None'}
+        </p>
+        {cleanLocation && (
+          <p className="text-xs text-slate-500 mt-1">
+            You can always update this later in your profile settings
+          </p>
+        )}
+      </div>
+    </div>
+  );
+};
+
 export default function SettingsPage() {
   const { profile: initialProfile, session, refreshProfile } = useOutletContext(); 
   
@@ -219,11 +438,11 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [fullName, setFullName] = useState('');
-  const [role, setRole] = useState('');
   const [title, setTitle] = useState('');
   const [organizationName, setOrganizationName] = useState('');
   const [location, setLocation] = useState('');
   const [bio, setBio] = useState('');
+  const [interests, setInterests] = useState([]);
   const [avatarUrl, setAvatarUrl] = useState(null);
   const [profileMessage, setProfileMessage] = useState('');
   const [profileError, setProfileError] = useState('');
@@ -238,54 +457,68 @@ export default function SettingsPage() {
   const [privacyMessage, setPrivacyMessage] = useState('');
   const [privacyError, setPrivacyError] = useState('');
 
-  // Enhanced role mapping based on organization_type
-  const mapRoleFromProfile = (profile) => {
-    if (!profile) return 'Community member';
-    
-    // Use the role field if it exists and is not generic
-    if (profile.role && profile.role !== 'Community member') {
-      return profile.role;
+  // Fetch organization name from their actual organization
+  const fetchOrganizationName = async (profile) => {
+    if (!profile?.selected_organization_id) {
+      return profile?.organization_name || ''; // Fallback to old field
     }
-    
-    // Map from organization_type if role is generic
-    const roleMapping = {
-      'nonprofit': 'Nonprofit',
-      'government': 'Government',
-      'foundation': 'Funder',
-      'for-profit': 'For-profit',
-      'community-member': 'Community member'
-    };
-    
-    return roleMapping[profile.organization_type] || profile.role || 'Community member';
+
+    try {
+      const { data: orgData, error } = await supabase
+        .from('organizations')
+        .select('name')
+        .eq('id', profile.selected_organization_id)
+        .single();
+
+      if (error) {
+        console.error('Error fetching organization:', error);
+        return profile?.organization_name || '';
+      }
+
+      return orgData?.name || '';
+    } catch (err) {
+      console.error('Error fetching organization name:', err);
+      return profile?.organization_name || '';
+    }
   };
 
   // Enhanced useEffect to properly map all profile data
   useEffect(() => {
-    if (initialProfile) {
-      console.log('📋 Loading profile data:', initialProfile);
-      
-      setProfile(initialProfile);
-      setFullName(initialProfile.full_name || '');
-      
-      // Enhanced role mapping
-      const mappedRole = mapRoleFromProfile(initialProfile);
-      setRole(mappedRole);
-      
-      setTitle(initialProfile.title || '');
-      setOrganizationName(initialProfile.organization_name || '');
-      setLocation(initialProfile.location || '');
-      setBio(initialProfile.bio || '');
-      setAvatarUrl(initialProfile.avatar_url);
-      setPrivacySetting(initialProfile.profile_view_privacy || 'public');
-      
-      // Clear any previous messages when profile changes
-      setPrivacyMessage('');
-      setPrivacyError('');
-      setProfileMessage('');
-      setProfileError('');
-      
-      console.log('✅ Profile loaded with role:', mappedRole);
-    }
+    const loadProfileData = async () => {
+      if (initialProfile) {
+        console.log('📋 Loading profile data:', initialProfile);
+        
+        setProfile(initialProfile);
+        setFullName(initialProfile.full_name || '');
+        setTitle(initialProfile.title || '');
+        
+        // Fetch actual organization name
+        const orgName = await fetchOrganizationName(initialProfile);
+        setOrganizationName(orgName);
+        
+        setLocation(initialProfile.location || '');
+        setBio(initialProfile.bio || '');
+        
+        // Handle interests - can be array or null
+        const profileInterests = Array.isArray(initialProfile.interests) 
+          ? initialProfile.interests 
+          : [];
+        setInterests(profileInterests);
+        
+        setAvatarUrl(initialProfile.avatar_url);
+        setPrivacySetting(initialProfile.profile_view_privacy || 'public');
+        
+        // Clear any previous messages
+        setPrivacyMessage('');
+        setPrivacyError('');
+        setProfileMessage('');
+        setProfileError('');
+        
+        console.log('✅ Profile loaded with interests:', profileInterests);
+      }
+    };
+
+    loadProfileData();
   }, [initialProfile]);
 
   // Add event listener for global avatar updates
@@ -309,17 +542,19 @@ export default function SettingsPage() {
     setProfileError('');
 
     try {
+      // Prepare update data - only include fields that should be updated (excluding location since it auto-saves)
+      const updateData = {
+        full_name: fullName,
+        title: title,
+        bio: bio,
+        updated_at: new Date(),
+      };
+
+      console.log('💾 Updating profile with:', updateData);
+
       const { error } = await supabase
         .from('profiles')
-        .update({
-          full_name: fullName,
-          role: role,
-          title: (role === 'Funder' || role === 'Nonprofit' || role === 'Government' || role === 'For-profit') ? title : null,
-          organization_name: (role === 'Funder' || role === 'Nonprofit' || role === 'Government' || role === 'For-profit') ? organizationName : null,
-          location: location,
-          bio: bio,
-          updated_at: new Date(),
-        })
+        .update(updateData)
         .eq('id', session.user.id);
 
       if (error) {
@@ -363,7 +598,6 @@ export default function SettingsPage() {
       setProfileMessage("Avatar updated successfully!");
       
       // CRITICAL: Refresh the profile in the parent context
-      // This ensures ALL components throughout the app get the new avatar
       if (typeof refreshProfile === 'function') {
         await refreshProfile();
         console.log('✅ Profile context refreshed with new avatar');
@@ -383,6 +617,66 @@ export default function SettingsPage() {
     } catch (error) {
       console.error('❌ Error updating avatar:', error);
       setProfileError(`Failed to update avatar: ${error.message}`);
+    }
+  };
+
+  // Handle interests update
+  const handleInterestsChange = async (newInterests) => {
+    setInterests(newInterests);
+    
+    // Auto-save interests to database
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ 
+          interests: newInterests,
+          updated_at: new Date()
+        })
+        .eq('id', session.user.id);
+
+      if (error) {
+        console.error('Error saving interests:', error);
+        setProfileError('Failed to save interests');
+      } else {
+        console.log('✅ Interests auto-saved');
+        // Refresh profile to ensure consistency
+        if (typeof refreshProfile === 'function') {
+          await refreshProfile();
+        }
+      }
+    } catch (err) {
+      console.error('Error auto-saving interests:', err);
+      setProfileError('Failed to save interests');
+    }
+  };
+
+  // Handle location update
+  const handleLocationChange = async (newLocation) => {
+    setLocation(newLocation);
+    
+    // Auto-save location to database
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ 
+          location: newLocation,
+          updated_at: new Date()
+        })
+        .eq('id', session.user.id);
+
+      if (error) {
+        console.error('Error saving location:', error);
+        setProfileError('Failed to save location');
+      } else {
+        console.log('✅ Location auto-saved');
+        // Refresh profile to ensure consistency
+        if (typeof refreshProfile === 'function') {
+          await refreshProfile();
+        }
+      }
+    } catch (err) {
+      console.error('Error auto-saving location:', err);
+      setProfileError('Failed to save location');
     }
   };
 
@@ -535,94 +829,93 @@ export default function SettingsPage() {
         </div>
 
         <form onSubmit={handleUpdateProfile} className="space-y-4">
-            <div>
-                <label htmlFor="fullName" className="text-sm font-medium text-slate-700 block mb-1">Full Name</label>
-                <input 
-                  id="fullName" 
-                  required 
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors" 
-                  type="text" 
-                  value={fullName} 
-                  onChange={(e) => setFullName(e.target.value)} 
-                />
-            </div>
-            <div>
-                <label htmlFor="role" className="text-sm font-medium text-slate-700 block mb-1">Your Role</label>
-                <select 
-                  id="role" 
-                  required 
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors" 
-                  value={role} 
-                  onChange={(e) => setRole(e.target.value)}
-                >
-                    <option value="Nonprofit">Nonprofit</option>
-                    <option value="Funder">Funder</option>
-                    <option value="Government">Government</option>
-                    <option value="For-profit">For-profit</option>
-                    <option value="Community member">Community member</option>
-                </select>
-            </div>
-            {(role === 'Funder' || role === 'Nonprofit' || role === 'Government' || role === 'For-profit') && (
-                <>
-                    <div>
-                        <label htmlFor="title" className="text-sm font-medium text-slate-700 block mb-1">Your Title</label>
-                        <input 
-                          id="title" 
-                          required 
-                          className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors" 
-                          type="text" 
-                          value={title} 
-                          onChange={(e) => setTitle(e.target.value)} 
-                          placeholder="e.g., Executive Director" 
-                        />
-                    </div>
-                    <div>
-                        <label htmlFor="organization" className="text-sm font-medium text-slate-700 block mb-1">Organization Name</label>
-                        <input 
-                          id="organization" 
-                          required 
-                          className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors" 
-                          type="text" 
-                          value={organizationName} 
-                          onChange={(e) => setOrganizationName(e.target.value)} 
-                          placeholder="e.g., The Community Foundation" 
-                        />
-                    </div>
-                </>
-            )}
-            <div>
-                <label htmlFor="location" className="text-sm font-medium text-slate-700 block mb-1">Location (Optional)</label>
-                <input 
-                  id="location" 
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors" 
-                  type="text" 
-                  value={location} 
-                  onChange={(e) => setLocation(e.target.value)} 
-                  placeholder="e.g., San Francisco, CA" 
-                />
-            </div>
-            <div>
-                <label htmlFor="bio" className="text-sm font-medium text-slate-700 block mb-1">Bio</label>
-                <textarea
-                  id="bio"
-                  rows={4}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors resize-vertical"
-                  value={bio}
-                  onChange={(e) => setBio(e.target.value)}
-                  placeholder="Tell others about yourself and your work..."
-                />
-                <p className="text-xs text-slate-500 mt-1">{bio.length}/500 characters</p>
-            </div>
+          <div>
+            <label htmlFor="fullName" className="text-sm font-medium text-slate-700 block mb-1">Full Name</label>
+            <input 
+              id="fullName" 
+              required 
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors" 
+              type="text" 
+              value={fullName} 
+              onChange={(e) => setFullName(e.target.value)} 
+            />
+          </div>
 
-            <div className="pt-4">
-                <button 
-                  type="submit" 
-                  disabled={loading || uploading} 
-                  className="bg-blue-600 text-white py-2.5 px-6 rounded-lg hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed font-semibold shadow-sm transition-colors"
-                >
-                    {loading ? 'Saving...' : 'Save Profile Changes'}
-                </button>
+          <div>
+            <label htmlFor="title" className="text-sm font-medium text-slate-700 block mb-1">Your Title</label>
+            <input 
+              id="title" 
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors" 
+              type="text" 
+              value={title} 
+              onChange={(e) => setTitle(e.target.value)} 
+              placeholder="e.g., Executive Director, Program Manager" 
+            />
+          </div>
+
+          <div>
+            <label htmlFor="organization" className="text-sm font-medium text-slate-700 block mb-1">Organization Name</label>
+            <input 
+              id="organization" 
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-slate-50 text-slate-600 cursor-not-allowed" 
+              type="text" 
+              value={organizationName} 
+              disabled
+              placeholder="No organization linked"
+            />
+            <p className="text-xs text-slate-500 mt-1">
+              This is automatically populated from your linked organization. To change this, you'll need to join a different organization.
+            </p>
+          </div>
+
+          {/* Location Section */}
+          <div className="border-t border-slate-200 pt-6 mt-6">
+            <div className="flex items-center gap-2 mb-4">
+              <MapPinIcon className="text-green-500" />
+              <h3 className="text-lg font-semibold text-slate-800">Your Location</h3>
             </div>
+            <LocationSelector
+              location={location}
+              onChange={handleLocationChange}
+              loading={loading}
+            />
+          </div>
+
+          <div>
+            <label htmlFor="bio" className="text-sm font-medium text-slate-700 block mb-1">Bio</label>
+            <textarea
+              id="bio"
+              rows={4}
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors resize-vertical"
+              value={bio}
+              onChange={(e) => setBio(e.target.value)}
+              placeholder="Tell others about yourself and your work..."
+            />
+            <p className="text-xs text-slate-500 mt-1">{bio.length}/500 characters</p>
+          </div>
+
+          {/* Interests Section */}
+          <div className="border-t border-slate-200 pt-6 mt-6">
+            <div className="flex items-center gap-2 mb-4">
+              <HeartIcon className="text-pink-500" />
+              <h3 className="text-lg font-semibold text-slate-800">Your Interests</h3>
+            </div>
+            <InterestSelector
+              interests={interests}
+              onChange={handleInterestsChange}
+              loading={loading}
+            />
+          </div>
+
+          <div className="pt-4">
+            <button 
+              type="submit" 
+              disabled={loading || uploading} 
+              className="bg-blue-600 text-white py-2.5 px-6 rounded-lg hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed font-semibold shadow-sm transition-colors"
+            >
+              {loading ? 'Saving...' : 'Save Profile Changes'}
+            </button>
+          </div>
         </form>
         {profileMessage && <div className="text-green-600 text-sm mt-4 font-medium">{profileMessage}</div>}
         {profileError && <div className="text-red-600 text-sm mt-4 font-medium">{profileError}</div>}

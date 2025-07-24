@@ -1,20 +1,71 @@
-// Complete MyOrganizationPage.jsx with Organization Posts Integration
+// src/components/MyOrganizationPage.jsx - Clean Rewrite for New Database Structure
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { useOutletContext, Link } from 'react-router-dom';
+import { useOutletContext } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
-import { Users, Shield, MapPin, Globe, Building2, Edit, AlertTriangle, LogOut, Search, Crown, UserPlus, UserMinus, Settings, Star, MessageSquare, BarChart3, ClipboardList, TrendingUp } from 'lucide-react';
+import { 
+    Users, Shield, MapPin, Globe, Building2, Edit, AlertTriangle, LogOut, 
+    Search, Crown, UserPlus, UserMinus, Settings, Star, MessageSquare, 
+    BarChart3, ClipboardList, TrendingUp, Mail, Plus 
+} from 'lucide-react';
 import Avatar from './Avatar.jsx';
-import EnhancedOrganizationSetupPage from './OrganizationSetupPage.jsx';
-import OmegaAdminOrgSelector from './OmegaAdminOrgSelector.jsx';
-import AdminManagementModal from './AdminManagementModal.jsx';
-import SocialMetricsCard from './SocialMetricsCard.jsx';
-import OrganizationPosts from './OrganizationPosts.jsx';
-// Import our permission utilities
-import { hasPermission, PERMISSIONS, ROLES, getRoleDisplayName, getRoleBadgeColor, canManageUser } from '../utils/permissions.js';
+import StreamlinedOrganizationSetupPage from './OrganizationSetupPage.jsx';
+
+// Permission system inline
+const PERMISSIONS = {
+    EDIT_ORGANIZATION: 'edit_organization',
+    MANAGE_MEMBERS: 'manage_members',
+    MANAGE_ADMINS: 'manage_admins'
+};
+
+const ROLES = {
+    SUPER_ADMIN: 'super_admin',
+    ADMIN: 'admin',
+    MEMBER: 'member'
+};
+
+const hasPermission = (userRole, permission, isOmegaAdmin = false) => {
+    if (isOmegaAdmin) return true;
+    
+    const rolePermissions = {
+        [ROLES.SUPER_ADMIN]: [PERMISSIONS.EDIT_ORGANIZATION, PERMISSIONS.MANAGE_MEMBERS, PERMISSIONS.MANAGE_ADMINS],
+        [ROLES.ADMIN]: [PERMISSIONS.MANAGE_MEMBERS],
+        [ROLES.MEMBER]: []
+    };
+    
+    return rolePermissions[userRole]?.includes(permission) || false;
+};
+
+const getRoleDisplayName = (role, isOmegaAdmin = false) => {
+    if (isOmegaAdmin) return 'Omega Admin';
+    const roleNames = {
+        [ROLES.SUPER_ADMIN]: 'Super Admin',
+        [ROLES.ADMIN]: 'Admin', 
+        [ROLES.MEMBER]: 'Member'
+    };
+    return roleNames[role] || 'Member';
+};
+
+const getRoleBadgeColor = (role, isOmegaAdmin = false) => {
+    if (isOmegaAdmin) return 'bg-purple-100 text-purple-800 border-purple-200';
+    const colors = {
+        [ROLES.SUPER_ADMIN]: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+        [ROLES.ADMIN]: 'bg-blue-100 text-blue-800 border-blue-200',
+        [ROLES.MEMBER]: 'bg-green-100 text-green-800 border-green-200'
+    };
+    return colors[role] || 'bg-gray-100 text-gray-800 border-gray-200';
+};
+
+const canManageUser = (currentUserRole, targetRole, isOmegaAdmin = false) => {
+    if (isOmegaAdmin) return true;
+    if (currentUserRole === ROLES.SUPER_ADMIN) return true;
+    if (currentUserRole === ROLES.ADMIN && targetRole === ROLES.MEMBER) return true;
+    return false;
+};
 
 export default function MyOrganizationPage() {
     const { profile, session } = useOutletContext();
     
+    // State management
     const [organization, setOrganization] = useState(null);
     const [members, setMembers] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -22,49 +73,75 @@ export default function MyOrganizationPage() {
     const [userMembership, setUserMembership] = useState(null);
     const [isConfirmingLeave, setConfirmingLeave] = useState(false);
     
-    // Search and filter controls
+    // UI state
     const [searchQuery, setSearchQuery] = useState('');
     const [roleFilter, setRoleFilter] = useState('all');
-    
-    // Modal state for admin management
-    const [selectedMember, setSelectedMember] = useState(null);
-    const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
-    const [modalAction, setModalAction] = useState(null);
-
-    // NEW: Tab state for managing different sections
     const [activeTab, setActiveTab] = useState('overview');
-
-    // NEW: Editing state for organization details
+    
+    // Editing state
     const [isEditing, setIsEditing] = useState(false);
     const [editingData, setEditingData] = useState({});
     const [saving, setSaving] = useState(false);
-    const [logoFile, setLogoFile] = useState(null);
-    const [logoPreview, setLogoPreview] = useState(null);
 
-    // Check if user is Omega Admin
+    // Permissions
     const isOmegaAdmin = profile?.is_omega_admin === true;
+    const userRole = userMembership?.role;
+    const canEditOrg = hasPermission(userRole, PERMISSIONS.EDIT_ORGANIZATION, isOmegaAdmin);
+    const canManageMembers = hasPermission(userRole, PERMISSIONS.MANAGE_MEMBERS, isOmegaAdmin);
+    const canManageAdmins = hasPermission(userRole, PERMISSIONS.MANAGE_ADMINS, isOmegaAdmin);
+    const canViewAnalytics = ['super_admin', 'admin'].includes(userRole) || isOmegaAdmin;
+    const canLeave = !isOmegaAdmin && userMembership;
 
-    // NEW: Enhanced Tab configuration based on organization type - MOVED TO TOP LEVEL
-    const getTabsForOrganizationType = useCallback((orgType, canViewAnalytics) => {
+    // Organization type helpers
+    const getOrgTypeIcon = (type) => {
+        const iconMap = {
+            'nonprofit': '🏛️',
+            'foundation': '💰',
+            'government': '🏛️',
+            'for-profit': '🏢',
+            'education': '🎓',
+            'healthcare': '🏥',
+            'religious': '⛪',
+            'international': '🌍'
+        };
+        return iconMap[type] || '🏢';
+    };
+
+    const getOrgTypeLabel = (type) => {
+        const labelMap = {
+            'nonprofit': 'Nonprofit Organization',
+            'foundation': 'Foundation',
+            'government': 'Government Agency',
+            'for-profit': 'For-Profit Company',
+            'education': 'Educational Institution',
+            'healthcare': 'Healthcare Organization',
+            'religious': 'Religious Organization',
+            'international': 'International Organization'
+        };
+        return labelMap[type] || type;
+    };
+
+    // Tab configuration
+    const tabs = useMemo(() => {
+        if (!userMembership?.organization_type) return [];
+        
         const baseTabs = [
             { id: 'overview', label: 'Overview', icon: Building2 },
             { id: 'team', label: 'Team', icon: Users }
         ];
 
-        // Add analytics tab for admins
         if (canViewAnalytics) {
             baseTabs.splice(1, 0, { id: 'analytics', label: 'Analytics', icon: BarChart3 });
         }
 
-        // Add organization-type specific tabs
-        if (orgType === 'nonprofit') {
+        if (userMembership.organization_type === 'nonprofit') {
             return [
                 ...baseTabs,
                 { id: 'programs', label: 'Programs', icon: ClipboardList },
                 { id: 'impact', label: 'Impact Stories', icon: TrendingUp },
                 { id: 'supporters', label: 'Supporters', icon: Star }
             ];
-        } else if (orgType === 'foundation') {
+        } else if (userMembership.organization_type === 'foundation') {
             return [
                 ...baseTabs,
                 { id: 'grants', label: 'Active Grants', icon: ClipboardList },
@@ -74,24 +151,9 @@ export default function MyOrganizationPage() {
         }
 
         return baseTabs;
-    }, []);
+    }, [userMembership?.organization_type, canViewAnalytics]);
 
-    // Calculate permissions early
-    const userRole = userMembership?.role;
-    const canEditOrg = hasPermission(userRole, PERMISSIONS.EDIT_ORGANIZATION, isOmegaAdmin);
-    const canManageMembers = hasPermission(userRole, PERMISSIONS.MANAGE_MEMBERS, isOmegaAdmin);
-    const canManageAdmins = hasPermission(userRole, PERMISSIONS.MANAGE_ADMINS, isOmegaAdmin);
-    const canViewAnalytics = ['super_admin', 'admin'].includes(userRole) || isOmegaAdmin;
-    const canSubmitUpdates = ['super_admin', 'admin'].includes(userRole) || isOmegaAdmin;
-    const canLeave = !isOmegaAdmin && userMembership;
-
-    // Tabs configuration - now always calculated
-    const tabs = useMemo(() => 
-        getTabsForOrganizationType(userMembership?.organization_type, canViewAnalytics), 
-        [userMembership?.organization_type, canViewAnalytics, getTabsForOrganizationType]
-    );
-
-    // Filter and search members - moved up
+    // Filter members
     const filteredMembers = useMemo(() => {
         return members.filter(member => {
             const matchesSearch = !searchQuery || 
@@ -104,11 +166,10 @@ export default function MyOrganizationPage() {
         });
     }, [members, searchQuery, roleFilter]);
 
-    // Enhanced team member organization for Team tab - moved up
+    // Organize members by role
     const organizedMembers = useMemo(() => {
         const filtered = filteredMembers;
 
-        // Organize into sections
         const leadership = filtered.filter(m => 
             ['super_admin', 'admin'].includes(m.role) || 
             m.profiles?.title?.toLowerCase().includes('director') ||
@@ -128,34 +189,23 @@ export default function MyOrganizationPage() {
         return { leadership, staff, boardMembers };
     }, [filteredMembers]);
 
+    // Check membership
     const checkMembership = useCallback(async () => {
-        console.log('=== MEMBERSHIP CHECK STARTED ===');
-        setConfirmingLeave(false); 
-
         if (!session?.user?.id || !profile) {
-            console.log('❌ No session or profile, skipping membership check');
             setLoading(false);
             return;
         }
 
-        console.log('Debug info:', {
-            'session.user.id': session?.user?.id,
-            'profile.id': profile?.id,
-            'isOmegaAdmin': isOmegaAdmin
-        });
-
         setLoading(true);
         setError('');
+        setConfirmingLeave(false);
 
-        // For Omega Admins, show the organization selector instead
         if (isOmegaAdmin) {
-            console.log('👑 User is Omega Admin, skipping membership check');
             setLoading(false);
             return;
         }
 
         try {
-            // Check new membership system
             const { data: memberships, error: membershipError } = await supabase
                 .from('organization_memberships')
                 .select('*')
@@ -163,68 +213,37 @@ export default function MyOrganizationPage() {
                 .order('joined_at', { ascending: false })
                 .limit(1);
 
-            console.log('Membership query result:', {
-                memberships,
-                membershipError,
-                'profile.id used in query': profile.id,
-                'query timestamp': new Date().toISOString()
-            });
-
             if (membershipError) {
-                console.error('❌ Membership check error:', membershipError);
                 setError('Error checking membership');
                 setLoading(false);
                 return;
             }
 
-            // If we found a membership, use it
             if (memberships && memberships.length > 0) {
-                console.log('✅ Found membership:', memberships[0]);
                 setUserMembership(memberships[0]);
-                setLoading(false);
-                return;
+            } else {
+                setUserMembership(null);
+                setOrganization(null);
+                setMembers([]);
             }
-
-            // Check for legacy admin status
-            if (profile.managed_nonprofit_id || profile.managed_funder_id) {
-                console.log('📋 Found legacy admin membership');
-                setUserMembership({ 
-                    role: 'super_admin',
-                    organization_id: profile.managed_nonprofit_id || profile.managed_funder_id, 
-                    organization_type: profile.managed_nonprofit_id ? 'nonprofit' : 'funder'
-                });
-                setLoading(false);
-                return;
-            }
-
-            // No membership found - clear all organization state
-            console.log('❌ No membership found - clearing organization state');
-            setUserMembership(null);
-            setOrganization(null);
-            setMembers([]);
-            setLoading(false);
 
         } catch (err) {
-            console.error('❌ Error in checkMembership:', err);
             setError('Error checking membership');
-            // Also clear state on error
             setUserMembership(null);
             setOrganization(null);
             setMembers([]);
+        } finally {
             setLoading(false);
         }
     }, [profile, session?.user?.id, isOmegaAdmin]);
 
+    // Fetch organization data
     const fetchOrganizationData = useCallback(async () => {
         if (!userMembership) return;
 
         try {
             setLoading(true);
             
-            // ✅ FIXED: Use the unified 'organizations' table instead of separate tables
-            console.log('Fetching organization data for:', userMembership);
-            
-            // Fetch organization data from the unified organizations table
             const { data: orgData, error: orgError } = await supabase
                 .from('organizations')
                 .select('*')
@@ -233,34 +252,28 @@ export default function MyOrganizationPage() {
 
             if (orgError) {
                 setError('Error loading organization data');
-                console.error('Organization fetch error:', orgError);
                 setLoading(false);
                 return;
             }
 
             if (!orgData) {
                 setError('Organization not found');
-                console.error('No organization found with ID:', userMembership.organization_id);
                 setLoading(false);
                 return;
             }
 
-            console.log('✅ Organization data loaded:', orgData);
-            
-            // Set organization with the type from membership
             setOrganization({ 
                 ...orgData, 
                 type: userMembership.organization_type,
-                // Map unified table fields to expected fields for backward compatibility
-                logo_url: orgData.image_url, // Map image_url to logo_url for existing components
-                tagline: orgData.tagline || '', // Ensure tagline exists
-                description: orgData.description || '', // Ensure description exists
-                location: orgData.location || '', // Ensure location exists
-                website: orgData.website || '', // Ensure website exists
-                admin_profile_id: orgData.admin_profile_id // Keep admin reference
+                logo_url: orgData.image_url,
+                tagline: orgData.tagline || '', 
+                description: orgData.description || '', 
+                location: orgData.location || '', 
+                website: orgData.website || '', 
+                contact_email: orgData.contact_email || '',
+                admin_profile_id: orgData.admin_profile_id
             });
 
-            // Fetch organization members
             const { data: memberData, error: memberError } = await supabase
                 .from('organization_memberships')
                 .select(`
@@ -278,43 +291,24 @@ export default function MyOrganizationPage() {
                 .order('role', { ascending: false })
                 .order('joined_at', { ascending: true });
 
-            if (memberError) {
-                console.error('Member fetch error:', memberError);
-            } else {
-                console.log('✅ Member data loaded:', memberData);
+            if (!memberError) {
                 setMembers(memberData || []);
             }
 
         } catch (err) {
             setError('Error loading organization data');
-            console.error('General fetch error:', err);
         } finally {
             setLoading(false);
         }
     }, [userMembership]);
 
-    useEffect(() => {
-        checkMembership();
-    }, [checkMembership]);
-
-    useEffect(() => {
-        if (userMembership) {
-            fetchOrganizationData();
-        }
-    }, [fetchOrganizationData]);
-
-    // ENHANCED: Fixed leave organization function with automatic redirect
+    // Leave organization
     const executeLeave = async () => {
         if (!userMembership) return;
 
         try {
             setLoading(true);
             setError('');
-
-            console.log('Leaving organization...', {
-                userId: session.user.id,
-                organizationId: userMembership.organization_id
-            });
 
             const { error: deleteError } = await supabase
                 .from('organization_memberships')
@@ -323,36 +317,86 @@ export default function MyOrganizationPage() {
                 .eq('organization_id', userMembership.organization_id);
 
             if (deleteError) {
-                console.error('Error leaving organization:', deleteError);
                 setError('Error leaving organization: ' + deleteError.message);
                 setConfirmingLeave(false);
                 setLoading(false);
                 return;
             }
 
-            console.log('Successfully left organization');
+            const { error: profileUpdateError } = await supabase
+                .from('profiles')
+                .update({
+                    organization_choice: null,
+                    selected_organization_id: null,
+                    selected_organization_type: null,
+                    updated_at: new Date()
+                })
+                .eq('id', session.user.id);
 
-            // Immediately clear the user membership state
             setUserMembership(null);
             setOrganization(null);
             setMembers([]);
             setConfirmingLeave(false);
             
-            // Wait a moment for database consistency
             await new Promise(resolve => setTimeout(resolve, 500));
-            
-            // Double-check by calling checkMembership
             await checkMembership();
 
         } catch (err) {
-            console.error('Unexpected error leaving organization:', err);
             setError('An unexpected error occurred while leaving the organization.');
             setConfirmingLeave(false);
             setLoading(false);
         }
     };
 
-    // NEW: Handle editing functions
+    // Handle member actions
+    const handleMemberAction = async (member, action) => {
+        if (!userMembership) return;
+
+        const currentUserRole = userMembership.role;
+        const targetRole = member.role;
+        
+        if (!canManageUser(currentUserRole, targetRole, isOmegaAdmin)) {
+            setError('You do not have permission to manage this user.');
+            return;
+        }
+
+        try {
+            if (action === 'promote') {
+                const { error } = await supabase
+                    .from('organization_memberships')
+                    .update({ role: ROLES.ADMIN })
+                    .eq('profile_id', member.profile_id)
+                    .eq('organization_id', userMembership.organization_id);
+
+                if (error) throw error;
+                await fetchOrganizationData();
+
+            } else if (action === 'demote') {
+                const { error } = await supabase
+                    .from('organization_memberships')
+                    .update({ role: ROLES.MEMBER })
+                    .eq('profile_id', member.profile_id)
+                    .eq('organization_id', userMembership.organization_id);
+
+                if (error) throw error;
+                await fetchOrganizationData();
+
+            } else if (action === 'remove') {
+                const { error } = await supabase
+                    .from('organization_memberships')
+                    .delete()
+                    .eq('profile_id', member.profile_id)
+                    .eq('organization_id', userMembership.organization_id);
+
+                if (error) throw error;
+                await fetchOrganizationData();
+            }
+        } catch (err) {
+            setError(`Error ${action}ing member: ${err.message}`);
+        }
+    };
+
+    // Editing functions
     const startEditing = () => {
         setIsEditing(true);
         setEditingData({
@@ -363,36 +407,12 @@ export default function MyOrganizationPage() {
             location: organization.location || '',
             contact_email: organization.contact_email || ''
         });
-        setLogoPreview(organization.logo_url);
     };
 
     const cancelEditing = () => {
         setIsEditing(false);
         setEditingData({});
-        setLogoFile(null);
-        setLogoPreview(null);
         setError('');
-    };
-
-    const handleLogoUpload = (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-
-        if (file.size > 2 * 1024 * 1024) {
-            setError('Logo file size must be less than 2MB');
-            return;
-        }
-
-        if (!file.type.startsWith('image/')) {
-            setError('Please select an image file');
-            return;
-        }
-
-        setLogoFile(file);
-        const reader = new FileReader();
-        reader.onload = (e) => setLogoPreview(e.target.result);
-        reader.readAsDataURL(file);
-        setError(''); // Clear any previous errors
     };
 
     const saveChanges = async () => {
@@ -402,37 +422,6 @@ export default function MyOrganizationPage() {
             setSaving(true);
             setError('');
 
-            let logoUrl = organization.image_url; // Keep existing logo by default
-
-            // Upload new logo if provided
-            if (logoFile) {
-                console.log('📷 Uploading new logo...');
-                const fileExt = logoFile.name.split('.').pop();
-                const fileName = `org-logo-${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
-                
-                const { data: uploadData, error: uploadError } = await supabase.storage
-                    .from('avatars')
-                    .upload(fileName, logoFile, { 
-                        cacheControl: '3600',
-                        upsert: false 
-                    });
-
-                if (uploadError) {
-                    console.error('❌ Logo upload error:', uploadError);
-                    setError('Failed to upload logo. Please try again.');
-                    setSaving(false);
-                    return;
-                }
-
-                const { data: { publicUrl } } = supabase.storage
-                    .from('avatars')
-                    .getPublicUrl(uploadData.path);
-                
-                logoUrl = `${publicUrl}?v=${Date.now()}`;
-                console.log('✅ Logo uploaded:', logoUrl);
-            }
-
-            // Update organization in database
             const updateData = {
                 name: editingData.name,
                 tagline: editingData.tagline || null,
@@ -440,11 +429,8 @@ export default function MyOrganizationPage() {
                 website: editingData.website || null,
                 location: editingData.location || null,
                 contact_email: editingData.contact_email || null,
-                image_url: logoUrl,
                 updated_at: new Date()
             };
-
-            console.log('💾 Updating organization with:', updateData);
 
             const { error: updateError } = await supabase
                 .from('organizations')
@@ -452,107 +438,38 @@ export default function MyOrganizationPage() {
                 .eq('id', organization.id);
 
             if (updateError) {
-                console.error('❌ Organization update error:', updateError);
                 setError('Failed to save changes. Please try again.');
                 setSaving(false);
                 return;
             }
 
-            console.log('✅ Organization updated successfully');
-
-            // Update local state
             setOrganization(prev => ({
                 ...prev,
-                ...updateData,
-                logo_url: logoUrl // Update the mapped field too
+                ...updateData
             }));
 
-            // Exit editing mode
             setIsEditing(false);
             setEditingData({});
-            setLogoFile(null);
-            setLogoPreview(null);
 
         } catch (err) {
-            console.error('❌ Error saving changes:', err);
             setError('An unexpected error occurred. Please try again.');
         } finally {
             setSaving(false);
         }
     };
-    
-    // Handle member actions (promote, demote, remove)
-    const handleMemberAction = async (member, action) => {
-        if (!userMembership) return;
 
-        const userRole = userMembership.role;
-        const targetRole = member.role;
-        
-        // Use new permission system with omega admin support
-        if (!canManageUser(userRole, targetRole, isOmegaAdmin)) {
-            setError('You do not have permission to manage this user.');
-            return;
+    // Effects
+    useEffect(() => {
+        checkMembership();
+    }, [checkMembership]);
+
+    useEffect(() => {
+        if (userMembership) {
+            fetchOrganizationData();
         }
+    }, [fetchOrganizationData]);
 
-        try {
-            if (action === 'promote') {
-                // Promote member to admin
-                const { error } = await supabase
-                    .from('organization_memberships')
-                    .update({ role: ROLES.ADMIN })
-                    .eq('profile_id', member.profile_id)
-                    .eq('organization_id', userMembership.organization_id);
-
-                if (error) throw error;
-                await fetchOrganizationData(); // Refresh
-
-            } else if (action === 'demote') {
-                // Demote admin/super_admin to member
-                const { error } = await supabase
-                    .from('organization_memberships')
-                    .update({ role: ROLES.MEMBER })
-                    .eq('profile_id', member.profile_id)
-                    .eq('organization_id', userMembership.organization_id);
-
-                if (error) throw error;
-                await fetchOrganizationData(); // Refresh
-
-            } else if (action === 'remove') {
-                // Remove member from organization
-                const { error } = await supabase
-                    .from('organization_memberships')
-                    .delete()
-                    .eq('profile_id', member.profile_id)
-                    .eq('organization_id', userMembership.organization_id);
-
-                if (error) throw error;
-                await fetchOrganizationData(); // Refresh
-            }
-        } catch (err) {
-            console.error('Error managing member:', err);
-            setError(`Error ${action}ing member: ${err.message}`);
-        }
-    };
-
-    if (loading) {
-        return <div className="p-6 text-center text-slate-500">Loading organization details...</div>;
-    }
-
-    // For Omega Admins, show organization selector
-    if (isOmegaAdmin) {
-        return <OmegaAdminOrgSelector />;
-    }
-
-    // If no membership, show setup page
-    if (!userMembership) {
-        return <EnhancedOrganizationSetupPage onJoinSuccess={checkMembership} />;
-    }
-    
-    if (!organization) {
-        return <div className="p-6 text-center text-slate-500">Loading organization details...</div>;
-    }
-    
-    // NEW: Render team member card without join date
+    // Render team member card
     const renderTeamMemberCard = (member) => {
         const getRoleIcon = (role) => {
             switch (role) {
@@ -564,7 +481,7 @@ export default function MyOrganizationPage() {
         };
 
         return (
-            <div key={member.profile_id} className="flex items-center justify-between p-4 border border-slate-200 rounded-lg hover:bg-slate-50">
+            <div key={member.profile_id} className="flex items-center justify-between p-4 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors">
                 <div className="flex items-center space-x-3">
                     <Avatar 
                         src={member.profiles?.avatar_url} 
@@ -582,16 +499,18 @@ export default function MyOrganizationPage() {
                         {member.profiles?.title && (
                             <p className="text-sm text-slate-500">{member.profiles.title}</p>
                         )}
+                        <p className="text-xs text-slate-400">
+                            Joined {new Date(member.joined_at).toLocaleDateString()}
+                        </p>
                     </div>
                 </div>
 
-                {/* Member Actions */}
                 {canManageMembers && member.profile_id !== profile.id && (
                     <div className="flex items-center space-x-2">
                         {member.role === ROLES.MEMBER && canManageAdmins && (
                             <button
                                 onClick={() => handleMemberAction(member, 'promote')}
-                                className="text-green-600 hover:text-green-800 p-1 rounded"
+                                className="text-green-600 hover:text-green-800 p-1 rounded transition-colors"
                                 title="Promote to Admin"
                             >
                                 <UserPlus className="w-4 h-4" />
@@ -600,7 +519,7 @@ export default function MyOrganizationPage() {
                         {(member.role === ROLES.ADMIN || member.role === ROLES.SUPER_ADMIN) && canManageAdmins && (
                             <button
                                 onClick={() => handleMemberAction(member, 'demote')}
-                                className="text-orange-600 hover:text-orange-800 p-1 rounded"
+                                className="text-orange-600 hover:text-orange-800 p-1 rounded transition-colors"
                                 title="Demote to Member"
                             >
                                 <UserMinus className="w-4 h-4" />
@@ -608,7 +527,7 @@ export default function MyOrganizationPage() {
                         )}
                         <button
                             onClick={() => handleMemberAction(member, 'remove')}
-                            className="text-red-600 hover:text-red-800 p-1 rounded"
+                            className="text-red-600 hover:text-red-800 p-1 rounded transition-colors"
                             title="Remove from Organization"
                         >
                             <UserMinus className="w-4 h-4" />
@@ -619,8 +538,8 @@ export default function MyOrganizationPage() {
         );
     };
 
-    // NEW: Render team section
-    const renderTeamSection = (title, members, emptyMessage) => {
+    // Render team section
+    const renderTeamSection = (title, members) => {
         if (members.length === 0) return null;
 
         return (
@@ -635,50 +554,66 @@ export default function MyOrganizationPage() {
         );
     };
 
+    // Loading state
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center py-12">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                <span className="ml-3 text-slate-500">Loading organization details...</span>
+            </div>
+        );
+    }
+
+    // Omega admin interface
+    if (isOmegaAdmin) {
+        return (
+            <div className="text-center py-12">
+                <Crown className="w-12 h-12 text-yellow-500 mx-auto mb-4" />
+                <h2 className="text-xl font-semibold text-slate-800 mb-2">Omega Admin Access</h2>
+                <p className="text-slate-600">As an Omega Admin, you have access to all organizations on the platform.</p>
+            </div>
+        );
+    }
+
+    // No membership - show setup page
+    if (!userMembership) {
+        return <StreamlinedOrganizationSetupPage onJoinSuccess={checkMembership} />;
+    }
+    
+    // No organization found
+    if (!organization) {
+        return (
+            <div className="text-center py-12">
+                <AlertTriangle className="w-12 h-12 text-orange-500 mx-auto mb-4" />
+                <h2 className="text-xl font-semibold text-slate-800 mb-2">Organization Not Found</h2>
+                <p className="text-slate-600">The organization associated with your membership could not be found.</p>
+            </div>
+        );
+    }
+    
     return (
         <div className="space-y-6">
+            {/* Error message */}
             {error && (
-                <div className="p-6 bg-red-50 text-red-700 border border-red-200 rounded-lg flex items-center">
+                <div className="p-4 bg-red-50 text-red-700 border border-red-200 rounded-lg flex items-center">
                     <AlertTriangle className="w-5 h-5 mr-3 flex-shrink-0"/>
                     <span>{error}</span>
                 </div>
             )}
 
-            {/* Organization Header with integrated About Us */}
+            {/* Organization Header */}
             <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
                 <div className="flex items-start justify-between flex-wrap gap-4">
                     <div className="flex items-center space-x-4">
-                        {/* Logo section with editing capability */}
-                        <div className="relative">
-                            {isEditing ? (
-                                <div className="flex flex-col items-center space-y-2">
-                                    <div className="w-16 h-16 rounded-full bg-slate-200 border-2 border-dashed border-slate-300 flex items-center justify-center overflow-hidden">
-                                        {logoPreview ? (
-                                            <img 
-                                                src={logoPreview} 
-                                                alt="Logo preview" 
-                                                className="w-full h-full object-cover"
-                                            />
-                                        ) : (
-                                            <span className="text-slate-500 text-xs">Logo</span>
-                                        )}
-                                    </div>
-                                    <input
-                                        type="file"
-                                        accept="image/*"
-                                        onChange={handleLogoUpload}
-                                        className="hidden"
-                                        id="logo-upload"
-                                    />
-                                    <label
-                                        htmlFor="logo-upload"
-                                        className="px-2 py-1 text-xs bg-blue-600 text-white rounded cursor-pointer hover:bg-blue-700"
-                                    >
-                                        Change Logo
-                                    </label>
-                                </div>
+                        <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center overflow-hidden">
+                            {organization.logo_url ? (
+                                <img 
+                                    src={organization.logo_url} 
+                                    alt={organization.name}
+                                    className="w-full h-full object-cover"
+                                />
                             ) : (
-                                <Avatar src={organization.logo_url} fullName={organization.name} size="lg" />
+                                <span className="text-2xl">{getOrgTypeIcon(organization.type)}</span>
                             )}
                         </div>
                         
@@ -689,7 +624,7 @@ export default function MyOrganizationPage() {
                                         type="text"
                                         value={editingData.name}
                                         onChange={(e) => setEditingData(prev => ({ ...prev, name: e.target.value }))}
-                                        className="text-2xl font-bold text-slate-800 bg-white border border-slate-300 rounded px-3 py-1 w-full max-w-md"
+                                        className="text-2xl font-bold text-slate-800 bg-white border border-slate-300 rounded px-3 py-1 w-full max-w-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                         placeholder="Organization Name"
                                         required
                                     />
@@ -697,31 +632,15 @@ export default function MyOrganizationPage() {
                                         type="text"
                                         value={editingData.tagline}
                                         onChange={(e) => setEditingData(prev => ({ ...prev, tagline: e.target.value }))}
-                                        className="text-slate-600 bg-white border border-slate-300 rounded px-3 py-1 w-full max-w-lg"
-                                        placeholder="Tagline"
+                                        className="text-slate-600 bg-white border border-slate-300 rounded px-3 py-1 w-full max-w-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                        placeholder="Organization tagline"
                                     />
-                                    <div className="flex items-center space-x-4">
-                                        <input
-                                            type="text"
-                                            value={editingData.location}
-                                            onChange={(e) => setEditingData(prev => ({ ...prev, location: e.target.value }))}
-                                            className="text-sm text-slate-500 bg-white border border-slate-300 rounded px-2 py-1"
-                                            placeholder="Location"
-                                        />
-                                        <input
-                                            type="url"
-                                            value={editingData.website}
-                                            onChange={(e) => setEditingData(prev => ({ ...prev, website: e.target.value }))}
-                                            className="text-sm text-slate-500 bg-white border border-slate-300 rounded px-2 py-1"
-                                            placeholder="Website URL"
-                                        />
-                                    </div>
                                 </div>
                             ) : (
                                 <div>
                                     <h1 className="text-2xl font-bold text-slate-800">{organization.name}</h1>
-                                    <p className="text-slate-600 mt-1">{organization.tagline}</p>
-                                    <div className="flex items-center mt-2 text-sm text-slate-500">
+                                    {organization.tagline && <p className="text-slate-600 mt-1">{organization.tagline}</p>}
+                                    <div className="flex items-center mt-2 text-sm text-slate-500 flex-wrap gap-4">
                                         <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getRoleBadgeColor(userRole, isOmegaAdmin)}`}>
                                             {userRole === ROLES.SUPER_ADMIN && <Crown className="w-3 h-3 mr-1.5" />}
                                             {userRole === ROLES.ADMIN && <Shield className="w-3 h-3 mr-1.5" />}
@@ -729,14 +648,49 @@ export default function MyOrganizationPage() {
                                             {isOmegaAdmin && <Star className="w-3 h-3 mr-1.5" />}
                                             {getRoleDisplayName(userRole, isOmegaAdmin)}
                                         </span>
-                                        {organization.location && <span className="ml-4 flex items-center"><MapPin className="w-4 h-4 mr-1.5" />{organization.location}</span>}
+                                        <span className="text-slate-400">•</span>
+                                        <span className="flex items-center">
+                                            <span className="mr-1">{getOrgTypeIcon(organization.type)}</span>
+                                            {getOrgTypeLabel(organization.type)}
+                                        </span>
+                                        {organization.location && (
+                                            <>
+                                                <span className="text-slate-400">•</span>
+                                                <span className="flex items-center">
+                                                    <MapPin className="w-4 h-4 mr-1.5" />
+                                                    {organization.location}
+                                                </span>
+                                            </>
+                                        )}
                                         {organization.website && (
-                                            <span className="ml-4 flex items-center">
-                                                <Globe className="w-4 h-4 mr-1.5" />
-                                                <a href={organization.website} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800">
-                                                    Website
-                                                </a>
-                                            </span>
+                                            <>
+                                                <span className="text-slate-400">•</span>
+                                                <span className="flex items-center">
+                                                    <Globe className="w-4 h-4 mr-1.5" />
+                                                    <a 
+                                                        href={organization.website} 
+                                                        target="_blank" 
+                                                        rel="noopener noreferrer" 
+                                                        className="text-blue-600 hover:text-blue-800 transition-colors"
+                                                    >
+                                                        Website
+                                                    </a>
+                                                </span>
+                                            </>
+                                        )}
+                                        {organization.contact_email && (
+                                            <>
+                                                <span className="text-slate-400">•</span>
+                                                <span className="flex items-center">
+                                                    <Mail className="w-4 h-4 mr-1.5" />
+                                                    <a 
+                                                        href={`mailto:${organization.contact_email}`}
+                                                        className="text-blue-600 hover:text-blue-800 transition-colors"
+                                                    >
+                                                        Contact
+                                                    </a>
+                                                </span>
+                                            </>
                                         )}
                                     </div>
                                 </div>
@@ -750,14 +704,14 @@ export default function MyOrganizationPage() {
                                 <button
                                     onClick={cancelEditing}
                                     disabled={saving}
-                                    className="px-4 py-2 border border-slate-300 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 disabled:opacity-50"
+                                    className="px-4 py-2 border border-slate-300 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 disabled:opacity-50 transition-colors"
                                 >
                                     Cancel
                                 </button>
                                 <button
                                     onClick={saveChanges}
                                     disabled={saving || !editingData.name?.trim()}
-                                    className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center"
+                                    className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center transition-colors"
                                 >
                                     {saving ? (
                                         <>
@@ -765,21 +719,19 @@ export default function MyOrganizationPage() {
                                             Saving...
                                         </>
                                     ) : (
-                                        'Save Changes'
+                                        <>
+                                            <Settings className="w-4 h-4 mr-2" />
+                                            Save Changes
+                                        </>
                                     )}
                                 </button>
                             </div>
                         ) : (
                             <>
-                                {organization.slug && (
-                                    <Link to={`/${userMembership.organization_type === 'nonprofit' ? 'nonprofits' : 'funders'}/${organization.slug}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center px-4 py-2 border border-slate-300 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50">
-                                        View Public Profile
-                                    </Link>
-                                )}
                                 {canEditOrg && (
                                     <button
                                         onClick={startEditing}
-                                        className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 shadow-sm"
+                                        className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 shadow-sm transition-colors"
                                     >
                                         <Edit size={16} className="mr-2" />
                                         Edit Organization
@@ -788,7 +740,7 @@ export default function MyOrganizationPage() {
                                 {canLeave && (
                                     <button
                                         onClick={() => setConfirmingLeave(true)}
-                                        className="inline-flex items-center px-4 py-2 border border-red-300 text-red-700 text-sm font-medium rounded-lg hover:bg-red-50"
+                                        className="inline-flex items-center px-4 py-2 border border-red-300 text-red-700 text-sm font-medium rounded-lg hover:bg-red-50 transition-colors"
                                     >
                                         <LogOut size={16} className="mr-2" />
                                         Leave Organization
@@ -799,37 +751,51 @@ export default function MyOrganizationPage() {
                     </div>
                 </div>
 
-                {/* About Us section - with editing capability */}
+                {/* About section */}
                 {isEditing ? (
                     <div className="mt-6 pt-6 border-t border-slate-200">
-                        <label className="block text-sm font-medium text-slate-700 mb-2">Description</label>
+                        <label className="block text-sm font-medium text-slate-700 mb-2">About This Organization</label>
                         <textarea
                             value={editingData.description}
                             onChange={(e) => setEditingData(prev => ({ ...prev, description: e.target.value }))}
                             rows={4}
-                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                            placeholder="Describe your organization's mission and activities..."
+                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                            placeholder="Describe your organization's mission, activities, and goals..."
                         />
-                        <div className="mt-4">
-                            <label className="block text-sm font-medium text-slate-700 mb-2">Contact Email</label>
+                        <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <input
+                                type="text"
+                                value={editingData.location}
+                                onChange={(e) => setEditingData(prev => ({ ...prev, location: e.target.value }))}
+                                className="px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                placeholder="Location"
+                            />
+                            <input
+                                type="url"
+                                value={editingData.website}
+                                onChange={(e) => setEditingData(prev => ({ ...prev, website: e.target.value }))}
+                                className="px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                placeholder="Website URL"
+                            />
                             <input
                                 type="email"
                                 value={editingData.contact_email}
                                 onChange={(e) => setEditingData(prev => ({ ...prev, contact_email: e.target.value }))}
-                                className="w-full max-w-md px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                placeholder="contact@organization.org"
+                                className="px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                placeholder="Contact Email"
                             />
                         </div>
                     </div>
                 ) : (
                     organization.description && (
                         <div className="mt-6 pt-6 border-t border-slate-200">
+                            <h3 className="text-sm font-medium text-slate-700 mb-2">About</h3>
                             <p className="text-slate-600 leading-relaxed">{organization.description}</p>
                         </div>
                     )
                 )}
 
-                {/* Enhanced Tab Navigation */}
+                {/* Tab Navigation */}
                 <div className="mt-6 pt-6 border-t border-slate-200">
                     <nav className="flex space-x-8">
                         {tabs.map((tab) => {
@@ -856,52 +822,59 @@ export default function MyOrganizationPage() {
 
             {/* Tab Content */}
             {activeTab === 'overview' && (
-                <div>
-                    <OrganizationPosts
-                        organization={organization}
-                        organizationType={userMembership.organization_type}
-                        userRole={userRole}
-                        isOmegaAdmin={isOmegaAdmin}
-                        profile={profile}
-                        className="p-6"
-                    />
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                    <div className="text-center py-12">
+                        <MessageSquare className="w-12 h-12 text-slate-400 mx-auto mb-4" />
+                        <h3 className="text-lg font-medium text-slate-900 mb-2">Organization Updates</h3>
+                        <p className="text-slate-600 mb-6">
+                            Share updates, announcements, and engage with your community.
+                        </p>
+                        <button className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                            <Plus className="w-4 h-4 mr-2" />
+                            Create Post
+                        </button>
+                    </div>
                 </div>
             )}
 
-            {/* NEW: Analytics Tab - Only for Admins */}
+            {/* Analytics Tab */}
             {activeTab === 'analytics' && (
                 <div className="space-y-6">
-                    <SocialMetricsCard 
-                        organization={organization} 
-                        organizationType={userMembership.organization_type}
-                        userRole={userRole}
-                        isOmegaAdmin={isOmegaAdmin}
-                    />
-                    
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                            <h3 className="text-lg font-semibold text-slate-800 mb-4">Profile Performance</h3>
-                            <div className="space-y-4">
-                                <div className="flex justify-between items-center">
-                                    <span className="text-slate-600">Profile Views (30 days)</span>
-                                    <span className="font-semibold">1,234</span>
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-sm font-medium text-slate-600">Total Members</p>
+                                    <p className="text-2xl font-bold text-slate-900">{members.length}</p>
                                 </div>
-                                <div className="flex justify-between items-center">
-                                    <span className="text-slate-600">Followers Growth</span>
-                                    <span className="font-semibold text-green-600">+12%</span>
-                                </div>
+                                <Users className="w-8 h-8 text-blue-500" />
                             </div>
                         </div>
                         
                         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                            <h3 className="text-lg font-semibold text-slate-800 mb-4">Engagement Trends</h3>
-                            <p className="text-slate-600">Detailed engagement analytics and trends...</p>
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-sm font-medium text-slate-600">Profile Views</p>
+                                    <p className="text-2xl font-bold text-slate-900">1,234</p>
+                                </div>
+                                <BarChart3 className="w-8 h-8 text-green-500" />
+                            </div>
+                        </div>
+                        
+                        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-sm font-medium text-slate-600">Engagement</p>
+                                    <p className="text-2xl font-bold text-slate-900">+12%</p>
+                                </div>
+                                <TrendingUp className="w-8 h-8 text-purple-500" />
+                            </div>
                         </div>
                     </div>
                 </div>
             )}
 
-            {/* NEW: Enhanced Team Tab with organized sections */}
+            {/* Team Tab */}
             {activeTab === 'team' && (
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
                     <div className="flex items-center justify-between mb-6">
@@ -914,13 +887,13 @@ export default function MyOrganizationPage() {
                                     placeholder="Search members..."
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
-                                    className="pl-10 pr-4 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    className="pl-10 pr-4 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
                                 />
                             </div>
                             <select
                                 value={roleFilter}
                                 onChange={(e) => setRoleFilter(e.target.value)}
-                                className="px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                className="px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
                             >
                                 <option value="all">All Roles</option>
                                 <option value={ROLES.SUPER_ADMIN}>Super Admins</option>
@@ -931,9 +904,9 @@ export default function MyOrganizationPage() {
                     </div>
 
                     <div className="space-y-8">
-                        {renderTeamSection("Leadership", organizedMembers.leadership, "No leadership members found")}
-                        {renderTeamSection("Staff", organizedMembers.staff, "No staff members found")}
-                        {renderTeamSection("Board Members", organizedMembers.boardMembers, "No board members found")}
+                        {renderTeamSection("Leadership", organizedMembers.leadership)}
+                        {renderTeamSection("Staff", organizedMembers.staff)}
+                        {renderTeamSection("Board Members", organizedMembers.boardMembers)}
                     </div>
 
                     {filteredMembers.length === 0 && (
@@ -949,22 +922,31 @@ export default function MyOrganizationPage() {
                 <>
                     {activeTab === 'programs' && (
                         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                            <h2 className="text-lg font-semibold text-slate-800 mb-4">Programs & Services</h2>
-                            <p className="text-slate-600">Manage your organization's programs and services.</p>
+                            <div className="text-center py-12">
+                                <ClipboardList className="w-12 h-12 text-slate-400 mx-auto mb-4" />
+                                <h2 className="text-lg font-semibold text-slate-800 mb-2">Programs & Services</h2>
+                                <p className="text-slate-600">Manage your organization's programs and services.</p>
+                            </div>
                         </div>
                     )}
                     
                     {activeTab === 'impact' && (
                         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                            <h2 className="text-lg font-semibold text-slate-800 mb-4">Impact Stories</h2>
-                            <p className="text-slate-600">Share and manage your organization's impact stories.</p>
+                            <div className="text-center py-12">
+                                <TrendingUp className="w-12 h-12 text-slate-400 mx-auto mb-4" />
+                                <h2 className="text-lg font-semibold text-slate-800 mb-2">Impact Stories</h2>
+                                <p className="text-slate-600">Share and manage your organization's impact stories.</p>
+                            </div>
                         </div>
                     )}
                     
                     {activeTab === 'supporters' && (
                         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                            <h2 className="text-lg font-semibold text-slate-800 mb-4">Supporters & Donors</h2>
-                            <p className="text-slate-600">Manage relationships with your supporters and donors.</p>
+                            <div className="text-center py-12">
+                                <Star className="w-12 h-12 text-slate-400 mx-auto mb-4" />
+                                <h2 className="text-lg font-semibold text-slate-800 mb-2">Supporters & Donors</h2>
+                                <p className="text-slate-600">Manage relationships with your supporters and donors.</p>
+                            </div>
                         </div>
                     )}
                 </>
@@ -974,40 +956,57 @@ export default function MyOrganizationPage() {
                 <>
                     {activeTab === 'grants' && (
                         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                            <h2 className="text-lg font-semibold text-slate-800 mb-4">Active Grants</h2>
-                            <p className="text-slate-600">Manage your active grant opportunities.</p>
+                            <div className="text-center py-12">
+                                <ClipboardList className="w-12 h-12 text-slate-400 mx-auto mb-4" />
+                                <h2 className="text-lg font-semibold text-slate-800 mb-2">Active Grants</h2>
+                                <p className="text-slate-600">Manage your active grant opportunities.</p>
+                            </div>
                         </div>
                     )}
                     
                     {activeTab === 'grantees' && (
                         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                            <h2 className="text-lg font-semibold text-slate-800 mb-4">Our Grantees</h2>
-                            <p className="text-slate-600">View and manage your current and past grantees.</p>
+                            <div className="text-center py-12">
+                                <Users className="w-12 h-12 text-slate-400 mx-auto mb-4" />
+                                <h2 className="text-lg font-semibold text-slate-800 mb-2">Our Grantees</h2>
+                                <p className="text-slate-600">View and manage your current and past grantees.</p>
+                            </div>
                         </div>
                     )}
                     
                     {activeTab === 'impact' && (
                         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                            <h2 className="text-lg font-semibold text-slate-800 mb-4">Impact Stories</h2>
-                            <p className="text-slate-600">Showcase the impact of your funding.</p>
+                            <div className="text-center py-12">
+                                <TrendingUp className="w-12 h-12 text-slate-400 mx-auto mb-4" />
+                                <h2 className="text-lg font-semibold text-slate-800 mb-2">Impact Stories</h2>
+                                <p className="text-slate-600">Showcase the impact of your funding.</p>
+                            </div>
                         </div>
                     )}
                 </>
             )}
 
-            {/* UPDATED: Confirmation Modal for Leaving Organization */}
+            {/* Leave Organization Confirmation Modal */}
             {isConfirmingLeave && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                     <div className="bg-white p-6 rounded-xl shadow-xl max-w-md w-full mx-4">
-                        <h3 className="text-lg font-semibold text-slate-800 mb-4">Leave Organization</h3>
+                        <div className="flex items-center mb-4">
+                            <AlertTriangle className="w-6 h-6 text-orange-500 mr-3" />
+                            <h3 className="text-lg font-semibold text-slate-800">Leave Organization</h3>
+                        </div>
                         <div className="mb-6">
                             <p className="text-slate-600 mb-4">
-                                Are you sure you want to leave {organization.name}? You'll need to be re-invited to rejoin.
+                                Are you sure you want to leave <strong>{organization.name}</strong>? 
                             </p>
+                            <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
+                                <p className="text-orange-800 text-sm">
+                                    <strong>Note:</strong> You'll lose access to organization features and will need to be re-invited to rejoin.
+                                </p>
+                            </div>
                             {userRole === ROLES.SUPER_ADMIN && (
-                                <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                                    <p className="text-blue-800 text-sm">
-                                        <strong>Note:</strong> You are leaving as a Super Admin. Make sure other admins are available to manage the organization if needed.
+                                <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+                                    <p className="text-red-800 text-sm">
+                                        <strong>Warning:</strong> You are a Super Admin. Make sure other admins can manage the organization before leaving.
                                     </p>
                                 </div>
                             )}
@@ -1016,14 +1015,14 @@ export default function MyOrganizationPage() {
                             <button
                                 onClick={() => setConfirmingLeave(false)}
                                 disabled={loading}
-                                className="flex-1 px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 disabled:opacity-50"
+                                className="flex-1 px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 disabled:opacity-50 transition-colors"
                             >
                                 Cancel
                             </button>
                             <button
                                 onClick={executeLeave}
                                 disabled={loading}
-                                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 flex items-center justify-center"
+                                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 flex items-center justify-center transition-colors"
                             >
                                 {loading ? (
                                     <>
@@ -1031,32 +1030,15 @@ export default function MyOrganizationPage() {
                                         Leaving...
                                     </>
                                 ) : (
-                                    'Leave Organization'
+                                    <>
+                                        <LogOut className="w-4 h-4 mr-2" />
+                                        Leave Organization
+                                    </>
                                 )}
                             </button>
                         </div>
                     </div>
                 </div>
-            )}
-
-            {/* Admin Management Modal */}
-            {isAdminModalOpen && selectedMember && (
-                <AdminManagementModal
-                    member={selectedMember}
-                    action={modalAction}
-                    organization={organization}
-                    onClose={() => {
-                        setIsAdminModalOpen(false);
-                        setSelectedMember(null);
-                        setModalAction(null);
-                    }}
-                    onSuccess={() => {
-                        setIsAdminModalOpen(false);
-                        setSelectedMember(null);
-                        setModalAction(null);
-                        fetchOrganizationData(); // Refresh the member list
-                    }}
-                />
             )}
         </div>
     );

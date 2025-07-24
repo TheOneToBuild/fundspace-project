@@ -324,7 +324,7 @@ export default function ProfilePage() {
     }
 
     return (
-        <div>
+        <div className="pb-72">
             <ProfileLayout
                 profile={profile}
                 user={session?.user}
