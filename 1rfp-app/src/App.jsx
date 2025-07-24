@@ -33,6 +33,10 @@ import DashboardHomePage from './components/DashboardHomePage.jsx';
 // --- HELLO COMMUNITY IMPORT ---
 import HelloCommunityRoute from './components/HelloCommunityRoute.jsx';
 
+// --- FOLLOWERS/FOLLOWING IMPORTS ---
+import FollowersPage from './components/FollowersPage.jsx';
+import FollowingPage from './components/FollowingPage.jsx';
+
 // --- OMEGA ADMIN IMPORTS ---
 import OmegaAdminDashboard from './components/OmegaAdminDashboard.jsx';
 import OmegaAdminAnalytics from './components/OmegaAdminAnalytics.jsx';
@@ -555,6 +559,10 @@ export default function App() {
               <Route path="saved-grants" element={<SavedGrantsPage />} />
               <Route path="hello-community" element={<HelloCommunityRoute />} />
               <Route path="settings" element={<SettingsPage />} />
+              
+              {/* --- NEW: FOLLOWERS/FOLLOWING ROUTES --- */}
+              <Route path="followers" element={<FollowersPage />} />
+              <Route path="following" element={<FollowingPage />} />
               
               {/* --- ORGANIZATION ROUTES --- */}
               <Route path="my-organization" element={<MyOrganizationPage />} />

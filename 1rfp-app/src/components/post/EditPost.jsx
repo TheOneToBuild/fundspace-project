@@ -1,9 +1,9 @@
-// src/components/post/EditPost.jsx
+// src/components/post/EditPost.jsx - FIXED VERSION
 import React, { useState, useRef, useEffect } from 'react';
 import { supabase } from '../../supabaseClient';
 import { Camera, X } from 'lucide-react';
 
-// --- TIPTAP IMPORTS (from CreatePost.jsx) ---
+// --- TIPTAP IMPORTS ---
 import { useEditor, EditorContent, ReactRenderer } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Mention from '@tiptap/extension-mention';
@@ -23,15 +23,22 @@ export default function EditPost({ post, onSave, onCancel }) {
     const fileInputRef = useRef(null);
     const isComponentMounted = useRef(true);
 
-    // --- TIPTAP EDITOR HOOK (replaces useState for content) ---
+    // --- TIPTAP EDITOR HOOK WITH FIXED MENTION EXTENSION ---
     const editor = useEditor({
         extensions: [
             StarterKit,
-            // Copied Mention configuration from CreatePost.jsx to ensure consistency
+            // FIXED MENTION EXTENSION - Direct database queries
             Mention.extend({
                 name: 'mention',
                 addAttributes() {
-                    return { ...this.parent?.(), type: { default: null, parseHTML: e => e.getAttribute('data-type'), renderHTML: a => a.type ? { 'data-type': a.type } : {} } };
+                    return {
+                        ...this.parent?.(),
+                        type: {
+                            default: null,
+                            parseHTML: e => e.getAttribute('data-type'),
+                            renderHTML: a => a.type ? { 'data-type': a.type } : {}
+                        }
+                    };
                 },
                 renderHTML({ node, HTMLAttributes }) {
                     const { id, label, type } = node.attrs;
@@ -44,11 +51,60 @@ export default function EditPost({ post, onSave, onCancel }) {
                 suggestion: {
                     items: async ({ query }) => {
                         try {
-                            const { data, error } = await supabase.rpc('search_mentionable_entities', { search_query: query, limit_count: 10 });
-                            if (error) { console.error('Error searching mentions:', error); return []; }
-                            return data?.map(item => ({...item})) || [];
+                            if (!query || query.length < 2) {
+                                return [];
+                            }
+
+                            // FIXED: Direct database queries instead of RPC function
+                            const searchPattern = `%${query.trim()}%`;
+                            
+                            // Search users/profiles
+                            const { data: profiles, error: profilesError } = await supabase
+                                .from('profiles')
+                                .select('id, full_name, title, organization_name, avatar_url, role')
+                                .or(`full_name.ilike.${searchPattern},title.ilike.${searchPattern},organization_name.ilike.${searchPattern}`)
+                                .limit(5);
+
+                            if (profilesError) {
+                                console.error('Error searching profiles:', profilesError);
+                            }
+
+                            // Search organizations
+                            const { data: organizations, error: orgsError } = await supabase
+                                .from('organizations')
+                                .select('id, name, type, tagline, image_url')
+                                .ilike('name', searchPattern)
+                                .limit(5);
+
+                            if (orgsError) {
+                                console.error('Error searching organizations:', orgsError);
+                            }
+
+                            // Format results to match expected structure
+                            const userResults = (profiles || []).map(profile => ({
+                                id: profile.id,
+                                name: profile.full_name,
+                                type: 'user',
+                                avatar_url: profile.avatar_url,
+                                title: profile.title,
+                                organization_name: profile.organization_name,
+                                role: profile.role
+                            }));
+
+                            const orgResults = (organizations || []).map(org => ({
+                                id: `${org.type}-${org.id}`,
+                                name: org.name,
+                                type: 'organization',
+                                avatar_url: org.image_url,
+                                title: org.tagline,
+                                organization_name: org.type === 'nonprofit' ? 'Nonprofit' : 'Funder',
+                                role: org.type
+                            }));
+
+                            return [...userResults, ...orgResults];
                         } catch (err) {
-                            console.error('Exception during mention search:', err); return [];
+                            console.error('Exception during mention search:', err);
+                            return [];
                         }
                     },
                     render: () => {
@@ -78,113 +134,145 @@ export default function EditPost({ post, onSave, onCancel }) {
     // Effect to initialize state from props
     useEffect(() => {
         isComponentMounted.current = true;
-        const displayImages = post.image_urls && post.image_urls.length > 0 ? post.image_urls : (post.image_url ? [post.image_url] : []);
+        const displayImages = post.image_urls && post.image_urls.length > 0 ? post.image_urls : [];
         setEditedImages(displayImages);
-        let parsedTags = [];
-        if (post.tags) {
-            try { parsedTags = typeof post.tags === 'string' ? JSON.parse(post.tags) : post.tags; } catch (e) { console.error('Error parsing tags in EditPost:', e); }
-        }
-        setEditedTags(Array.isArray(parsedTags) ? parsedTags : []);
+        const displayTags = post.tags ? (typeof post.tags === 'string' ? JSON.parse(post.tags) : post.tags) : [];
+        setEditedTags(displayTags);
         return () => { isComponentMounted.current = false; };
     }, [post]);
 
-    const availableTags = [ { id: 'education', label: 'Education', color: 'bg-blue-100 text-blue-800 border-blue-200' }, { id: 'health', label: 'Health', color: 'bg-green-100 text-green-800 border-green-200' }, { id: 'environment', label: 'Environment', color: 'bg-emerald-100 text-emerald-800 border-emerald-200' }, { id: 'arts', label: 'Arts & Culture', color: 'bg-purple-100 text-purple-800 border-purple-200' }, { id: 'social', label: 'Social Services', color: 'bg-pink-100 text-pink-800 border-pink-200' }, { id: 'community', label: 'Community', color: 'bg-orange-100 text-orange-800 border-orange-200' }, { id: 'youth', label: 'Youth Development', color: 'bg-indigo-100 text-indigo-800 border-indigo-200' }, { id: 'housing', label: 'Housing', color: 'bg-yellow-100 text-yellow-800 border-yellow-200' }, { id: 'advocacy', label: 'Advocacy', color: 'bg-red-100 text-red-800 border-red-200' }, { id: 'research', label: 'Research', color: 'bg-gray-100 text-gray-800 border-gray-200' } ];
-    const getRandomTagColor = () => { const colors = [ 'bg-blue-100 text-blue-800 border-blue-200', 'bg-green-100 text-green-800 border-green-200', 'bg-purple-100 text-purple-800 border-purple-200', 'bg-pink-100 text-pink-800 border-pink-200', 'bg-orange-100 text-orange-800 border-orange-200', 'bg-indigo-100 text-indigo-800 border-indigo-200', 'bg-yellow-100 text-yellow-800 border-yellow-200', 'bg-red-100 text-red-800 border-red-200' ]; return colors[Math.floor(Math.random() * colors.length)]; };
-    const handleTagToggle = (tagId) => { if (editedTags.length >= 6 && !editedTags.some(tag => tag.id === tagId)) return; setEditedTags(prev => { const existingTag = prev.find(tag => tag.id === tagId); if (existingTag) return prev.filter(tag => tag.id !== tagId); const availableTag = availableTags.find(tag => tag.id === tagId); return [...prev, availableTag]; }); };
-    const addCustomTag = () => { if (!customTagInput.trim() || editedTags.length >= 6) return; const customTag = { id: `custom-${Date.now()}`, label: customTagInput.trim(), color: getRandomTagColor(), isCustom: true }; setEditedTags(prev => [...prev, customTag]); setCustomTagInput(''); };
+    const predefinedTags = [
+        { id: 'funding', label: 'Funding', color: 'bg-blue-100 text-blue-800 border-blue-200' },
+        { id: 'collaboration', label: 'Collaboration', color: 'bg-green-100 text-green-800 border-green-200' },
+        { id: 'volunteer', label: 'Volunteer', color: 'bg-purple-100 text-purple-800 border-purple-200' },
+        { id: 'event', label: 'Event', color: 'bg-yellow-100 text-yellow-800 border-yellow-200' },
+        { id: 'announcement', label: 'Announcement', color: 'bg-red-100 text-red-800 border-red-200' },
+        { id: 'grant', label: 'Grant', color: 'bg-indigo-100 text-indigo-800 border-indigo-200' },
+        { id: 'partnership', label: 'Partnership', color: 'bg-pink-100 text-pink-800 border-pink-200' },
+        { id: 'success-story', label: 'Success Story', color: 'bg-emerald-100 text-emerald-800 border-emerald-200' },
+    ];
+
+    const getRandomTagColor = () => {
+        const colors = [
+            'bg-slate-100 text-slate-800 border-slate-200',
+            'bg-gray-100 text-gray-800 border-gray-200',
+            'bg-zinc-100 text-zinc-800 border-zinc-200',
+            'bg-stone-100 text-stone-800 border-stone-200',
+            'bg-orange-100 text-orange-800 border-orange-200',
+            'bg-amber-100 text-amber-800 border-amber-200',
+            'bg-lime-100 text-lime-800 border-lime-200',
+            'bg-cyan-100 text-cyan-800 border-cyan-200',
+            'bg-sky-100 text-sky-800 border-sky-200',
+            'bg-violet-100 text-violet-800 border-violet-200',
+            'bg-fuchsia-100 text-fuchsia-800 border-fuchsia-200',
+            'bg-rose-100 text-rose-800 border-rose-200',
+        ];
+        return colors[Math.floor(Math.random() * colors.length)];
+    };
+
+    const addTag = (tag) => { if (!editedTags.find(t => t.id === tag.id)) { setEditedTags(prev => [...prev, tag]); } setShowTagSelector(false); };
+    const addCustomTag = () => { if (customTagInput.trim() && !editedTags.find(t => t.label.toLowerCase() === customTagInput.trim().toLowerCase())) { const customTag = { id: `custom-${Date.now()}`, label: customTagInput.trim(), color: getRandomTagColor(), isCustom: true }; setEditedTags(prev => [...prev, customTag]); setCustomTagInput(''); } };
     const removeTag = (tagId) => setEditedTags(prev => prev.filter(tag => tag.id !== tagId));
     const removeImage = (imageUrl) => setEditedImages(prev => prev.filter(url => url !== imageUrl));
     const removeNewImage = (imageId) => setNewImages(prev => { const updated = prev.filter(img => img.id !== imageId); const removedImage = prev.find(img => img.id === imageId); if (removedImage) URL.revokeObjectURL(removedImage.preview); return updated; });
     const handleImageSelect = (event) => { const files = Array.from(event.target.files); const maxImages = 6; if (editedImages.length + newImages.length + files.length > maxImages) { alert(`You can only have up to ${maxImages} images per post.`); return; } const validFiles = files.filter(file => file.type.startsWith('image/') && file.size <= 10 * 1024 * 1024); if (validFiles.length < files.length) alert('Some images were invalid (must be under 10MB).'); if (validFiles.length > 0) { const imageObjects = validFiles.map(file => ({ file, preview: URL.createObjectURL(file), id: Math.random().toString(36).substr(2, 9) })); setNewImages(prev => [...prev, ...imageObjects]); } };
-    const uploadNewImages = async () => { if (newImages.length === 0) return []; const uploadPromises = newImages.map(async (imageObj) => { const fileExt = imageObj.file.name.split('.').pop(); const fileName = `${Math.random()}${fileExt}`; const filePath = `post-images/${fileName}`; const { error: uploadError } = await supabase.storage.from('post-images').upload(filePath, imageObj.file); if (uploadError) throw uploadError; const { data } = supabase.storage.from('post-images').getPublicUrl(filePath); return data.publicUrl; }); return Promise.all(uploadPromises); };
+    const uploadNewImages = async () => { if (newImages.length === 0) return []; const uploadPromises = newImages.map(async (imageObj) => { const fileExt = imageObj.file.name.split('.').pop(); const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`; const { data, error } = await supabase.storage.from('post-images').upload(fileName, imageObj.file); if (error) throw error; const { data: urlData } = supabase.storage.from('post-images').getPublicUrl(fileName); return urlData.publicUrl; }); return Promise.all(uploadPromises); };
 
-    // Updated save handler to get content and mentions from the editor
     const handleSave = async () => {
         if (!editor) return;
         setUploading(true);
         try {
-            const newImageUrls = await uploadNewImages();
-            const allImages = [...editedImages, ...newImageUrls];
-            newImages.forEach(img => URL.revokeObjectURL(img.preview));
+            let finalImageUrls = [...editedImages];
+            if (newImages.length > 0) { const uploadedUrls = await uploadNewImages(); finalImageUrls = [...finalImageUrls, ...uploadedUrls]; }
             const editorHtmlContent = editor.getHTML();
-            const mentionsForStorage = [];
-            const editorJsonContent = editor.getJSON();
-            if (editorJsonContent?.content) {
-                editorJsonContent.content.forEach(node => {
-                    if (node.content) {
-                        node.content.forEach(inlineNode => {
-                            if (inlineNode.type === 'mention' && inlineNode.attrs) {
-                                const { id, label, type } = inlineNode.attrs;
-                                if (id && label && type) mentionsForStorage.push({ displayName: label, id, type });
-                            }
-                        });
-                    }
-                });
-            }
-            onSave({ content: editorHtmlContent, tags: editedTags, images: allImages, mentions: mentionsForStorage });
-        } catch (error) {
-            alert('Failed to save changes. Please try again.');
-        } finally {
-            if (isComponentMounted.current) setUploading(false);
-        }
+            const mentionsForStorage = []; const editorJsonContent = editor.getJSON();
+            if (editorJsonContent?.content) { editorJsonContent.content.forEach((node) => { if (node.content) { node.content.forEach((inlineNode) => { if (inlineNode.type === 'mention' && inlineNode.attrs) { const { id, label, type } = inlineNode.attrs; if (id && label && type) { mentionsForStorage.push({ displayName: label, id: id, type: type }); } } }); } }); }
+            const updatedPost = { content: editorHtmlContent.trim(), image_urls: finalImageUrls.length > 0 ? finalImageUrls : null, tags: editedTags.length > 0 ? JSON.stringify(editedTags) : null, mentions: mentionsForStorage.length > 0 ? JSON.stringify(mentionsForStorage) : null, updated_at: new Date().toISOString() };
+            onSave(updatedPost);
+        } catch (error) { console.error('Error saving post:', error); alert('Failed to save post. Please try again.'); } finally { setUploading(false); }
     };
-
-    if (!editor) return null;
 
     return (
         <div className="space-y-4">
-            {/* Replaced textarea with the Tiptap EditorContent component */}
-            <EditorContent editor={editor} />
+            <div className="border border-slate-200 rounded-lg p-4">
+                <EditorContent editor={editor} />
+            </div>
 
             {(editedImages.length > 0 || newImages.length > 0) && (
-                 <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                     {editedImages.map((imageUrl, index) => (
-                        <div key={index} className="relative group"><img src={imageUrl} alt={`Image ${index + 1}`} className="w-full h-24 object-cover rounded-lg" /><button onClick={() => removeImage(imageUrl)} className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100" type="button"><X size={12} /></button></div>
+                        <div key={`existing-${index}`} className="relative">
+                            <img src={imageUrl} alt={`Existing ${index + 1}`} className="w-full h-32 object-cover rounded-lg" />
+                            <button onClick={() => removeImage(imageUrl)} className="absolute top-2 right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors"><X size={14} /></button>
+                        </div>
                     ))}
-                    {newImages.map((image) => (
-                        <div key={image.id} className="relative group"><img src={image.preview} alt="New upload" className="w-full h-24 object-cover rounded-lg" /><button onClick={() => removeNewImage(image.id)} className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100" type="button"><X size={12} /></button></div>
+                    {newImages.map((imageObj) => (
+                        <div key={`new-${imageObj.id}`} className="relative">
+                            <img src={imageObj.preview} alt="New preview" className="w-full h-32 object-cover rounded-lg" />
+                            <button onClick={() => removeNewImage(imageObj.id)} className="absolute top-2 right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors"><X size={14} /></button>
+                        </div>
                     ))}
                 </div>
             )}
-            
-            <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-4">
-                    {editedImages.length + newImages.length < 6 && (
-                        <>
-                            <input ref={fileInputRef} type="file" multiple accept="image/*" onChange={handleImageSelect} className="hidden" id="imageEditUpload" />
-                            <label htmlFor="imageEditUpload" className="flex items-center space-x-2 text-slate-600 hover:text-blue-600 cursor-pointer" type="button">
-                                <Camera size={20} /><span className="text-sm font-medium">Add Images</span>
-                            </label>
-                        </>
-                    )}
+
+            {editedTags.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                    {editedTags.map(tag => (
+                        <span key={tag.id} className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border ${tag.color}`}>
+                            {tag.label}
+                            <button onClick={() => removeTag(tag.id)} className="ml-2 hover:text-red-600 transition-colors"><X size={14} /></button>
+                        </span>
+                    ))}
+                </div>
+            )}
+
+            <div className="flex items-center justify-between pt-4 border-t border-slate-100">
+                <div className="flex items-center space-x-2">
+                    <button onClick={() => fileInputRef.current?.click()} className="flex items-center space-x-2 px-3 py-2 text-slate-600 hover:text-slate-800 hover:bg-slate-50 rounded-lg transition-colors" disabled={uploading}>
+                        <Camera size={18} />
+                        <span className="text-sm">Add Photos</span>
+                    </button>
+
                     <div className="relative">
-                        <button onClick={() => setShowTagSelector(!showTagSelector)} className="flex items-center space-x-2 text-slate-600 hover:text-blue-600 cursor-pointer" type="button">
-                            <div className="w-5 h-5 rounded-full bg-gradient-to-r from-blue-400 to-purple-500 flex items-center justify-center"><span className="text-white text-xs font-bold">#</span></div>
-                            <span className="text-sm font-medium">Manage Tags</span>
+                        <button onClick={() => setShowTagSelector(!showTagSelector)} className="flex items-center space-x-2 px-3 py-2 text-slate-600 hover:text-slate-800 hover:bg-slate-50 rounded-lg transition-colors" disabled={uploading}>
+                            <span className="text-sm">#</span>
+                            <span className="text-sm">Tags</span>
                         </button>
+
                         {showTagSelector && (
-                            <div className="absolute top-full mt-2 bg-white rounded-lg shadow-lg border p-4 z-50 w-96">
-                                <p className="text-sm font-medium text-slate-700 mb-3">Manage tags ({editedTags.length}/6)</p>
-                                <div className="flex space-x-2 mb-4">
-                                    <input type="text" value={customTagInput} onChange={(e) => setCustomTagInput(e.target.value)} placeholder="Create custom tag..." className="flex-1 px-3 py-2 border rounded-lg text-sm" onKeyPress={(e) => e.key === 'Enter' && addCustomTag()} maxLength={20} disabled={editedTags.length >= 6} />
-                                    <button onClick={addCustomTag} disabled={!customTagInput.trim() || editedTags.length >= 6} className="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50">Add</button>
+                            <div className="absolute bottom-full left-0 mb-2 p-4 bg-white border border-slate-200 rounded-lg shadow-lg z-10 min-w-64">
+                                <h4 className="font-medium text-slate-800 mb-3">Add Tags</h4>
+                                <div className="space-y-2 mb-4">
+                                    <p className="text-xs text-slate-500 uppercase tracking-wider">Popular Tags</p>
+                                    <div className="flex flex-wrap gap-2">
+                                        {predefinedTags.map(tag => (
+                                            <button key={tag.id} onClick={() => addTag(tag)} disabled={editedTags.find(t => t.id === tag.id)} className={`px-2 py-1 text-xs rounded-full border transition-colors ${editedTags.find(t => t.id === tag.id) ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed' : `${tag.color} hover:opacity-80 cursor-pointer`}`}>
+                                                {tag.label}
+                                            </button>
+                                        ))}
+                                    </div>
                                 </div>
-                                <div className="grid grid-cols-2 gap-2 mb-4">
-                                    {availableTags.map(tag => (
-                                        <button key={tag.id} onClick={() => handleTagToggle(tag.id)} disabled={editedTags.length >= 6 && !editedTags.some(t => t.id === tag.id)} className={`text-left px-3 py-2 rounded-lg text-sm border disabled:opacity-50 ${editedTags.some(t => t.id === tag.id) ? tag.color + ' ring-2 ring-blue-400' : 'bg-gray-50 hover:bg-gray-100'}`} type="button">{tag.label}</button>
-                                    ))}
+                                <div className="border-t border-slate-100 pt-3">
+                                    <p className="text-xs text-slate-500 uppercase tracking-wider mb-2">Custom Tag</p>
+                                    <div className="flex space-x-2">
+                                        <input type="text" value={customTagInput} onChange={(e) => setCustomTagInput(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && addCustomTag()} placeholder="Enter tag name" className="flex-1 px-2 py-1 text-sm border border-slate-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                        <button onClick={addCustomTag} disabled={!customTagInput.trim()} className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">Add</button>
+                                    </div>
                                 </div>
-                                <button onClick={() => setShowTagSelector(false)} className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg text-sm" type="button">Done</button>
                             </div>
                         )}
                     </div>
                 </div>
+
+                <div className="flex items-center space-x-3">
+                    <button onClick={onCancel} disabled={uploading} className="px-4 py-2 text-slate-600 hover:text-slate-800 transition-colors disabled:opacity-50">Cancel</button>
+                    <button onClick={handleSave} disabled={uploading} className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors">
+                        {uploading ? (<><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />Saving...</>) : ('Save Changes')}
+                    </button>
+                </div>
             </div>
-            
-            <div className="flex items-center justify-end space-x-2 pt-3 border-t">
-                <button onClick={onCancel} className="px-4 py-2 text-sm text-slate-600" disabled={uploading}>Cancel</button>
-                <button onClick={handleSave} disabled={uploading} className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50">{uploading ? 'Saving...' : 'Save Changes'}</button>
-            </div>
+
+            <input ref={fileInputRef} type="file" accept="image/*" multiple onChange={handleImageSelect} className="hidden" />
         </div>
     );
-};
+}

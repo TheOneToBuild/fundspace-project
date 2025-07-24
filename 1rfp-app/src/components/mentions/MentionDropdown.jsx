@@ -1,3 +1,4 @@
+// src/components/mentions/MentionDropdown.jsx - FIXED VERSION
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../supabaseClient';
 
@@ -26,13 +27,54 @@ export default function MentionDropdown({
 
       setLoading(true);
       try {
-        const { data, error } = await supabase.rpc('search_mentionable_entities', {
-          search_query: query,
-          limit_count: 10
-        });
+        // FIXED: Direct database queries instead of RPC function
+        const searchPattern = `%${query.trim()}%`;
+        
+        // Search users/profiles
+        const { data: profiles, error: profilesError } = await supabase
+          .from('profiles')
+          .select('id, full_name, title, organization_name, avatar_url, role')
+          .or(`full_name.ilike.${searchPattern},title.ilike.${searchPattern},organization_name.ilike.${searchPattern}`)
+          .limit(5);
 
-        if (error) throw error;
-        setSuggestions(data || []);
+        if (profilesError) {
+          console.error('Error searching profiles:', profilesError);
+        }
+
+        // Search organizations
+        const { data: organizations, error: orgsError } = await supabase
+          .from('organizations')
+          .select('id, name, type, tagline, image_url')
+          .ilike('name', searchPattern)
+          .limit(5);
+
+        if (orgsError) {
+          console.error('Error searching organizations:', orgsError);
+        }
+
+        // Format results to match expected structure
+        const userResults = (profiles || []).map(profile => ({
+          id: profile.id,
+          name: profile.full_name,
+          type: 'user',
+          avatar_url: profile.avatar_url,
+          title: profile.title,
+          organization_name: profile.organization_name,
+          role: profile.role
+        }));
+
+        const orgResults = (organizations || []).map(org => ({
+          id: `${org.type}-${org.id}`,
+          name: org.name,
+          type: 'organization',
+          avatar_url: org.image_url,
+          title: org.tagline,
+          organization_name: org.type === 'nonprofit' ? 'Nonprofit' : 'Funder',
+          role: org.type
+        }));
+
+        const allResults = [...userResults, ...orgResults];
+        setSuggestions(allResults);
         setInternalSelectedIndex(-1); // Reset selection when results change
       } catch (error) {
         console.error('Error searching mentions:', error);
@@ -227,9 +269,7 @@ export default function MentionDropdown({
                     }}
                   />
                 ) : (
-                  <span>
-                    {suggestion.type === 'user' ? '👤' : '🏢'}
-                  </span>
+                  <span>{suggestion.type === 'user' ? '👤' : '🏢'}</span>
                 )}
               </div>
 
@@ -258,27 +298,25 @@ export default function MentionDropdown({
 
               {/* Type indicator */}
               <div style={{
-                fontSize: '20px',
-                opacity: 0.6
+                fontSize: '16px',
+                opacity: 0.7,
+                flexShrink: 0
               }}>
                 {suggestion.type === 'user' ? '👤' : '🏢'}
               </div>
             </div>
           ))}
-        </div>
-      )}
-
-      {/* Footer hint */}
-      {suggestions.length > 0 && (
-        <div style={{
-          padding: '8px 12px',
-          borderTop: '1px solid #e1e5e9',
-          fontSize: '11px',
-          color: '#8a8d91',
-          backgroundColor: '#f8f9fa',
-          textAlign: 'center'
-        }}>
-          ↑↓ to navigate • Enter to select • Esc to close
+          {/* Footer hint for navigation */}
+          <div style={{
+            padding: '8px 12px',
+            borderTop: '1px solid #e1e5e9',
+            fontSize: '11px',
+            color: '#8a8d91',
+            backgroundColor: '#f8f9fa',
+            textAlign: 'center'
+          }}>
+            ↑↓ to navigate • Enter to select • Esc to close
+          </div>
         </div>
       )}
     </div>

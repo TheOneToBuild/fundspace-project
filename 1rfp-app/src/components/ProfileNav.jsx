@@ -1,11 +1,12 @@
-// src/components/ProfileNav.jsx - Updated for Unified Organizations Table
+// src/components/ProfileNav.jsx - Updated UI with Title Removed
 import React, { useState, useEffect } from 'react';
-import { NavLink, useOutletContext } from 'react-router-dom';
+import { NavLink, useOutletContext, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import { isPlatformAdmin } from '../utils/permissions.js';
 
 export default function ProfileNav() {
     const { profile } = useOutletContext();
+    const navigate = useNavigate();
     const [stats, setStats] = useState({
         followersCount: 0,
         followingCount: 0
@@ -22,7 +23,7 @@ export default function ProfileNav() {
         }
     }, [profile?.id]);
 
-    // NEW: Listen for real-time follow updates
+    // Listen for real-time follow updates
     useEffect(() => {
         if (!profile?.id) return;
 
@@ -69,10 +70,7 @@ export default function ProfileNav() {
             }
         };
 
-        // Add event listener for follow updates
         window.addEventListener('followUpdate', handleFollowUpdate);
-
-        // Cleanup event listener
         return () => {
             window.removeEventListener('followUpdate', handleFollowUpdate);
         };
@@ -117,7 +115,7 @@ export default function ProfileNav() {
         }
     };
 
-    // 🔄 UPDATED: Fetch organization info from unified organizations table
+    // Fetch organization info from unified organizations table
     const fetchOrganizationInfo = async () => {
         try {
             console.log('📊 Fetching organization info for profile:', profile?.id);
@@ -194,7 +192,7 @@ export default function ProfileNav() {
 
     const displayOrg = getDisplayOrganization();
     
-    // 🔄 UPDATED: Include all new organization types for community access
+    // Include all organization types for community access
     const canAccessCommunity = profile?.role && [
         'Nonprofit', 
         'Funder', 
@@ -207,41 +205,13 @@ export default function ProfileNav() {
         'International'
     ].includes(profile.role);
 
-    const getOrganizationTypeDisplay = (type) => {
-        const typeMap = {
-            'nonprofit': 'Nonprofit',
-            'foundation': 'Foundation',
-            'government': 'Government',
-            'for-profit': 'For-Profit',
-            'education': 'Education',
-            'healthcare': 'Healthcare',
-            'religious': 'Religious',
-            'international': 'International'
-        };
-        return typeMap[type] || type;
+    // Clickable handlers for followers/following
+    const handleFollowersClick = () => {
+        navigate('/profile/followers');
     };
 
-    const getOrganizationIcon = (type) => {
-        switch (type) {
-            case 'nonprofit':
-                return '🏛️';
-            case 'foundation':
-                return '💰';
-            case 'government':
-                return '🏛️';
-            case 'for-profit':
-                return '🏢';
-            case 'education':
-                return '🎓';
-            case 'healthcare':
-                return '🏥';
-            case 'religious':
-                return '⛪';
-            case 'international':
-                return '🌍';
-            default:
-                return '🏢';
-        }
+    const handleFollowingClick = () => {
+        navigate('/profile/following');
     };
 
     const navLinkClass = ({ isActive }) =>
@@ -278,40 +248,41 @@ export default function ProfileNav() {
                     <h2 className="text-base font-bold text-slate-800 mb-1">
                         {profile?.full_name || 'Your Name'}
                     </h2>
-                    <p className="text-xs text-slate-600 mb-3 leading-tight">
-                        {displayOrg ? (
-                            <>
-                                <span className="font-medium text-blue-600">{displayOrg.role}</span>
-                                <br />
-                                <span className="text-slate-500 flex items-center justify-center">
-                                    <span className="mr-1">{getOrganizationIcon(displayOrg.type)}</span>
-                                    {displayOrg.name}
-                                </span>
-                                <br />
-                                <span className="text-xs text-slate-400">
-                                    {getOrganizationTypeDisplay(displayOrg.type)}
-                                </span>
-                            </>
-                        ) : (
-                            <span className="text-slate-500">{profile?.role || 'Community Member'}</span>
-                        )}
-                    </p>
+                    
+                    {/* UPDATED: Only show organization name, no title */}
+                    {displayOrg && (
+                        <p className="text-xs text-slate-500 mb-3">
+                            {displayOrg.name}
+                        </p>
+                    )}
+                    
+                    {!displayOrg && profile?.role && (
+                        <p className="text-xs text-slate-500 mb-3">
+                            {profile.role}
+                        </p>
+                    )}
                 </div>
                 
-                {/* Compact Stats - ENHANCED: Now with real-time updates */}
+                {/* Clickable Followers/Following Stats */}
                 <div className="flex justify-center space-x-6 border-t border-slate-100 pt-3">
-                    <div className="text-center">
+                    <button 
+                        onClick={handleFollowersClick}
+                        className="text-center hover:bg-slate-50 rounded-lg p-2 transition-colors cursor-pointer"
+                    >
                         <p className="text-lg font-bold text-blue-600 transition-all duration-300">
                             {loading ? '...' : stats.followersCount}
                         </p>
                         <p className="text-xs text-slate-500 uppercase tracking-wide">Followers</p>
-                    </div>
-                    <div className="text-center">
+                    </button>
+                    <button 
+                        onClick={handleFollowingClick}
+                        className="text-center hover:bg-slate-50 rounded-lg p-2 transition-colors cursor-pointer"
+                    >
                         <p className="text-lg font-bold text-purple-600 transition-all duration-300">
                             {loading ? '...' : stats.followingCount}
                         </p>
                         <p className="text-xs text-slate-500 uppercase tracking-wide">Following</p>
-                    </div>
+                    </button>
                 </div>
             </div>
 
@@ -366,7 +337,7 @@ export default function ProfileNav() {
                 </nav>
             </div>
             
-            {/* Compact Your Profile Section */}
+            {/* Your Profile Section */}
             <div className="bg-white p-3 rounded-xl shadow-sm border border-slate-200">
                 <div className="flex items-center space-x-2 mb-2">
                     <div className="w-5 h-5 bg-purple-200 rounded-md flex items-center justify-center">
@@ -375,6 +346,19 @@ export default function ProfileNav() {
                     <h3 className="text-sm font-bold text-slate-700">Your Profile</h3>
                 </div>
                 <nav className="space-y-1">
+                    {/* My Organization moved to top with simple title */}
+                    {!isOmegaAdmin && (
+                        <NavLink to="/profile/my-organization" className={navLinkClass}>
+                            <div className="w-6 h-6 bg-red-200 rounded-md flex items-center justify-center text-xs shadow-sm">
+                                🏢
+                            </div>
+                            <span className="font-medium">My Organization</span>
+                            {displayOrg?.hasManagementAccess && (
+                                <span className="text-xs bg-blue-100 text-blue-700 px-1 py-0.5 rounded">Admin</span>
+                            )}
+                        </NavLink>
+                    )}
+                    
                     <NavLink to="/profile/members" className={navLinkClass}>
                         <div className="w-6 h-6 bg-green-200 rounded-md flex items-center justify-center text-xs shadow-sm">
                             👥
@@ -389,19 +373,20 @@ export default function ProfileNav() {
                         <span className="font-medium">Saved Grants</span>
                     </NavLink>
                     
-                    {!isOmegaAdmin && (
-                        <NavLink to="/profile/my-organization" className={navLinkClass}>
-                            <div className="w-6 h-6 bg-red-200 rounded-md flex items-center justify-center text-xs shadow-sm">
-                                {displayOrg ? getOrganizationIcon(displayOrg.type) : '🏢'}
-                            </div>
-                            <span className="font-medium">
-                                {displayOrg ? displayOrg.name : 'My Organization'}
-                            </span>
-                            {displayOrg?.hasManagementAccess && (
-                                <span className="text-xs bg-blue-100 text-blue-700 px-1 py-0.5 rounded">Admin</span>
-                            )}
-                        </NavLink>
-                    )}
+                    {/* Additional useful features */}
+                    <NavLink to="/profile/notifications" className={navLinkClass}>
+                        <div className="w-6 h-6 bg-blue-200 rounded-md flex items-center justify-center text-xs shadow-sm">
+                            🔔
+                        </div>
+                        <span className="font-medium">Notifications</span>
+                    </NavLink>
+                    
+                    <NavLink to="/profile/activity" className={navLinkClass}>
+                        <div className="w-6 h-6 bg-indigo-200 rounded-md flex items-center justify-center text-xs shadow-sm">
+                            📊
+                        </div>
+                        <span className="font-medium">My Activity</span>
+                    </NavLink>
                     
                     <NavLink to="/profile/settings" className={navLinkClass}>
                         <div className="w-6 h-6 bg-gray-300 rounded-md flex items-center justify-center text-xs shadow-sm">

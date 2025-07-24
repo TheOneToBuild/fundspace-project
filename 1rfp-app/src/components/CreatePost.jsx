@@ -1,4 +1,4 @@
-// src/components/CreatePost.jsx - Complete with Placeholder Extension
+// src/components/CreatePost.jsx - Complete with Fixed Mentions
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { supabase } from '../supabaseClient';
 import { Camera, X, Smile, AtSign } from 'lucide-react';
@@ -9,7 +9,7 @@ import { processMentionsForNotifications } from '../utils/notificationUtils';
 import { useEditor, EditorContent, ReactRenderer } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Mention from '@tiptap/extension-mention';
-import Placeholder from '@tiptap/extension-placeholder'; // ADD THIS IMPORT
+import Placeholder from '@tiptap/extension-placeholder';
 import tippy from 'tippy.js';
 import 'tippy.js/dist/tippy.css';
 
@@ -31,7 +31,7 @@ export default function CreatePost({
     const [uploading, setUploading] = useState(false);
     const [showEmojiPicker, setShowEmojiPicker] = useState(false);
 
-    // --- State to explicitly track if editor content is empty ---
+    // State to explicitly track if editor content is empty
     const [isEditorContentEmpty, setIsEditorContentEmpty] = useState(true);
 
     // Tag states
@@ -120,7 +120,7 @@ export default function CreatePost({
     
     const placeholderText = placeholder || defaultPlaceholder;
 
-    // --- TIPTAP EDITOR HOOK WITH PLACEHOLDER EXTENSION ---
+    // TIPTAP EDITOR HOOK WITH FIXED MENTION EXTENSION
     const editor = useEditor({
         extensions: [
             StarterKit,
@@ -131,6 +131,7 @@ export default function CreatePost({
                 showOnlyCurrent: false,
                 includeChildren: true,
             }),
+            // FIXED MENTION EXTENSION - Direct database queries instead of RPC
             Mention.extend({
                 name: 'mention',
                 
@@ -195,24 +196,57 @@ export default function CreatePost({
                 suggestion: {
                     items: async ({ query }) => {
                         try {
-                            const { data, error } = await supabase.rpc('search_mentionable_entities', {
-                                search_query: query,
-                                limit_count: 10
-                            });
-                            if (error) {
-                                console.error('Error searching mentions:', error);
+                            if (!query || query.length < 2) {
                                 return [];
                             }
+
+                            // FIXED: Direct database queries instead of RPC function
+                            const searchPattern = `%${query.trim()}%`;
                             
-                            return data?.map(item => ({
-                                id: item.id,
-                                name: item.name,
-                                type: item.type,
-                                avatar_url: item.avatar_url,
-                                title: item.title,
-                                organization_name: item.organization_name,
-                                role: item.role
-                            })) || [];
+                            // Search users/profiles
+                            const { data: profiles, error: profilesError } = await supabase
+                                .from('profiles')
+                                .select('id, full_name, title, organization_name, avatar_url, role')
+                                .or(`full_name.ilike.${searchPattern},title.ilike.${searchPattern},organization_name.ilike.${searchPattern}`)
+                                .limit(5);
+
+                            if (profilesError) {
+                                console.error('Error searching profiles:', profilesError);
+                            }
+
+                            // Search organizations
+                            const { data: organizations, error: orgsError } = await supabase
+                                .from('organizations')
+                                .select('id, name, type, tagline, image_url')
+                                .ilike('name', searchPattern)
+                                .limit(5);
+
+                            if (orgsError) {
+                                console.error('Error searching organizations:', orgsError);
+                            }
+
+                            // Format results to match expected structure
+                            const userResults = (profiles || []).map(profile => ({
+                                id: profile.id,
+                                name: profile.full_name,
+                                type: 'user',
+                                avatar_url: profile.avatar_url,
+                                title: profile.title,
+                                organization_name: profile.organization_name,
+                                role: profile.role
+                            }));
+
+                            const orgResults = (organizations || []).map(org => ({
+                                id: `${org.type}-${org.id}`,
+                                name: org.name,
+                                type: 'organization',
+                                avatar_url: org.image_url,
+                                title: org.tagline,
+                                organization_name: org.type === 'nonprofit' ? 'Nonprofit' : 'Funder',
+                                role: org.type
+                            }));
+
+                            return [...userResults, ...orgResults];
                         } catch (err) {
                             console.error('Exception during mention search:', err);
                             return [];
@@ -302,7 +336,7 @@ export default function CreatePost({
         setShowEmojiPicker(false);
     }, []);
 
-    // --- IMAGE RELATED FUNCTIONS ---
+    // IMAGE RELATED FUNCTIONS
     const processFiles = (files) => {
         const maxImages = 6;
         
@@ -378,7 +412,7 @@ export default function CreatePost({
         return Promise.all(uploadPromises);
     };
 
-    // --- CREATE MENTION RECORDS FOR DATABASE ---
+    // CREATE MENTION RECORDS FOR DATABASE
     const createMentionRecords = async (postId, mentions) => {
         const mentionTable = isOrganizationPost ? 'organization_post_mentions' : 'post_mentions';
         const postIdField = isOrganizationPost ? 'organization_post_id' : 'post_id';
@@ -413,7 +447,7 @@ export default function CreatePost({
         }
     };
 
-    // --- MAIN SUBMIT HANDLER ---
+    // MAIN SUBMIT HANDLER
     const handlePostSubmit = async () => {
         if (!editor || (isEditorContentEmpty && selectedImages.length === 0) || !profile) return;
 
