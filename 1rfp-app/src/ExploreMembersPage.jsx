@@ -2,38 +2,13 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useOutletContext } from 'react-router-dom';
 import { supabase } from './supabaseClient';
-import { 
-    UserPlus, UserCheck, User, Search, BadgeCheck, Users, Heart, 
-    Sparkles, Building2, GraduationCap, Stethoscope, Church, Globe 
-} from 'lucide-react';
+import { UserPlus, UserCheck, User, Search, BadgeCheck, Users, Heart } from 'lucide-react';
 import { followUser, unfollowUser } from './utils/followUtils';
 import Avatar from './components/Avatar.jsx';
 
-// Centralized style configuration for different member types
-const TYPE_STYLES = {
-  'nonprofit': { icon: Heart, ring: 'border-rose-400', bg: 'bg-rose-500' },
-  'foundation': { icon: Sparkles, ring: 'border-purple-400', bg: 'bg-purple-500' },
-  'government': { icon: Building2, ring: 'border-blue-400', bg: 'bg-blue-500' },
-  'education': { icon: GraduationCap, ring: 'border-indigo-400', bg: 'bg-indigo-500' },
-  'healthcare': { icon: Stethoscope, ring: 'border-emerald-400', bg: 'bg-emerald-500' },
-  'for-profit': { icon: Building2, ring: 'border-green-400', bg: 'bg-green-500' },
-  'religious': { icon: Church, ring: 'border-amber-400', bg: 'bg-amber-500' },
-  'international': { icon: Globe, ring: 'border-cyan-400', bg: 'bg-cyan-500' },
-  'community-member': { icon: User, ring: 'border-slate-400', bg: 'bg-slate-500' },
-  'default': { icon: User, ring: 'border-slate-300', bg: 'bg-slate-400' }
-};
-
-const getMemberStyle = (member) => {
-  const type = member.organization_type || 'community-member';
-  return TYPE_STYLES[type] || TYPE_STYLES.default;
-};
-
-// Enhanced MemberCard with visual distinctions
+// Simplified MemberCard without the avatar ring/icon overlay
 const MemberCard = ({ member, currentUserId, isFollowing, isUpdating, onFollowToggle }) => {
     
-    const style = getMemberStyle(member);
-    const Icon = style.icon;
-
     const handleButtonClick = (e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -46,17 +21,12 @@ const MemberCard = ({ member, currentUserId, isFollowing, isUpdating, onFollowTo
             className="group text-center flex flex-col h-full bg-white rounded-xl shadow-sm border border-slate-200 p-5 hover:shadow-lg hover:-translate-y-1 transition-all duration-300"
         >
             <div className="flex-grow">
-                <div className="relative w-24 h-24 mx-auto">
-                    <Avatar 
-                        src={member.avatar_url} 
-                        fullName={member.full_name} 
-                        className={`w-full h-full border-4 ${style.ring}`}
-                    />
-                    <div className={`absolute -bottom-1 -right-1 flex items-center justify-center w-8 h-8 rounded-full ${style.bg} border-2 border-white`}>
-                        <Icon className="w-4 h-4 text-white" />
-                    </div>
-                </div>
-
+                <Avatar 
+                    src={member.avatar_url} 
+                    fullName={member.full_name} 
+                    size="2xl"
+                    className="mx-auto"
+                />
                 <h3 className="text-md font-semibold text-slate-800 group-hover:text-blue-600 transition-colors mt-4 truncate">
                     {member.full_name}
                     {member.is_omega_admin && <BadgeCheck className="inline-block w-5 h-5 ml-1 text-blue-500" title="Verified Admin" />}
@@ -110,6 +80,7 @@ export default function ExploreMembersPage() {
     const [members, setMembers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
+    const [roleFilter, setRoleFilter] = useState('all'); // State for the filter dropdown
     const [followedIds, setFollowedIds] = useState(null);
     const [followingInProgress, setFollowingInProgress] = useState(new Set());
 
@@ -148,8 +119,12 @@ export default function ExploreMembersPage() {
                     const searchPattern = `%${searchTerm.trim()}%`;
                     query = query.or(`full_name.ilike.${searchPattern},title.ilike.${searchPattern},organization_name.ilike.${searchPattern}`);
                 }
-                const { data, error } = await query.order('updated_at', { ascending: false, nullsLast: true });
+                // Apply the role filter to the query
+                if (roleFilter !== 'all') {
+                    query = query.eq('organization_type', roleFilter);
+                }
 
+                const { data, error } = await query.order('updated_at', { ascending: false, nullsLast: true });
                 if (error) throw error;
 
                 if (data && data.length > 0 && currentUserProfile?.id) {
@@ -189,7 +164,8 @@ export default function ExploreMembersPage() {
         }, 300);
 
         return () => clearTimeout(timer);
-    }, [searchTerm, followedIds, currentUserProfile]);
+    }, [searchTerm, roleFilter, followedIds, currentUserProfile]);
+
 
     const handleFollowToggle = async (targetId, isCurrentlyFollowing) => {
         if (!currentUserProfile?.id || followingInProgress.has(targetId)) return;
@@ -199,7 +175,7 @@ export default function ExploreMembersPage() {
 
         setFollowedIds(prev => {
             const newSet = new Set(prev);
-if (isCurrentlyFollowing) newSet.delete(targetId); else newSet.add(targetId);
+            if (isCurrentlyFollowing) newSet.delete(targetId); else newSet.add(targetId);
             return newSet;
         });
 
@@ -231,15 +207,36 @@ if (isCurrentlyFollowing) newSet.delete(targetId); else newSet.add(targetId);
                 </p>
             </div>
 
-            <div className="relative">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
-                <input
-                    type="text"
-                    placeholder="Discover changemakers by name, title, or organization..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-12 pr-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
-                />
+            {/* Search and Filter Controls */}
+            <div className="flex flex-col sm:flex-row items-center gap-4">
+                <div className="relative flex-grow w-full">
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
+                    <input
+                        type="text"
+                        placeholder="Discover changemakers by name, title, or organization..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="w-full pl-12 pr-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
+                    />
+                </div>
+                <div className="flex-shrink-0 w-full sm:w-auto">
+                    <select
+                        value={roleFilter}
+                        onChange={(e) => setRoleFilter(e.target.value)}
+                        className="w-full h-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+                    >
+                        <option value="all">All Types</option>
+                        <option value="nonprofit">Nonprofit</option>
+                        <option value="foundation">Foundation</option>
+                        <option value="government">Government</option>
+                        <option value="education">Education</option>
+                        <option value="healthcare">Healthcare</option>
+                        <option value="for-profit">For-Profit</option>
+                        <option value="religious">Religious</option>
+                        <option value="international">International</option>
+                        <option value="community-member">Community Member</option>
+                    </select>
+                </div>
             </div>
 
             {loading ? (
@@ -265,7 +262,7 @@ if (isCurrentlyFollowing) newSet.delete(targetId); else newSet.add(targetId);
                     <User className="w-12 h-12 text-slate-400 mx-auto mb-4" />
                     <h3 className="text-lg font-medium text-slate-800 mb-2">No Members Found</h3>
                     <p className="text-slate-500 max-w-md mx-auto">
-                        {searchTerm ? 'No one matched your search. Try another name or keyword!' : 'It looks like our constellation is still growing. Be the first star!'}
+                        {searchTerm || roleFilter !== 'all' ? 'No members match your current filters. Try a different search!' : 'It looks like our constellation is still growing. Be the first star!'}
                     </p>
                 </div>
             )}

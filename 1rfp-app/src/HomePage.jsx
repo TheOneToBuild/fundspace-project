@@ -159,7 +159,7 @@ function HomePage() {
             Where community <span className="inline-block min-w-[220px] text-transparent bg-clip-text bg-gradient-to-r from-purple-500 to-blue-600">{displayedText}</span> together.
           </h1>
           <p className="max-w-xl md:max-w-2xl mx-auto text-lg md:text-xl text-slate-700 mb-10 leading-relaxed font-display">
-  A space for Bay Area 🌉  changemakers to 
+  A space for Bay Area 🌉  changemakersto 
   <span className="text-pink-500 font-semibold animate-bounce-slow"> connect </span> 🤝, 
   <span className="text-emerald-500 font-semibold animate-bounce-slow"> collaborate </span> 🫶, and 
   <span className="text-sky-500 font-semibold animate-bounce-slow"> build </span> 🏗️ 
