@@ -1,4 +1,4 @@
-// Create a new file: src/components/PublicHeader.jsx
+// 1. UPDATE: src/components/PublicHeader.jsx
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, NavLink } from 'react-router-dom';
 import { Menu, X, PlusCircle } from './Icons.jsx';
@@ -27,10 +27,10 @@ export default function PublicHeader() {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const mobileMenuRef = useRef(null);
 
+    // UPDATED: Unified navigation links
     const mainNavLinks = [
-        { to: "/", text: "Find Grants", activeClassName: "text-blue-600 font-semibold" },
-        { to: "/funders", text: "Explore Funders", activeClassName: "text-green-600 font-semibold" },
-        { to: "/nonprofits", text: "Explore Nonprofits", activeClassName: "text-purple-600 font-semibold" },
+        { to: "/grants", text: "Find Grants", activeClassName: "text-blue-600 font-semibold" },
+        { to: "/organizations", text: "Explore Organizations", activeClassName: "text-blue-600 font-semibold" },
         { to: "/spotlight", text: "Spotlight", activeClassName: "text-rose-600 font-semibold" },
     ];
 
@@ -63,21 +63,16 @@ export default function PublicHeader() {
         <>
             <header className="bg-white/80 backdrop-blur-lg shadow-sm sticky top-0 z-40 border-b border-slate-200">
                 <div className="container mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-3 flex justify-between items-center">
-                    {/* Logo */}
                     <Link to="/" aria-label="1RFP Home">
                         <img src={headerLogoImage} alt="1RFP Logo" className="h-10 sm:h-12 md:h-14 w-auto" />
                     </Link>
-                    
-                    {/* Desktop Navigation */}
                     <nav className="hidden md:flex items-center space-x-4 lg:space-x-6">
-                        {mainNavLinks.map(link => (
-                            <PublicNavLink key={link.to} to={link.to} activeClassName={link.activeClassName}>
-                                {link.text}
+                        {mainNavLinks.map(({ to, text, activeClassName }) => (
+                            <PublicNavLink key={to} to={to} activeClassName={activeClassName}>
+                                {text}
                             </PublicNavLink>
                         ))}
                     </nav>
-                    
-                    {/* Desktop Actions */}
                     <div className="hidden md:flex items-center space-x-3 lg:space-x-4">
                         <AuthButton />
                         <Link 
@@ -89,8 +84,6 @@ export default function PublicHeader() {
                             <span className="lg:hidden">Submit</span>
                         </Link>
                     </div>
-                    
-                    {/* Mobile Menu Button */}
                     <div className="md:hidden">
                         <button 
                             onClick={() => setIsMobileMenuOpen(true)} 
@@ -128,15 +121,15 @@ export default function PublicHeader() {
 
                         {/* Mobile Navigation Links */}
                         <nav className="py-4">
-                            {mainNavLinks.map(link => (
+                            {mainNavLinks.map(({ to, text, activeClassName }) => (
                                 <PublicNavLink 
-                                    key={link.to} 
-                                    to={link.to} 
-                                    activeClassName={link.activeClassName}
+                                    key={to} 
+                                    to={to} 
+                                    activeClassName={activeClassName}
                                     mobile 
                                     onClick={closeMobileMenu}
                                 >
-                                    {link.text}
+                                    {text}
                                 </PublicNavLink>
                             ))}
                         </nav>
@@ -151,8 +144,6 @@ export default function PublicHeader() {
                                 <PlusCircle size={16} className="mr-2" />
                                 Submit Grant
                             </Link>
-                            
-                            {/* Auth Button in Mobile Menu */}
                             <div className="w-full">
                                 <AuthButton mobile onClose={closeMobileMenu} />
                             </div>
@@ -163,3 +154,69 @@ export default function PublicHeader() {
         </>
     );
 }
+
+// 2. UPDATE: src/components/DashboardHeader.jsx
+// The DashboardHeader in your documents already has the correct navigation:
+// ✅ "Explore Organizations" instead of separate funders/nonprofits
+// ✅ Routes to "/profile/organizations"
+// The mobile menu also correctly shows "Explore Organizations"
+
+// 3. UPDATE: Any standalone AppNavLink components
+const AppNavLink = ({ to, children, activeClassName, ...props }) => {
+    return (
+        <NavLink
+            to={to}
+            className={({ isActive }) =>
+                `text-sm md:text-base font-medium transition-colors ${
+                    isActive ? activeClassName : 'text-slate-700 hover:text-blue-600'
+                }`
+            }
+            {...props}
+        >
+            {children}
+        </NavLink>
+    );
+};
+
+// 4. UPDATE: If you have any inline navigation in other components, update like this:
+const UpdatedInlineNavigation = () => (
+    <nav className="hidden md:flex items-center space-x-4 md:space-x-6">
+        <AppNavLink to="/grants" activeClassName="text-blue-600 font-semibold">
+            Find Grants
+        </AppNavLink>
+        <AppNavLink to="/organizations" activeClassName="text-blue-600 font-semibold">
+            Explore Organizations
+        </AppNavLink>
+        <AppNavLink to="/spotlight" activeClassName="text-rose-600 font-semibold">
+            Spotlight
+        </AppNavLink>
+    </nav>
+);
+
+// 5. UPDATE: Any buttons or links that reference old routes
+const UpdatedActionButtons = () => (
+    <>
+        {/* Update any buttons that linked to /funders or /nonprofits */}
+        <Link 
+            to="/organizations" 
+            className="inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-0.5"
+        >
+            Explore Organizations
+        </Link>
+        
+        {/* Update any filter buttons */}
+        <Link 
+            to="/organizations?type=foundation" 
+            className="inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-lg text-white bg-green-600 hover:bg-green-700 shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-0.5"
+        >
+            Explore Funders
+        </Link>
+        
+        <Link 
+            to="/organizations?type=nonprofit" 
+            className="inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-lg text-white bg-purple-600 hover:bg-purple-700 shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-0.5"
+        >
+            Explore Nonprofits
+        </Link>
+    </>
+);

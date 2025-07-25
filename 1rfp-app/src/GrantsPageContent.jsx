@@ -1,7 +1,7 @@
 // src/GrantsPageContent.jsx
 import React, { useState, useEffect, useMemo, useCallback, useContext } from 'react';
 import { supabase } from './supabaseClient.js';
-import { Search, Users, MapPin, Calendar, DollarSign, Info, ChevronDown, ExternalLink, Zap, Clock, Target, Briefcase as IconBriefcase, BarChart3, ClipboardList, TrendingUp, Loader, XCircle, Heart, Bot, Briefcase, LayoutGrid, List, SlidersHorizontal, Bookmark } from './components/Icons.jsx';
+import { Search, Users, MapPin, Calendar, DollarSign, Info, ChevronDown, ExternalLink, Zap, Clock, Target, Briefcase as IconBriefcase, BarChart3, ClipboardList, TrendingUp, Loader, XCircle, Heart, Bot, Briefcase, LayoutGrid, List, SlidersHorizontal, Bookmark, ArrowRight } from './components/Icons.jsx';
 import GrantCard from './components/GrantCard.jsx';
 import GrantDetailModal from './GrantDetailModal.jsx';
 import FilterBar from './components/FilterBar.jsx';
@@ -78,7 +78,7 @@ const GrantListItem = ({ grant, onOpenDetailModal, isSaved, onSave, onUnsave, se
             </div>
             <div className="flex-shrink-0 flex items-center gap-2">
                 {session && (
-                    <button 
+                    <button
                         onClick={handleBookmarkClick}
                         className={`p-2.5 rounded-lg transition-colors ${isSaved ? 'bg-pink-100 text-pink-600' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
                         aria-label={isSaved ? 'Unsave grant' : 'Save grant'}
@@ -86,7 +86,7 @@ const GrantListItem = ({ grant, onOpenDetailModal, isSaved, onSave, onUnsave, se
                         <Bookmark size={18} />
                     </button>
                 )}
-                <button 
+                <button
                     onClick={(e) => { e.stopPropagation(); onOpenDetailModal(grant); }}
                     className="px-4 py-2 bg-blue-50 text-blue-700 font-semibold rounded-lg hover:bg-blue-100 text-sm"
                 >
@@ -101,16 +101,14 @@ const GrantsPageContent = ({ isProfileView = false }) => {
   const { setPageBgColor } = useContext(LayoutContext);
 
   useEffect(() => {
+    // Use a clean, neutral background consistent with the homepage
     if (!isProfileView) {
-      // MODIFIED: Changed to the new gradient background
-      setPageBgColor('bg-gradient-to-br from-rose-50 via-orange-50 to-yellow-50');
-
+      setPageBgColor('bg-slate-50'); // Changed from gradient to slate-50
       return () => {
-          setPageBgColor('bg-white');
+          setPageBgColor('bg-white'); // Resets on component unmount
       };
     }
   }, [isProfileView, setPageBgColor]);
-
 
   const [grants, setGrants] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -130,14 +128,36 @@ const GrantsPageContent = ({ isProfileView = false }) => {
         setLoading(true);
         const { data: { session } } = await supabase.auth.getSession();
         setSession(session);
-        const { data: grantsData, error: grantsError } = await supabase.from('grants').select(`*, funders(name, logo_url, slug), grant_categories(categories(id, name)), grant_locations(locations(id, name))`).order('id', { ascending: false });
-        if (grantsError) console.error('Error fetching grants:', grantsError);
-        else {
-            const formattedData = grantsData.map(grant => ({...grant, foundationName: grant.funders?.name || 'Unknown Funder', funderLogoUrl: grant.funders?.logo_url || null, funderSlug: grant.funders?.slug || null, fundingAmount: grant.max_funding_amount || grant.funding_amount_text || 'Not specified', dueDate: grant.deadline, grantType: grant.grant_type, eligibility_criteria: grant.eligibility_criteria, categories: grant.grant_categories.map(gc => gc.categories), locations: grant.grant_locations.map(gl => gl.locations)}));
+
+        const { data: grantsData, error: grantsError } = await supabase
+            .from('grants_with_taxonomy')
+            .select('*')
+            .order('id', { ascending: false });
+
+        if (grantsError) {
+            console.error('Error fetching grants:', grantsError);
+        } else {
+            const formattedData = grantsData.map(grant => ({
+                ...grant,
+                foundationName: grant.funder_name || 'Unknown Funder',
+                funderLogoUrl: grant.funder_logo_url || null,
+                funderSlug: grant.funder_slug || null,
+                fundingAmount: grant.max_funding_amount || grant.funding_amount_text || 'Not specified',
+                dueDate: grant.deadline,
+                grantType: grant.grant_type,
+                eligibility_criteria: grant.eligibility_criteria,
+                categories: grant.category_names ? grant.category_names.map((name, idx) => ({ id: idx, name })) : [],
+                locations: grant.location_names ? grant.location_names.map((name, idx) => ({ id: idx, name })) : [],
+                eligible_organization_types: grant.taxonomy_codes || []
+            }));
             setGrants(formattedData);
         }
+
         if (session) {
-            const { data: savedData, error: savedError } = await supabase.from('saved_grants').select('grant_id').eq('user_id', session.user.id);
+            const { data: savedData, error: savedError } = await supabase
+                .from('saved_grants')
+                .select('grant_id')
+                .eq('user_id', session.user.id);
             if (savedError) console.error('Error fetching saved grants:', savedError);
             else setSavedGrantIds(new Set(savedData.map(g => g.grant_id)));
         }
@@ -175,7 +195,7 @@ const GrantsPageContent = ({ isProfileView = false }) => {
       setGrants(prevGrants => prevGrants.map(g => g.id === grantId ? { ...g, save_count: g.save_count + 1 } : g));
     }
   };
-  
+
   const uniqueCategories = useMemo(() => Array.from(new Set(grants.flatMap(g => g.categories?.map(c => c.name) || []).filter(Boolean))).sort(), [grants]);
   const uniqueGrantTypes = useMemo(() => Array.from(new Set(grants.map(g => g.grantType).filter(Boolean))).sort(), [grants]);
   const uniqueLocations = useMemo(() => Array.from(new Set(grants.flatMap(g => g.locations?.map(l => l.name) || []).filter(Boolean))).sort(), [grants]);
@@ -185,9 +205,9 @@ const GrantsPageContent = ({ isProfileView = false }) => {
     if (!filteredAndSortedItems) return 0;
     return filteredAndSortedItems.filter(isGrantActive).reduce((sum, grant) => { const amount = grant.max_funding_amount || '0'; return sum + parseMaxFundingAmount(amount.toString()); }, 0);
   }, [filteredAndSortedItems]);
-  
+
   const handleFilterChange = useCallback((key, value) => { setFilterConfig(prev => ({ ...prev, [key]: value })); setCurrentPage(1); }, []);
-  
+
   const handleSearchAction = useCallback((suggestion) => {
     const newConfig = { ...filterConfig, searchTerm: suggestion.text };
     if (suggestion.type === 'category' && !filterConfig.categoryFilter.includes(suggestion.text)) {
@@ -202,19 +222,19 @@ const GrantsPageContent = ({ isProfileView = false }) => {
     const newCategoryFilter = categoryExists ? filterConfig.categoryFilter.filter(cat => cat !== categoryName) : [...filterConfig.categoryFilter, categoryName];
     handleFilterChange('categoryFilter', newCategoryFilter);
   }, [filterConfig.categoryFilter, handleFilterChange]);
-  
+
   const paginate = useCallback((page) => { if (page < 1 || (totalPages > 0 && page > totalPages)) return; setCurrentPage(page); document.getElementById('grants')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, [totalPages]);
   const handlePerPageChange = useCallback((e) => { setGrantsPerPage(Number(e.target.value)); setCurrentPage(1); }, []);
   const openDetail = useCallback((grant) => { setSelectedGrant(grant); setIsDetailModal(true); }, []);
   const closeDetail = useCallback(() => { setSelectedGrant(null); setIsDetailModal(false); }, []);
   const handleClearFilters = useCallback(() => { setFilterConfig({ searchTerm: '', locationFilter: [], categoryFilter: [], grantTypeFilter: '', grantStatusFilter: '', sortCriteria: 'dueDate_asc' }); setCurrentPage(1); }, []);
   const handleRemoveGrantFilter = useCallback((keyToRemove, valueToRemove) => {
-    if (keyToRemove === 'categoryFilter' || keyToRemove === 'locationFilter') { handleFilterChange(keyToRemove, filterConfig[keyToRemove].filter(item => item !== valueToRemove)); } 
+    if (keyToRemove === 'categoryFilter' || keyToRemove === 'locationFilter') { handleFilterChange(keyToRemove, filterConfig[keyToRemove].filter(item => item !== valueToRemove)); }
     else { handleFilterChange(keyToRemove, ''); }
   }, [filterConfig, handleFilterChange]);
-  
+
   useEffect(() => { document.title = '1RFP - Find Your Next Funding Opportunity'; }, []);
-  
+
   const activeGrantFilters = useMemo(() => {
     let filters = [];
     if (filterConfig.searchTerm) filters.push({ key: 'searchTerm', label: `Search: "${filterConfig.searchTerm}"` });
@@ -254,15 +274,25 @@ const GrantsPageContent = ({ isProfileView = false }) => {
     <>
       <div className={isProfileView ? "" : "container mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12"}>
         {!isProfileView && (
-          <section id="funding-opportunity-intro" className="text-center pt-8 pb-12 md:pt-12 md:pb-16 mb-10 md:mb-12 scroll-mt-20 bg-transparent p-6 sm:p-8 md:p-10 rounded-xl">
-            <h2 className="text-3xl md:text-4xl font-bold text-slate-800 mb-3">Find Your Next Funding Opportunity</h2>
-            <p className="text-md md:text-lg text-slate-600 mb-6 max-w-2xl mx-auto">Discover RFPs and grants tailored for nonprofits in the San Francisco Bay Area.</p>
+          // Redesigned the intro section to be a contained, elevated panel
+          <section id="funding-opportunity-intro" className="text-center mb-12 bg-white p-8 md:p-12 rounded-2xl border border-slate-200/80 shadow-sm">
+            {/* Bolder, more impactful typography for the main heading */}
+            <h2 className="text-4xl md:text-5xl font-extrabold tracking-tight text-slate-900 mb-4">
+              Find Your Next Funding Opportunity
+            </h2>
+            <p className="text-lg text-slate-600 mb-8 max-w-3xl mx-auto">
+              Our comprehensive database connects you with RFPs and grants from across the Bay Area.
+            </p>
+
+            {/* Mobile filter button */}
             <div className="mt-8 md:hidden">
               <button onClick={() => setIsMobileFiltersVisible(!isMobileFiltersVisible)} className="w-full inline-flex items-center justify-center px-4 py-2 border border-slate-300 rounded-md shadow-sm text-sm font-medium text-slate-700 bg-white hover:bg-slate-50">
                 {isMobileFiltersVisible ? 'Hide Filters' : 'Show Filters'}
                 {activeGrantFilters.length > 0 && ( <span className="ml-2 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-blue-600 rounded-full">{activeGrantFilters.length}</span> )}
               </button>
             </div>
+
+            {/* The FilterBar itself remains functionally the same, but now lives in a cleaner container */}
             <FilterBar {...filterBarProps} isMobileVisible={isMobileFiltersVisible} />
           </section>
         )}
@@ -277,12 +307,20 @@ const GrantsPageContent = ({ isProfileView = false }) => {
               {filtersVisible && ( <div className="mt-4 pt-4 border-t"> <FilterBar {...filterBarProps} isMobileVisible={true} /> </div> )}
             </div>
           )}
-          
+
           <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
-            <h2 className="text-2xl font-semibold text-slate-800 text-center md:text-left">
-              <span>Available Grants </span><span className="text-blue-600">({totalFilteredItems})</span>
+            {/* Refined the grants count heading for better hierarchy */}
+            <h2 className="text-3xl font-bold text-slate-800 text-center md:text-left">
+              <span>Available Grants </span>
+              <span className="text-blue-600 font-semibold">({totalFilteredItems})</span>
+
               {totalFilteredItems > 0 && !loading && (
-                <><span className="text-slate-300 mx-3" aria-hidden="true">·</span><span className="text-green-600 font-semibold">Active Funds (<AnimatedCounter targetValue={totalFilteredFunding} duration={1000} prefix="$" formatValue={formatCurrency}/>)</span></>
+                <>
+                  <span className="text-slate-300 mx-2 font-light" aria-hidden="true">|</span>
+                  <span className="text-green-600 font-semibold text-2xl">
+                    <AnimatedCounter targetValue={totalFilteredFunding} duration={1000} prefix="$" formatValue={formatCurrency}/>
+                  </span>
+                </>
               )}
             </h2>
             <div className="flex items-center gap-2">
@@ -329,10 +367,10 @@ const GrantsPageContent = ({ isProfileView = false }) => {
         </section>
       </div>
       {isDetailModalOpen && selectedGrant && (
-        <GrantDetailModal 
-            grant={selectedGrant} 
-            isOpen={isDetailModalOpen} 
-            onClose={closeDetail} 
+        <GrantDetailModal
+            grant={selectedGrant}
+            isOpen={isDetailModalOpen}
+            onClose={closeDetail}
             session={session}
             isSaved={savedGrantIds.has(selectedGrant.id)}
             onSave={handleSaveGrant}
