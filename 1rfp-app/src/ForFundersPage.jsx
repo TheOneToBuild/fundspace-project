@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Feather, Heart, Users, UploadCloud, Loader, Briefcase, BarChart3, Handshake, UserPlus, Zap } from './components/Icons.jsx';
-import NonprofitCard from './components/NonprofitCard.jsx';
+import OrganizationCard from './components/OrganizationCard.jsx';
 import AnimatedShape from './components/AnimatedShape.jsx';
 import ScrollArrow from './components/ScrollArrow.jsx';
 import AnimatedCounter from './components/AnimatedCounter.jsx';
@@ -133,6 +133,9 @@ const ForFundersPage = () => {
         }, 1500);
     };
     
+    // No-op for now, can be replaced with real filter logic if needed
+    const handleFilterChange = () => {};
+
     return (
         // MODIFIED: Wrap the component in PublicPageLayout and provide the gradient class
         <PublicPageLayout bgColor="bg-gradient-to-br from-rose-50 via-orange-50 to-yellow-50">
@@ -200,7 +203,13 @@ const ForFundersPage = () => {
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 w-full max-w-7xl mx-auto z-20 relative">
                             {nonprofitData.map((nonprofit, index) => ( 
                                 <motion.div variants={textFloatUp} key={nonprofit.slug || index}>
-                                    <NonprofitCard nonprofit={nonprofit} />
+                                    <OrganizationCard 
+                                        key={nonprofit.id}
+                                        organization={nonprofit}
+                                        handleFilterChange={handleFilterChange}
+                                        linkTo={`/nonprofits/${nonprofit.slug}`}
+                                        buttonText="View Profile"
+                                    />
                                 </motion.div> 
                             ))}
                         </div>

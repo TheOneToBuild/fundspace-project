@@ -3,10 +3,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { supabase } from './supabaseClient.js';
 import { countySpotlightData } from './spotlightData.js';
-// --- ADDED Map and ArrowRight icons ---
 import { Users, DollarSign, MapPin, Loader, ExternalLink, Map, ArrowRight } from './components/Icons.jsx';
-import NonprofitCard from './components/NonprofitCard.jsx';
-import FunderCard from './components/FunderCard.jsx';
+import OrganizationCard from './components/OrganizationCard.jsx';
 
 const CountySpotlightPage = () => {
   const { countySlug } = useParams(); 
@@ -14,6 +12,9 @@ const CountySpotlightPage = () => {
   const [nonprofits, setNonprofits] = useState([]);
   const [funders, setFunders] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // No-op for now, can be replaced with real filter logic if needed
+  const handleFilterChange = () => {};
 
   useEffect(() => {
     const spotlightData = countySpotlightData[countySlug];
@@ -118,7 +119,19 @@ const CountySpotlightPage = () => {
                 <div className="mt-4 w-24 h-1 bg-purple-500 mx-auto rounded-full"></div>
               </div>
               <div className="grid md:grid-cols-3 gap-8 items-stretch">
-                {nonprofits.length > 0 ? ( nonprofits.map(nonprofit => <NonprofitCard key={nonprofit.id} nonprofit={nonprofit} />) ) : ( <p className="text-center text-slate-500 col-span-3">No specific nonprofits found for this spotlight yet.</p> )}
+                {nonprofits.length > 0 ? (
+                  nonprofits.map(nonprofit => (
+                    <OrganizationCard
+                      key={nonprofit.id}
+                      organization={nonprofit}
+                      handleFilterChange={handleFilterChange}
+                      linkTo={`/nonprofits/${nonprofit.slug}`}
+                      buttonText="View Profile"
+                    />
+                  ))
+                ) : (
+                  <p className="text-center text-slate-500 col-span-3">No specific nonprofits found for this spotlight yet.</p>
+                )}
               </div>
             </div>
           </section>
@@ -132,7 +145,19 @@ const CountySpotlightPage = () => {
                 <div className="mt-4 w-24 h-1 bg-green-500 mx-auto rounded-full"></div>
               </div>
               <div className="grid md:grid-cols-3 gap-8 items-stretch">
-                {funders.length > 0 ? ( funders.map(funder => <FunderCard key={funder.id} funder={funder} />) ) : ( <p className="text-center text-slate-500 col-span-3">No specific funders found for this spotlight yet.</p> )}
+                {funders.length > 0 ? (
+                  funders.map(funder => (
+                    <OrganizationCard
+                      key={funder.id}
+                      organization={funder}
+                      handleFilterChange={handleFilterChange}
+                      linkTo={`/funders/${funder.slug}`}
+                      buttonText="View Grants"
+                    />
+                  ))
+                ) : (
+                  <p className="text-center text-slate-500 col-span-3">No specific funders found for this spotlight yet.</p>
+                )}
               </div>
             </div>
           </section>

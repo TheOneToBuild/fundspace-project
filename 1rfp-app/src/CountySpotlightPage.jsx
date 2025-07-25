@@ -1,12 +1,9 @@
-// src/CountySpotlightPage.jsx
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { supabase } from './supabaseClient.js';
 import { countySpotlightData } from './spotlightData.js';
-import { Users, DollarSign, MapPin, Loader, ExternalLink, Map, ArrowRight } from './components/Icons.jsx';
-import NonprofitCard from './components/NonprofitCard.jsx';
-import FunderCard from './components/FunderCard.jsx';
-// MODIFIED: Import the PublicPageLayout component
+import { Users, DollarSign, MapPin, Loader, ArrowRight } from './components/Icons.jsx';
+import OrganizationCard from './components/OrganizationCard.jsx';
 import PublicPageLayout from './components/PublicPageLayout.jsx';
 
 const CountySpotlightPage = () => {
@@ -19,8 +16,8 @@ const CountySpotlightPage = () => {
   useEffect(() => {
     const spotlightData = countySpotlightData[countySlug];
     if (!spotlightData) {
-        setLoading(false);
-        return;
+      setLoading(false);
+      return;
     }
     
     setSpotlight(spotlightData);
@@ -30,67 +27,80 @@ const CountySpotlightPage = () => {
       setLoading(true);
       try {
         let citiesToQuery;
-        let countyNameForQuery = spotlight.communityName;
+        let countyNameForQuery = spotlightData.communityName;
 
         if (countySlug === 'san-francisco') {
-            citiesToQuery = ['San Francisco, CA'];
+          citiesToQuery = ['San Francisco, CA'];
         } else {
-            citiesToQuery = spotlight.featuredCities.map(city => `${city.name}, CA`);
+          citiesToQuery = spotlightData.featuredCities.map(city => `${city.name}, CA`);
         }
 
         const [nonprofitRes, funderRes] = await Promise.all([
-            supabase
-              .from('nonprofits')
-              .select('*, nonprofit_categories(categories(name))')
-              .in('location', citiesToQuery)
-              .limit(3),
-            
-            supabase
-              .from('funders')
-              .select('*, funder_type:funder_type_id(name), funder_categories(categories(name)), funder_funding_locations!inner(locations!inner(name))')
-              .eq('funder_funding_locations.locations.name', countyNameForQuery)
-              .limit(3)
+          supabase
+            .from('nonprofits')
+            .select('*, nonprofit_categories(categories(name))')
+            .in('location', citiesToQuery)
+            .limit(3),
+          supabase
+            .from('funders')
+            .select('*, funder_type:funder_type_id(name), funder_categories(categories(name)), funder_funding_locations!inner(locations!inner(name))')
+            .eq('funder_funding_locations.locations.name', countyNameForQuery)
+            .limit(3)
         ]);
         
         if (nonprofitRes.error) throw nonprofitRes.error;
-        const formattedNonprofits = (nonprofitRes.data || []).map(np => ({ ...np, imageUrl: np.image_url, focusAreas: np.nonprofit_categories.map(npc => npc.categories.name) }));
+        const formattedNonprofits = (nonprofitRes.data || []).map(np => ({ 
+          ...np, 
+          imageUrl: np.image_url, 
+          focusAreas: np.nonprofit_categories.map(npc => npc.categories.name) 
+        }));
         setNonprofits(formattedNonprofits);
 
         if (funderRes.error) throw funderRes.error;
-        let localFunders = (funderRes.data || []).map(f => ({ ...f, funderType: f.funder_type?.name, focus_areas: f.funder_categories.map(fc => fc.categories.name), funding_locations: [countyNameForQuery] }));
+        let localFunders = (funderRes.data || []).map(f => ({ 
+          ...f, 
+          funderType: f.funder_type?.name, 
+          focus_areas: f.funder_categories.map(fc => fc.categories.name), 
+          funding_locations: [countyNameForQuery] 
+        }));
         
         let combinedFunders = [...localFunders];
         if (localFunders.length < 3) {
-            const remainingLimit = 3 - localFunders.length;
-            const { data: regionalFundersData, error: regionalError } = await supabase
-                .from('funders')
-                .select('*, funder_type:funder_type_id(name), funder_categories(categories(name)), funder_funding_locations!inner(locations!inner(name))')
-                .eq('funder_funding_locations.locations.name', 'All Bay Area Counties')
-                .limit(remainingLimit);
+          const remainingLimit = 3 - localFunders.length;
+          const { data: regionalFundersData, error: regionalError } = await supabase
+            .from('funders')
+            .select('*, funder_type:funder_type_id(name), funder_categories(categories(name)), funder_funding_locations!inner(locations!inner(name))')
+            .eq('funder_funding_locations.locations.name', 'All Bay Area Counties')
+            .limit(remainingLimit);
 
-            if (regionalError) console.warn("Could not fetch regional funders:", regionalError);
+          if (regionalError) console.warn("Could not fetch regional funders:", regionalError);
 
-            if (regionalFundersData) {
-                const formattedRegionalFunders = regionalFundersData.map(f => ({ ...f, funderType: f.funder_type?.name, focus_areas: f.funder_categories.map(fc => fc.categories.name), funding_locations: ['All Bay Area Counties'] }));
-                const existingIds = new Set(combinedFunders.map(f => f.id));
-                const uniqueRegionalFunders = formattedRegionalFunders.filter(f => !existingIds.has(f.id));
-                combinedFunders.push(...uniqueRegionalFunders);
-            }
+          if (regionalFundersData) {
+            const formattedRegionalFunders = regionalFundersData.map(f => ({ 
+              ...f, 
+              funderType: f.funder_type?.name, 
+              focus_areas: f.funder_categories.map(fc => fc.categories.name), 
+              funding_locations: ['All Bay Area Counties'] 
+            }));
+            const existingIds = new Set(combinedFunders.map(f => f.id));
+            const uniqueRegionalFunders = formattedRegionalFunders.filter(f => !existingIds.has(f.id));
+            combinedFunders.push(...uniqueRegionalFunders);
+          }
         }
         
         setFunders(combinedFunders.slice(0, 3));
 
       } catch (error) {
-        console.error("Error fetching live spotlight data:", error);
+        console.error("Error fetching spotlight data:", error);
       } finally {
         setLoading(false);
       }
     };
 
-    if (spotlight) {
+    if (spotlightData) {
       fetchSpotlightData();
     }
-  }, [spotlight, countySlug]);
+  }, [countySlug]);
 
   const iconMap = {
     Users: <Users size={24} className="text-rose-500" />,
@@ -100,18 +110,18 @@ const CountySpotlightPage = () => {
   
   if (!spotlight && !loading) {
     return (
+      <PublicPageLayout bgColor="bg-gradient-to-br from-rose-50 via-orange-50 to-yellow-50">
         <div className="text-center py-20">
-            <h1 className="text-2xl font-bold">Community Spotlight Not Found</h1>
-            <p className="text-slate-600 mt-2">The county slug "{countySlug}" is not valid.</p>
-            <Link to="/spotlight" className="text-blue-600 hover:underline mt-4 inline-block">View All Spotlights</Link>
+          <h1 className="text-2xl font-bold">Community Spotlight Not Found</h1>
+          <p className="text-slate-600 mt-2">The county slug "{countySlug}" is not valid.</p>
+          <Link to="/spotlight" className="text-blue-600 hover:underline mt-4 inline-block">View All Spotlights</Link>
         </div>
+      </PublicPageLayout>
     );
   }
 
   return (
-    // MODIFIED: Wrap the component in PublicPageLayout and provide the gradient class
     <PublicPageLayout bgColor="bg-gradient-to-br from-rose-50 via-orange-50 to-yellow-50">
-      {/* MODIFIED: Removed the hardcoded background class from this div */}
       <div>
         <div className="relative h-[60vh] min-h-[400px] flex items-center justify-center text-white text-center px-4">
           <div className="absolute inset-0 bg-black opacity-50 z-10"></div>
@@ -148,7 +158,18 @@ const CountySpotlightPage = () => {
                   <div className="mt-4 w-24 h-1 bg-purple-500 mx-auto rounded-full"></div>
                 </div>
                 <div className="grid md:grid-cols-3 gap-8 items-stretch">
-                  {nonprofits.length > 0 ? ( nonprofits.map(nonprofit => <NonprofitCard key={nonprofit.id} nonprofit={nonprofit} />) ) : ( <p className="text-center text-slate-500 col-span-3">No specific nonprofits found for this spotlight yet.</p> )}
+                  {nonprofits.length > 0 ? (
+                    nonprofits.map(nonprofit => (
+                      <OrganizationCard 
+                        key={nonprofit.id} 
+                        organization={nonprofit} 
+                        linkTo={`/nonprofits/${nonprofit.slug}`}
+                        buttonText="View Profile"
+                      />
+                    ))
+                  ) : (
+                    <p className="text-center text-slate-500 col-span-3">No specific nonprofits found for this spotlight yet.</p>
+                  )}
                 </div>
               </div>
             </section>
@@ -161,7 +182,18 @@ const CountySpotlightPage = () => {
                   <div className="mt-4 w-24 h-1 bg-green-500 mx-auto rounded-full"></div>
                 </div>
                 <div className="grid md:grid-cols-3 gap-8 items-stretch">
-                  {funders.length > 0 ? ( funders.map(funder => <FunderCard key={funder.id} funder={funder} />) ) : ( <p className="text-center text-slate-500 col-span-3">No specific funders found for this spotlight yet.</p> )}
+                  {funders.length > 0 ? (
+                    funders.map(funder => (
+                      <OrganizationCard 
+                        key={funder.id} 
+                        organization={funder} 
+                        linkTo={`/funders/${funder.slug}`}
+                        buttonText="View Grants"
+                      />
+                    ))
+                  ) : (
+                    <p className="text-center text-slate-500 col-span-3">No specific funders found for this spotlight yet.</p>
+                  )}
                 </div>
               </div>
             </section>

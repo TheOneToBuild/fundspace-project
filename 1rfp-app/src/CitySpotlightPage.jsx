@@ -4,8 +4,7 @@ import { useParams, Link } from 'react-router-dom';
 import { supabase } from './supabaseClient.js';
 import { citySpotlightData } from './spotlightData.js';
 import { Users, DollarSign, Calendar, Loader, ArrowLeft } from './components/Icons.jsx';
-import NonprofitCard from './components/NonprofitCard.jsx';
-import FunderCard from './components/FunderCard.jsx';
+import OrganizationCard from './components/OrganizationCard.jsx';
 
 const CitySpotlightPage = () => {
   const { countySlug, citySlug } = useParams();
@@ -13,6 +12,9 @@ const CitySpotlightPage = () => {
   const [nonprofits, setNonprofits] = useState([]);
   const [funders, setFunders] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // No-op for now, can be replaced with real filter logic if needed
+  const handleFilterChange = () => {};
 
   useEffect(() => {
     const spotlightData = citySpotlightData[citySlug];
@@ -118,15 +120,37 @@ const CitySpotlightPage = () => {
             <>
             {/* --- Nonprofits & Funders Sections --- */}
             <section className="pb-16 md:pb-24">
-                <div className="text-center mb-12"><h2 className="text-3xl md:text-4xl font-bold text-slate-800">Spotlight on Local Nonprofits</h2><div className="mt-4 w-24 h-1 bg-purple-500 mx-auto rounded-full"></div></div>
+                <div className="text-center mb-12">
+                  <h2 className="text-3xl md:text-4xl font-bold text-slate-800">Spotlight on Local Nonprofits</h2>
+                  <div className="mt-4 w-24 h-1 bg-purple-500 mx-auto rounded-full"></div>
+                </div>
                 <div className="grid md:grid-cols-3 gap-8 items-stretch">
-                    {nonprofits.length > 0 ? nonprofits.map(np => <NonprofitCard key={np.id} nonprofit={np} />) : <p className="text-center text-slate-500 col-span-3">No specific nonprofits found for this city yet.</p>}
+                    {nonprofits.length > 0 ? nonprofits.map(nonprofit => (
+                      <OrganizationCard
+                        key={nonprofit.id}
+                        organization={nonprofit}
+                        handleFilterChange={handleFilterChange}
+                        linkTo={`/nonprofits/${nonprofit.slug}`}
+                        buttonText="View Profile"
+                      />
+                    )) : <p className="text-center text-slate-500 col-span-3">No specific nonprofits found for this city yet.</p>}
                 </div>
             </section>
             <section className="pb-16 md:pb-24">
-                <div className="text-center mb-12"><h2 className="text-3xl md:text-4xl font-bold text-slate-800">Spotlight on Community Funders</h2><div className="mt-4 w-24 h-1 bg-green-500 mx-auto rounded-full"></div></div>
+                <div className="text-center mb-12">
+                  <h2 className="text-3xl md:text-4xl font-bold text-slate-800">Spotlight on Community Funders</h2>
+                  <div className="mt-4 w-24 h-1 bg-green-500 mx-auto rounded-full"></div>
+                </div>
                 <div className="grid md:grid-cols-3 gap-8 items-stretch">
-                    {funders.length > 0 ? funders.map(f => <FunderCard key={f.id} funder={f} />) : <p className="text-center text-slate-500 col-span-3">No specific funders found for this city yet.</p>}
+                    {funders.length > 0 ? funders.map(funder => (
+                      <OrganizationCard
+                        key={funder.id}
+                        organization={funder}
+                        handleFilterChange={handleFilterChange}
+                        linkTo={`/funders/${funder.slug}`}
+                        buttonText="View Grants"
+                      />
+                    )) : <p className="text-center text-slate-500 col-span-3">No specific funders found for this city yet.</p>}
                 </div>
             </section>
             </>

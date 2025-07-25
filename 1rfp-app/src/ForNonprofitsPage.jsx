@@ -3,7 +3,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Briefcase, CheckCircle, Search, Calendar, Bot, BarChart3, Users, Handshake, TrendingUp, Filter, ShieldCheck } from './components/Icons.jsx';
-import FunderCard from './components/FunderCard.jsx';
+import OrganizationCard from './components/OrganizationCard.jsx';
 import AnimatedShape from './components/AnimatedShape.jsx';
 import ScrollArrow from './components/ScrollArrow.jsx';
 import AnimatedCounter from './components/AnimatedCounter.jsx';
@@ -121,11 +121,11 @@ const animatedH1 = { hidden: {}, visible: { transition: { staggerChildren: 0.1 }
 const animatedWord = { hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: 'easeOut' } } };
 
 const ForNonprofitsPage = () => {
-    
+    // No-op for now, can be replaced with real filter logic if needed
+    const handleFilterChange = () => {};
+
     return (
-        // MODIFIED: Wrap the component in PublicPageLayout and provide the gradient class
         <PublicPageLayout bgColor="bg-gradient-to-br from-rose-50 via-orange-50 to-yellow-50">
-            {/* MODIFIED: Removed the hardcoded background class from this div */}
             <div className="text-[#333132] font-serif overflow-x-hidden">
                 <div className="container mx-auto px-4 sm:px-6 max-w-7xl">
 
@@ -192,7 +192,13 @@ const ForNonprofitsPage = () => {
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 w-full max-w-7xl mx-auto z-20 relative">
                             {funderData.map((funder, index) => ( 
                                 <motion.div variants={textFloatUp} key={funder.slug || index}>
-                                    <FunderCard funder={funder} />
+                                    <OrganizationCard 
+                                        key={funder.id}
+                                        organization={funder}
+                                        handleFilterChange={handleFilterChange}
+                                        linkTo={`/funders/${funder.slug}`}
+                                        buttonText="View Grants"
+                                    />
                                 </motion.div> 
                             ))}
                         </div>
