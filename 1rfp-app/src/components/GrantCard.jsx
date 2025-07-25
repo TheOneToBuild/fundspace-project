@@ -1,7 +1,7 @@
-// src/components/EnhancedGrantCard.jsx
-import React, { useMemo } from 'react';
+// src/components/GrantCard.jsx
+import React, { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { IconBriefcase, MapPin, DollarSign, Calendar, ExternalLink, ShieldCheck, Bookmark, Users, Building2 } from './Icons.jsx';
+import { IconBriefcase, MapPin, DollarSign, Calendar, ExternalLink, ShieldCheck, Bookmark, Users, Building2, Clock, Zap, Target, ChevronRight, Sparkles } from './Icons.jsx';
 import { formatDate, getPillClasses, getGrantTypePillClasses, formatFundingDisplay } from '../utils.js';
 
 // Taxonomy code to display name mapping
@@ -26,25 +26,48 @@ const TAXONOMY_DISPLAY_NAMES = {
   'religious.church': 'Religious Organizations'
 };
 
+// Enhanced gradient pill classes for categories
+const getEnhancedPillClasses = (categoryName) => {
+  const categoryMap = {
+    'Arts': 'bg-gradient-to-r from-purple-100 to-pink-100 text-purple-700 border-purple-200',
+    'Culture': 'bg-gradient-to-r from-purple-100 to-pink-100 text-purple-700 border-purple-200',
+    'Education': 'bg-gradient-to-r from-blue-100 to-indigo-100 text-blue-700 border-blue-200',
+    'Health': 'bg-gradient-to-r from-emerald-100 to-green-100 text-emerald-700 border-emerald-200',
+    'Healthcare': 'bg-gradient-to-r from-emerald-100 to-green-100 text-emerald-700 border-emerald-200',
+    'Environment': 'bg-gradient-to-r from-green-100 to-teal-100 text-green-700 border-green-200',
+    'Housing': 'bg-gradient-to-r from-orange-100 to-amber-100 text-orange-700 border-orange-200',
+    'Technology': 'bg-gradient-to-r from-cyan-100 to-blue-100 text-cyan-700 border-cyan-200',
+    'Innovation': 'bg-gradient-to-r from-violet-100 to-purple-100 text-violet-700 border-violet-200',
+    'Community': 'bg-gradient-to-r from-rose-100 to-pink-100 text-rose-700 border-rose-200',
+    'Community Development': 'bg-gradient-to-r from-rose-100 to-pink-100 text-rose-700 border-rose-200',
+    'Social Impact': 'bg-gradient-to-r from-indigo-100 to-purple-100 text-indigo-700 border-indigo-200',
+    'Research': 'bg-gradient-to-r from-slate-100 to-blue-100 text-slate-700 border-slate-200'
+  };
+  
+  return categoryMap[categoryName] || 'bg-gradient-to-r from-slate-100 to-gray-100 text-slate-700 border-slate-200';
+};
+
 // Organization type colors for pills
 const getOrgTypePillClasses = (taxonomyCode) => {
   const typeMap = {
-    'nonprofit': 'bg-rose-100 text-rose-700 border-rose-200',
-    'education': 'bg-indigo-100 text-indigo-700 border-indigo-200',
-    'healthcare': 'bg-emerald-100 text-emerald-700 border-emerald-200',
-    'government': 'bg-blue-100 text-blue-700 border-blue-200',
-    'foundation': 'bg-purple-100 text-purple-700 border-purple-200',
-    'forprofit': 'bg-green-100 text-green-700 border-green-200',
-    'religious': 'bg-amber-100 text-amber-700 border-amber-200',
-    'international': 'bg-cyan-100 text-cyan-700 border-cyan-200'
+    'nonprofit': 'bg-gradient-to-r from-rose-100 to-red-100 text-rose-700 border-rose-200',
+    'education': 'bg-gradient-to-r from-indigo-100 to-blue-100 text-indigo-700 border-indigo-200',
+    'healthcare': 'bg-gradient-to-r from-emerald-100 to-green-100 text-emerald-700 border-emerald-200',
+    'government': 'bg-gradient-to-r from-blue-100 to-cyan-100 text-blue-700 border-blue-200',
+    'foundation': 'bg-gradient-to-r from-purple-100 to-violet-100 text-purple-700 border-purple-200',
+    'forprofit': 'bg-gradient-to-r from-green-100 to-emerald-100 text-green-700 border-green-200',
+    'religious': 'bg-gradient-to-r from-amber-100 to-yellow-100 text-amber-700 border-amber-200',
+    'international': 'bg-gradient-to-r from-cyan-100 to-teal-100 text-cyan-700 border-cyan-200'
   };
   
   const prefix = taxonomyCode.split('.')[0];
-  return typeMap[prefix] || 'bg-slate-100 text-slate-700 border-slate-200';
+  return typeMap[prefix] || 'bg-gradient-to-r from-slate-100 to-gray-100 text-slate-700 border-slate-200';
 };
 
-const EnhancedGrantCard = ({ grant, onOpenDetailModal, onFilterByCategory, onSave, onUnsave, isSaved, session, userOrganizationType = null }) => {
+const GrantCard = ({ grant, onOpenDetailModal, onFilterByCategory, onSave, onUnsave, isSaved, session, userOrganizationType = null }) => {
     const navigate = useNavigate();
+    const [isHovered, setIsHovered] = useState(false);
+    
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
@@ -78,6 +101,15 @@ const EnhancedGrantCard = ({ grant, onOpenDetailModal, onFilterByCategory, onSav
         return name.substring(0, 2).toUpperCase();
     };
 
+    const formatFunding = (amount) => {
+        if (typeof amount === 'string' && amount.includes('$')) return amount;
+        const cleanAmount = amount?.toString().replace(/[^0-9]/g, '') || '0';
+        const num = parseInt(cleanAmount);
+        if (num >= 1000000) return `$${(num / 1000000).toFixed(1)}M`;
+        if (num >= 1000) return `$${(num / 1000).toFixed(0)}K`;
+        return `$${num.toLocaleString()}`;
+    };
+
     const handleSaveClick = (e) => {
         e.stopPropagation();
         if (!session) {
@@ -92,125 +124,161 @@ const EnhancedGrantCard = ({ grant, onOpenDetailModal, onFilterByCategory, onSav
     };
 
     return (
-        <div className={`bg-white p-6 rounded-xl border transition-all duration-300 ease-in-out flex flex-col justify-between transform hover:-translate-y-1 relative overflow-hidden h-full ${
-            isEligibleForUser 
-                ? 'border-slate-200 hover:shadow-xl hover:border-blue-300' 
-                : 'border-slate-300 bg-slate-50 opacity-75'
-        }`}>
+        <div 
+            className={`group relative bg-white rounded-2xl border border-slate-200 overflow-hidden transition-all duration-500 ease-out transform hover:-translate-y-3 hover:shadow-2xl cursor-pointer h-full flex flex-col ${
+                isHovered ? 'scale-[1.02]' : ''
+            } ${isEligibleForUser ? '' : 'opacity-80'} ${isExpired ? 'opacity-60' : ''}`}
+            onMouseEnter={() => setIsHovered(true)}
+            onMouseLeave={() => setIsHovered(false)}
+            onClick={() => onOpenDetailModal(grant)}
+        >
+            {/* Magical gradient overlay that appears on hover */}
+            <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 via-purple-500/10 to-pink-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
             
-            {/* Eligibility indicator for user */}
-            {!isEligibleForUser && (
-                <div className="absolute top-0 left-0 bg-amber-500 text-white text-[10px] font-bold px-3 py-1 rounded-br-lg z-10 uppercase tracking-wider">
-                    Check Eligibility
-                </div>
-            )}
+            {/* Magical border effect */}
+            <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 opacity-0 group-hover:opacity-20 transition-opacity duration-500 -z-10 blur-xl scale-110" />
 
-            {isExpired && (
-                <>
-                    <div className="absolute inset-0 bg-slate-50/70 z-10"></div>
-                    <span className="absolute top-0 right-[-1px] bg-slate-500 text-white text-[10px] font-bold px-3 py-1 rounded-bl-lg z-20 uppercase tracking-wider">
-                        EXPIRED
-                    </span>
-                </>
-            )}
-
-            {isEndingSoon && !isExpired && (
-                <span
-                    className="absolute top-0 right-[-1px] bg-amber-500 text-white text-[10px] font-bold px-3 py-1 rounded-bl-lg z-10 uppercase tracking-wider shadow-sm"
-                    title={`Due in ${daysUntilDue} day${daysUntilDue === 1 ? '' : 's'}`}
-                >
-                    {daysUntilDue === 1 ? 'DUE TOMORROW' : 
-                     daysUntilDue === 0 ? 'DUE TODAY' : 
-                     `${daysUntilDue} DAYS LEFT`}
-                </span>
-            )}
-
-            <div className="relative z-0">
-                <div className="flex justify-between items-start mb-3">
-                    <h3 className="text-lg font-semibold text-slate-800 group-hover:text-blue-600 transition-colors duration-200 pr-4">
-                        {grant.title}
-                    </h3>
-                    <div className="flex flex-col items-end gap-2 flex-shrink-0">
-                        {grant.grantType && (
-                            <span className={`text-xs font-medium px-3 py-1 rounded-full whitespace-nowrap ${getGrantTypePillClasses(grant.grantType)}`}>
-                                {grant.grantType}
-                            </span>
-                        )}
-                        {grant.save_count > 0 && (
-                            <div
-                                className="flex items-center gap-1 bg-indigo-50 text-indigo-700 rounded-full px-2 py-1"
-                                title={`${grant.save_count} user${grant.save_count === 1 ? '' : 's'} saved this grant`}
-                            >
-                                <Bookmark size={14} className="text-indigo-500" fill="currentColor"/>
-                                <span className="text-sm font-bold">{grant.save_count}</span>
-                            </div>
-                        )}
+            {/* Status badges */}
+            <div className="absolute top-4 right-4 z-10 flex flex-col gap-2">
+                {!isEligibleForUser && (
+                    <div className="bg-gradient-to-r from-amber-400 to-orange-500 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg flex items-center gap-1">
+                        <ShieldCheck size={12} />
+                        Check Eligibility
                     </div>
-                </div>
+                )}
                 
-                <Link 
-                    to={`/funders/${grant.funderSlug}`} 
-                    className={`flex items-center mb-4 group ${isExpired ? 'pointer-events-none' : ''}`}
-                    onClick={(e) => { if(isExpired) e.preventDefault(); e.stopPropagation(); }}
-                >
+                {isExpired && (
+                    <div className="bg-gradient-to-r from-slate-400 to-slate-500 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg">
+                        EXPIRED
+                    </div>
+                )}
+                
+                {isEndingSoon && !isExpired && (
+                    <div className="bg-gradient-to-r from-red-400 to-orange-500 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg animate-pulse">
+                        {daysUntilDue === 1 ? 'DUE TOMORROW' : 
+                         daysUntilDue === 0 ? 'DUE TODAY' : 
+                         `${daysUntilDue} DAYS LEFT`}
+                    </div>
+                )}
+                
+                {grant.save_count > 0 && (
+                    <div className="bg-gradient-to-r from-indigo-500 to-purple-600 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg flex items-center gap-1">
+                        <Bookmark size={12} fill="currentColor" />
+                        {grant.save_count}
+                    </div>
+                )}
+            </div>
+
+            {/* Main content */}
+            <div className="p-6 relative z-0 flex-grow flex flex-col">
+                {/* Header with funder info */}
+                <div className="flex items-center mb-4">
                     {grant.funderLogoUrl ? (
                         <img 
                             src={grant.funderLogoUrl} 
                             alt={`${grant.foundationName} logo`}
-                            className="h-6 w-6 mr-2 rounded-full object-contain border border-slate-200 flex-shrink-0"
-                            onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.nextSibling.style.display = 'flex'; }}
+                            className="h-12 w-12 rounded-xl object-cover border-2 border-white shadow-lg mr-4 group-hover:shadow-xl transition-shadow duration-300"
+                            onError={(e) => { 
+                                e.currentTarget.style.display = 'none'; 
+                                e.currentTarget.nextElementSibling.style.display = 'flex'; 
+                            }}
                         />
-                    ) : null }
-                    <div className={`h-6 w-6 mr-2 rounded-full bg-blue-100 text-blue-600 flex-shrink-0 items-center justify-center font-bold text-[10px] border border-blue-200 ${grant.funderLogoUrl ? 'hidden' : 'flex'}`}>
+                    ) : null}
+                    <div className={`h-12 w-12 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 text-white flex items-center justify-center font-bold text-sm shadow-lg mr-4 group-hover:shadow-xl transition-shadow duration-300 ${grant.funderLogoUrl ? 'hidden' : 'flex'}`}>
                         {getInitials(grant.foundationName)}
                     </div>
-                    <span className="text-sm text-slate-600 font-medium truncate group-hover:underline group-hover:text-blue-600 transition-colors">
-                        {grant.foundationName}
-                    </span>
-                </Link>
+                    
+                    <div className="flex-1">
+                        <Link 
+                            to={`/funders/${grant.funderSlug}`} 
+                            className="font-semibold text-slate-700 text-sm hover:text-blue-600 transition-colors duration-300 block"
+                            onClick={(e) => { if(isExpired) e.preventDefault(); e.stopPropagation(); }}
+                        >
+                            {grant.foundationName}
+                        </Link>
+                        {grant.grantType && (
+                            <span className="inline-block mt-1 text-xs bg-gradient-to-r from-blue-100 to-indigo-100 text-blue-700 px-3 py-1 rounded-full font-medium border border-blue-200">
+                                {grant.grantType}
+                            </span>
+                        )}
+                    </div>
+                </div>
 
-                {/* NEW: Eligible Organization Types Section */}
-                {grant.eligible_organization_types && grant.eligible_organization_types.length > 0 && (
-                    <div className="mb-4">
-                        <h4 className="text-xs font-semibold text-slate-700 mb-2 uppercase tracking-wider flex items-center gap-1">
-                            <Users size={12} />
-                            Eligible Organizations
-                        </h4>
-                        <div className="flex flex-wrap gap-2">
-                            {grant.eligible_organization_types.slice(0, 3).map((taxonomyCode, index) => {
-                                const displayName = TAXONOMY_DISPLAY_NAMES[taxonomyCode] || taxonomyCode;
-                                const isUserEligible = userOrganizationType && taxonomyCode.startsWith(userOrganizationType);
-                                
-                                return (
-                                    <span 
-                                        key={index}
-                                        className={`text-xs font-medium px-2.5 py-1 rounded-full border transition-all ${
-                                            isUserEligible 
-                                                ? 'bg-green-100 text-green-800 border-green-300 ring-2 ring-green-200' 
-                                                : getOrgTypePillClasses(taxonomyCode)
-                                        }`}
-                                        title={isUserEligible ? 'You are eligible for this grant!' : displayName}
-                                    >
-                                        {isUserEligible && '✓ '}
-                                        {displayName}
-                                    </span>
-                                );
-                            })}
-                            {grant.eligible_organization_types.length > 3 && (
-                                <span className="text-xs text-slate-500 px-2 py-1">
-                                    +{grant.eligible_organization_types.length - 3} more
-                                </span>
-                            )}
+                {/* Title */}
+                <h3 className="text-xl font-bold text-slate-800 mb-3 group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r group-hover:from-blue-600 group-hover:to-purple-600 transition-all duration-300 line-clamp-2">
+                    {grant.title}
+                </h3>
+
+                {/* Description */}
+                <p className="text-slate-600 text-sm leading-relaxed mb-6 line-clamp-3 flex-grow">
+                    {grant.description}
+                </p>
+
+                {/* Key metrics in a beautiful grid */}
+                <div className="grid grid-cols-2 gap-3 mb-6">
+                    <div className="bg-gradient-to-br from-green-50 to-emerald-50 p-4 rounded-xl border border-green-100 group-hover:shadow-lg transition-shadow duration-300">
+                        <div className="flex items-center gap-2 mb-2">
+                            <div className="p-1 bg-green-100 rounded-lg">
+                                <DollarSign size={14} className="text-green-600" />
+                            </div>
+                            <span className="text-xs font-semibold text-green-700 uppercase tracking-wide">Funding</span>
+                        </div>
+                        <div className="text-lg font-bold text-green-800">
+                            {formatFunding(grant.fundingAmount)}
                         </div>
                     </div>
-                )}
+                    
+                    <div className="bg-gradient-to-br from-red-50 to-orange-50 p-4 rounded-xl border border-red-100 group-hover:shadow-lg transition-shadow duration-300">
+                        <div className="flex items-center gap-2 mb-2">
+                            <div className="p-1 bg-red-100 rounded-lg">
+                                <Calendar size={14} className="text-red-600" />
+                            </div>
+                            <span className="text-xs font-semibold text-red-700 uppercase tracking-wide">Due Date</span>
+                        </div>
+                        <div className="text-sm font-bold text-red-800">
+                            {grant.dueDate ? formatDate(grant.dueDate) : 'Rolling'}
+                        </div>
+                    </div>
+                </div>
 
-                {/* Legacy Categories Section (keep for backward compatibility) */}
+                {/* Location with better design */}
+                <div className="mb-4">
+                    <div className="flex items-center gap-2 mb-2">
+                        <MapPin size={14} className="text-blue-500" />
+                        <span className="text-xs font-semibold text-blue-700 uppercase tracking-wide">Location</span>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                        {grant.locations && grant.locations.length > 0 ? (
+                            grant.locations.slice(0, 3).map((location, index) => (
+                                <span 
+                                    key={index}
+                                    className="text-xs font-medium px-3 py-1.5 bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 rounded-full border border-blue-200"
+                                >
+                                    {location.name}
+                                </span>
+                            ))
+                        ) : (
+                            <span className="text-xs font-medium px-3 py-1.5 bg-slate-100 text-slate-600 rounded-full">
+                                Not specified
+                            </span>
+                        )}
+                        {grant.locations && grant.locations.length > 3 && (
+                            <span className="text-xs text-slate-500 px-2 py-1">
+                                +{grant.locations.length - 3} more
+                            </span>
+                        )}
+                    </div>
+                </div>
+
+                {/* Categories with title and better design */}
                 {grant.categories && grant.categories.length > 0 && (
-                    <div className="mb-4">
-                        <h4 className="text-xs font-semibold text-slate-700 mb-2 uppercase tracking-wider">Focus Areas</h4>
+                    <div className="mb-6">
+                        <div className="flex items-center gap-2 mb-2">
+                            <Target size={14} className="text-purple-500" />
+                            <span className="text-xs font-semibold text-purple-700 uppercase tracking-wide">Focus Areas</span>
+                        </div>
                         <div className="flex flex-wrap gap-2">
-                            {grant.categories.map((category, index) => {
+                            {grant.categories.slice(0, 2).map((category, index) => {
                                 const categoryName = category.name || category;
                                 return (
                                     <button 
@@ -220,87 +288,85 @@ const EnhancedGrantCard = ({ grant, onOpenDetailModal, onFilterByCategory, onSav
                                             e.stopPropagation();
                                             onFilterByCategory(categoryName);
                                         }}
-                                        className={`text-xs font-semibold px-2.5 py-1 rounded-full transition-transform transform hover:scale-105 active:scale-95 ${getPillClasses(categoryName)} ${isExpired ? 'cursor-not-allowed' : ''}`}
-                                        title={`Filter by: ${categoryName}`}
+                                        className={`text-xs font-semibold px-3 py-1.5 rounded-full transition-all duration-300 transform hover:scale-105 active:scale-95 border ${getEnhancedPillClasses(categoryName)} ${isExpired ? 'cursor-not-allowed opacity-50' : 'hover:shadow-lg'}`}
                                     >
                                         {categoryName}
                                     </button>
                                 );
                             })}
+                            {grant.categories.length > 2 && (
+                                <span className="text-xs text-slate-500 px-3 py-1.5 bg-slate-100 rounded-full font-medium">
+                                    +{grant.categories.length - 2} more
+                                </span>
+                            )}
                         </div>
                     </div>
                 )}
-                
-                <p className="text-sm text-slate-500 mb-4 line-clamp-3 leading-relaxed">
-                    {grant.description}
-                </p>
 
-                <div className="space-y-2.5 text-sm mb-5">
-                   <div className="flex items-start text-slate-700">
-                        <MapPin size={15} className="mr-2.5 mt-0.5 text-blue-500 flex-shrink-0" />
-                        <div>
-                            <span className="font-medium text-slate-600">Location: </span> 
-                            {grant.locations && grant.locations.length > 0
-                                ? grant.locations.map(loc => loc.name || loc).join(', ')
-                                : 'Not specified'
-                            }
+                {/* Eligible Organizations with better design */}
+                {grant.eligible_organization_types && grant.eligible_organization_types.length > 0 && (
+                    <div className="mb-6">
+                        <div className="flex items-center gap-2 mb-2">
+                            <Users size={14} className="text-emerald-500" />
+                            <span className="text-xs font-semibold text-emerald-700 uppercase tracking-wide">Eligible Organizations</span>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                            {grant.eligible_organization_types.slice(0, 2).map((taxonomyCode, index) => {
+                                const displayName = TAXONOMY_DISPLAY_NAMES[taxonomyCode] || taxonomyCode;
+                                const isUserEligible = userOrganizationType && taxonomyCode.startsWith(userOrganizationType);
+                                
+                                return (
+                                    <span 
+                                        key={index}
+                                        className={`text-xs font-medium px-3 py-1.5 rounded-full border transition-all duration-300 ${
+                                            isUserEligible 
+                                                ? 'bg-gradient-to-r from-green-100 to-emerald-100 text-green-800 border-green-300 shadow-lg' 
+                                                : getOrgTypePillClasses(taxonomyCode)
+                                        }`}
+                                    >
+                                        {isUserEligible && '✓ '}
+                                        {displayName}
+                                    </span>
+                                );
+                            })}
+                            {grant.eligible_organization_types.length > 2 && (
+                                <span className="text-xs text-slate-500 px-3 py-1.5 bg-slate-100 rounded-full font-medium">
+                                    +{grant.eligible_organization_types.length - 2} more
+                                </span>
+                            )}
                         </div>
                     </div>
-
-                    <div className="flex items-center text-slate-700">
-                        <DollarSign size={15} className="mr-2.5 text-green-500 flex-shrink-0" />
-                        <div>
-                            <span className="font-medium text-slate-600">Funding: </span>
-                            <span className="font-semibold text-green-600">
-                                {formatFundingDisplay(grant.fundingAmount)}
-                            </span>
-                        </div>
-                    </div>
-
-                    <div className="flex items-center text-slate-700">
-                        <Calendar size={15} className="mr-2.5 text-red-500 flex-shrink-0" />
-                        <div>
-                            <span className="font-medium text-slate-600">Due: </span>
-                            {grant.dueDate 
-                                ? formatDate(grant.dueDate)
-                                : 'Continuous'
-                            }
-                        </div>
-                    </div>
-
-                    {grant.eligibility_criteria && (
-                        <div className="flex items-start text-slate-700">
-                            <ShieldCheck size={15} className="mr-2.5 mt-0.5 text-indigo-500 flex-shrink-0" />
-                            <div className="line-clamp-4">
-                                <span className="font-medium text-slate-600">Eligibility: </span>
-                                {grant.eligibility_criteria}
-                            </div>
-                        </div>
-                    )}
-                </div>
+                )}
             </div>
 
-            <div className="mt-auto flex justify-between items-center relative z-0">
+            {/* Action footer */}
+            <div className="px-6 pb-6 flex justify-between items-center relative z-0 mt-auto">
                 <button
-                    onClick={() => onOpenDetailModal(grant)}
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onOpenDetailModal(grant);
+                    }}
                     disabled={isExpired}
-                    className={`inline-flex items-center justify-center flex-grow px-4 py-2.5 border border-transparent rounded-lg shadow-sm text-sm font-medium transition-all duration-200 ease-in-out transform hover:scale-105 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none ${
-                        isEligibleForUser
-                            ? 'text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500'
-                            : 'text-slate-600 bg-slate-200 hover:bg-slate-300'
-                    } ${isExpired ? 'bg-slate-400' : ''}`}
+                    className={`group/btn flex items-center gap-2 px-6 py-3 font-semibold rounded-xl shadow-lg transition-all duration-300 transform hover:scale-105 hover:shadow-xl disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none flex-1 mr-3 justify-center ${
+                        isEligibleForUser && !isExpired
+                            ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:from-blue-700 hover:to-purple-700'
+                            : 'bg-gradient-to-r from-slate-400 to-slate-500 text-white'
+                    }`}
                 >
+                    <Sparkles size={16} className="group-hover/btn:animate-pulse" />
                     {isEligibleForUser ? 'View Details' : 'Check Details'}
+                    <ChevronRight size={16} className="group-hover/btn:translate-x-1 transition-transform duration-300" />
                 </button>
+                
                 <button
                     onClick={handleSaveClick}
-                    title={isSaved && session ? "Unsave this grant" : "Save this grant"}
                     disabled={isExpired}
-                    className={`ml-2 p-2.5 rounded-lg transition-colors duration-200 disabled:opacity-50 ${
+                    className={`p-3 rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none ${
                         isSaved && session
-                            ? 'bg-pink-100 text-pink-600 hover:bg-pink-200' 
-                            : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                            ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white hover:from-pink-600 hover:to-rose-600' 
+                            : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-50 hover:border-slate-300'
                     }`}
+                    title={isSaved && session ? "Unsave this grant" : "Save this grant"}
                 >
                     <Bookmark size={18} fill={isSaved && session ? 'currentColor' : 'none'} />
                 </button>
@@ -309,4 +375,4 @@ const EnhancedGrantCard = ({ grant, onOpenDetailModal, onFilterByCategory, onSav
     );
 };
 
-export default EnhancedGrantCard;
+export default GrantCard;
