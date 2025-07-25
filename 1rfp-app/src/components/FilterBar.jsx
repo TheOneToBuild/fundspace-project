@@ -1,7 +1,7 @@
 // src/components/FilterBar.jsx
 import React, { useMemo } from 'react';
 import Select from 'react-select';
-import { Search, MapPin, DollarSign, Filter, IconBriefcase, Info, ChevronDown, ListFilter, XCircle, Heart, Users as UsersIcon, Tag, TrendingUp } from './Icons.jsx';
+import { Search, MapPin, DollarSign, Filter, IconBriefcase, Info, ChevronDown, ListFilter, XCircle, Heart, Users as UsersIcon, Tag, TrendingUp, Building } from './Icons.jsx';
 import FilterPills from './FilterPills.jsx';
 import EnhancedSearchInput from './EnhancedSearchInput.jsx';
 
@@ -46,6 +46,9 @@ const FilterBar = ({
   maxBudget, setMaxBudget,
   minStaff, setMinStaff,
   maxStaff, setMaxStaff,
+  // Organization Filters (NEW)
+  typeFilter, setTypeFilter,
+  availableTypes, orgTypeConfig,
   // Common Props
   sortCriteria, setSortCriteria,
   uniqueCategories = [],
@@ -62,11 +65,13 @@ const FilterBar = ({
   hideSearchInput = false,
   funders = [],
   nonprofits = [],
+  organizations = [],
   onSuggestionSelect
 }) => {
   const isGrantsPage = pageType === 'grants';
   const isFundersPage = pageType === 'funders';
   const isNonprofitsPage = pageType === 'nonprofits';
+  const isOrganizationsPage = pageType === 'organizations'; // NEW
 
   // --- DYNAMIC LABELS AND SORT OPTIONS ---
   let searchLabel = 'Search';
@@ -112,6 +117,24 @@ const FilterBar = ({
             <option value="staffCount_asc">Staff Count (Lowest)</option>
             <option value="yearFounded_desc">Year Founded (Newest)</option>
             <option value="yearFounded_asc">Year Founded (Oldest)</option>
+        </>
+    );
+  } else if (isOrganizationsPage) { // NEW
+    searchLabel = 'Search Organizations';
+    searchPlaceholder = "Search by name, type, focus area...";
+    accentColorClass = 'focus:ring-blue-500';
+    sortOptions = (
+        <>
+            <option value="name_asc">Name (A-Z)</option>
+            <option value="name_desc">Name (Z-A)</option>
+            <option value="type_asc">Type (A-Z)</option>
+            <option value="type_desc">Type (Z-A)</option>
+            <option value="location_asc">Location (A-Z)</option>
+            <option value="location_desc">Location (Z-A)</option>
+            <option value="funding_desc">Funding (High to Low)</option>
+            <option value="funding_asc">Funding (Low to High)</option>
+            <option value="created_desc">Newest First</option>
+            <option value="created_asc">Oldest First</option>
         </>
     );
   }
@@ -198,7 +221,7 @@ const FilterBar = ({
               <label htmlFor="enhanced-search" className="block text-sm font-medium text-slate-700 mb-2">{searchLabel}</label>
               <EnhancedSearchInput
                 searchTerm={searchTerm} onSearchChange={setSearchTerm} onSuggestionSelect={onSuggestionSelect}
-                funders={funders} nonprofits={nonprofits} placeholder={searchPlaceholder} className=""
+                funders={funders} nonprofits={nonprofits} organizations={organizations} placeholder={searchPlaceholder} className=""
               />
             </div>
             <div className="w-64">
@@ -316,6 +339,44 @@ const FilterBar = ({
                   <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
                 </div>
             </>
+        )}
+
+        {/* --- ORGANIZATIONS FILTERS (NEW) --- */}
+        {isOrganizationsPage && (
+          <>
+            <div className="relative">
+              <label htmlFor="org-type-filter" className="block text-sm font-medium text-slate-700 mb-2"><Building size={16} className="inline mr-1" />Organization Type</label>
+              <select
+                id="org-type-filter"
+                value={typeFilter?.[0] || ''}
+                onChange={(e) => setTypeFilter(e.target.value ? [e.target.value] : [])}
+                className={`w-full pl-3 pr-8 py-3 border border-slate-300 rounded-lg focus:ring-2 ${accentColorClass} bg-white text-sm transition-colors hover:border-slate-400 appearance-none`}
+              >
+                <option value="">All Types</option>
+                {availableTypes?.map(type => {
+                  const config = orgTypeConfig?.[type];
+                  return (
+                    <option key={type} value={type}>
+                      {config?.label || type}
+                    </option>
+                  );
+                })}
+              </select>
+              <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
+            </div>
+            <div className="relative">
+              <label htmlFor="org-focus-area-filter" className="block text-sm font-medium text-slate-700 mb-2"><Tag size={16} className="inline mr-1" />Focus Areas</label>
+              <Select id="org-focus-area-filter" isMulti options={focusAreaOptions} value={getSelectedValues(focusAreaFilter, focusAreaOptions)} 
+                onChange={handleMultiSelectChange(setFocusAreaFilter)} placeholder="Select focus areas..." className="text-sm" styles={customSelectStyles} isClearable
+              />
+            </div>
+            <div className="relative">
+              <label htmlFor="org-location-filter" className="block text-sm font-medium text-slate-700 mb-2"><MapPin size={16} className="inline mr-1" />Location</label>
+              <Select id="org-location-filter" isMulti options={locationOptions} value={getSelectedValues(locationFilter, locationOptions)} 
+                onChange={handleMultiSelectChange(setLocationFilter)} placeholder="Select locations..." className="text-sm" styles={customSelectStyles} isClearable
+              />
+            </div>
+          </>
         )}
       </div>
 

@@ -95,7 +95,7 @@ export default function DashboardHeader({
                                 <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                                 <input 
                                     type="text" 
-                                    placeholder="Search grants, funders..." 
+                                    placeholder="Search grants, organizations..." 
                                     className="pl-10 pr-4 py-2 w-64 border border-slate-300 rounded-lg bg-slate-50 focus:bg-white focus:ring-1 focus:ring-blue-500 transition-colors"
                                     onFocus={() => setIsSearchFocused(true)}
                                     onBlur={() => setIsSearchFocused(false)}
@@ -103,12 +103,11 @@ export default function DashboardHeader({
                             </div>
                         </div>
 
-                        {/* Desktop Navigation */}
+                        {/* Desktop Navigation - UPDATED: Unified Organizations */}
                         <nav className="hidden md:flex items-center justify-center h-full">
                             <HeaderNavLink to="/profile" Icon={Home}>Home</HeaderNavLink>
                             <HeaderNavLink to="/profile/grants" Icon={ClipboardList}>Grants</HeaderNavLink>
-                            <HeaderNavLink to="/profile/funders" Icon={Building}>Funders</HeaderNavLink>
-                            <HeaderNavLink to="/profile/nonprofits" Icon={FileText}>Nonprofits</HeaderNavLink>
+                            <HeaderNavLink to="/profile/organizations" Icon={Building}>Organizations</HeaderNavLink>
                         </nav>
 
                         {/* Right side - Actions and Profile */}
@@ -169,7 +168,7 @@ export default function DashboardHeader({
                             <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                             <input 
                                 type="text" 
-                                placeholder="Search grants, funders..." 
+                                placeholder="Search grants, organizations..." 
                                 className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg bg-slate-50 focus:bg-white focus:ring-1 focus:ring-blue-500 transition-colors"
                             />
                         </div>
@@ -200,7 +199,7 @@ export default function DashboardHeader({
                             </button>
                         </div>
 
-                        {/* Mobile Navigation Links */}
+                        {/* Mobile Navigation Links - UPDATED: Unified Organizations */}
                         <nav className="py-4">
                             <HeaderNavLink to="/profile" Icon={Home} mobile onClick={closeMobileMenu}>
                                 Dashboard Home
@@ -208,11 +207,8 @@ export default function DashboardHeader({
                             <HeaderNavLink to="/profile/grants" Icon={ClipboardList} mobile onClick={closeMobileMenu}>
                                 My Grants
                             </HeaderNavLink>
-                            <HeaderNavLink to="/profile/funders" Icon={Building} mobile onClick={closeMobileMenu}>
-                                Explore Funders
-                            </HeaderNavLink>
-                            <HeaderNavLink to="/profile/nonprofits" Icon={FileText} mobile onClick={closeMobileMenu}>
-                                Explore Nonprofits
+                            <HeaderNavLink to="/profile/organizations" Icon={Building} mobile onClick={closeMobileMenu}>
+                                Explore Organizations
                             </HeaderNavLink>
                         </nav>
 

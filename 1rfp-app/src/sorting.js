@@ -110,3 +110,74 @@ export const sortNonprofits = (list, sortCriteria) => {
   }
   return sortedList;
 };
+
+// Helper function to parse budget strings (same as in filtering.js)
+const parseBudgetString = (budgetStr) => {
+  if (!budgetStr) return 0;
+  
+  // Remove currency symbols and convert to lowercase
+  const cleaned = budgetStr.toLowerCase().replace(/[$,\s]/g, '');
+  
+  // Extract the first number and multiplier
+  const match = cleaned.match(/(\d+(?:\.\d+)?)(k|m|b)?/);
+  if (!match) return 0;
+  
+  const num = parseFloat(match[1]);
+  const multiplier = match[2];
+  
+  switch (multiplier) {
+    case 'k': return num * 1000;
+    case 'm': return num * 1000000;
+    case 'b': return num * 1000000000;
+    default: return num;
+  }
+};
+
+// Organization sorting function
+export const sortOrganizations = (organizations, sortCriteria) => {
+  const sorted = [...organizations];
+  
+  switch (sortCriteria) {
+    case 'name_asc':
+      return sorted.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    
+    case 'name_desc':
+      return sorted.sort((a, b) => (b.name || '').localeCompare(a.name || ''));
+    
+    case 'type_asc':
+      return sorted.sort((a, b) => (a.type || '').localeCompare(b.type || ''));
+    
+    case 'type_desc':
+      return sorted.sort((a, b) => (b.type || '').localeCompare(a.type || ''));
+    
+    case 'location_asc':
+      return sorted.sort((a, b) => (a.location || '').localeCompare(b.location || ''));
+    
+    case 'location_desc':
+      return sorted.sort((a, b) => (b.location || '').localeCompare(a.location || ''));
+    
+    case 'created_desc':
+      return sorted.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+    
+    case 'created_asc':
+      return sorted.sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
+    
+    // Sort by budget/funding amount (for relevant org types)
+    case 'funding_desc':
+      return sorted.sort((a, b) => {
+        const aValue = parseBudgetString(a.total_funding_annually || a.budget || '0');
+        const bValue = parseBudgetString(b.total_funding_annually || b.budget || '0');
+        return bValue - aValue;
+      });
+    
+    case 'funding_asc':
+      return sorted.sort((a, b) => {
+        const aValue = parseBudgetString(a.total_funding_annually || a.budget || '0');
+        const bValue = parseBudgetString(b.total_funding_annually || b.budget || '0');
+        return aValue - bValue;
+      });
+    
+    default:
+      return sorted.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  }
+};

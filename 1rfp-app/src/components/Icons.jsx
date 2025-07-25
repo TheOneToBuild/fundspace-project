@@ -94,4 +94,7 @@ export {
   EyeOff, 
   Save,
   Quote,
+  GraduationCap,
+  Stethoscope, 
+  Church,
 } from 'lucide-react';

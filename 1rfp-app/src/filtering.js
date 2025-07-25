@@ -50,7 +50,6 @@ export const filterGrants = (grant, filters) => {
   return matchesSearch && matchesLocation && matchesCategory && matchesMinFunding && matchesMaxFunding && matchesGrantType && matchesGrantStatus;
 };
 
-// The rest of the file (filterFunders, filterNonprofits) remains the same
 export const filterFunders = (funder, filters) => {
   const { searchTerm, locationFilter, focusAreaFilter, grantTypeFilter, funderTypeFilter, geographicScopeFilter, annualGivingFilter, minFunding, maxFunding } = filters;
 
@@ -143,4 +142,110 @@ export const filterNonprofits = (nonprofit, filters) => {
   const matchesMaxStaff = isNaN(maxS) || nonprofit.staffCount <= maxS;
 
   return matchesSearch && matchesLocation && matchesFocusArea && matchesMinBudget && matchesMaxBudget && matchesMinStaff && matchesMaxStaff;
+};
+
+// Helper function to parse budget strings like "$1M - $5M" or "Up to $30M"
+const parseBudgetString = (budgetStr) => {
+  if (!budgetStr) return 0;
+  
+  // Remove currency symbols and convert to lowercase
+  const cleaned = budgetStr.toLowerCase().replace(/[$,\s]/g, '');
+  
+  // Extract the first number and multiplier
+  const match = cleaned.match(/(\d+(?:\.\d+)?)(k|m|b)?/);
+  if (!match) return 0;
+  
+  const num = parseFloat(match[1]);
+  const multiplier = match[2];
+  
+  switch (multiplier) {
+    case 'k': return num * 1000;
+    case 'm': return num * 1000000;
+    case 'b': return num * 1000000000;
+    default: return num;
+  }
+};
+
+// Organization filtering function
+export const filterOrganizations = (organizations, filterConfig) => {
+  return organizations.filter(org => {
+    // Search term filter
+    if (filterConfig.searchTerm) {
+      const searchLower = filterConfig.searchTerm.toLowerCase();
+      const matchesSearch = 
+        org.name?.toLowerCase().includes(searchLower) ||
+        org.description?.toLowerCase().includes(searchLower) ||
+        org.focus_areas?.some(area => area.toLowerCase().includes(searchLower));
+      
+      if (!matchesSearch) return false;
+    }
+
+    // Location filter
+    if (filterConfig.locationFilter && filterConfig.locationFilter.length > 0) {
+      if (!org.location || !filterConfig.locationFilter.some(loc => 
+        org.location.toLowerCase().includes(loc.toLowerCase())
+      )) {
+        return false;
+      }
+    }
+
+    // Focus area filter
+    if (filterConfig.focusAreaFilter && filterConfig.focusAreaFilter.length > 0) {
+      if (!org.focus_areas || !filterConfig.focusAreaFilter.some(area =>
+        org.focus_areas.includes(area)
+      )) {
+        return false;
+      }
+    }
+
+    // Organization type filter
+    if (filterConfig.typeFilter && filterConfig.typeFilter.length > 0) {
+      if (!filterConfig.typeFilter.includes(org.type)) {
+        return false;
+      }
+    }
+
+    // Taxonomy filter (if you want to filter by specific taxonomies)
+    if (filterConfig.taxonomyFilter && filterConfig.taxonomyFilter.length > 0) {
+      if (!filterConfig.taxonomyFilter.includes(org.taxonomy_code)) {
+        return false;
+      }
+    }
+
+    // Budget filter for nonprofits
+    if (filterConfig.minBudget || filterConfig.maxBudget) {
+      if (org.type === 'nonprofit' && org.budget) {
+        const budgetValue = parseBudgetString(org.budget);
+        if (filterConfig.minBudget && budgetValue < parseFloat(filterConfig.minBudget)) {
+          return false;
+        }
+        if (filterConfig.maxBudget && budgetValue > parseFloat(filterConfig.maxBudget)) {
+          return false;
+        }
+      }
+    }
+
+    // Annual giving filter for foundations
+    if (filterConfig.annualGivingFilter) {
+      if (org.type === 'foundation' && org.total_funding_annually) {
+        const givingValue = parseBudgetString(org.total_funding_annually);
+        const ranges = {
+          '0-500000': [0, 500000],
+          '500000-1000000': [500000, 1000000],
+          '1000000-5000000': [1000000, 5000000],
+          '5000000-10000000': [5000000, 10000000],
+          '10000000-50000000': [10000000, 50000000],
+          '50000000-100000000': [50000000, 100000000],
+          '100000000-999999999': [100000000, 999999999]
+        };
+        
+        const range = ranges[filterConfig.annualGivingFilter];
+        if (range && (givingValue < range[0] || givingValue > range[1])) {
+          return false;
+        }
+      }
+    }
+
+    return true;
+  });
 };
