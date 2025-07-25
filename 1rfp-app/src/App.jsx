@@ -49,6 +49,9 @@ import OmegaAdminManageMembers from './components/OmegaAdminManageMembers.jsx';
 import MyOrganizationPage from './components/MyOrganizationPage.jsx';
 import EditOrganizationPage from './components/EditOrganizationPage.jsx';
 
+// --- NEW: UNIFIED ORGANIZATION PROFILE ---
+import OrganizationProfilePage from './pages/OrganizationProfilePage.jsx';
+
 // --- AUTH COMPONENTS ---
 import SignUpWizard from './components/auth/SignUpWizard.jsx';
 import OnboardingWizard from './components/OnboardingWizard.jsx'; // 🎯 NEW: Import OnboardingWizard
@@ -535,19 +538,11 @@ export default function App() {
             <Route path="submit-grant" element={<SubmitGrantPage />} />
             <Route path="roadmap" element={<RoadmapPage />} />
             
-            {/* ⭐ FIXED: MISSING DIRECT PROFILE ROUTES FOR MENTIONS */}
+            {/* ⭐ DIRECT PROFILE ROUTES FOR MENTIONS */}
             <Route path="profile/:profileId" element={<MemberProfilePage />} />
             
-            {/* 🔄 UPDATED: UNIFIED ORGANIZATION ROUTES */}
-            {/* TODO: Implement unified organization routing */}
-            {/* <Route path="organizations/:organizationId" element={<UnifiedOrganizationProfilePage />} /> */}
-            
-            {/* 🔄 LEGACY ROUTES - Current working routes */}
-            <Route path="funders/:funderSlug" element={<FunderProfilePage />} />
-            <Route path="nonprofits/:slug" element={<NonprofitProfilePage />} />
-            {/* TODO: Replace with legacy redirects when unified routing is implemented */}
-            {/* <Route path="funders/:funderSlug" element={<LegacyFunderRedirect />} /> */}
-            {/* <Route path="nonprofits/:slug" element={<LegacyNonprofitRedirect />} /> */}
+            {/* 🔄 NEW: UNIFIED ORGANIZATION ROUTES */}
+            <Route path="organizations/:slug" element={<OrganizationProfilePage />} />
             
             <Route path="profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>}>
               <Route index element={<DashboardHomePage />} />
