@@ -167,10 +167,10 @@ function HomePage() {
   <span className="magical-hover font-semibold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-pink-500 to-yellow-400 transition-all duration-500 ease-in-out hover:brightness-125 hover:drop-shadow-[0_0_5px_rgba(255,255,255,0.8)]"> magical </span> 🌟 together.
 </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <a href="#" className="inline-flex items-center justify-center px-8 py-3.5 font-semibold rounded-full text-white bg-blue-600 hover:bg-blue-700 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 w-full sm:w-auto">
+            <a href="/grants" className="inline-flex items-center justify-center px-8 py-3.5 font-semibold rounded-full text-white bg-blue-600 hover:bg-blue-700 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 w-full sm:w-auto">
               Explore Grants <Search className="ml-2" />
             </a>
-            <a href="#" className="inline-flex items-center justify-center px-8 py-3.5 font-semibold rounded-full text-blue-700 bg-blue-100 hover:bg-blue-200/70 transition-colors duration-300 w-full sm:w-auto">
+            <a href="/login?view=signup" className="inline-flex items-center justify-center px-8 py-3.5 font-semibold rounded-full text-blue-700 bg-blue-100 hover:bg-blue-200/70 transition-colors duration-300 w-full sm:w-auto">
               Join the Network <ArrowRight className="ml-2" />
             </a>
           </div>

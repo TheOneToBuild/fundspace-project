@@ -1,5 +1,2 @@
 // urls.txt
-https://communityarts.zff.org/guidelines-and-eligibility/
-https://haassr.org/we-initiative/#howtoapply
-https://first5sanmateo.org/funding-opportunities/
-https://resources.ca.gov/grants/environmental-enhancement-and-mitigation-eem
+https://communityarts.zff.org/apply/
