@@ -1,7 +1,8 @@
-// src/components/OrganizationSetupPage.jsx - Fixed version with improvements
+// src/components/OrganizationSetupPage.jsx - Complete with Instant Events Integration
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../supabaseClient';
 import { Search, Building2, Users, Plus, ArrowRight, Star, MapPin, Globe, Mail, X, ChevronDown } from 'lucide-react';
+import { notifyOrganizationJoined } from '../utils/organizationEvents';
 
 function debounce(fn, delay) {
     let timeoutId;
@@ -16,6 +17,8 @@ function debounce(fn, delay) {
 }
 
 export default function StreamlinedOrganizationSetupPage({ onJoinSuccess }) {
+    console.log('🎯 OrganizationSetupPage loaded with instant events support');
+    
     // FIXED: Persist activeTab across page visibility changes
     const [activeTab, setActiveTab] = useState(() => {
         return localStorage.getItem('orgSetupActiveTab') || 'join';
@@ -116,6 +119,7 @@ export default function StreamlinedOrganizationSetupPage({ onJoinSuccess }) {
 
     // Clear localStorage on successful completion
     const clearPersistedData = () => {
+        console.log('🧹 Clearing persisted organization setup data');
         localStorage.removeItem('orgSetupFormData');
         localStorage.removeItem('orgSetupSelectedCategories');
         localStorage.removeItem('orgSetupSelectedLocations');
@@ -249,8 +253,9 @@ export default function StreamlinedOrganizationSetupPage({ onJoinSuccess }) {
         };
     }, []);
 
-    // Join an existing organization
+    // 🚀 ENHANCED: Join an existing organization with INSTANT EVENTS
     const handleJoinOrganization = async (organization) => {
+        console.log('🤝 INSTANT JOIN: Starting to join organization:', organization.name);
         setLoading(true);
         setError('');
         setMessage('');
@@ -278,6 +283,8 @@ export default function StreamlinedOrganizationSetupPage({ onJoinSuccess }) {
                 throw new Error(`Failed to join organization: ${membershipError.message}`);
             }
 
+            console.log('✅ INSTANT JOIN: Successfully joined organization in database');
+
             const { error: profileError } = await supabase
                 .from('profiles')
                 .update({
@@ -288,26 +295,38 @@ export default function StreamlinedOrganizationSetupPage({ onJoinSuccess }) {
                 })
                 .eq('id', session.user.id);
 
+            if (profileError) {
+                console.warn('⚠️ Profile update error (non-critical):', profileError);
+            }
+
+            // 🚀 INSTANT EVENT: Notify organization joined immediately
+            console.log('📡 INSTANT JOIN: Dispatching instant organization change event');
+            notifyOrganizationJoined(session.user.id, organization);
+
             setMessage(`Successfully joined ${organization.name}!`);
             clearPersistedData(); // Clear form data on success
             
+            console.log('🎉 INSTANT JOIN: Complete! ProfileNav should update instantly.');
+
+            // Short delay then trigger success callback
             setTimeout(() => {
                 if (onJoinSuccess) {
                     onJoinSuccess();
                 }
-            }, 1500);
+            }, 1000); // Reduced from 1500ms to 1000ms
 
         } catch (err) {
-            console.error('Join organization error:', err);
+            console.error('❌ Join organization error:', err);
             setError(err.message || 'Failed to join organization');
         } finally {
             setLoading(false);
         }
     };
 
-    // Create a new organization
+    // 🚀 ENHANCED: Create a new organization with INSTANT EVENTS
     const handleCreateOrganization = async (e) => {
         e.preventDefault();
+        console.log('🏗️ INSTANT CREATE: Starting to create organization:', createForm.name);
         setCreating(true);
         setError('');
         setMessage('');
@@ -348,14 +367,13 @@ export default function StreamlinedOrganizationSetupPage({ onJoinSuccess }) {
                 website: createForm.website.trim(),
                 location: createForm.location.trim(),
                 contact_email: createForm.contact_email.trim() || null,
-                ein: createForm.type === 'nonprofit' ? createForm.ein.trim() : null, // FIXED: Use dedicated ein column
+                ein: createForm.type === 'nonprofit' ? createForm.ein.trim() : null,
                 admin_profile_id: session.user.id,
                 image_url: null,
                 is_verified: false,
                 extended_data: {
                     focus_areas: selectedCategories,
                     supported_locations: selectedLocations
-                    // Note: EIN is now in dedicated column, not in extended_data
                 }
             };
 
@@ -368,6 +386,8 @@ export default function StreamlinedOrganizationSetupPage({ onJoinSuccess }) {
             if (orgError) {
                 throw new Error(`Failed to create organization: ${orgError.message}`);
             }
+
+            console.log('✅ INSTANT CREATE: Successfully created organization in database:', newOrg);
 
             // Create organization membership for creator (as super_admin)
             const membershipData = {
@@ -386,6 +406,8 @@ export default function StreamlinedOrganizationSetupPage({ onJoinSuccess }) {
             if (membershipError) {
                 throw new Error(`Organization created but failed to set up membership: ${membershipError.message}`);
             }
+
+            console.log('✅ INSTANT CREATE: Successfully created membership');
 
             // Create category relationships
             if (selectedCategories.length > 0) {
@@ -414,17 +436,28 @@ export default function StreamlinedOrganizationSetupPage({ onJoinSuccess }) {
                 })
                 .eq('id', session.user.id);
 
+            if (profileError) {
+                console.warn('⚠️ Profile update error (non-critical):', profileError);
+            }
+
+            // 🚀 INSTANT EVENT: Notify organization joined immediately
+            console.log('📡 INSTANT CREATE: Dispatching instant organization change event');
+            notifyOrganizationJoined(session.user.id, newOrg);
+
             setMessage(`Successfully created ${newOrg.name}! You are now the organization's administrator.`);
             clearPersistedData(); // Clear form data on success
             
+            console.log('🎉 INSTANT CREATE: Complete! ProfileNav should update instantly.');
+            
+            // Short delay then trigger success callback
             setTimeout(() => {
                 if (onJoinSuccess) {
                     onJoinSuccess();
                 }
-            }, 1500);
+            }, 1000); // Reduced from 1500ms to 1000ms
 
         } catch (err) {
-            console.error('Create organization error:', err);
+            console.error('❌ Create organization error:', err);
             setError(err.message || 'Failed to create organization');
         } finally {
             setCreating(false);
@@ -703,7 +736,7 @@ export default function StreamlinedOrganizationSetupPage({ onJoinSuccess }) {
                                         >
                                             <option value="">Select specific category...</option>
                                             {taxonomyOptions.map((taxonomy) => (
-                                                <option key={`${taxonomy.code}-${taxonomy.id}`} value={taxonomy.code}>
+                                                <option key={taxonomy.code} value={taxonomy.code}>
                                                     {taxonomy.display_name}
                                                 </option>
                                             ))}

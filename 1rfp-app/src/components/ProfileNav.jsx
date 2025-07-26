@@ -1,8 +1,31 @@
-// src/components/ProfileNav.jsx - Updated UI with Title Removed
-import React, { useState, useEffect } from 'react';
+// src/components/ProfileNav.jsx - Complete Instant Organization Updates
+import React, { useState, useEffect, useCallback } from 'react';
 import { NavLink, useOutletContext, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import { isPlatformAdmin } from '../utils/permissions.js';
+
+// Helper function to get available community channels for user
+const getUserCommunityChannels = (profile) => {
+  // EVERYONE gets Hello World
+  const channels = [{
+    id: 'hello-world',
+    name: 'Hello World',
+    icon: '👋',
+    route: '/profile',
+    color: 'purple'
+  }];
+
+  // EVERYONE gets Hello Community (no gating)
+  channels.push({
+    id: 'hello-community',
+    name: 'Hello Community',
+    icon: '🤝',
+    route: '/profile/hello-community',
+    color: 'indigo'
+  });
+
+  return channels;
+};
 
 export default function ProfileNav() {
     const { profile } = useOutletContext();
@@ -21,6 +44,59 @@ export default function ProfileNav() {
             fetchProfileStats();
             fetchOrganizationInfo();
         }
+    }, [profile?.id]);
+
+    // INSTANT: Listen for custom organization change events + real-time
+    useEffect(() => {
+        if (!profile?.id) return;
+
+        console.log('🚀 Setting up INSTANT organization tracking for profile:', profile.id);
+
+        // INSTANT: Custom event listener for immediate updates
+        const handleInstantOrgChange = (event) => {
+            if (event.detail?.profileId === profile.id) {
+                console.log('⚡ INSTANT organization change event received!', event.detail);
+                // Immediate update, no delay
+                fetchOrganizationInfo();
+            }
+        };
+
+        // INSTANT: Listen for custom events
+        window.addEventListener('organizationChanged', handleInstantOrgChange);
+
+        // BACKUP: Real-time subscription (slower but reliable)
+        const channel = supabase
+            .channel(`organization_memberships_instant:${profile.id}`)
+            .on(
+                'postgres_changes',
+                {
+                    event: '*',
+                    schema: 'public',
+                    table: 'organization_memberships',
+                    filter: `profile_id=eq.${profile.id}`
+                },
+                (payload) => {
+                    console.log('🏢 Real-time org membership change (backup):', payload);
+                    // Small delay for database consistency
+                    setTimeout(() => fetchOrganizationInfo(), 300);
+                }
+            )
+            .subscribe();
+
+        // BACKUP: Window focus refresh
+        const handleWindowFocus = () => {
+            console.log('👁️ Window focus - refreshing organization info');
+            setTimeout(() => fetchOrganizationInfo(), 100);
+        };
+
+        window.addEventListener('focus', handleWindowFocus);
+
+        return () => {
+            console.log('🔕 Cleaning up instant organization tracking');
+            window.removeEventListener('organizationChanged', handleInstantOrgChange);
+            supabase.removeChannel(channel);
+            window.removeEventListener('focus', handleWindowFocus);
+        };
     }, [profile?.id]);
 
     // Listen for real-time follow updates
@@ -115,12 +191,14 @@ export default function ProfileNav() {
         }
     };
 
-    // Fetch organization info from unified organizations table
-    const fetchOrganizationInfo = async () => {
+    // OPTIMIZED: Faster organization fetch
+    const fetchOrganizationInfo = useCallback(async () => {
+        if (!profile?.id) return;
+        
         try {
-            console.log('📊 Fetching organization info for profile:', profile?.id);
+            console.log('⚡ INSTANT fetch organization info for profile:', profile.id);
             
-            // Query organization memberships with unified organizations table
+            // Get most recent membership with optimized query
             const { data: memberships, error } = await supabase
                 .from('organization_memberships')
                 .select(`
@@ -135,10 +213,11 @@ export default function ProfileNav() {
                 `)
                 .eq('profile_id', profile.id)
                 .order('joined_at', { ascending: false })
-                .limit(1);
+                .limit(1); // Only get the most recent
 
             if (error) {
-                console.error('Error fetching organization memberships:', error);
+                console.error('❌ Error fetching organization memberships:', error);
+                setOrganizationInfo(null);
                 return;
             }
 
@@ -152,20 +231,28 @@ export default function ProfileNav() {
                     tagline: org.tagline,
                     type: org.type,
                     image_url: org.image_url,
-                    role: membership.role
+                    role: membership.role,
+                    joinedAt: membership.joined_at
                 };
                 
-                setOrganizationInfo(orgData);
-                console.log('🏢 Organization info loaded:', orgData);
+                console.log('⚡ Organization info INSTANTLY updated:', orgData);
+                
+                setOrganizationInfo(prevOrgInfo => {
+                    if (!prevOrgInfo || prevOrgInfo.id !== orgData.id || prevOrgInfo.name !== orgData.name) {
+                        console.log('✅ INSTANT ORGANIZATION UPDATE - UI refreshed!');
+                        return orgData;
+                    }
+                    return orgData;
+                });
             } else {
-                console.log('👤 No organization membership found');
+                console.log('👤 No organization membership found - clearing org info');
                 setOrganizationInfo(null);
             }
         } catch (err) {
-            console.error('Error fetching organization info:', err);
+            console.error('❌ Error in fetchOrganizationInfo:', err);
             setOrganizationInfo(null);
         }
-    };
+    }, [profile?.id]);
 
     const getDisplayOrganization = () => {
         // Priority: organizationInfo from membership > profile.organization_name > null
@@ -192,19 +279,9 @@ export default function ProfileNav() {
 
     const displayOrg = getDisplayOrganization();
     
-    // Include all organization types for community access
-    const canAccessCommunity = profile?.role && [
-        'Nonprofit', 
-        'Funder', 
-        'Government', 
-        'For-profit',
-        'Education',
-        'Healthcare', 
-        'Religious',
-        'Foundation',
-        'International'
-    ].includes(profile.role);
-
+    // Get available community channels for this user (everyone gets both)
+    const communityChannels = getUserCommunityChannels(profile);
+    
     // Clickable handlers for followers/following
     const handleFollowersClick = () => {
         navigate('/profile/followers');
@@ -249,11 +326,17 @@ export default function ProfileNav() {
                         {profile?.full_name || 'Your Name'}
                     </h2>
                     
-                    {/* UPDATED: Only show organization name, no title */}
-                    {displayOrg && (
-                        <p className="text-xs text-slate-500 mb-3">
-                            {displayOrg.name}
-                        </p>
+                    {/* INSTANT Organization Display */}
+                    {displayOrg ? (
+                        <div className="mb-3">
+                            <p className="text-xs text-slate-500 transition-all duration-300" title={`${displayOrg.name} (${displayOrg.role})`}>
+                                {displayOrg.name}
+                            </p>
+                        </div>
+                    ) : (
+                        <div className="mb-3">
+                            <p className="text-xs text-slate-500">No organization</p>
+                        </div>
                     )}
                     
                     {!displayOrg && profile?.role && (
@@ -286,7 +369,7 @@ export default function ProfileNav() {
                 </div>
             </div>
 
-            {/* Compact Community Feeds */}
+            {/* Enhanced Community Feeds */}
             <div className="bg-white p-3 rounded-xl shadow-sm border border-slate-200">
                 <div className="flex items-center space-x-2 mb-2">
                     <div className="w-5 h-5 bg-blue-200 rounded-md flex items-center justify-center">
@@ -295,29 +378,21 @@ export default function ProfileNav() {
                     <h3 className="text-sm font-bold text-slate-700">Community Feeds</h3>
                 </div>
                 <nav className="space-y-1">
-                    <NavLink to="/profile" end className={communityNavLinkClass}>
-                        <div className="w-6 h-6 bg-purple-200 rounded-md flex items-center justify-center text-xs shadow-sm">
-                            👋
-                        </div>
-                        <span className="flex-1 font-medium">Hello World</span>
-                    </NavLink>
-                    
-                    {canAccessCommunity ? (
-                        <NavLink to="/profile/hello-community" className={communityNavLinkClass}>
-                            <div className="w-6 h-6 bg-pink-200 rounded-md flex items-center justify-center text-xs shadow-sm">
-                                🤝
+                    {/* Everyone gets both channels */}
+                    {communityChannels.map(channel => (
+                        <NavLink 
+                            key={channel.id}
+                            to={channel.route} 
+                            state={channel.state}
+                            end={channel.id === 'hello-world'}
+                            className={communityNavLinkClass}
+                        >
+                            <div className={`w-6 h-6 bg-${channel.color}-200 rounded-md flex items-center justify-center text-xs shadow-sm`}>
+                                {channel.icon}
                             </div>
-                            <span className="flex-1 font-medium">Hello Community</span>
+                            <span className="flex-1 font-medium">{channel.name}</span>
                         </NavLink>
-                    ) : (
-                        <div className="flex items-center space-x-2 w-full px-3 py-2 text-sm font-medium text-slate-400 cursor-not-allowed">
-                            <div className="w-6 h-6 bg-gray-200 rounded-md flex items-center justify-center text-xs opacity-60">
-                                🤝
-                            </div>
-                            <span className="flex-1">Hello Community</span>
-                            <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">Org Required</span>
-                        </div>
-                    )}
+                    ))}
                     
                     <div className="flex items-center space-x-2 w-full px-3 py-2 text-sm font-medium text-slate-500 cursor-not-allowed">
                         <div className="w-6 h-6 bg-orange-200 rounded-md flex items-center justify-center text-xs opacity-60">
@@ -373,19 +448,12 @@ export default function ProfileNav() {
                         <span className="font-medium">Saved Grants</span>
                     </NavLink>
                     
-                    {/* Additional useful features */}
+                    {/* Additional useful features - removed My Activity */}
                     <NavLink to="/profile/notifications" className={navLinkClass}>
                         <div className="w-6 h-6 bg-blue-200 rounded-md flex items-center justify-center text-xs shadow-sm">
                             🔔
                         </div>
                         <span className="font-medium">Notifications</span>
-                    </NavLink>
-                    
-                    <NavLink to="/profile/activity" className={navLinkClass}>
-                        <div className="w-6 h-6 bg-indigo-200 rounded-md flex items-center justify-center text-xs shadow-sm">
-                            📊
-                        </div>
-                        <span className="font-medium">My Activity</span>
                     </NavLink>
                     
                     <NavLink to="/profile/settings" className={navLinkClass}>

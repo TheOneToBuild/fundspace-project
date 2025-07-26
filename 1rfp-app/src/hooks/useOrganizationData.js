@@ -1,7 +1,12 @@
-// hooks/useOrganizationData.js
+// src/hooks/useOrganizationData.js - Complete with Instant Events Integration
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
+import { 
+    notifyOrganizationJoined, 
+    notifyOrganizationLeft, 
+    notifyOrganizationUpdated 
+} from '../utils/organizationEvents';
 
 export function useOrganizationData(profile, session) {
     const navigate = useNavigate();
@@ -11,16 +16,21 @@ export function useOrganizationData(profile, session) {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
 
+    console.log('🎯 useOrganizationData hook initialized for profile:', profile?.id);
+
     const checkMembership = useCallback(async () => {
         if (!session?.user?.id || !profile) {
+            console.log('❌ No session or profile, skipping membership check');
             setLoading(false);
             return;
         }
 
+        console.log('🔍 Checking membership for profile:', profile.id);
         setLoading(true);
         setError('');
 
         if (profile?.is_omega_admin === true) {
+            console.log('👑 Omega admin detected, skipping membership check');
             setLoading(false);
             return;
         }
@@ -34,30 +44,36 @@ export function useOrganizationData(profile, session) {
                 .limit(1);
 
             if (membershipError) {
+                console.error('❌ Membership check error:', membershipError);
                 setError('Error checking membership');
                 setLoading(false);
                 return;
             }
 
             if (memberships && memberships.length > 0) {
+                console.log('✅ Found membership:', memberships[0]);
                 setUserMembership(memberships[0]);
             } else {
+                console.log('📝 No membership found');
                 setUserMembership(null);
                 setOrganization(null);
                 setMembers([]);
             }
         } catch (err) {
+            console.error('❌ Membership check error:', err);
             setError('Error checking membership');
-            setUserMembership(null);
-            setOrganization(null);
-            setMembers([]);
         } finally {
             setLoading(false);
         }
     }, [profile, session?.user?.id]);
 
     const fetchOrganizationData = useCallback(async () => {
-        if (!userMembership) return;
+        if (!userMembership) {
+            console.log('📝 No user membership, skipping organization data fetch');
+            return;
+        }
+
+        console.log('🔍 Fetching organization data for membership:', userMembership);
 
         try {
             setLoading(true);
@@ -69,12 +85,15 @@ export function useOrganizationData(profile, session) {
                 .single();
 
             if (orgError || !orgData) {
+                console.error('❌ Organization not found:', orgError);
                 setError('Organization not found');
                 setLoading(false);
                 return;
             }
 
-            setOrganization({ 
+            console.log('✅ Found organization:', orgData);
+            
+            const enrichedOrgData = { 
                 ...orgData, 
                 type: userMembership.organization_type,
                 logo_url: orgData.image_url,
@@ -83,8 +102,11 @@ export function useOrganizationData(profile, session) {
                 location: orgData.location || '', 
                 website: orgData.website || '', 
                 contact_email: orgData.contact_email || '',
-            });
+            };
+            
+            setOrganization(enrichedOrgData);
 
+            // Fetch organization members
             const { data: memberData, error: memberError } = await supabase
                 .from('organization_memberships')
                 .select(`
@@ -98,163 +120,324 @@ export function useOrganizationData(profile, session) {
                     )
                 `)
                 .eq('organization_id', userMembership.organization_id)
-                .eq('organization_type', userMembership.organization_type)
-                .order('role', { ascending: false })
-                .order('joined_at', { ascending: true });
+                .order('joined_at', { ascending: false });
 
-            if (!memberError) {
+            if (memberError) {
+                console.error('❌ Error fetching members:', memberError);
+                setError('Error loading organization members');
+            } else {
+                console.log('✅ Found members:', memberData?.length || 0);
                 setMembers(memberData || []);
             }
+
         } catch (err) {
+            console.error('❌ Error fetching organization data:', err);
             setError('Error loading organization data');
         } finally {
             setLoading(false);
         }
     }, [userMembership]);
 
-    const executeLeave = async () => {
-        if (!userMembership) return;
-
-        try {
-            setLoading(true);
-            setError('');
-
-            const { error: deleteError } = await supabase
-                .from('organization_memberships')
-                .delete()
-                .eq('profile_id', session.user.id)
-                .eq('organization_id', userMembership.organization_id);
-
-            if (deleteError) {
-                setError('Error leaving organization: ' + deleteError.message);
-                return;
-            }
-
-            await supabase
-                .from('profiles')
-                .update({
-                    organization_choice: null,
-                    selected_organization_id: null,
-                    selected_organization_type: null,
-                    updated_at: new Date()
-                })
-                .eq('id', session.user.id);
-
-            setUserMembership(null);
-            setOrganization(null);
-            setMembers([]);
-            
-            await new Promise(resolve => setTimeout(resolve, 500));
-            await checkMembership();
-        } catch (err) {
-            setError('An unexpected error occurred while leaving the organization.');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const executeDeleteOrganization = async (confirmText) => {
-        if (!organization || confirmText !== organization.name) {
-            setError('Please enter the organization name exactly to confirm deletion.');
+    // Enhanced leave organization function with instant events
+    const executeLeave = useCallback(async () => {
+        if (!userMembership || !profile?.id) {
+            console.log('❌ Cannot leave: no membership or profile');
             return false;
         }
 
-        try {
-            setLoading(true);
-            setError('');
+        console.log('👋 Leaving organization:', userMembership.organization_id);
+        setLoading(true);
+        setError('');
 
-            // Step 1: Delete all organization memberships
-            const { error: membershipError } = await supabase
+        try {
+            const { error: deleteError } = await supabase
+                .from('organization_memberships')
+                .delete()
+                .eq('profile_id', profile.id)
+                .eq('organization_id', userMembership.organization_id);
+
+            if (deleteError) {
+                console.error('❌ Error leaving organization:', deleteError);
+                setError('Failed to leave organization');
+                return false;
+            }
+
+            console.log('✅ Successfully left organization');
+            
+            // 🚀 INSTANT EVENT: Notify organization left
+            notifyOrganizationLeft(profile.id, userMembership.organization_id);
+
+            // Clear state
+            setUserMembership(null);
+            setOrganization(null);
+            setMembers([]);
+
+            return true;
+        } catch (err) {
+            console.error('❌ Unexpected error leaving organization:', err);
+            setError('Unexpected error occurred');
+            return false;
+        } finally {
+            setLoading(false);
+        }
+    }, [userMembership, profile?.id]);
+
+    // Enhanced delete organization function with instant events
+    const executeDeleteOrganization = useCallback(async () => {
+        if (!organization || !userMembership || !profile?.id) {
+            console.log('❌ Cannot delete: missing organization, membership, or profile');
+            return false;
+        }
+
+        console.log('🗑️ Deleting organization:', organization.id);
+        setLoading(true);
+        setError('');
+
+        try {
+            // Delete organization memberships first
+            const { error: membershipsError } = await supabase
                 .from('organization_memberships')
                 .delete()
                 .eq('organization_id', organization.id);
 
-            if (membershipError) {
-                throw new Error('Failed to remove organization members: ' + membershipError.message);
+            if (membershipsError) {
+                console.error('❌ Error deleting memberships:', membershipsError);
+                setError('Failed to delete organization memberships');
+                return false;
             }
 
-            // Step 2: Delete organization posts (if any)
-            await supabase
-                .from('organization_posts')
-                .delete()
-                .eq('organization_id', organization.id);
-
-            // Step 3: Delete the organization itself
+            // Delete the organization
             const { error: orgError } = await supabase
                 .from('organizations')
                 .delete()
                 .eq('id', organization.id);
 
             if (orgError) {
-                throw new Error('Failed to delete organization: ' + orgError.message);
-            }
-
-            // Step 4: Update user profile to clear organization references
-            await supabase
-                .from('profiles')
-                .update({
-                    organization_choice: null,
-                    selected_organization_id: null,
-                    selected_organization_type: null,
-                    updated_at: new Date()
-                })
-                .eq('id', session.user.id);
-
-            // Success - navigate away
-            alert('Organization deleted successfully.');
-            navigate('/profile');
-            return true;
-        } catch (err) {
-            console.error('Delete organization error:', err);
-            setError(err.message || 'An unexpected error occurred while deleting the organization.');
-            return false;
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const updateOrganization = async (updateData) => {
-        if (!organization) return false;
-
-        try {
-            setLoading(true);
-            setError('');
-
-            const { error: updateError } = await supabase
-                .from('organizations')
-                .update({
-                    ...updateData,
-                    updated_at: new Date()
-                })
-                .eq('id', organization.id);
-
-            if (updateError) {
-                setError('Failed to save changes. Please try again.');
+                console.error('❌ Error deleting organization:', orgError);
+                setError('Failed to delete organization');
                 return false;
             }
 
-            setOrganization(prev => ({
-                ...prev,
-                ...updateData
-            }));
+            console.log('✅ Successfully deleted organization');
+            
+            // 🚀 INSTANT EVENT: Notify organization left (since it's deleted)
+            notifyOrganizationLeft(profile.id, organization.id);
+
+            // Clear state
+            setUserMembership(null);
+            setOrganization(null);
+            setMembers([]);
 
             return true;
         } catch (err) {
-            setError('An unexpected error occurred. Please try again.');
+            console.error('❌ Unexpected error deleting organization:', err);
+            setError('Unexpected error occurred');
             return false;
         } finally {
             setLoading(false);
         }
-    };
+    }, [organization, userMembership, profile?.id]);
 
+    // Enhanced update organization function with instant events
+    const updateOrganization = useCallback(async (updateData) => {
+        if (!organization || !userMembership || !profile?.id) {
+            console.log('❌ Cannot update: missing organization, membership, or profile');
+            return false;
+        }
+
+        console.log('📝 Updating organization:', organization.id, updateData);
+        setLoading(true);
+        setError('');
+
+        try {
+            const { data: updatedOrg, error: updateError } = await supabase
+                .from('organizations')
+                .update(updateData)
+                .eq('id', organization.id)
+                .select()
+                .single();
+
+            if (updateError) {
+                console.error('❌ Error updating organization:', updateError);
+                setError('Failed to update organization');
+                return false;
+            }
+
+            console.log('✅ Successfully updated organization:', updatedOrg);
+            
+            // Update local state
+            const enrichedOrgData = { 
+                ...updatedOrg, 
+                type: userMembership.organization_type,
+                logo_url: updatedOrg.image_url,
+                tagline: updatedOrg.tagline || '', 
+                description: updatedOrg.description || '', 
+                location: updatedOrg.location || '', 
+                website: updatedOrg.website || '', 
+                contact_email: updatedOrg.contact_email || '',
+            };
+            
+            setOrganization(enrichedOrgData);
+            
+            // 🚀 INSTANT EVENT: Notify organization updated
+            notifyOrganizationUpdated(profile.id, enrichedOrgData);
+
+            return true;
+        } catch (err) {
+            console.error('❌ Unexpected error updating organization:', err);
+            setError('Unexpected error occurred');
+            return false;
+        } finally {
+            setLoading(false);
+        }
+    }, [organization, userMembership, profile?.id]);
+
+    // Enhanced join organization function with instant events (for use in other components)
+    const joinOrganization = useCallback(async (organizationData) => {
+        if (!profile?.id || !session?.user?.id) {
+            console.log('❌ Cannot join: no profile or session');
+            return false;
+        }
+
+        console.log('🤝 Joining organization:', organizationData);
+        setLoading(true);
+        setError('');
+
+        try {
+            const membershipData = {
+                profile_id: profile.id,
+                organization_id: organizationData.id,
+                organization_type: organizationData.type,
+                role: 'member',
+                membership_type: 'staff',
+                is_public: true
+            };
+
+            const { error: membershipError } = await supabase
+                .from('organization_memberships')
+                .insert(membershipData);
+
+            if (membershipError) {
+                console.error('❌ Error joining organization:', membershipError);
+                setError('Failed to join organization');
+                return false;
+            }
+
+            console.log('✅ Successfully joined organization');
+            
+            // Update membership state
+            setUserMembership({
+                ...membershipData,
+                joined_at: new Date().toISOString()
+            });
+
+            // 🚀 INSTANT EVENT: Notify organization joined
+            notifyOrganizationJoined(profile.id, organizationData);
+
+            // Refresh organization data
+            await checkMembership();
+
+            return true;
+        } catch (err) {
+            console.error('❌ Unexpected error joining organization:', err);
+            setError('Unexpected error occurred');
+            return false;
+        } finally {
+            setLoading(false);
+        }
+    }, [profile?.id, session?.user?.id, checkMembership]);
+
+    // Enhanced create organization function with instant events
+    const createOrganization = useCallback(async (orgData, focusAreas, supportedLocations) => {
+        if (!profile?.id || !session?.user?.id) {
+            console.log('❌ Cannot create: no profile or session');
+            return false;
+        }
+
+        console.log('🏗️ Creating organization:', orgData);
+        setLoading(true);
+        setError('');
+
+        try {
+            // Create organization
+            const createData = {
+                ...orgData,
+                admin_profile_id: profile.id,
+                is_verified: false,
+                extended_data: {
+                    focus_areas: focusAreas || [],
+                    supported_locations: supportedLocations || []
+                }
+            };
+
+            const { data: newOrg, error: orgError } = await supabase
+                .from('organizations')
+                .insert(createData)
+                .select()
+                .single();
+
+            if (orgError) {
+                console.error('❌ Error creating organization:', orgError);
+                setError('Failed to create organization');
+                return false;
+            }
+
+            console.log('✅ Successfully created organization:', newOrg);
+
+            // Create membership for creator (as super_admin)
+            const membershipData = {
+                profile_id: profile.id,
+                organization_id: newOrg.id,
+                organization_type: newOrg.type,
+                role: 'super_admin',
+                membership_type: 'staff',
+                is_public: true
+            };
+
+            const { error: membershipError } = await supabase
+                .from('organization_memberships')
+                .insert(membershipData);
+
+            if (membershipError) {
+                console.error('❌ Error creating membership:', membershipError);
+                setError('Organization created but failed to set up membership');
+                return false;
+            }
+
+            console.log('✅ Successfully created membership');
+
+            // Update local state
+            setUserMembership({
+                ...membershipData,
+                joined_at: new Date().toISOString()
+            });
+
+            // 🚀 INSTANT EVENT: Notify organization joined (created and joined)
+            notifyOrganizationJoined(profile.id, newOrg);
+
+            // Refresh organization data
+            await checkMembership();
+
+            return newOrg;
+        } catch (err) {
+            console.error('❌ Unexpected error creating organization:', err);
+            setError('Unexpected error occurred');
+            return false;
+        } finally {
+            setLoading(false);
+        }
+    }, [profile?.id, session?.user?.id, checkMembership]);
+
+    // Effect to check membership when profile changes
     useEffect(() => {
+        console.log('🔄 Profile changed, checking membership...');
         checkMembership();
     }, [checkMembership]);
 
+    // Effect to fetch organization data when membership changes
     useEffect(() => {
-        if (userMembership) {
-            fetchOrganizationData();
-        }
+        console.log('🔄 Membership changed, fetching organization data...');
+        fetchOrganizationData();
     }, [fetchOrganizationData]);
 
     return {
@@ -268,6 +451,8 @@ export function useOrganizationData(profile, session) {
         fetchOrganizationData,
         executeLeave,
         executeDeleteOrganization,
-        updateOrganization
+        updateOrganization,
+        joinOrganization,
+        createOrganization
     };
 }

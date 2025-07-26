@@ -99,4 +99,5 @@ export {
   Church,
   Send,
   Lock,
+  Settings,
 } from 'lucide-react';
