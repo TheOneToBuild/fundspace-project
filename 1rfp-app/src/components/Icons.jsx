@@ -98,4 +98,5 @@ export {
   Stethoscope, 
   Church,
   Send,
+  Lock,
 } from 'lucide-react';

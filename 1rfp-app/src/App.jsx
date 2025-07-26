@@ -383,7 +383,7 @@ export default function App() {
             <Route path="about" element={<AboutUsPage />} />
             <Route path="contact" element={<ContactUsPage />} />
             <Route path="how-it-works" element={<HowItWorksPage />} />
-            <Route path="for-nonprofits" element={<ForSeekersPage />} />
+            <Route path="for-seekers" element={<ForSeekersPage />} />
             <Route path="for-funders" element={<ForFundersPage />} />
             <Route path="faq" element={<FaqPage />} />
             <Route path="submit-grant" element={<SubmitGrantPage />} />
