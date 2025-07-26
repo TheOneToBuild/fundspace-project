@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getPillClasses } from '../utils.js';
-import { MapPin, DollarSign, Users, Award, MessageSquare, ExternalLink, Heart, Shield, GraduationCap, Stethoscope, Church, Building, ChevronRight, Sparkles, Target, TrendingUp } from './Icons.jsx';
+import { MapPin, DollarSign, Users, Award, MessageSquare, ExternalLink, Heart, Shield, GraduationCap, Stethoscope, Church, Building, ChevronRight, Sparkles, Target, TrendingUp, Eye } from './Icons.jsx';
 
 // Organization type configurations
 const ORG_TYPE_CONFIG = {
@@ -50,25 +50,32 @@ const ORG_TYPE_CONFIG = {
   }
 };
 
-// Enhanced gradient pill classes for focus areas
+// Enhanced gradient pill classes for focus areas - all different colors
 const getEnhancedPillClasses = (focusArea) => {
   const areaMap = {
-    'Arts': 'bg-gradient-to-r from-purple-100 to-pink-100 text-purple-700 border-purple-200',
-    'Culture': 'bg-gradient-to-r from-purple-100 to-pink-100 text-purple-700 border-purple-200',
-    'Education': 'bg-gradient-to-r from-blue-100 to-indigo-100 text-blue-700 border-blue-200',
-    'Health': 'bg-gradient-to-r from-emerald-100 to-green-100 text-emerald-700 border-emerald-200',
-    'Healthcare': 'bg-gradient-to-r from-emerald-100 to-green-100 text-emerald-700 border-emerald-200',
-    'Environment': 'bg-gradient-to-r from-green-100 to-teal-100 text-green-700 border-green-200',
-    'Housing': 'bg-gradient-to-r from-orange-100 to-amber-100 text-orange-700 border-orange-200',
-    'Technology': 'bg-gradient-to-r from-cyan-100 to-blue-100 text-cyan-700 border-cyan-200',
-    'Innovation': 'bg-gradient-to-r from-violet-100 to-purple-100 text-violet-700 border-violet-200',
-    'Community': 'bg-gradient-to-r from-rose-100 to-pink-100 text-rose-700 border-rose-200',
-    'Community Development': 'bg-gradient-to-r from-rose-100 to-pink-100 text-rose-700 border-rose-200',
-    'Social Impact': 'bg-gradient-to-r from-indigo-100 to-purple-100 text-indigo-700 border-indigo-200',
-    'Research': 'bg-gradient-to-r from-slate-100 to-blue-100 text-slate-700 border-slate-200'
+    'Arts': 'bg-gradient-to-r from-fuchsia-100 to-purple-100 text-fuchsia-700 border-fuchsia-200',
+    'Culture': 'bg-gradient-to-r from-rose-100 to-pink-100 text-rose-700 border-rose-200',
+    'Education': 'bg-gradient-to-r from-sky-100 to-blue-100 text-sky-700 border-sky-200',
+    'Health': 'bg-gradient-to-r from-emerald-100 to-teal-100 text-emerald-700 border-emerald-200',
+    'Healthcare': 'bg-gradient-to-r from-green-100 to-emerald-100 text-green-700 border-green-200',
+    'Environment': 'bg-gradient-to-r from-lime-100 to-green-100 text-lime-700 border-lime-200',
+    'Housing': 'bg-gradient-to-r from-amber-100 to-orange-100 text-amber-700 border-amber-200',
+    'Technology': 'bg-gradient-to-r from-cyan-100 to-teal-100 text-cyan-700 border-cyan-200',
+    'Innovation': 'bg-gradient-to-r from-indigo-100 to-violet-100 text-indigo-700 border-indigo-200',
+    'Community': 'bg-gradient-to-r from-pink-100 to-rose-100 text-pink-700 border-pink-200',
+    'Community Development': 'bg-gradient-to-r from-red-100 to-rose-100 text-red-700 border-red-200',
+    'Social Impact': 'bg-gradient-to-r from-violet-100 to-purple-100 text-violet-700 border-violet-200',
+    'Research': 'bg-gradient-to-r from-gray-100 to-slate-100 text-gray-700 border-gray-200',
+    'Medical Research': 'bg-gradient-to-r from-blue-100 to-indigo-100 text-blue-700 border-blue-200',
+    'Mental Health': 'bg-gradient-to-r from-purple-100 to-indigo-100 text-purple-700 border-purple-200',
+    'Health Equity': 'bg-gradient-to-r from-teal-100 to-green-100 text-teal-700 border-teal-200',
+    'Chronic Disease Prevention': 'bg-gradient-to-r from-orange-100 to-red-100 text-orange-700 border-orange-200',
+    'Pediatric Health': 'bg-gradient-to-r from-yellow-100 to-amber-100 text-yellow-700 border-yellow-200',
+    'Child Health Research': 'bg-gradient-to-r from-lime-100 to-yellow-100 text-lime-700 border-lime-200',
+    'Pediatric Education': 'bg-gradient-to-r from-emerald-100 to-cyan-100 text-emerald-700 border-emerald-200'
   };
   
-  return areaMap[focusArea] || 'bg-gradient-to-r from-slate-100 to-gray-100 text-slate-700 border-slate-200';
+  return areaMap[focusArea] || 'bg-gradient-to-r from-slate-100 to-zinc-100 text-slate-700 border-slate-200';
 };
 
 const OrganizationCard = ({ organization, handleFilterChange, linkTo, buttonText = "View Profile" }) => {
@@ -180,88 +187,108 @@ const OrganizationCard = ({ organization, handleFilterChange, linkTo, buttonText
             </div>
           </div>
           <div className="flex-1">
-            <h3 className="text-xl font-bold text-slate-800 mb-2 group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r group-hover:from-blue-600 group-hover:to-purple-600 transition-all duration-300 line-clamp-2">{organization.name}</h3>
+            <h3 className="text-xl font-bold text-slate-800 mb-2 group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r group-hover:from-blue-600 group-hover:to-purple-600 transition-all duration-300 line-clamp-1 h-7">{organization.name}</h3>
             
-            {/* Organization type badge */}
-            {handleFilterChange ? (
-              <button 
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  handleFilterChange('typeFilter', [organization.type]);
-                }}
-                className={`text-xs font-semibold px-3 py-1.5 rounded-full mt-2 inline-flex items-center gap-1.5 transition-all duration-300 transform hover:scale-105 active:scale-95 border ${colorClasses.bg} ${colorClasses.text} ${colorClasses.border}`}
-                title={`Filter by type: ${typeConfig.label}`}
-              >
-                {typeConfig.icon}
-                {typeConfig.label}
-              </button>
-            ) : (
-              <span className={`text-xs font-semibold px-3 py-1.5 rounded-full mt-2 inline-flex items-center gap-1.5 border ${colorClasses.bg} ${colorClasses.text} ${colorClasses.border}`}>
-                {typeConfig.icon}
-                {typeConfig.label}
-              </span>
-            )}
+            {/* Organization type badge and engagement stats */}
+            <div className="flex flex-wrap items-center gap-2 mt-2">
+              {handleFilterChange ? (
+                <button 
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleFilterChange('typeFilter', [organization.type]);
+                  }}
+                  className={`text-xs font-semibold px-3 py-1.5 rounded-full inline-flex items-center gap-1.5 transition-all duration-300 transform hover:scale-105 active:scale-95 border ${colorClasses.bg} ${colorClasses.text} ${colorClasses.border}`}
+                  title={`Filter by type: ${typeConfig.label}`}
+                >
+                  {typeConfig.icon}
+                  {typeConfig.label}
+                </button>
+              ) : (
+                <span className={`text-xs font-semibold px-3 py-1.5 rounded-full inline-flex items-center gap-1.5 border ${colorClasses.bg} ${colorClasses.text} ${colorClasses.border}`}>
+                  {typeConfig.icon}
+                  {typeConfig.label}
+                </span>
+              )}
+
+              {/* Followers count */}
+              {(organization.followers_count || organization.followersCount) && (
+                <span className="text-xs font-medium px-2 py-1 rounded-full bg-blue-50 text-blue-600 border border-blue-200 inline-flex items-center gap-1">
+                  <Eye size={12} />
+                  {organization.followers_count || organization.followersCount} followers
+                </span>
+              )}
+
+              {/* Likes count */}
+              {(organization.likes_count || organization.likesCount) && (
+                <span className="text-xs font-medium px-2 py-1 rounded-full bg-pink-50 text-pink-600 border border-pink-200 inline-flex items-center gap-1">
+                  <Heart size={12} />
+                  {organization.likes_count || organization.likesCount} likes
+                </span>
+              )}
+            </div>
           </div>
         </div>
 
-        {/* Description */}
-        <p className="text-slate-600 text-sm leading-relaxed mb-6 line-clamp-3 flex-grow">
-          {organization.description}
-        </p>
+        {/* Description - Fixed height to ensure consistent layout */}
+        <div className="mb-6 h-16"> {/* Fixed height for exactly 3 lines */}
+          <p className="text-slate-600 text-sm leading-relaxed line-clamp-3 h-full">
+            {organization.description}
+          </p>
+        </div>
 
-        {/* Key metrics in a beautiful grid */}
+        {/* Key metrics in a beautiful grid - Fixed positioning */}
         <div className="grid grid-cols-1 gap-3 mb-6">
-          <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-4 rounded-xl border border-blue-100 group-hover:shadow-lg transition-shadow duration-300">
+          <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-4 rounded-xl border border-blue-100 group-hover:shadow-lg transition-shadow duration-300 h-20"> {/* Fixed height */}
             <div className="flex items-center gap-2 mb-2">
               <div className="p-1 bg-blue-100 rounded-lg">
                 <MapPin size={14} className="text-blue-600" />
               </div>
               <span className="text-xs font-semibold text-blue-700 uppercase tracking-wide">Location</span>
             </div>
-            <div className="text-sm font-bold text-blue-800">
+            <div className="text-sm font-bold text-blue-800 line-clamp-1">
               {organization.location || 'Not specified'}
             </div>
           </div>
           
           {/* Type-specific fields */}
           {organization.type === 'foundation' && organization.total_funding_annually && (
-            <div className="bg-gradient-to-br from-green-50 to-emerald-50 p-4 rounded-xl border border-green-100 group-hover:shadow-lg transition-shadow duration-300">
+            <div className="bg-gradient-to-br from-green-50 to-emerald-50 p-4 rounded-xl border border-green-100 group-hover:shadow-lg transition-shadow duration-300 h-20"> {/* Fixed height */}
               <div className="flex items-center gap-2 mb-2">
                 <div className="p-1 bg-green-100 rounded-lg">
                   <DollarSign size={14} className="text-green-600" />
                 </div>
                 <span className="text-xs font-semibold text-green-700 uppercase tracking-wide">Annual Giving</span>
               </div>
-              <div className="text-sm font-bold text-green-800">
+              <div className="text-sm font-bold text-green-800 line-clamp-1">
                 {organization.total_funding_annually}
               </div>
             </div>
           )}
           
           {organization.type === 'nonprofit' && organization.budget && (
-            <div className="bg-gradient-to-br from-green-50 to-emerald-50 p-4 rounded-xl border border-green-100 group-hover:shadow-lg transition-shadow duration-300">
+            <div className="bg-gradient-to-br from-green-50 to-emerald-50 p-4 rounded-xl border border-green-100 group-hover:shadow-lg transition-shadow duration-300 h-20"> {/* Fixed height */}
               <div className="flex items-center gap-2 mb-2">
                 <div className="p-1 bg-green-100 rounded-lg">
                   <DollarSign size={14} className="text-green-600" />
                 </div>
                 <span className="text-xs font-semibold text-green-700 uppercase tracking-wide">Annual Budget</span>
               </div>
-              <div className="text-sm font-bold text-green-800">
+              <div className="text-sm font-bold text-green-800 line-clamp-1">
                 {organization.budget}
               </div>
             </div>
           )}
           
           {(organization.staff_count || organization.staffCount) && (
-            <div className="bg-gradient-to-br from-purple-50 to-pink-50 p-4 rounded-xl border border-purple-100 group-hover:shadow-lg transition-shadow duration-300">
+            <div className="bg-gradient-to-br from-purple-50 to-pink-50 p-4 rounded-xl border border-purple-100 group-hover:shadow-lg transition-shadow duration-300 h-20"> {/* Fixed height */}
               <div className="flex items-center gap-2 mb-2">
                 <div className="p-1 bg-purple-100 rounded-lg">
                   <Users size={14} className="text-purple-600" />
                 </div>
                 <span className="text-xs font-semibold text-purple-700 uppercase tracking-wide">Staff Count</span>
               </div>
-              <div className="text-sm font-bold text-purple-800">
+              <div className="text-sm font-bold text-purple-800 line-clamp-1">
                 {organization.staff_count || organization.staffCount}
               </div>
             </div>
@@ -269,35 +296,35 @@ const OrganizationCard = ({ organization, handleFilterChange, linkTo, buttonText
 
           {/* Legacy funder fields for backward compatibility */}
           {organization.notable_grant && (
-            <div className="bg-gradient-to-br from-amber-50 to-yellow-50 p-4 rounded-xl border border-amber-100 group-hover:shadow-lg transition-shadow duration-300">
+            <div className="bg-gradient-to-br from-amber-50 to-yellow-50 p-4 rounded-xl border border-amber-100 group-hover:shadow-lg transition-shadow duration-300 h-20"> {/* Fixed height */}
               <div className="flex items-center gap-2 mb-2">
                 <div className="p-1 bg-amber-100 rounded-lg">
                   <Award size={14} className="text-amber-600" />
                 </div>
                 <span className="text-xs font-semibold text-amber-700 uppercase tracking-wide">Notable Grant</span>
               </div>
-              <div className="text-sm font-bold text-amber-800">
+              <div className="text-sm font-bold text-amber-800 line-clamp-1">
                 {organization.notable_grant}
               </div>
             </div>
           )}
           
           {organization.average_grant_size && (
-            <div className="bg-gradient-to-br from-orange-50 to-red-50 p-4 rounded-xl border border-orange-100 group-hover:shadow-lg transition-shadow duration-300">
+            <div className="bg-gradient-to-br from-orange-50 to-red-50 p-4 rounded-xl border border-orange-100 group-hover:shadow-lg transition-shadow duration-300 h-20"> {/* Fixed height */}
               <div className="flex items-center gap-2 mb-2">
                 <div className="p-1 bg-orange-100 rounded-lg">
                   <TrendingUp size={14} className="text-orange-600" />
                 </div>
                 <span className="text-xs font-semibold text-orange-700 uppercase tracking-wide">Avg. Grant Size</span>
               </div>
-              <div className="text-sm font-bold text-orange-800">
+              <div className="text-sm font-bold text-orange-800 line-clamp-1">
                 {organization.average_grant_size}
               </div>
             </div>
           )}
         </div>
 
-        {/* Focus areas with better design */}
+        {/* Focus areas with better design and different colors */}
         {((organization.focus_areas && organization.focus_areas.length > 0) || 
           (organization.focusAreas && organization.focusAreas.length > 0)) && (
           <div className="mb-6">

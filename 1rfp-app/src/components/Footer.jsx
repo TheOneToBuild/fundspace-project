@@ -7,8 +7,8 @@ import { Facebook, Twitter, Linkedin, Youtube, Instagram } from './Icons.jsx';
 export default function Footer() {
   const productLinks = [
     { to: "/how-it-works", text: "How 1RFP Works" },
-    { to: "/for-nonprofits", text: "For Nonprofits" },
-    { to: "/for-funders", text: "For Funders" },
+    { to: "/for-seekers", text: "For Grant Seekers" },
+    { to: "/for-funders", text: "For Fund Providers" },
     { to: "/submit-grant", text: "Submit a Grant" },
   ];
 

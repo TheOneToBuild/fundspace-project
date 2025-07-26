@@ -178,19 +178,38 @@ const ExploreOrganizations = ({ isProfileView = false }) => {
     const fetchOrganizations = async () => {
       setLoading(true);
       try {
-        const { data, error } = await supabase
-          .from('organizations')
+        // First, try to use the view with engagement counts
+        let { data, error } = await supabase
+          .from('organizations_with_engagement')
           .select(`
             *,
             organization_categories(categories(name))
           `);
 
-        if (error) throw error;
+        // If the view doesn't exist, fall back to regular query
+        if (error && error.message.includes('relation "organizations_with_engagement" does not exist')) {
+          console.log('📊 Engagement view not found, fetching without counts...');
+          
+          const { data: fallbackData, error: fallbackError } = await supabase
+            .from('organizations')
+            .select(`
+              *,
+              organization_categories(categories(name))
+            `);
+          
+          if (fallbackError) throw fallbackError;
+          data = fallbackData;
+        } else if (error) {
+          throw error;
+        }
 
         if (data) {
           const formattedData = data.map(org => ({
             ...org,
-            focus_areas: org.organization_categories?.map(oc => oc.categories?.name).filter(Boolean) || []
+            focus_areas: org.organization_categories?.map(oc => oc.categories?.name).filter(Boolean) || [],
+            // Include engagement counts if available
+            followers_count: org.followers_count || 0,
+            likes_count: org.likes_count || 0
           }));
           setOrganizations(formattedData);
         }
@@ -200,6 +219,7 @@ const ExploreOrganizations = ({ isProfileView = false }) => {
         setLoading(false);
       }
     };
+    
     fetchOrganizations();
   }, []);
 
@@ -306,6 +326,7 @@ const ExploreOrganizations = ({ isProfileView = false }) => {
 
   return (
     <div className={isProfileView ? "" : "container mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12"}>
+      {/* Only show intro section when NOT in profile view */}
       {!isProfileView && (
         <section id="organization-intro" className="text-center mb-12 relative">
           {/* Magical background elements */}
@@ -334,6 +355,7 @@ const ExploreOrganizations = ({ isProfileView = false }) => {
       )}
 
       <section id="organizations-list" className="scroll-mt-20">
+        {/* Only show this filter section when IN profile view */}
         {isProfileView && (
           <div className="bg-white/80 backdrop-blur-sm p-6 rounded-2xl shadow-lg border border-white/60 mb-8">
             <button 

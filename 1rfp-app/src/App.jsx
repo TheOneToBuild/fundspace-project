@@ -12,7 +12,7 @@ import CitySpotlightPage from './CitySpotlightPage.jsx';
 import AboutUsPage from './AboutUsPage.jsx';
 import ContactUsPage from './ContactUsPage.jsx';
 import HowItWorksPage from './HowItWorksPage.jsx';
-import ForNonprofitsPage from './ForNonprofitsPage.jsx';
+import ForSeekersPage from './ForSeekersPage.jsx';
 import ForFundersPage from './ForFundersPage.jsx';
 import RoadmapPage from './RoadmapPage.jsx';
 import FaqPage from './FaqPage.jsx';
@@ -383,7 +383,7 @@ export default function App() {
             <Route path="about" element={<AboutUsPage />} />
             <Route path="contact" element={<ContactUsPage />} />
             <Route path="how-it-works" element={<HowItWorksPage />} />
-            <Route path="for-nonprofits" element={<ForNonprofitsPage />} />
+            <Route path="for-nonprofits" element={<ForSeekersPage />} />
             <Route path="for-funders" element={<ForFundersPage />} />
             <Route path="faq" element={<FaqPage />} />
             <Route path="submit-grant" element={<SubmitGrantPage />} />
