@@ -22,35 +22,84 @@ function parseFundingAmount(text) {
 
 async function getOrCreateOrganization(name, website) {
     if (!name) throw new Error("Organization name is required.");
+    
+    // First try to find existing organization
+    const { data: existing } = await supabase
+        .from('organizations')
+        .select('id, name')
+        .eq('name', name)
+        .single();
+    
+    if (existing) {
+        return existing;
+    }
+    
+    // Create new organization
     const { data, error } = await supabase
         .from('organizations')
-        .upsert({ name: name, website: website, slug: generateSlug(name), type: 'funder' }, { onConflict: 'name', ignoreDuplicates: false })
+        .insert({ name: name, website: website, slug: generateSlug(name), type: 'funder' })
         .select('id, name')
         .single();
+    
     if (error) throw error;
-    if (!data) throw new Error(`Could not create or find organization: ${name}`);
+    if (!data) throw new Error(`Could not create organization: ${name}`);
     return data;
 }
 
 async function getOrCreateCategory(categoryName) {
     if (!categoryName) return null;
-    const { data } = await supabase.from('categories').upsert({ name: categoryName }, { onConflict: 'name' }).select('id').single();
+    
+    // First try to find existing category
+    const { data: existing } = await supabase
+        .from('categories')
+        .select('id')
+        .eq('name', categoryName)
+        .single();
+    
+    if (existing) return existing.id;
+    
+    // Create new category
+    const { data } = await supabase
+        .from('categories')
+        .insert({ name: categoryName })
+        .select('id')
+        .single();
+    
     return data?.id;
 }
 
 async function saveGrantsToSupabase(grants, primaryUrl) {
     if (!grants || grants.length === 0) return 0;
     let savedCount = 0;
+    
     for (const grant of grants) {
         try {
+            console.log(`💾 Processing grant: "${grant.title}"`);
+            
             const organization = await getOrCreateOrganization(grant.funder_name, new URL(primaryUrl).origin);
+            console.log(`✅ Organization ready: ${organization.name} (ID: ${organization.id})`);
+            
+            // Check if grant already exists for this organization
+            const { data: existingGrant } = await supabase
+                .from('grants')
+                .select('id')
+                .eq('organization_id', organization.id)
+                .eq('title', grant.title)
+                .single();
+            
+            if (existingGrant) {
+                console.log(`⚠️ Grant "${grant.title}" already exists, skipping`);
+                continue;
+            }
+            
             const deadlineMatch = grant.deadline ? String(grant.deadline).match(/(\d{4}-\d{2}-\d{2})/) : null;
             const deadlineToInsert = deadlineMatch ? deadlineMatch[0] : null;
             const fundingAmount = parseFundingAmount(grant.funding_amount_text);
 
+            // Insert new grant
             const { data: grantResult, error } = await supabase
                 .from('grants')
-                .upsert({
+                .insert({
                     organization_id: organization.id,
                     title: grant.title,
                     description: grant.description,
@@ -64,17 +113,27 @@ async function saveGrantsToSupabase(grants, primaryUrl) {
                     slug: generateSlug(`${organization.name} ${grant.title}`),
                     date_added: new Date().toISOString().split('T')[0],
                     last_updated: new Date().toISOString()
-                }, { onConflict: 'organization_id, title' })
-                .select('id').single();
+                })
+                .select('id')
+                .single();
+            
             if (error) throw error;
+            
+            console.log(`✅ Grant saved: "${grant.title}" (ID: ${grantResult.id})`);
             savedCount++;
 
+            // Add categories if provided
             if (grant.categories && Array.isArray(grant.categories)) {
                 for (const categoryName of grant.categories) {
                     const categoryId = await getOrCreateCategory(categoryName);
-                    if (categoryId) await supabase.from('grant_categories').upsert({ grant_id: grantResult.id, category_id: categoryId });
+                    if (categoryId) {
+                        await supabase
+                            .from('grant_categories')
+                            .insert({ grant_id: grantResult.id, category_id: categoryId });
+                    }
                 }
             }
+            
         } catch (err) {
             console.error(`❗ Error saving "${grant.title}":`, err.message);
         }
@@ -156,7 +215,7 @@ export const handler = async function(event, context) {
             console.log(`⚠️ Could not parse AI response as JSON: ${e.message}`);
         }
 
-        // *** ADD THIS: Save grants to database ***
+        // Save grants to database
         let savedCount = 0;
         if (grants.length > 0) {
             console.log(`💾 Saving ${grants.length} grants to database...`);
@@ -167,7 +226,7 @@ export const handler = async function(event, context) {
         // Update final status
         const finalMessage = savedCount > 0 
             ? `Processing complete. Found and saved ${savedCount} grant(s).`
-            : 'No grant opportunities found after analysis.';
+            : grants.length > 0 ? 'Grants found but already exist in database.' : 'No grant opportunities found after analysis.';
 
         await supabase
             .from('grant_submissions')
