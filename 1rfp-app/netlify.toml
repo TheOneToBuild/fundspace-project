@@ -1,21 +1,22 @@
+# This configuration assumes it is run from the root of your repository.
 [build]
-  # We specify the full path for the command from the repo root
+  # 1. Go into the app folder, 2. install dependencies, 3. run the build script
   command = "cd 1rfp-app && npm install && npm run build"
-  # We specify the full path to the final built site
+  # The location of the final built site, relative to the repository root
   publish = "1rfp-app/dist"
 
 [functions]
-  # We specify the full path to the bundled functions output
+  # The location of your bundled functions, relative to the repository root
   directory = "1rfp-app/netlify/functions-dist"
 
-# Preserving your scheduled functions
+# --- The rest of your settings remain the same ---
+
 [functions."fetch-and-cache-news"]
   schedule = "0 * * * *"
 
 [functions."cleanup-old-news"]
   schedule = "0 0 * * *"
 
-# Preserving your headers configuration
 [[headers]]
   for = "/.netlify/functions/*"
   [headers.values]
