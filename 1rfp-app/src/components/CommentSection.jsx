@@ -1,34 +1,83 @@
-// src/components/CommentSection.jsx - Enhanced to support organization posts
-import React, { useState, useEffect, useCallback } from 'react';
+// src/components/CommentSection.jsx - Refactored with modular components
+import React, { useState, useEffect, useCallback, Suspense, lazy } from 'react';
 import { supabase } from '../supabaseClient';
-import { Send, Trash2 } from 'lucide-react';
-import Avatar from './Avatar.jsx';
+import CommentCard from './comment/CommentCard';
+import CommentForm from './comment/CommentForm';
 
-// Helper functions
-const timeAgo = (date) => {
-    const seconds = Math.floor((new Date() - new Date(date)) / 1000);
-    let interval = seconds / 31536000;
-    if (interval > 1) return Math.floor(interval) + "y";
-    interval = seconds / 2592000;
-    if (interval > 1) return new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    interval = seconds / 86400;
-    if (interval > 1) return Math.floor(interval) + "d";
-    interval = seconds / 3600;
-    if (interval > 1) return Math.floor(interval) + "h";
-    interval = seconds / 60;
-    if (interval > 1) return Math.floor(interval) + "m";
-    return Math.floor(seconds) + "s";
-};
+// Lazy load the ReactionsModal
+const ReactionsModal = lazy(() => import("./post/ReactionsModal"));
 
-export default function CommentSection({ post, currentUserProfile, onCommentAdded, onCommentDeleted }) {
+export default function CommentSection({ 
+    post, 
+    currentUserProfile, 
+    onCommentAdded, 
+    onCommentDeleted,
+    showCommentForm = true,
+    compact = false 
+}) {
     const [comments, setComments] = useState([]);
-    const [newComment, setNewComment] = useState('');
     const [loading, setLoading] = useState(true);
+    const [activeReactionsModal, setActiveReactionsModal] = useState(null);
+    const [modalReactors, setModalReactors] = useState([]);
+    const [modalReactionSummary, setModalReactionSummary] = useState([]);
+    const [modalLikeCount, setModalLikeCount] = useState(0);
 
     // Determine if this is an organization post
     const isOrganizationPost = post._isOrganizationPost;
     const commentsTable = isOrganizationPost ? 'organization_post_comments' : 'post_comments';
     const postIdField = isOrganizationPost ? 'organization_post_id' : 'post_id';
+
+    // Handle opening reactions modal
+    const handleOpenReactionsModal = async (comment) => {
+        const commentReactionsTable = isOrganizationPost ? 'organization_post_comment_likes' : 'post_comment_likes';
+        
+        try {
+            // Use a simpler approach - get reactions and profiles separately
+            const { data: reactionData } = await supabase
+                .from(commentReactionsTable)
+                .select('reaction_type, user_id')
+                .eq('comment_id', comment.id);
+            
+            if (reactionData && reactionData.length > 0) {
+                // Get the user IDs
+                const userIds = reactionData.map(r => r.user_id);
+                
+                // Get profiles for those users
+                const { data: profileData } = await supabase
+                    .from('profiles')
+                    .select('id, full_name, avatar_url, organization_name')
+                    .in('id', userIds);
+                
+                if (profileData) {
+                    // Combine reaction data with profile data
+                    const combinedData = reactionData.map(reaction => {
+                        const profile = profileData.find(p => p.id === reaction.user_id);
+                        return {
+                            ...profile,
+                            reaction_type: reaction.reaction_type,
+                            profile_id: profile?.id,
+                            user_id: reaction.user_id
+                        };
+                    });
+                    
+                    // Calculate reaction summary
+                    const counts = {};
+                    reactionData.forEach(like => {
+                        const type = like.reaction_type || 'like';
+                        counts[type] = (counts[type] || 0) + 1;
+                    });
+                    const summary = Object.entries(counts).map(([type, count]) => ({ type, count }));
+                    
+                    setModalReactors(combinedData);
+                    setModalReactionSummary(summary);
+                    setModalLikeCount(reactionData.length);
+                    setActiveReactionsModal(comment.id);
+                }
+            }
+        } catch (error) {
+            console.error('Error loading modal reactors:', error);
+        }
+    };
 
     // Fetches comments when the component mounts
     const fetchComments = useCallback(async () => {
@@ -60,90 +109,17 @@ export default function CommentSection({ post, currentUserProfile, onCommentAdde
         fetchComments();
     }, [fetchComments]);
 
-    // Handles submitting a new comment
-    const handleCommentSubmit = async (e) => {
-        e.preventDefault();
-        if (!newComment.trim() || !currentUserProfile) return;
-
-        const content = newComment.trim();
-        setNewComment(''); // Clear input for better UX
-
-        try {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) {
-                console.error('No authenticated user found');
-                setNewComment(content); // Restore input
-                return;
-            }
-
-            // Prepare comment data based on post type
-            const commentData = {
-                content: content,
-                profile_id: currentUserProfile.id,
-                user_id: user.id
-            };
-            
-            // Add the appropriate post ID field
-            commentData[postIdField] = post.id;
-
-            console.log('Submitting comment:', {
-                table: commentsTable,
-                data: commentData,
-                postType: isOrganizationPost ? 'organization' : 'regular'
-            });
-
-            // Insert the new comment and select it back to get the full object
-            const { data: createdComment, error } = await supabase
-                .from(commentsTable)
-                .insert(commentData)
-                .select(`
-                    *,
-                    profiles(
-                        id, 
-                        full_name, 
-                        role, 
-                        avatar_url,
-                        organization_name
-                    )
-                `)
-                .single();
-
-            if (error) {
-                console.error("Error posting comment:", error);
-                setNewComment(content); // Restore input if submission fails
-                alert(`Failed to post comment: ${error.message}`);
-                return;
-            }
-
-            console.log('Comment created successfully:', createdComment);
-
-            // Optimistically update the UI with the new comment
-            setComments(currentComments => [...currentComments, createdComment]);
-            
-            // Update the post's comment count
-            if (isOrganizationPost) {
-                try {
-                    await supabase.rpc('update_organization_post_comments_count', { 
-                        post_id: post.id 
-                    });
-                } catch (rpcError) {
-                    console.warn('Failed to update comment count:', rpcError);
-                }
-            }
-            
-            // Notify the parent component that a comment was added
-            if (onCommentAdded) {
-                onCommentAdded();
-            }
-
-        } catch (error) {
-            console.error("Unexpected error posting comment:", error);
-            setNewComment(content); // Restore input
-            alert('Failed to post comment. Please try again.');
+    // Handle new comment added
+    const handleCommentAdded = (newComment) => {
+        setComments(currentComments => [...currentComments, newComment]);
+        
+        // Notify parent component
+        if (onCommentAdded) {
+            onCommentAdded();
         }
     };
-    
-    // Handles deleting a comment
+
+    // Handle comment deletion
     const handleDeleteComment = async (commentId) => {
         // Optimistically remove the comment from the UI
         setComments(currentComments => currentComments.filter(c => c.id !== commentId));
@@ -157,109 +133,79 @@ export default function CommentSection({ post, currentUserProfile, onCommentAdde
             console.error("Error deleting comment:", error);
             fetchComments(); // Re-fetch comments to correct the UI if delete fails
         } else {
-            // Update the post's comment count
+            // Update the post's comment count for organization posts
             if (isOrganizationPost) {
                 await supabase.rpc('update_organization_post_comments_count', { 
                     post_id: post.id 
                 });
             }
             
-            // Notify the parent component that a comment was deleted
+            // Notify parent component
             if (onCommentDeleted) {
                 onCommentDeleted();
             }
         }
     };
 
+    // Handle comment editing (placeholder for future implementation)
+    const handleEditComment = (comment) => {
+        console.log('Edit comment:', comment);
+        // TODO: Implement comment editing functionality
+    };
+
+    // Handle comment replies (placeholder for future implementation)
+    const handleReplyToComment = (comment) => {
+        console.log('Reply to comment:', comment);
+        // TODO: Implement comment reply functionality
+    };
+
     return (
-        <div className="pt-4 mt-2 space-y-4">
-            {/* New Comment Form - FIXED: Added user avatar */}
-            <form onSubmit={handleCommentSubmit} className="flex items-start space-x-3">
-                <Avatar 
-                    src={currentUserProfile?.avatar_url} 
-                    fullName={currentUserProfile?.full_name} 
-                    size="sm" 
+        <div className={`pt-4 mt-2 space-y-4 ${compact ? 'max-h-96 overflow-y-auto' : ''}`}>
+            {/* Comment Form */}
+            {showCommentForm && (
+                <CommentForm
+                    post={post}
+                    currentUserProfile={currentUserProfile}
+                    onCommentAdded={handleCommentAdded}
                 />
-                <div className="flex-1 relative">
-                    <textarea
-                        value={newComment}
-                        onChange={(e) => setNewComment(e.target.value)}
-                        placeholder="Write a comment..."
-                        className="w-full p-2 pr-10 bg-slate-100 rounded-lg border-slate-200 focus:ring-2 focus:ring-blue-500 placeholder-slate-500 transition-all text-sm resize-none"
-                        rows="1"
-                        style={{ minHeight: '40px' }}
-                        onKeyDown={(e) => {
-                            if (e.key === 'Enter' && !e.shiftKey) {
-                                e.preventDefault();
-                                handleCommentSubmit(e);
-                            }
-                        }}
-                    />
-                    <button 
-                        type="submit" 
-                        disabled={!newComment.trim()} 
-                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-blue-600 disabled:text-slate-400 rounded-full hover:bg-blue-100 disabled:hover:bg-transparent transition-colors"
-                        onClick={(e) => {
-                            e.preventDefault();
-                            handleCommentSubmit(e);
-                        }}
-                    >
-                        <Send size={18} />
-                    </button>
-                </div>
-            </form>
+            )}
 
             {/* Comments List */}
             <div className="space-y-4">
                 {loading && <p className="text-sm text-slate-500">Loading comments...</p>}
+                
                 {comments.map(comment => (
-                    <div key={comment.id} className="flex items-start space-x-3">
-                        <Avatar 
-                            src={comment.profiles?.avatar_url} 
-                            fullName={comment.profiles?.full_name} 
-                            size="sm" 
-                        />
-                        <div className="flex-1 min-w-0">
-                            <div className="bg-slate-100 rounded-lg p-3">
-                                <div className="flex items-start justify-between mb-1">
-                                    <div className="flex items-center space-x-2">
-                                        <span className="font-medium text-slate-900 text-sm">
-                                            {comment.profiles?.full_name}
-                                        </span>
-                                        {comment.profiles?.organization_name && (
-                                            <span className="text-xs text-slate-500">
-                                                • {comment.profiles.organization_name}
-                                            </span>
-                                        )}
-                                    </div>
-                                    {(currentUserProfile?.id === comment.profile_id) && (
-                                        <button
-                                            onClick={() => handleDeleteComment(comment.id)}
-                                            className="text-slate-400 hover:text-red-500 p-1"
-                                            title="Delete comment"
-                                        >
-                                            <Trash2 size={14} />
-                                        </button>
-                                    )}
-                                </div>
-                                <p className="text-slate-700 text-sm leading-relaxed">
-                                    {comment.content}
-                                </p>
-                            </div>
-                            <div className="mt-1 ml-2">
-                                <span className="text-xs text-slate-500">
-                                    {timeAgo(comment.created_at)}
-                                </span>
-                            </div>
-                        </div>
-                    </div>
+                    <CommentCard
+                        key={comment.id}
+                        comment={comment}
+                        currentUserProfile={currentUserProfile}
+                        isOrganizationPost={isOrganizationPost}
+                        onEdit={handleEditComment}
+                        onDelete={handleDeleteComment}
+                        onReply={handleReplyToComment}
+                        onOpenReactionsModal={handleOpenReactionsModal}
+                        showActions={true}
+                        showReply={false} // Can be enabled for threading later
+                    />
                 ))}
+                
                 {!loading && comments.length === 0 && (
                     <p className="text-sm text-slate-500 text-center py-4">
                         No comments yet. Be the first to comment!
                     </p>
                 )}
             </div>
+            
+            {/* Reactions Modal */}
+            <Suspense fallback={null}>
+                <ReactionsModal
+                    isOpen={!!activeReactionsModal}
+                    onClose={() => setActiveReactionsModal(null)}
+                    reactors={modalReactors}
+                    likeCount={modalLikeCount}
+                    reactionSummary={modalReactionSummary}
+                />
+            </Suspense>
         </div>
     );
 }
