@@ -1,22 +1,16 @@
 # Netlify build settings for your React app
 [build]
-  # This command navigates into your app folder, installs dependencies, and builds it
-  command = "cd 1rfp-app && npm install && npm run build"
-  # This tells Netlify where the final built site is located
-  publish = "1rfp-app/dist"
+  # CORRECTED: Since the build starts in 1rfp-app, we just need to run npm install.
+  command = "npm install && npm run build"
+  # CORRECTED: The publish directory is relative to the build's base directory.
+  publish = "dist"
 
 # Main functions configuration
 [functions]
-  # CORRECTED PATH: Points to the functions directory inside your 1rfp-app
-  directory = "1rfp-app/netlify/functions"
-  # Preserving your existing settings
+  # CORRECTED: The functions directory is also relative to the base directory.
+  directory = "netlify/functions"
   external_node_modules = ["axios", "jsdom", "rss-parser", "@supabase/supabase-js"]
   node_bundler = "esbuild"
-
-# Development server settings
-[dev]
-  # CORRECTED PATH: For running locally with the Netlify CLI
-  functions = "1rfp-app/netlify/functions"
 
 # Preserving your scheduled functions
 [functions."fetch-and-cache-news"]
