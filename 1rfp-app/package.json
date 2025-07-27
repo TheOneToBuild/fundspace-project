@@ -5,8 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "npm run build:functions && vite build",
-    "build:functions": "netlify-lambda build netlify/functions",
+    "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview"
   },
@@ -39,7 +38,6 @@
     "eslint-plugin-react-refresh": "^0.4.19",
     "globals": "^16.0.0",
     "netlify-cli": "^22.2.2",
-    "netlify-lambda": "^2.0.16",
     "postcss": "^8.5.4",
     "prettier": "^3.5.3",
     "tailwindcss": "^3.4.17",

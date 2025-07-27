@@ -4,7 +4,9 @@
   publish = "dist"
 
 [functions]
-  directory = "netlify/functions-dist"
+  directory = "netlify/functions"
+  external_node_modules = ["@sparticuz/chromium", "puppeteer-core"]
+  node_bundler = "esbuild"
 
 # Preserving your scheduled functions
 [functions."fetch-and-cache-news"]
