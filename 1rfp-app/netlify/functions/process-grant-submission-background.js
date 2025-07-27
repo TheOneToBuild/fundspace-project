@@ -417,15 +417,16 @@ export const handler = async function(event, context) {
 
         const finalStatus = savedCount > 0 ? 'success' : 'failed';
 
+        // Update submission status to completed
         await supabase
             .from('grant_submissions')
             .update({ 
-                status: finalStatus, 
+                status: finalStatus === 'success' ? 'completed' : 'failed', 
                 error_message: finalMessage 
             })
             .eq('id', submissionId);
 
-        console.log(`🎉 Enhanced processing complete! Status: ${finalStatus}`);
+        console.log(`🎉 Enhanced processing complete! Status: ${finalStatus === 'success' ? 'completed' : 'failed'}`);
         console.log(`📊 Final results: Found ${grants.length} grants, saved ${savedCount} qualifying grants`);
 
         return {

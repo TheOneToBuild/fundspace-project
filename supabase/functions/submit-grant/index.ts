@@ -58,7 +58,7 @@ serve(async (req) => {
     // Immediately respond to the user
     return new Response(JSON.stringify({ 
         submissionId: submission.id, 
-        message: "Submission received and is now being processed. We'll notify you upon completion." 
+        message: "Submission received and is now being processed. Thank you for supporting the community!" 
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 202, // 202 Accepted
