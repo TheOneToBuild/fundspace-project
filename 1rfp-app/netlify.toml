@@ -1,15 +1,11 @@
-# Netlify build settings
 [build]
-  # Tell Netlify the root of your app is here
-  base = "1rfp-app"
-  # The build command, Netlify runs "npm install" automatically
-  command = "npm run build"
-  # The final built site to publish
+  # We specify the full path for the command from the repo root
+  command = "cd 1rfp-app && npm install && npm run build"
+  # We specify the full path to the final built site
   publish = "1rfp-app/dist"
 
-# Functions configuration
 [functions]
-  # Where the bundled functions will be placed by netlify-lambda
+  # We specify the full path to the bundled functions output
   directory = "1rfp-app/netlify/functions-dist"
 
 # Preserving your scheduled functions
