@@ -1,4 +1,4 @@
-// src/components/mentions/MentionDropdown.jsx - FIXED VERSION
+// src/components/mentions/MentionDropdown.jsx - FIXED VERSION with Updated Schema
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../supabaseClient';
 
@@ -27,7 +27,6 @@ export default function MentionDropdown({
 
       setLoading(true);
       try {
-        // FIXED: Direct database queries instead of RPC function
         const searchPattern = `%${query.trim()}%`;
         
         // Search users/profiles
@@ -41,16 +40,28 @@ export default function MentionDropdown({
           console.error('Error searching profiles:', profilesError);
         }
 
-        // Search organizations
+        // FIXED: Search the unified organizations table with all organization types
         const { data: organizations, error: orgsError } = await supabase
           .from('organizations')
-          .select('id, name, type, tagline, image_url')
+          .select('id, name, type, tagline, image_url, slug')
           .ilike('name', searchPattern)
           .limit(5);
 
         if (orgsError) {
           console.error('Error searching organizations:', orgsError);
         }
+
+        console.log('🔍 MentionDropdown: Search results:', {
+          query,
+          profiles: profiles?.length || 0,
+          organizations: organizations?.length || 0,
+          orgData: organizations?.map(org => ({ 
+            id: org.id, 
+            name: org.name, 
+            type: org.type,
+            slug: org.slug 
+          }))
+        });
 
         // Format results to match expected structure
         const userResults = (profiles || []).map(profile => ({
@@ -63,17 +74,49 @@ export default function MentionDropdown({
           role: profile.role
         }));
 
-        const orgResults = (organizations || []).map(org => ({
-          id: `${org.type}-${org.id}`,
-          name: org.name,
-          type: 'organization',
-          avatar_url: org.image_url,
-          title: org.tagline,
-          organization_name: org.type === 'nonprofit' ? 'Nonprofit' : 'Funder',
-          role: org.type
-        }));
+        // FIXED: Format organization results with correct ID format and proper type mapping
+        const orgResults = (organizations || []).map(org => {
+          // Create mention ID in the format: orgType-orgId
+          const mentionId = `${org.type}-${org.id}`;
+          
+          // Map organization type to display label
+          const getOrgTypeLabel = (type) => {
+            const typeLabels = {
+              'nonprofit': 'Nonprofit',
+              'funder': 'Funder', 
+              'foundation': 'Foundation',
+              'education': 'Education',
+              'healthcare': 'Healthcare',
+              'government': 'Government',
+              'religious': 'Religious',
+              'forprofit': 'For-Profit'
+            };
+            return typeLabels[type] || 'Organization';
+          };
+
+          return {
+            id: mentionId, // This is the key fix - proper format for mention ID
+            name: org.name,
+            type: 'organization',
+            avatar_url: org.image_url,
+            title: org.tagline || `${getOrgTypeLabel(org.type)} Organization`,
+            organization_name: getOrgTypeLabel(org.type),
+            role: org.type, // Store the actual org type
+            _orgType: org.type, // Additional metadata
+            _orgId: org.id,
+            _slug: org.slug
+          };
+        });
 
         const allResults = [...userResults, ...orgResults];
+        
+        console.log('🔍 MentionDropdown: Formatted results:', allResults.map(r => ({
+          id: r.id,
+          name: r.name,
+          type: r.type,
+          role: r.role
+        })));
+        
         setSuggestions(allResults);
         setInternalSelectedIndex(-1); // Reset selection when results change
       } catch (error) {
@@ -129,6 +172,8 @@ export default function MentionDropdown({
   }, [suggestions, currentSelectedIndex, onClose, onKeyDown]);
 
   const handleSelect = (suggestion) => {
+    console.log('🎯 MentionDropdown: Selected mention:', suggestion);
+    
     onSelect && onSelect({
       id: suggestion.id,
       name: suggestion.name,
@@ -173,8 +218,8 @@ export default function MentionDropdown({
       }
       return 'User';
     } else {
-      // Organization
-      return suggestion.role === 'nonprofit' ? 'Nonprofit' : 'Funder';
+      // Organization - use the formatted organization name
+      return suggestion.organization_name || 'Organization';
     }
   };
 

@@ -173,94 +173,37 @@ const PostModal = ({
         suggestion: {
           items: async ({ query }) => {
             try {
-              // Show following/followers when no query
               if (!query || query.length === 0) {
                 if (!profile?.id) return [];
-                
                 try {
-                  // Get people the current user is following
                   const { data: following } = await supabase
                     .from('followers')
                     .select(`
                       following_id,
-                      profiles!followers_following_id_fkey(
-                        id, 
-                        full_name, 
-                        title, 
-                        organization_name, 
-                        avatar_url, 
-                        role
-                      )
+                      profiles!followers_following_id_fkey(id, full_name, title, organization_name, avatar_url, role)
                     `)
                     .eq('follower_id', profile.id)
-                    .limit(8);
+                    .limit(5);
 
-                  // Get people following the current user
-                  const { data: followers } = await supabase
-                    .from('followers')
-                    .select(`
-                      follower_id,
-                      profiles!followers_follower_id_fkey(
-                        id, 
-                        full_name, 
-                        title, 
-                        organization_name, 
-                        avatar_url, 
-                        role
-                      )
-                    `)
-                    .eq('following_id', profile.id)
-                    .limit(8);
-
-                  // Combine and deduplicate
-                  const allConnections = new Map();
-                  
-                  if (following) {
-                    following.forEach(f => {
-                      if (f.profiles) {
-                        allConnections.set(f.profiles.id, {
-                          id: f.profiles.id,
-                          name: f.profiles.full_name,
-                          type: 'user',
-                          avatar_url: f.profiles.avatar_url,
-                          title: f.profiles.title,
-                          organization_name: f.profiles.organization_name,
-                          role: f.profiles.role
-                        });
-                      }
-                    });
-                  }
-
-                  if (followers) {
-                    followers.forEach(f => {
-                      if (f.profiles && !allConnections.has(f.profiles.id)) {
-                        allConnections.set(f.profiles.id, {
-                          id: f.profiles.id,
-                          name: f.profiles.full_name,
-                          type: 'user',
-                          avatar_url: f.profiles.avatar_url,
-                          title: f.profiles.title,
-                          organization_name: f.profiles.organization_name,
-                          role: f.profiles.role
-                        });
-                      }
-                    });
-                  }
-
-                  return Array.from(allConnections.values()).slice(0, 8);
-                } catch (error) {
-                  console.error('Error fetching connections for mentions:', error);
+                  return (following || []).map(f => ({
+                    id: f.profiles.id,
+                    name: f.profiles.full_name,
+                    type: 'user',
+                    avatar_url: f.profiles.avatar_url,
+                    title: f.profiles.title,
+                    organization_name: f.profiles.organization_name,
+                    role: f.profiles.role
+                  }));
+                } catch (err) {
+                  console.error('Error fetching following for mention suggestions:', err);
                   return [];
                 }
               }
 
-              if (query.length < 2) {
-                return [];
-              }
+              if (query.length < 2) return [];
 
               const searchPattern = `%${query.trim()}%`;
               
-              // Search users/profiles
               const { data: profiles, error: profilesError } = await supabase
                 .from('profiles')
                 .select('id, full_name, title, organization_name, avatar_url, role')
@@ -271,7 +214,6 @@ const PostModal = ({
                 console.error('Error searching profiles:', profilesError);
               }
 
-              // Search organizations
               const { data: organizations, error: orgsError } = await supabase
                 .from('organizations')
                 .select('id, name, type, tagline, image_url, slug')
@@ -282,7 +224,6 @@ const PostModal = ({
                 console.error('Error searching organizations:', orgsError);
               }
 
-              // Format results
               const userResults = (profiles || []).map(profile => ({
                 id: profile.id,
                 name: profile.full_name,
@@ -293,18 +234,35 @@ const PostModal = ({
                 role: profile.role
               }));
 
-              const orgResults = (organizations || []).map(org => ({
-                id: org.slug || `${org.type}-${org.id}`,
-                name: org.name,
-                type: 'organization',
-                avatar_url: org.image_url,
-                title: org.tagline,
-                organization_name: org.type === 'nonprofit' ? 'Nonprofit' : 'Funder',
-                role: org.type,
-                _orgType: org.type,
-                _orgId: org.id,
-                _slug: org.slug
-              }));
+              const orgResults = (organizations || []).map(org => {
+                const mentionId = `${org.type}-${org.id}`;
+                const getOrgTypeLabel = (type) => {
+                  const typeLabels = {
+                    'nonprofit': 'Nonprofit',
+                    'funder': 'Funder', 
+                    'foundation': 'Foundation',
+                    'education': 'Education',
+                    'healthcare': 'Healthcare',
+                    'government': 'Government',
+                    'religious': 'Religious',
+                    'forprofit': 'For-Profit'
+                  };
+                  return typeLabels[type] || 'Organization';
+                };
+
+                return {
+                  id: mentionId,
+                  name: org.name,
+                  type: 'organization',
+                  avatar_url: org.image_url,
+                  title: org.tagline || `${getOrgTypeLabel(org.type)} Organization`,
+                  organization_name: getOrgTypeLabel(org.type),
+                  role: org.type,
+                  _orgType: org.type,
+                  _orgId: org.id,
+                  _slug: org.slug
+                };
+              });
 
               return [...userResults, ...orgResults];
             } catch (err) {
@@ -327,13 +285,27 @@ const PostModal = ({
                   placement: 'bottom-start', 
                   duration: 0,
                   zIndex: 9999,
-                  maxWidth: 300,
+                  maxWidth: 400,
                   theme: 'light-border'
                 });
               },
-              onUpdate: props => { component.updateProps(props); popup[0].setProps({ getReferenceClientRect: props.clientRect }); },
-              onKeyDown: props => { if (props.event.key === 'Escape') { popup[0].hide(); return true; } return component.ref?.onKeyDown(props); },
-              onExit: () => { if (popup && popup[0]) popup[0].destroy(); if (component) component.destroy(); popup = null; component = null; },
+              onUpdate: props => { 
+                component.updateProps(props); 
+                popup[0].setProps({ getReferenceClientRect: props.clientRect }); 
+              },
+              onKeyDown: props => { 
+                if (props.event.key === 'Escape') { 
+                  popup[0].hide(); 
+                  return true; 
+                } 
+                return component.ref?.onKeyDown(props); 
+              },
+              onExit: () => { 
+                if (popup && popup[0]) popup[0].destroy(); 
+                if (component) component.destroy(); 
+                popup = null; 
+                component = null; 
+              },
             };
           },
         },

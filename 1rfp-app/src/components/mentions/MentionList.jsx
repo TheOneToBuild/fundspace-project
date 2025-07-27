@@ -1,4 +1,4 @@
-// src/components/mentions/MentionList.jsx
+// src/components/mentions/MentionList.jsx - Updated for New Schema
 import React, { useState, useEffect, forwardRef, useImperativeHandle } from 'react';
 import Avatar from '../Avatar';
 
@@ -9,6 +9,8 @@ const MentionList = forwardRef((props, ref) => {
     const selectItem = index => {
         const item = props.items[index];
         if (item) {
+            console.log('🎯 MentionList: Selecting item:', item);
+            
             // Pass all three attributes to Tiptap
             props.command({ 
                 id: item.id, 
@@ -61,7 +63,22 @@ const MentionList = forwardRef((props, ref) => {
             }
             return 'User';
         } else {
-            return suggestion.role === 'nonprofit' ? 'Nonprofit' : 'Funder';
+            // FIXED: Handle all organization types from the unified organizations table
+            const getOrgTypeLabel = (role) => {
+                const typeLabels = {
+                    'nonprofit': 'Nonprofit',
+                    'funder': 'Funder', 
+                    'foundation': 'Foundation',
+                    'education': 'Education',
+                    'healthcare': 'Healthcare',
+                    'government': 'Government',
+                    'religious': 'Religious',
+                    'forprofit': 'For-Profit'
+                };
+                return typeLabels[role] || 'Organization';
+            };
+            
+            return getOrgTypeLabel(suggestion.role);
         }
     };
 

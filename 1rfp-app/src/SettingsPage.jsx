@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
 import { useOutletContext } from 'react-router-dom';
-
-// Import all the new setting components
 import AvatarSettings from './components/settings/AvatarSettings';
 import ProfileInfoForm from './components/settings/ProfileInfoForm';
 import InterestSelector from './components/settings/InterestSelector';
@@ -14,8 +12,6 @@ import EmailSettings from './components/settings/EmailSettings';
 
 export default function SettingsPage() {
   const { profile: initialProfile, session, refreshProfile } = useOutletContext();
-
-  // Master state for the page
   const [loading, setLoading] = useState(false);
   const [profile, setProfile] = useState(null);
   const [fullName, setFullName] = useState('');
@@ -30,7 +26,6 @@ export default function SettingsPage() {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   
-  // Effect to load all profile data when the component mounts or the initial profile changes
   useEffect(() => {
     const loadProfileData = async () => {
       if (initialProfile) {
@@ -49,21 +44,18 @@ export default function SettingsPage() {
     loadProfileData();
   }, [initialProfile]);
 
-  // Fetches the user's authoritative organization name from the membership table
   const fetchOrganizationName = async (profileId) => {
     if (!profileId) return '';
     const { data } = await supabase.from('organization_memberships').select('organizations!inner(name)').eq('profile_id', profileId).order('joined_at', { ascending: false }).limit(1).single();
     return data?.organizations?.name || '';
   };
   
-  // Helper to show success or error messages that disappear after 3 seconds
   const showMessage = (msg, isError = false) => {
     if (isError) setError(msg);
     else setMessage(msg);
     setTimeout(() => { setError(''); setMessage(''); }, 3000);
   };
 
-  // Handles saving the main profile form
   const handleUpdateProfile = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -77,7 +69,6 @@ export default function SettingsPage() {
     setLoading(false);
   };
   
-  // Handles the callback from the uploader component
   const handleAvatarUploaded = async (imageUrl) => {
     const cacheBustedUrl = `${imageUrl}?v=${Date.now()}`;
     const { error } = await supabase.from('profiles').update({ avatar_url: cacheBustedUrl, updated_at: new Date() }).eq('id', session.user.id);
@@ -89,7 +80,6 @@ export default function SettingsPage() {
     }
   };
 
-  // Handles removing the avatar
   const handleImageRemoved = async () => {
     setLoading(true);
     const { error } = await supabase.from('profiles').update({ avatar_url: null, updated_at: new Date() }).eq('id', session.user.id);
@@ -102,14 +92,12 @@ export default function SettingsPage() {
     setLoading(false);
   };
 
-  // Handles auto-saving for fields like Interests and Location
   const handleAutoSave = async (field, value) => {
     const { error } = await supabase.from('profiles').update({ [field]: value, updated_at: new Date() }).eq('id', session.user.id);
     if (error) showMessage(`Failed to save ${field}`, true);
     else if (typeof refreshProfile === 'function') await refreshProfile();
   };
   
-  // Handles updates from the NotificationSettings component
   const updateNotificationProfile = async (updatedFields) => {
     setLoading(true);
     const { data, error } = await supabase.from('profiles').update(updatedFields).eq('id', session.user.id).select().single();
@@ -121,7 +109,6 @@ export default function SettingsPage() {
     setLoading(false);
   };
   
-  // Handles updates from the PrivacySettings component
   const handlePrivacyChange = async (newSetting) => {
     setPrivacyLoading(true);
     const { error } = await supabase.rpc('update_profile_view_privacy', { p_user_id: session.user.id, p_privacy_setting: newSetting });
@@ -145,7 +132,6 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-8">
-      {/* --- Profile Info Form Card --- */}
       <div className="bg-white p-6 rounded-xl shadow-md border border-slate-200">
         <h2 className="text-2xl font-bold text-slate-800">Profile Information</h2>
         <p className="text-slate-500 mt-1 mb-6">Update your personal and professional information.</p>
@@ -166,13 +152,16 @@ export default function SettingsPage() {
                 loading={loading}
             />
             
+            {/* --- MOVED TO HERE --- */}
+            <div className="border-t pt-6">
+                <LocationSelector location={location} onChange={(val) => { setLocation(val); handleAutoSave('location', val); }} loading={loading} />
+            </div>
+            
             <div className="border-t pt-6">
                 <InterestSelector interests={interests} onChange={(val) => { setInterests(val); handleAutoSave('interests', val); }} loading={loading} />
             </div>
             
-            <div className="border-t pt-6">
-                <LocationSelector location={location} onChange={(val) => { setLocation(val); handleAutoSave('location', val); }} loading={loading} />
-            </div>
+            {/* --- LocationSelector was moved from here --- */}
             
             <div className="pt-4">
                 <button type="submit" disabled={loading} className="bg-blue-600 text-white py-2.5 px-6 rounded-lg hover:bg-blue-700 disabled:bg-blue-400 font-semibold">
@@ -184,7 +173,6 @@ export default function SettingsPage() {
         </form>
       </div>
 
-      {/* --- Other Settings Cards --- */}
       <PrivacySettings
         privacySetting={privacySetting}
         handlePrivacyChange={handlePrivacyChange}
