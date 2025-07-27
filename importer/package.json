@@ -15,9 +15,11 @@
     "@supabase/supabase-js": "^2.50.0",
     "axios": "^1.10.0",
     "cheerio": "^1.1.0",
+    "chrome-aws-lambda": "^10.1.0",
     "dotenv": "^16.5.0",
     "pdf-parse": "^1.1.1",
     "playwright": "^1.53.1",
+    "puppeteer-core": "^10.4.0",
     "serpapi": "^2.1.0",
     "xml2js": "^0.6.2"
   }
