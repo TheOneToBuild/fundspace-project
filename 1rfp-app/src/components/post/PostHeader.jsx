@@ -1,4 +1,4 @@
-// src/components/post/PostHeader.jsx - Updated with Clickable Profile and Organization
+// src/components/post/PostHeader.jsx - Updated with Clickable Profile and Organization - NO DELETE CONFIRMATION
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MoreHorizontal, Trash2 } from 'lucide-react';
@@ -120,9 +120,8 @@ export default function PostHeader({ author, createdAt, isAuthor, onEdit, onDele
                                 <button
                                     onClick={() => {
                                         setIsMenuOpen(false);
-                                        if (window.confirm('Are you sure you want to delete this post?')) {
-                                            onDelete?.();
-                                        }
+                                        // 🚀 FIXED: Remove confirmation dialog - delete immediately like comments
+                                        onDelete?.();
                                     }}
                                     className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
                                 >

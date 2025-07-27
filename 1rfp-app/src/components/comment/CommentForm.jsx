@@ -182,14 +182,31 @@ export default function CommentForm({
                             }));
 
                             const orgResults = (organizations || []).map(org => ({
-                                id: org.slug || `${org.type}-${org.id}`, // Use slug if available, fallback to type-id
+                                // FIXED: Use consistent ID format - prefer slug if available, fallback to type-id format
+                                id: org.slug || `${org.type}-${org.id}`,
                                 name: org.name,
                                 type: 'organization',
                                 avatar_url: org.image_url,
                                 title: org.tagline,
                                 organization_name: org.type === 'nonprofit' ? 'Nonprofit' : 'Funder',
-                                role: org.type
+                                role: org.type,
+                                // Store additional metadata for navigation
+                                _orgType: org.type,
+                                _orgId: org.id,
+                                _slug: org.slug
                             }));
+
+                            console.log('🔍 CommentForm: Mention search results:', {
+                                query,
+                                userResults: userResults.length,
+                                orgResults: orgResults.length,
+                                organizations: orgResults.map(org => ({ 
+                                    name: org.name, 
+                                    id: org.id, 
+                                    slug: org._slug,
+                                    type: org._orgType 
+                                }))
+                            });
 
                             return [...userResults, ...orgResults];
                         } catch (err) {
@@ -384,6 +401,8 @@ export default function CommentForm({
                     } 
                 }); 
             }
+
+            console.log('💾 CommentForm: Saving comment with mentions:', mentionsForStorage);
 
             // Prepare comment data
             const commentData = {

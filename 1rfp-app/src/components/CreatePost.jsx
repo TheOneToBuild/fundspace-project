@@ -1,4 +1,4 @@
-// src/components/CreatePost.jsx - Complete with Fixed Channel Logic
+// src/components/CreatePost.jsx - Compact Version with Modal Expansion
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { supabase } from '../supabaseClient';
 import { Camera, X, Smile, AtSign } from 'lucide-react';
@@ -34,850 +34,965 @@ const getDbChannelFromOrgType = (orgType) => {
   return ORGANIZATION_CHANNELS[baseType] || 'hello-community';
 };
 
+// Compact Post Box Component
+const CompactPostBox = ({ profile, organization, isOrganizationPost, onClick }) => {
+  const defaultPlaceholder = isOrganizationPost 
+    ? `Share an update for ${organization?.name || 'your organization'}...`
+    : `What's on your mind, ${profile?.full_name?.split(' ')[0] || 'there'}?`;
+
+  return (
+    <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+      <div className="flex items-center space-x-3">
+        <div className="flex-shrink-0">
+          {isOrganizationPost && organization ? (
+            <Avatar 
+              src={organization.image_url} 
+              fullName={organization.name} 
+              size="md" 
+            />
+          ) : (
+            <Avatar 
+              src={profile?.avatar_url} 
+              fullName={profile?.full_name} 
+              size="md" 
+            />
+          )}
+        </div>
+        
+        <div 
+          onClick={onClick}
+          className="flex-1 bg-slate-50 hover:bg-slate-100 transition-colors cursor-pointer rounded-full px-4 py-3 border border-slate-200"
+        >
+          <span className="text-slate-500 text-sm">
+            {defaultPlaceholder}
+          </span>
+        </div>
+
+        <button
+          onClick={onClick}
+          className="px-6 py-2 bg-blue-600 text-white text-sm font-medium rounded-full hover:bg-blue-700 transition-colors"
+        >
+          Post
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// Full Post Modal Component  
+const PostModal = ({ 
+  isOpen, 
+  onClose, 
+  profile, 
+  onNewPost, 
+  channel, 
+  placeholder, 
+  organizationId, 
+  organizationType, 
+  organization 
+}) => {
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [selectedImages, setSelectedImages] = useState([]);
+  const [uploading, setUploading] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [isEditorContentEmpty, setIsEditorContentEmpty] = useState(true);
+  const [selectedTags, setSelectedTags] = useState([]);
+  const [showTagSelector, setShowTagSelector] = useState(false);
+  const [customTagInput, setCustomTagInput] = useState('');
+
+  const fileInputRef = useRef(null);
+  const tagSelectorRef = useRef(null);
+
+  const emojis = [
+    '😊', '😂', '❤️', '👍', '🎉', '🔥', '💡', '🚀',
+    '💯', '⭐', '🌟', '💪', '🙌', '👏', '🎯', '💝'
+  ];
+
+  // Check if this is an organization post
+  const isOrganizationPost = channel === 'organization' && organizationId && organizationType;
+
+  // Determine which table to use
+  const postsTable = isOrganizationPost ? 'organization_posts' : 'posts';
+
+  // Generate the placeholder text
+  const defaultPlaceholder = isOrganizationPost 
+    ? `Share an update for ${organization?.name || 'your organization'}...`
+    : `What's on your mind, ${profile?.full_name?.split(' ')[0] || 'there'}?`;
+  
+  const placeholderText = placeholder || defaultPlaceholder;
+
+  // TIPTAP EDITOR HOOK
+  const editor = useEditor({
+    extensions: [
+      StarterKit,
+      Placeholder.configure({
+        placeholder: placeholderText,
+        showOnlyWhenEditable: true,
+        showOnlyCurrent: false,
+        includeChildren: true,
+      }),
+      // MENTION EXTENSION with following/followers
+      Mention.extend({
+        name: 'mention',
+        addAttributes() {
+          return {
+            ...this.parent?.(),
+            type: {
+              default: null,
+              parseHTML: e => e.getAttribute('data-type'),
+              renderHTML: a => a.type ? { 'data-type': a.type } : {}
+            }
+          };
+        },
+        renderHTML({ node, HTMLAttributes }) {
+          const { id, label, type } = node.attrs;
+          return ['span', { ...HTMLAttributes, class: 'mention', 'data-id': id, 'data-label': label, 'data-type': type }, `@${label}`];
+        },
+        parseHTML() {
+          return [
+            {
+              tag: 'span[data-type][data-id]',
+              getAttrs: element => ({
+                id: element.getAttribute('data-id'),
+                label: element.getAttribute('data-label'),
+                type: element.getAttribute('data-type'),
+              }),
+            },
+            {
+              tag: 'span.mention',
+              getAttrs: element => ({
+                id: element.getAttribute('data-id'),
+                label: element.getAttribute('data-label'),
+                type: element.getAttribute('data-type'),
+              }),
+            },
+          ];
+        },
+      }).configure({
+        suggestion: {
+          items: async ({ query }) => {
+            try {
+              // Show following/followers when no query
+              if (!query || query.length === 0) {
+                if (!profile?.id) return [];
+                
+                try {
+                  // Get people the current user is following
+                  const { data: following } = await supabase
+                    .from('followers')
+                    .select(`
+                      following_id,
+                      profiles!followers_following_id_fkey(
+                        id, 
+                        full_name, 
+                        title, 
+                        organization_name, 
+                        avatar_url, 
+                        role
+                      )
+                    `)
+                    .eq('follower_id', profile.id)
+                    .limit(8);
+
+                  // Get people following the current user
+                  const { data: followers } = await supabase
+                    .from('followers')
+                    .select(`
+                      follower_id,
+                      profiles!followers_follower_id_fkey(
+                        id, 
+                        full_name, 
+                        title, 
+                        organization_name, 
+                        avatar_url, 
+                        role
+                      )
+                    `)
+                    .eq('following_id', profile.id)
+                    .limit(8);
+
+                  // Combine and deduplicate
+                  const allConnections = new Map();
+                  
+                  if (following) {
+                    following.forEach(f => {
+                      if (f.profiles) {
+                        allConnections.set(f.profiles.id, {
+                          id: f.profiles.id,
+                          name: f.profiles.full_name,
+                          type: 'user',
+                          avatar_url: f.profiles.avatar_url,
+                          title: f.profiles.title,
+                          organization_name: f.profiles.organization_name,
+                          role: f.profiles.role
+                        });
+                      }
+                    });
+                  }
+
+                  if (followers) {
+                    followers.forEach(f => {
+                      if (f.profiles && !allConnections.has(f.profiles.id)) {
+                        allConnections.set(f.profiles.id, {
+                          id: f.profiles.id,
+                          name: f.profiles.full_name,
+                          type: 'user',
+                          avatar_url: f.profiles.avatar_url,
+                          title: f.profiles.title,
+                          organization_name: f.profiles.organization_name,
+                          role: f.profiles.role
+                        });
+                      }
+                    });
+                  }
+
+                  return Array.from(allConnections.values()).slice(0, 8);
+                } catch (error) {
+                  console.error('Error fetching connections for mentions:', error);
+                  return [];
+                }
+              }
+
+              if (query.length < 2) {
+                return [];
+              }
+
+              const searchPattern = `%${query.trim()}%`;
+              
+              // Search users/profiles
+              const { data: profiles, error: profilesError } = await supabase
+                .from('profiles')
+                .select('id, full_name, title, organization_name, avatar_url, role')
+                .or(`full_name.ilike.${searchPattern},title.ilike.${searchPattern},organization_name.ilike.${searchPattern}`)
+                .limit(5);
+
+              if (profilesError) {
+                console.error('Error searching profiles:', profilesError);
+              }
+
+              // Search organizations
+              const { data: organizations, error: orgsError } = await supabase
+                .from('organizations')
+                .select('id, name, type, tagline, image_url, slug')
+                .ilike('name', searchPattern)
+                .limit(5);
+
+              if (orgsError) {
+                console.error('Error searching organizations:', orgsError);
+              }
+
+              // Format results
+              const userResults = (profiles || []).map(profile => ({
+                id: profile.id,
+                name: profile.full_name,
+                type: 'user',
+                avatar_url: profile.avatar_url,
+                title: profile.title,
+                organization_name: profile.organization_name,
+                role: profile.role
+              }));
+
+              const orgResults = (organizations || []).map(org => ({
+                id: org.slug || `${org.type}-${org.id}`,
+                name: org.name,
+                type: 'organization',
+                avatar_url: org.image_url,
+                title: org.tagline,
+                organization_name: org.type === 'nonprofit' ? 'Nonprofit' : 'Funder',
+                role: org.type,
+                _orgType: org.type,
+                _orgId: org.id,
+                _slug: org.slug
+              }));
+
+              return [...userResults, ...orgResults];
+            } catch (err) {
+              console.error('Exception during mention search:', err);
+              return [];
+            }
+          },
+          render: () => {
+            let component, popup;
+            return {
+              onStart: props => {
+                component = new ReactRenderer(MentionList, { props, editor: props.editor });
+                popup = tippy('body', { 
+                  getReferenceClientRect: props.clientRect, 
+                  appendTo: () => document.body, 
+                  content: component.element, 
+                  showOnCreate: true, 
+                  interactive: true, 
+                  trigger: 'manual', 
+                  placement: 'bottom-start', 
+                  duration: 0,
+                  zIndex: 9999,
+                  maxWidth: 300,
+                  theme: 'light-border'
+                });
+              },
+              onUpdate: props => { component.updateProps(props); popup[0].setProps({ getReferenceClientRect: props.clientRect }); },
+              onKeyDown: props => { if (props.event.key === 'Escape') { popup[0].hide(); return true; } return component.ref?.onKeyDown(props); },
+              onExit: () => { if (popup && popup[0]) popup[0].destroy(); if (component) component.destroy(); popup = null; component = null; },
+            };
+          },
+        },
+      }),
+    ],
+    content: '<p></p>',
+    editorProps: {
+      attributes: {
+        class: 'prose-sm outline-none text-slate-700 placeholder:text-slate-400 bg-white',
+        style: 'line-height: 1.5; min-height: 120px; white-space: pre-wrap;'
+      },
+    },
+    onUpdate: ({ editor }) => {
+      const isEmpty = editor.isEmpty;
+      setIsEditorContentEmpty(isEmpty);
+    }
+  });
+
+  // Available tags for selection
+  const availableTags = [
+    { id: 'announcement', label: 'Announcement', color: 'bg-blue-100 text-blue-800' },
+    { id: 'funding', label: 'Funding', color: 'bg-green-100 text-green-800' },
+    { id: 'program', label: 'Program', color: 'bg-purple-100 text-purple-800' },
+    { id: 'partnership', label: 'Partnership', color: 'bg-indigo-100 text-indigo-800' },
+    { id: 'impact', label: 'Impact', color: 'bg-orange-100 text-orange-800' },
+    { id: 'research', label: 'Research', color: 'bg-teal-100 text-teal-800' },
+    { id: 'education', label: 'Education', color: 'bg-red-100 text-red-800' },
+    { id: 'healthcare', label: 'Healthcare', color: 'bg-pink-100 text-pink-800' },
+    { id: 'environment', label: 'Environment', color: 'bg-emerald-100 text-emerald-800' },
+    { id: 'community', label: 'Community', color: 'bg-yellow-100 text-yellow-800' }
+  ];
+
+  const getRandomTagColor = () => {
+    const colors = [
+      'bg-blue-100 text-blue-800',
+      'bg-green-100 text-green-800',
+      'bg-purple-100 text-purple-800',
+      'bg-indigo-100 text-indigo-800',
+      'bg-orange-100 text-orange-800',
+      'bg-teal-100 text-teal-800',
+      'bg-red-100 text-red-800',
+      'bg-pink-100 text-pink-800'
+    ];
+    return colors[Math.floor(Math.random() * colors.length)];
+  };
+
+  const handleTagToggle = (tagId) => {
+    if (selectedTags.length >= 6 && !selectedTags.some(tag => tag.id === tagId)) {
+      return;
+    }
+    
+    setSelectedTags(prev => {
+      const existingTag = prev.find(tag => tag.id === tagId);
+      if (existingTag) {
+        return prev.filter(tag => tag.id !== tagId);
+      } else {
+        const availableTag = availableTags.find(tag => tag.id === tagId);
+        return [...prev, availableTag];
+      }
+    });
+  };
+
+  const addCustomTag = () => {
+    if (!customTagInput.trim() || selectedTags.length >= 6) return;
+    
+    const customTag = {
+      id: `custom-${Date.now()}`,
+      label: customTagInput.trim(),
+      color: getRandomTagColor(),
+      isCustom: true
+    };
+    
+    setSelectedTags(prev => [...prev, customTag]);
+    setCustomTagInput('');
+  };
+
+  const removeTag = (tagId) => {
+    setSelectedTags(prev => prev.filter(tag => tag.id !== tagId));
+  };
+
+  // Upload images to Supabase storage
+  const uploadImages = async (imageObjs) => {
+    const uploadPromises = imageObjs.map(async (imageObj) => {
+      const fileExt = imageObj.file.name.split('.').pop();
+      const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`;
+      
+      const { data, error } = await supabase.storage
+        .from('post-images')
+        .upload(fileName, imageObj.file);
+
+      if (error) throw error;
+
+      const { data: urlData } = supabase.storage
+        .from('post-images')
+        .getPublicUrl(fileName);
+
+      return urlData.publicUrl;
+    });
+
+    return Promise.all(uploadPromises);
+  };
+
+  const handleImageSelect = (event) => {
+    const files = Array.from(event.target.files);
+    const maxImages = 6;
+    
+    if (selectedImages.length + files.length > maxImages) {
+      alert(`You can only add up to ${maxImages} images per post.`);
+      return;
+    }
+
+    const validFiles = files.filter(file => 
+      file.type.startsWith('image/') && file.size <= 10 * 1024 * 1024
+    );
+
+    if (validFiles.length < files.length) {
+      alert('Some images were invalid (must be under 10MB).');
+    }
+
+    if (validFiles.length > 0) {
+      const imageObjects = validFiles.map(file => ({
+        file,
+        preview: URL.createObjectURL(file),
+        id: Math.random().toString(36).substr(2, 9)
+      }));
+      setSelectedImages(prev => [...prev, ...imageObjects]);
+    }
+  };
+
+  const removeImage = (imageId) => {
+    setSelectedImages(prev => {
+      const updated = prev.filter(img => img.id !== imageId);
+      const removedImage = prev.find(img => img.id === imageId);
+      if (removedImage) {
+        URL.revokeObjectURL(removedImage.preview);
+      }
+      return updated;
+    });
+  };
+
+  const handleEmojiSelect = (emoji) => {
+    editor.chain().focus().insertContent(emoji).run();
+    setShowEmojiPicker(false);
+  };
+
+  // Check if we can submit - need content OR images
+  const canSubmit = !isLoading && !uploading && (!isEditorContentEmpty || selectedImages.length > 0);
+
+  const handleSubmit = async () => {
+    if (!canSubmit || !profile) return;
+
+    const editorTextContent = editor.getText().trim();
+    if (!editorTextContent && selectedImages.length === 0) {
+      return;
+    }
+
+    setIsLoading(true);
+    setUploading(true);
+    setError('');
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setError('You must be logged in to post.');
+        return;
+      }
+
+      let imageUrls = [];
+      
+      if (selectedImages.length > 0) {
+        imageUrls = await uploadImages(selectedImages);
+      }
+
+      // Get HTML content from Tiptap
+      const editorHtmlContent = editor.getHTML();
+
+      // Extract mentions from Tiptap JSON for database storage
+      const mentionsForStorage = [];
+      const editorJsonContent = editor.getJSON();
+
+      if (editorJsonContent?.content) {
+        editorJsonContent.content.forEach((node) => {
+          if (node.content) {
+            node.content.forEach((inlineNode) => {
+              if (inlineNode.type === 'mention' && inlineNode.attrs) {
+                const { id, label, type } = inlineNode.attrs;
+                if (id && label && type) {
+                  mentionsForStorage.push({
+                    displayName: label,
+                    id: id,
+                    type: type
+                  });
+                }
+              }
+            });
+          }
+        });
+      }
+
+      // Prepare post data based on post type
+      let postData;
+      
+      if (isOrganizationPost) {
+        // Organization post data
+        postData = {
+          content: editorHtmlContent.trim() || '',
+          organization_id: organizationId,
+          organization_type: organizationType,
+          created_by_user_id: user.id,
+          image_urls: imageUrls.length > 0 ? imageUrls : null,
+          tags: selectedTags.length > 0 ? JSON.stringify(selectedTags) : null,
+          mentions: mentionsForStorage.length > 0 ? JSON.stringify(mentionsForStorage) : null,
+        };
+      } else {
+        // Regular post data with proper channel
+        let finalChannel = channel;
+        if (channel !== 'hello-world' && organizationType) {
+          finalChannel = getDbChannelFromOrgType(organizationType);
+        }
+        
+        postData = {
+          content: editorHtmlContent.trim() || '',
+          user_id: user.id,
+          profile_id: profile.id,
+          image_urls: imageUrls.length > 0 ? imageUrls : null,
+          image_url: imageUrls.length === 1 ? imageUrls[0] : null,
+          tags: selectedTags.length > 0 ? JSON.stringify(selectedTags) : null,
+          channel: finalChannel,
+          mentions: mentionsForStorage.length > 0 ? JSON.stringify(mentionsForStorage) : null,
+          organization_type: organizationType || profile?.organization_type || null
+        };
+      }
+
+      const { data: newPost, error: postError } = await supabase
+        .from(postsTable)
+        .insert(postData)
+        .select()
+        .single();
+
+      if (postError) {
+        setError('Failed to create post. Please try again.');
+        console.error('Post creation error:', postError);
+        return;
+      }
+
+      console.log('✅ Post created successfully:', newPost);
+
+      if (mentionsForStorage.length > 0) {
+        const notificationResult = await processMentionsForNotifications(
+          newPost.id, 
+          editorHtmlContent, 
+          profile.id,
+          isOrganizationPost
+        );
+        
+        if (notificationResult.success) {
+          console.log('✅ Mention notifications created successfully');
+        } else {
+          console.error('❌ Failed to create mention notifications:', notificationResult.error);
+        }
+      }
+
+      // Clean up and close modal
+      selectedImages.forEach(img => URL.revokeObjectURL(img.preview));
+      
+      editor.commands.setContent('<p></p>');
+      setSelectedImages([]);
+      setSelectedTags([]);
+      setIsEditorContentEmpty(true);
+      setShowEmojiPicker(false);
+      setShowTagSelector(false);
+      setCustomTagInput('');
+
+      if (onNewPost && typeof onNewPost === 'function') {
+        onNewPost(newPost);
+      }
+
+      // Close modal
+      onClose();
+
+    } catch (error) {
+      console.error('Error creating post:', error);
+      setError('Something went wrong. Please try again.');
+    } finally {
+      setIsLoading(false);
+      setUploading(false);
+    }
+  };
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      selectedImages.forEach(img => URL.revokeObjectURL(img.preview));
+    };
+  }, []);
+
+  // Handle modal close with cleanup
+  const handleClose = () => {
+    // Clean up state
+    selectedImages.forEach(img => URL.revokeObjectURL(img.preview));
+    setSelectedImages([]);
+    setSelectedTags([]);
+    setShowEmojiPicker(false);
+    setShowTagSelector(false);
+    setCustomTagInput('');
+    setError('');
+    if (editor) {
+      editor.commands.setContent('<p></p>');
+    }
+    onClose();
+  };
+
+  // Handle click outside to close dropdowns
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      // Close emoji picker
+      if (showEmojiPicker && !event.target.closest('.emoji-picker-container')) {
+        setShowEmojiPicker(false);
+      }
+      
+      // Close tag selector
+      if (showTagSelector && tagSelectorRef.current && !tagSelectorRef.current.contains(event.target)) {
+        setShowTagSelector(false);
+      }
+    };
+
+    if (showEmojiPicker || showTagSelector) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showEmojiPicker, showTagSelector]);
+
+  if (!isOpen || !editor) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl shadow-xl max-w-4xl w-full max-h-[98vh] overflow-hidden">
+        {/* Modal Header */}
+        <div className="flex items-center justify-between p-6 border-b border-slate-200">
+          <h2 className="text-lg font-semibold text-slate-800">
+            {isOrganizationPost ? `Post as ${organization?.name}` : 'Create Post'}
+          </h2>
+          <button
+            onClick={handleClose}
+            className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors"
+          >
+            <X size={20} />
+          </button>
+        </div>
+
+        {/* Modal Content */}
+        <div className="p-6 max-h-[calc(98vh-120px)] overflow-y-auto">
+          <div className="flex items-start space-x-3 mb-4">
+            <div className="flex-shrink-0">
+              {isOrganizationPost && organization ? (
+                <Avatar 
+                  src={organization.image_url} 
+                  fullName={organization.name} 
+                  size="md" 
+                />
+              ) : (
+                <Avatar 
+                  src={profile?.avatar_url} 
+                  fullName={profile?.full_name} 
+                  size="md" 
+                />
+              )}
+            </div>
+            
+            <div className="flex-1 min-w-0">
+              {/* TipTap Editor */}
+              <div className="relative">
+                <div className="w-full p-4 bg-slate-50 rounded-lg border border-slate-200 focus-within:ring-2 focus-within:ring-blue-500 transition-all">
+                  <style>
+                    {`
+                    .post-modal-editor .ProseMirror {
+                      outline: none;
+                      border: none;
+                      padding: 0;
+                      margin: 0;
+                      background: transparent;
+                      min-height: 180px;
+                    }
+                    .post-modal-editor .mention {
+                      background-color: #e0e7ff;
+                      color: #3730a3;
+                      padding: 1px 4px;
+                      border-radius: 4px;
+                      font-weight: 500;
+                      text-decoration: none;
+                      cursor: pointer;
+                    }
+                    .post-modal-editor .mention:hover {
+                      background-color: #c7d2fe;
+                    }
+                    .post-modal-editor p {
+                      margin: 0;
+                      line-height: 1.5;
+                    }
+                    .post-modal-editor .ProseMirror-focused {
+                      outline: none;
+                    }
+                    .post-modal-editor .is-editor-empty:first-child::before {
+                      color: #9ca3af;
+                      content: attr(data-placeholder);
+                      float: left;
+                      height: 0;
+                      pointer-events: none;
+                    }
+                    `}
+                  </style>
+                  <EditorContent 
+                    editor={editor}
+                    className="post-modal-editor"
+                  />
+                </div>
+              </div>
+
+              {/* Error message */}
+              {error && (
+                <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded text-red-600 text-sm">
+                  {error}
+                </div>
+              )}
+
+              {/* Selected tags */}
+              {selectedTags.length > 0 && (
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {selectedTags.map(tag => (
+                    <span
+                      key={tag.id}
+                      className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${tag.color} border`}
+                    >
+                      {tag.label}
+                      <button
+                        onClick={() => removeTag(tag.id)}
+                        className="ml-1 text-current hover:text-red-600"
+                      >
+                        <X size={12} />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {/* Image previews */}
+              {selectedImages.length > 0 && (
+                <div className="mt-4 grid grid-cols-2 md:grid-cols-3 gap-3">
+                  {selectedImages.map((image) => (
+                    <div key={image.id} className="relative">
+                      <img 
+                        src={image.preview} 
+                        alt="Selected" 
+                        className="w-full h-32 object-cover rounded-lg border border-slate-200" 
+                      />
+                      <button
+                        onClick={() => removeImage(image.id)}
+                        className="absolute top-2 right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors shadow-lg"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Action buttons */}
+              <div className="mt-4 flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  {/* Mention button */}
+                  <button
+                    className="flex items-center space-x-2 px-4 py-2 text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors"
+                    onClick={() => editor.chain().focus().insertContent('@').run()}
+                  >
+                    <AtSign size={18} />
+                    <span className="text-sm">Mention</span>
+                  </button>
+
+                  {/* Photos button */}
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploading || selectedImages.length >= 6}
+                    className="flex items-center space-x-2 px-4 py-2 text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-50"
+                  >
+                    <Camera size={18} />
+                    <span className="text-sm">Photos</span>
+                  </button>
+
+                  {/* Emoji button */}
+                  <div className="relative emoji-picker-container">
+                    <button
+                      onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                      className="flex items-center space-x-2 px-4 py-2 text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors"
+                    >
+                      <Smile size={18} />
+                      <span className="text-sm">Emoji</span>
+                    </button>
+                    
+                    {showEmojiPicker && (
+                      <div className="absolute top-full mt-2 bg-white border border-slate-200 rounded-lg shadow-lg p-3 z-10">
+                        <div className="grid grid-cols-8 gap-1">
+                          {emojis.map((emoji, index) => (
+                            <button
+                              key={index}
+                              onClick={() => handleEmojiSelect(emoji)}
+                              className="w-8 h-8 flex items-center justify-center hover:bg-slate-100 rounded transition-colors"
+                            >
+                              {emoji}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Tags button */}
+                  <div className="relative" ref={tagSelectorRef}>
+                    <button
+                      onClick={() => setShowTagSelector(!showTagSelector)}
+                      className="flex items-center space-x-2 px-4 py-2 text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors"
+                    >
+                      <div className="w-4 h-4 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-bold">
+                        #
+                      </div>
+                      <span className="text-sm">Tags</span>
+                      {selectedTags.length > 0 && (
+                        <span className="ml-1 px-1.5 py-0.5 bg-blue-100 text-blue-800 text-xs rounded-full">
+                          {selectedTags.length}
+                        </span>
+                      )}
+                    </button>
+
+                    {showTagSelector && (
+                      <div className="absolute bottom-full mb-2 bg-white border border-slate-200 rounded-lg shadow-lg p-4 z-10 w-96 max-h-80 overflow-y-auto">
+                        <div className="mb-3">
+                          <h4 className="text-sm font-medium text-slate-800 mb-2">Select Tags ({selectedTags.length}/6)</h4>
+                          <div className="flex flex-wrap gap-2">
+                            {availableTags.map(tag => (
+                              <button
+                                key={tag.id}
+                                onClick={() => handleTagToggle(tag.id)}
+                                className={`px-2 py-1 rounded-full text-xs font-medium border transition-colors ${
+                                  selectedTags.some(t => t.id === tag.id)
+                                    ? tag.color
+                                    : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
+                                }`}
+                              >
+                                {tag.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                        
+                        {selectedTags.length < 6 && (
+                          <div>
+                            <h4 className="text-sm font-medium text-slate-800 mb-2">Add Custom Tag</h4>
+                            <div className="flex space-x-2">
+                              <input
+                                type="text"
+                                value={customTagInput}
+                                onChange={(e) => setCustomTagInput(e.target.value)}
+                                onKeyPress={(e) => e.key === 'Enter' && addCustomTag()}
+                                placeholder="Tag name"
+                                className="flex-1 px-2 py-1 text-sm border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                maxLength={20}
+                              />
+                              <button
+                                onClick={addCustomTag}
+                                disabled={!customTagInput.trim()}
+                                className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                Add
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Post button */}
+                <button
+                  onClick={handleSubmit}
+                  disabled={!canSubmit}
+                  className="px-8 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center space-x-2"
+                >
+                  {uploading && (
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  )}
+                  <span>{isLoading ? 'Posting...' : 'Post'}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Hidden file input */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          multiple
+          onChange={handleImageSelect}
+          className="hidden"
+        />
+      </div>
+    </div>
+  );
+};
+
+// Main Component
 export default function CreatePost({
   profile,
   onNewPost,
   channel = 'hello-world',
   placeholder = null,
   organizationId = null,
-  organizationType = null, // Organization base type (nonprofit, foundation, etc.)
-  organization = null // Pass full organization object for display
+  organizationType = null,
+  organization = null
 }) {
-    const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState('');
-    const [selectedImages, setSelectedImages] = useState([]);
-    const [uploading, setUploading] = useState(false);
-    const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-
-    // State to explicitly track if editor content is empty
-    const [isEditorContentEmpty, setIsEditorContentEmpty] = useState(true);
-
-    // Tag states
-    const [selectedTags, setSelectedTags] = useState([]);
-    const [showTagSelector, setShowTagSelector] = useState(false);
-    const [customTagInput, setCustomTagInput] = useState('');
-
-    const fileInputRef = useRef(null);
-
-    const emojis = [
-        '😊', '😂', '❤️', '👍', '🎉', '🔥', '💡', '🚀',
-        '💯', '⭐', '🌟', '💪', '🙌', '👏', '🎯', '💝'
-    ];
-
-    // Check if this is an organization post
-    const isOrganizationPost = channel === 'organization' && organizationId && organizationType;
-
-    // Determine which table to use
-    const postsTable = isOrganizationPost ? 'organization_posts' : 'posts';
-
-    // 🚀 FIXED: Simple and reliable channel detection
-    const finalChannel = (() => {
-      // Always respect explicitly passed channels first
-      if (channel && channel !== 'organization') {
-        return channel;
-      }
-      
-      // Only for organization posts, or when no explicit channel provided
-      if (isOrganizationPost) {
-        return 'organization';
-      }
-      
-      // Fallback for community channels when no explicit channel
-      if (!channel && organizationType) {
-        return getDbChannelFromOrgType(organizationType);
-      }
-      
-      if (!channel && profile?.organization_type) {
-        return getDbChannelFromOrgType(profile.organization_type);
-      }
-      
-      // Ultimate fallback
-      return 'hello-world';
-    })();
-
-    const availableTags = [
-        { id: 'education', label: 'Education', color: 'bg-blue-100 text-blue-800 border-blue-200' },
-        { id: 'health', label: 'Health', color: 'bg-green-100 text-green-800 border-green-200' },
-        { id: 'environment', label: 'Environment', color: 'bg-emerald-100 text-emerald-800 border-emerald-200' },
-        { id: 'arts', label: 'Arts & Culture', color: 'bg-purple-100 text-purple-800 border-purple-200' },
-        { id: 'social', label: 'Social Services', color: 'bg-pink-100 text-pink-800 border-pink-200' },
-        { id: 'community', label: 'Community', color: 'bg-orange-100 text-orange-800 border-orange-200' },
-        { id: 'youth', label: 'Youth Development', color: 'bg-indigo-100 text-indigo-800 border-indigo-200' },
-        { id: 'housing', label: 'Housing', color: 'bg-yellow-100 text-yellow-800 border-yellow-200' },
-        { id: 'advocacy', label: 'Advocacy', color: 'bg-red-100 text-red-800 border-red-200' },
-        { id: 'research', label: 'Research', color: 'bg-gray-100 text-gray-800 border-gray-200' }
-    ];
-
-    const getRandomTagColor = () => {
-        const colors = [
-            'bg-blue-100 text-blue-800 border-blue-200',
-            'bg-green-100 text-green-800 border-green-200',
-            'bg-purple-100 text-purple-800 border-purple-200',
-            'bg-pink-100 text-pink-800 border-pink-200',
-            'bg-orange-100 text-orange-800 border-orange-200',
-            'bg-indigo-100 text-indigo-800 border-indigo-200',
-            'bg-yellow-100 text-yellow-800 border-yellow-200',
-            'bg-red-100 text-red-800 border-red-200'
-        ];
-        return colors[Math.floor(Math.random() * colors.length)];
-    };
-
-    const handleTagToggle = (tagId) => {
-        if (selectedTags.length >= 6 && !selectedTags.some(tag => tag.id === tagId)) {
-            return;
-        }
-        
-        setSelectedTags(prev => {
-            const existingTag = prev.find(tag => tag.id === tagId);
-            if (existingTag) {
-                return prev.filter(tag => tag.id !== tagId);
-            } else {
-                const availableTag = availableTags.find(tag => tag.id === tagId);
-                return [...prev, availableTag];
-            }
-        });
-    };
-
-    const addCustomTag = () => {
-        if (!customTagInput.trim() || selectedTags.length >= 6) return;
-        
-        const customTag = {
-            id: `custom-${Date.now()}`,
-            label: customTagInput.trim(),
-            color: getRandomTagColor(),
-            isCustom: true
-        };
-        
-        setSelectedTags(prev => [...prev, customTag]);
-        setCustomTagInput('');
-    };
-
-    const removeTag = (tagId) => {
-        setSelectedTags(prev => prev.filter(tag => tag.id !== tagId));
-    };
-
-    // Generate the placeholder text
-    const defaultPlaceholder = isOrganizationPost 
-        ? `Share an update for ${organization?.name || 'your organization'}...`
-        : `What's on your mind, ${profile?.full_name?.split(' ')[0] || 'there'}?`;
-    
-    const placeholderText = placeholder || defaultPlaceholder;
-
-    // TIPTAP EDITOR HOOK WITH FIXED MENTION EXTENSION
-    const editor = useEditor({
-        extensions: [
-            StarterKit,
-            // ADD PLACEHOLDER EXTENSION
-            Placeholder.configure({
-                placeholder: placeholderText,
-                showOnlyWhenEditable: true,
-                showOnlyCurrent: false,
-                includeChildren: true,
-            }),
-            // FIXED MENTION EXTENSION - Direct database queries instead of RPC
-            Mention.extend({
-                name: 'mention',
-                
-                // Properly extend the addAttributes method to include 'type'
-                addAttributes() {
-                    return {
-                        ...this.parent?.(),  // Keep the parent attributes (id, label)
-                        type: {
-                            default: null,
-                            parseHTML: element => element.getAttribute('data-type'),
-                            renderHTML: attributes => {
-                                if (!attributes.type) return {};
-                                return { 'data-type': attributes.type };
-                            },
-                        },
-                    };
-                },
-                
-                // Enhanced renderHTML to ensure all mentions get proper classes and attributes
-                renderHTML({ node, HTMLAttributes }) {
-                    const { id, label, type } = node.attrs;
-                    return [
-                        'span',
-                        {
-                            ...HTMLAttributes,
-                            class: 'mention', // Ensure all mentions get the 'mention' class
-                            'data-id': id,
-                            'data-label': label,
-                            'data-type': type,
-                        },
-                        `@${label}`,
-                    ];
-                },
-                
-                // Enhanced parseHTML to read our custom attributes
-                parseHTML() {
-                    return [
-                        {
-                            tag: 'span[data-type][data-id]',
-                            getAttrs: element => {
-                                return {
-                                    id: element.getAttribute('data-id'),
-                                    label: element.getAttribute('data-label'),
-                                    type: element.getAttribute('data-type'),
-                                };
-                            },
-                        },
-                        // Also handle spans with just the mention class
-                        {
-                            tag: 'span.mention',
-                            getAttrs: element => {
-                                return {
-                                    id: element.getAttribute('data-id'),
-                                    label: element.getAttribute('data-label'),
-                                    type: element.getAttribute('data-type'),
-                                };
-                            },
-                        },
-                    ];
-                },
-            }).configure({
-                suggestion: {
-                    items: async ({ query }) => {
-                        try {
-                            if (!query || query.length < 2) {
-                                return [];
-                            }
-
-                            // FIXED: Direct database queries instead of RPC function
-                            const searchPattern = `%${query.trim()}%`;
-                            
-                            // Search users/profiles
-                            const { data: profiles, error: profilesError } = await supabase
-                                .from('profiles')
-                                .select('id, full_name, title, organization_name, avatar_url, role')
-                                .or(`full_name.ilike.${searchPattern},title.ilike.${searchPattern},organization_name.ilike.${searchPattern}`)
-                                .limit(5);
-
-                            if (profilesError) {
-                                console.error('Error searching profiles:', profilesError);
-                            }
-
-                            // Search organizations
-                            const { data: organizations, error: orgsError } = await supabase
-                                .from('organizations')
-                                .select('id, name, type, tagline, image_url')
-                                .ilike('name', searchPattern)
-                                .limit(5);
-
-                            if (orgsError) {
-                                console.error('Error searching organizations:', orgsError);
-                            }
-
-                            // Format results to match expected structure
-                            const userResults = (profiles || []).map(profile => ({
-                                id: profile.id,
-                                name: profile.full_name,
-                                type: 'user',
-                                avatar_url: profile.avatar_url,
-                                title: profile.title,
-                                organization_name: profile.organization_name,
-                                role: profile.role
-                            }));
-
-                            const orgResults = (organizations || []).map(org => ({
-                                id: `${org.type}-${org.id}`,
-                                name: org.name,
-                                type: 'organization',
-                                avatar_url: org.image_url,
-                                title: org.tagline,
-                                organization_name: org.type === 'nonprofit' ? 'Nonprofit' : 'Funder',
-                                role: org.type
-                            }));
-
-                            return [...userResults, ...orgResults];
-                        } catch (err) {
-                            console.error('Exception during mention search:', err);
-                            return [];
-                        }
-                    },
-                    render: () => {
-                        let component;
-                        let popup;
-
-                        return {
-                            onStart: props => {
-                                component = new ReactRenderer(MentionList, {
-                                    props,
-                                    editor: props.editor,
-                                });
-
-                                popup = tippy('body', {
-                                    getReferenceClientRect: props.clientRect,
-                                    appendTo: () => document.body,
-                                    content: component.element,
-                                    showOnCreate: true,
-                                    interactive: true,
-                                    trigger: 'manual',
-                                    placement: 'bottom-start',
-                                    duration: 0,
-                                });
-                            },
-                            onUpdate(props) {
-                                component.updateProps(props);
-                                popup[0].setProps({
-                                    getReferenceClientRect: props.clientRect,
-                                });
-                            },
-                            onKeyDown(props) {
-                                if (props.event.key === 'Escape') {
-                                    popup[0].hide();
-                                    return true;
-                                }
-                                return component.ref?.onKeyDown(props);
-                            },
-                            onExit() {
-                                if (popup && popup[0]) {
-                                    popup[0].destroy();
-                                }
-                                if (component) {
-                                    component.destroy();
-                                }
-                                // Clear references
-                                popup = null;
-                                component = null;
-                            },
-                        };
-                    },
-                },
-            }),
-        ],
-        content: '<p></p>',
-        onUpdate: ({ editor }) => {
-            const textContent = editor.getText();
-            setIsEditorContentEmpty(textContent.trim() === '');
-        },
-        editorProps: {
-            attributes: {
-                class: 'prose-sm outline-none border border-slate-200 rounded-lg p-3 pr-24 min-h-[7.5rem] focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-700',
-                style: 'resize: vertical; white-space: pre-wrap;'
-            },
-        },
-    });
-
-    const editorRef = useRef(editor);
-    useEffect(() => {
-        editorRef.current = editor;
-    }, [editor]);
-
-    const insertAtSymbol = useCallback(() => {
-        if (editorRef.current) {
-            editorRef.current.commands.insertContent('@');
-            editorRef.current.commands.focus();
-        }
-    }, []);
-
-    const handleEmojiSelect = useCallback((emoji) => {
-        if (editorRef.current) {
-            editorRef.current.commands.insertContent(emoji);
-            editorRef.current.commands.focus();
-        }
-        setShowEmojiPicker(false);
-    }, []);
-
-    // IMAGE RELATED FUNCTIONS
-    const processFiles = (files) => {
-        const maxImages = 6;
-        
-        if (selectedImages.length + files.length > maxImages) {
-            setError(`You can only upload up to ${maxImages} images per post.`);
-            return;
-        }
-
-        const validFiles = files.filter(file => {
-            const isValidType = file.type.startsWith('image/');
-            const isValidSize = file.size <= 10 * 1024 * 1024; // 10MB
-            
-            if (!isValidType) {
-                setError('Please select only image files.');
-                return false;
-            }
-            if (!isValidSize) {
-                setError('Images must be less than 10MB.');
-                return false;
-            }
-            return true;
-        });
-
-        if (validFiles.length > 0) {
-            setError('');
-            const newImages = validFiles.map(file => ({
-                file,
-                preview: URL.createObjectURL(file),
-                id: Math.random().toString(36).substr(2, 9)
-            }));
-            setSelectedImages(prev => [...prev, ...newImages]);
-        }
-    };
-
-    const handleImageSelect = (event) => {
-        const files = Array.from(event.target.files);
-        processFiles(files);
-    };
-
-    const removeImage = (imageId) => {
-        setSelectedImages(prev => {
-            const updated = prev.filter(img => img.id !== imageId);
-            const removedImage = prev.find(img => img.id === imageId);
-            if (removedImage) {
-                URL.revokeObjectURL(removedImage.preview);
-            }
-            return updated;
-        });
-    };
-
-    const uploadImages = async (images) => {
-        const uploadPromises = images.map(async (imageObj) => {
-            const fileExt = imageObj.file.name.split('.').pop();
-            const fileName = `${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
-            const filePath = `post-images/${fileName}`;
-
-            const { error: uploadError } = await supabase.storage
-                .from('post-images')
-                .upload(filePath, imageObj.file);
-
-            if (uploadError) {
-                console.error('Error uploading image:', uploadError);
-                throw uploadError;
-            }
-
-            const { data } = supabase.storage
-                .from('post-images')
-                .getPublicUrl(filePath);
-
-            return data.publicUrl;
-        });
-
-        return Promise.all(uploadPromises);
-    };
-
-    // CREATE MENTION RECORDS FOR DATABASE
-    const createMentionRecords = async (postId, mentions) => {
-        const mentionTable = isOrganizationPost ? 'organization_post_mentions' : 'post_mentions';
-        const postIdField = isOrganizationPost ? 'organization_post_id' : 'post_id';
-        
-        try {
-            const mentionRecords = mentions.map(mention => {
-                const record = {
-                    [postIdField]: postId,
-                    mention_type: mention.type
-                };
-
-                if (mention.type === 'user') {
-                    record.mentioned_profile_id = mention.id;
-                } else if (mention.type === 'organization') {
-                    const [orgType, orgId] = mention.id.split('-');
-                    record.mentioned_organization_id = parseInt(orgId);
-                    record.mentioned_organization_type = orgType;
-                }
-
-                return record;
-            });
-
-            const { error } = await supabase
-                .from(mentionTable)
-                .insert(mentionRecords);
-
-            if (error) {
-                console.error('Error creating mention records:', error);
-            }
-        } catch (error) {
-            console.error('Error processing mentions:', error);
-        }
-    };
-
-    // MAIN SUBMIT HANDLER - ROBUST WITH ORGANIZATION CHANNELS
-    const handlePostSubmit = async () => {
-        if (!editor || (isEditorContentEmpty && selectedImages.length === 0) || !profile) return;
-
-        setIsLoading(true);
-        setUploading(true);
-        setError('');
-
-        try {
-            const { data: { user } } = await supabase.auth.getUser();
-
-            if (!user) {
-                setError('You must be logged in to post.');
-                return;
-            }
-
-            let imageUrls = [];
-            
-            if (selectedImages.length > 0) {
-                imageUrls = await uploadImages(selectedImages);
-            }
-
-            // Get HTML content from Tiptap
-            const editorHtmlContent = editor.getHTML();
-
-            // Extract mentions from Tiptap JSON for database storage
-            const mentionsForStorage = [];
-            const editorJsonContent = editor.getJSON();
-
-            if (editorJsonContent?.content) {
-                editorJsonContent.content.forEach((node) => {
-                    if (node.content) {
-                        node.content.forEach((inlineNode) => {
-                            if (inlineNode.type === 'mention' && inlineNode.attrs) {
-                                const { id, label, type } = inlineNode.attrs;
-                                if (id && label && type) {
-                                    mentionsForStorage.push({
-                                        displayName: label,
-                                        id: id,
-                                        type: type
-                                    });
-                                }
-                            }
-                        });
-                    }
-                });
-            }
-
-            // Prepare post data based on post type
-            let postData;
-            
-            if (isOrganizationPost) {
-                // Organization post data
-                postData = {
-                    content: editorHtmlContent.trim() || '',
-                    organization_id: organizationId,
-                    organization_type: organizationType,
-                    created_by_user_id: user.id,
-                    image_urls: imageUrls.length > 0 ? imageUrls : null,
-                    tags: selectedTags.length > 0 ? JSON.stringify(selectedTags) : null,
-                    mentions: mentionsForStorage.length > 0 ? JSON.stringify(mentionsForStorage) : null,
-                };
-            } else {
-                // FIXED: Regular post data with proper channel
-                postData = {
-                    content: editorHtmlContent.trim() || '',
-                    user_id: user.id,
-                    profile_id: profile.id,
-                    image_urls: imageUrls.length > 0 ? imageUrls : null,
-                    image_url: imageUrls.length === 1 ? imageUrls[0] : null,
-                    tags: selectedTags.length > 0 ? JSON.stringify(selectedTags) : null,
-                    channel: finalChannel, // Use the fixed channel detection
-                    mentions: mentionsForStorage.length > 0 ? JSON.stringify(mentionsForStorage) : null,
-                    // Store organization type for additional filtering/organization purposes
-                    organization_type: organizationType || profile?.organization_type || null
-                };
-            }
-
-            const { data: newPost, error: postError } = await supabase
-                .from(postsTable)
-                .insert(postData)
-                .select()
-                .single();
-
-            if (postError) {
-                setError('Failed to create post. Please try again.');
-                console.error('Post creation error:', postError);
-                return;
-            }
-
-            console.log('✅ Post created successfully:', newPost);
-
-            if (mentionsForStorage.length > 0) {
-                await createMentionRecords(newPost.id, mentionsForStorage);
-                
-                // CREATE MENTION NOTIFICATIONS - Now works for both regular and organization posts
-                const notificationResult = await processMentionsForNotifications(
-                    newPost.id, 
-                    editorHtmlContent, 
-                    profile.id,
-                    isOrganizationPost  // Pass the post type flag
-                );
-                
-                if (notificationResult.success) {
-                    // Notifications created successfully
-                } else {
-                    console.error('❌ Failed to create mention notifications:', notificationResult.error);
-                }
-            }
-
-            // Clean up
-            selectedImages.forEach(img => URL.revokeObjectURL(img.preview));
-            
-            editor.commands.setContent('<p></p>');
-            setSelectedImages([]);
-            setSelectedTags([]);
-            setIsEditorContentEmpty(true);
-
-            if (onNewPost && typeof onNewPost === 'function') {
-                onNewPost(newPost);
-            }
-
-        } catch (error) {
-            console.error('Error creating post:', error);
-            setError('Something went wrong. Please try again.');
-        } finally {
-            setIsLoading(false);
-            setUploading(false);
-        }
-    };
-
-    // Cleanup on unmount
-    useEffect(() => {
-        return () => {
-            selectedImages.forEach(img => URL.revokeObjectURL(img.preview));
-        };
-    }, []);
-
-    if (!editor) {
-        return null;
-    }
-
-    return (
-        <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
-            <div className="flex items-start space-x-3">
-                <div className="flex-shrink-0">
-                    {isOrganizationPost && organization ? (
-                        // Show organization avatar for org posts
-                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
-                            {organization.logo_url || organization.image_url ? (
-                                <img 
-                                    src={organization.logo_url || organization.image_url} 
-                                    alt={organization.name}
-                                    className="w-12 h-12 rounded-full object-cover"
-                                />
-                            ) : (
-                                <span className="text-white font-bold text-lg">
-                                    {organization.name?.charAt(0)?.toUpperCase()}
-                                </span>
-                            )}
-                        </div>
-                    ) : (
-                        // Show user avatar for regular posts
-                        <Avatar src={profile?.avatar_url} fullName={profile?.full_name} size="md" />
-                    )}
-                </div>
-                
-                <div className="flex-1">
-                    {isOrganizationPost && organization && (
-                        <div className="mb-3">
-                            <p className="font-medium text-slate-900">{organization.name}</p>
-                        </div>
-                    )}
-                    
-                    <div className="relative">
-                        {/* TIPTAP EDITOR */}
-                        <EditorContent editor={editor} />
-
-                        <div className="absolute bottom-3 right-3 flex items-center space-x-3 z-10">
-                            <button
-                                onClick={insertAtSymbol}
-                                className="p-1 text-slate-400 hover:text-blue-500 transition-colors"
-                                type="button"
-                                title="Mention someone"
-                            >
-                                <AtSign size={20} />
-                            </button>
-
-                            <button
-                                onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                                className="p-1 text-slate-400 hover:text-yellow-500 transition-colors"
-                                type="button"
-                            >
-                                <Smile size={20} />
-                            </button>
-                        </div>
-
-                        {showEmojiPicker && (
-                            <div className="absolute top-full right-0 mt-2 bg-white rounded-lg shadow-lg border p-3 z-50 max-w-xs">
-                                <div className="grid grid-cols-8 gap-1">
-                                    {emojis.map((emoji, index) => (
-                                        <button
-                                            key={index}
-                                            onClick={() => handleEmojiSelect(emoji)}
-                                            className="text-lg hover:bg-gray-100 rounded p-1 transition-colors"
-                                            type="button"
-                                        >
-                                            {emoji}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-                    </div>
-
-                    {selectedImages.length > 0 && (
-                        <div className="mt-3">
-                            <div className="grid grid-cols-3 gap-2">
-                                {selectedImages.map((image, index) => (
-                                    <div key={image.id} className="relative group">
-                                        <img
-                                            src={image.preview}
-                                            alt={`Upload preview ${index + 1}`}
-                                            className="w-full h-32 object-cover rounded-lg"
-                                        />
-                                        <button
-                                            onClick={() => removeImage(image.id)}
-                                            className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                                            disabled={isLoading}
-                                            type="button"
-                                        >
-                                            <X size={14} />
-                                        </button>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-                    
-                    {selectedTags.length > 0 && (
-                        <div className="mt-3 flex flex-wrap gap-2">
-                            {selectedTags.map(tag => (
-                                <div key={tag.id} className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border ${tag.color} group`}>
-                                    <span>{tag.label}</span>
-                                    <button
-                                        onClick={() => removeTag(tag.id)}
-                                        className="ml-2 p-0.5 rounded-full hover:bg-black hover:bg-opacity-10 transition-colors"
-                                        type="button"
-                                    >
-                                        <X size={12} />
-                                    </button>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-
-                    {error && (
-                        <div className="mt-2 text-red-600 text-sm bg-red-50 p-2 rounded">{error}</div>
-                    )}
-
-                    <div className="flex items-center justify-between mt-4">
-                        <div className="flex items-center space-x-4">
-                            {selectedImages.length < 6 && (
-                                <>
-                                    <input
-                                        ref={fileInputRef}
-                                        type="file"
-                                        id="imageUpload"
-                                        multiple
-                                        accept="image/*"
-                                        onChange={handleImageSelect}
-                                        className="hidden"
-                                        disabled={isLoading}
-                                    />
-                                    <label
-                                        htmlFor="imageUpload"
-                                        className="flex items-center space-x-2 text-slate-600 hover:text-blue-600 cursor-pointer transition-colors py-1"
-                                    >
-                                        <Camera size={20} />
-                                        <span className="text-sm font-medium">
-                                            {selectedImages.length > 0 ? 'Add More' : 'Photos'}
-                                        </span>
-                                    </label>
-                                </>
-                            )}
-                            
-                            <div className="relative">
-                                <button
-                                    onClick={() => setShowTagSelector(!showTagSelector)}
-                                    className="flex items-center space-x-2 text-slate-600 hover:text-blue-600 cursor-pointer transition-colors py-1"
-                                    type="button"
-                                >
-                                    <div className="w-5 h-5 rounded-full bg-gradient-to-r from-blue-400 to-purple-500 flex items-center justify-center">
-                                        <span className="text-white text-xs font-bold">#</span>
-                                    </div>
-                                    <span className="text-sm font-medium">Tags</span>
-                                </button>
-
-                                {showTagSelector && (
-                                    <div className="absolute top-full mt-2 bg-white rounded-lg shadow-lg border p-4 z-50 w-96">
-                                        <p className="text-sm font-medium text-slate-700 mb-3">Add tags to categorize your post (max 6)</p>
-                                        
-                                        <div className="mb-4">
-                                            <div className="flex space-x-2">
-                                                <input
-                                                    type="text"
-                                                    value={customTagInput}
-                                                    onChange={(e) => setCustomTagInput(e.target.value)}
-                                                    placeholder="Create custom tag..."
-                                                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                    onKeyPress={(e) => e.key === 'Enter' && addCustomTag()}
-                                                    maxLength={20}
-                                                    disabled={selectedTags.length >= 6}
-                                                />
-                                                <button
-                                                    onClick={addCustomTag}
-                                                    disabled={!customTagInput.trim() || selectedTags.length >= 6}
-                                                    className="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                                                    type="button"
-                                                >
-                                                    Add
-                                                </button>
-                                            </div>
-                                        </div>
-
-                                        <div className="grid grid-cols-2 gap-2 mb-4">
-                                            {availableTags.map(tag => (
-                                                <button
-                                                    key={tag.id}
-                                                    onClick={() => handleTagToggle(tag.id)}
-                                                    disabled={selectedTags.length >= 6 && !selectedTags.some(t => t.id === tag.id)}
-                                                    className={`text-left px-3 py-2 rounded-lg text-sm font-medium border transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
-                                                        selectedTags.some(t => t.id === tag.id)
-                                                            ? tag.color + ' ring-2 ring-blue-300'
-                                                            : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
-                                                    }`}
-                                                    type="button"
-                                                >
-                                                    {tag.label}
-                                                </button>
-                                            ))}
-                                        </div>
-
-                                        <div className="flex items-center justify-between">
-                                            <span className="text-xs text-gray-500">{selectedTags.length}/6 tags selected</span>
-                                            <button
-                                                onClick={() => setShowTagSelector(false)}
-                                                className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
-                                                type="button"
-                                            >
-                                                Done
-                                            </button>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-
-                            {selectedImages.length > 0 && (
-                                <span className="text-xs text-slate-500 bg-slate-100 px-2 py-1 rounded-full">
-                                    {selectedImages.length}/6 photos
-                                </span>
-                            )}
-                            {selectedTags.length > 0 && (
-                                <span className="text-xs text-slate-500 bg-slate-100 px-2 py-1 rounded-full">
-                                    {selectedTags.length} tag{selectedTags.length !== 1 ? 's' : ''}
-                                </span>
-                            )}
-                        </div>
-                        
-                        <button
-                            onClick={handlePostSubmit}
-                            disabled={isLoading || (isEditorContentEmpty && selectedImages.length === 0)}
-                            className={`
-                                bg-blue-600 text-white px-6 py-2 rounded-lg font-medium
-                                hover:bg-blue-700 transition-colors shadow-sm
-                                disabled:opacity-50 disabled:cursor-not-allowed
-                            `}
-                            type="button"
-                        >
-                            {uploading ? 'Uploading...' : isLoading ? 'Posting...' : 'Post'}
-                        </button>
-                    </div>
-                    
-                    <div className="mt-2 text-xs text-slate-500">
-                        💡 Type @ to mention users or organizations
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const handleOpenModal = () => {
+    setIsModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+  };
+
+  // Check if this is an organization post
+  const isOrganizationPost = channel === 'organization' && organizationId && organizationType;
+
+  return (
+    <>
+      {/* Compact Post Box */}
+      <CompactPostBox 
+        profile={profile}
+        organization={organization}
+        isOrganizationPost={isOrganizationPost}
+        onClick={handleOpenModal}
+      />
+
+      {/* Full Post Modal */}
+      <PostModal 
+        isOpen={isModalOpen}
+        onClose={handleCloseModal}
+        profile={profile}
+        onNewPost={onNewPost}
+        channel={channel}
+        placeholder={placeholder}
+        organizationId={organizationId}
+        organizationType={organizationType}
+        organization={organization}
+      />
+    </>
+  );
 }

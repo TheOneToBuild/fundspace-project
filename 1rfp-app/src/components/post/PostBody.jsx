@@ -1,4 +1,4 @@
-// src/components/post/PostBody.jsx
+// src/components/post/PostBody.jsx - Fixed Organization Mention Navigation
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../supabaseClient';
@@ -22,7 +22,7 @@ export default function PostBody({ content, images, tags, onImageClick }) {
     const postBodyRef = useRef(null);
     const isHoveringRef = useRef(false);
 
-    // Function to get organization slug from ID
+    // Function to get organization slug from ID (same as CommentCard.jsx)
     const getOrganizationSlug = async (orgType, orgId) => {
         try {
             const tableName = orgType === 'nonprofit' ? 'nonprofits' : 'funders';
@@ -76,32 +76,41 @@ export default function PostBody({ content, images, tags, onImageClick }) {
                     console.log(`👤 Navigating to user profile: /profile/members/${mentionId}`);
                     navigate(`/profile/members/${mentionId}`);
                 } else if (mentionType === 'organization') {
-                    const [orgType, orgId] = mentionId.split('-');
+                    console.log('🏢 Organization mention ID:', mentionId);
                     
-                    if (!orgId) {
-                        console.warn('⚠️ Invalid organization ID format:', mentionId);
-                        return;
-                    }
-
-                    console.log(`🏢 Organization navigation:`, { mentionId, orgType, orgId });
-
-                    // Get the organization slug from the database
-                    const slug = await getOrganizationSlug(orgType, orgId);
-                    
-                    if (slug) {
-                        if (orgType === 'nonprofit') {
-                            console.log(`🏛️ Navigating to nonprofit: /nonprofits/${slug}`);
-                            navigate(`/nonprofits/${slug}`);
-                        } else if (orgType === 'funder') {
-                            console.log(`💰 Navigating to funder: /funders/${slug}`);
-                            navigate(`/funders/${slug}`);
+                    // Check if mentionId is in old format (type-id)
+                    if (mentionId.includes('-') && /^\w+-\d+$/.test(mentionId)) {
+                        // Old format: type-id, extract the ID and look up the slug
+                        const [orgType, orgId] = mentionId.split('-');
+                        console.log('📄 Old format detected, looking up slug for:', { orgType, orgId });
+                        
+                        try {
+                            // Get the organization slug from the database
+                            const slug = await getOrganizationSlug(orgType, orgId);
+                            
+                            if (slug) {
+                                if (orgType === 'nonprofit') {
+                                    console.log(`🏛️ Navigating to nonprofit: /nonprofits/${slug}`);
+                                    navigate(`/nonprofits/${slug}`);
+                                } else if (orgType === 'funder') {
+                                    console.log(`💰 Navigating to funder: /funders/${slug}`);
+                                    navigate(`/funders/${slug}`);
+                                }
+                            } else {
+                                console.error(`❌ Could not find slug for ${orgType} with ID ${orgId}`);
+                                // Fallback: try to navigate anyway (might show "not found" page)
+                                const fallbackPath = orgType === 'nonprofit' ? 
+                                    `/nonprofits/${orgId}` : `/funders/${orgId}`;
+                                console.log(`🔄 Trying fallback navigation: ${fallbackPath}`);
+                                navigate(fallbackPath);
+                            }
+                        } catch (error) {
+                            console.error('💥 Error during organization navigation:', error);
                         }
                     } else {
-                        console.error(`❌ Could not find slug for ${orgType} with ID ${orgId}`);
-                        // Fallback: try to navigate anyway (might show "not found" page)
-                        const fallbackPath = orgType === 'nonprofit' ? `/nonprofits/${orgId}` : `/funders/${orgId}`;
-                        console.log(`🔄 Trying fallback navigation: ${fallbackPath}`);
-                        navigate(fallbackPath);
+                        // New format: slug, navigate directly to organization page using slug
+                        console.log('✨ New format detected, navigating to slug:', mentionId);
+                        navigate(`/organizations/${mentionId}`);
                     }
                 }
             } catch (error) {
@@ -262,13 +271,38 @@ export default function PostBody({ content, images, tags, onImageClick }) {
                         className="text-slate-700 leading-relaxed whitespace-pre-wrap"
                         onClick={handleMentionClick}
                     >
+                        <style>
+                            {`
+                            .post-content .mention {
+                                background-color: #e0e7ff;
+                                color: #3730a3;
+                                padding: 1px 4px;
+                                border-radius: 4px;
+                                font-weight: 500;
+                                text-decoration: none;
+                                cursor: pointer;
+                                transition: all 0.2s ease;
+                            }
+                            .post-content .mention:hover {
+                                background-color: #c7d2fe;
+                                text-decoration: underline;
+                            }
+                            .post-content p {
+                                margin: 0;
+                                line-height: 1.4;
+                            }
+                            `}
+                        </style>
                         {shouldTruncate ? (
-                            renderTruncatedContent(content)
+                            <div className="post-content">
+                                {renderTruncatedContent(content)}
+                            </div>
                         ) : (
                             <div 
                                 dangerouslySetInnerHTML={{ 
                                     __html: processContentForDisplay(content) 
                                 }} 
+                                className="post-content"
                             />
                         )}
                     </div>
