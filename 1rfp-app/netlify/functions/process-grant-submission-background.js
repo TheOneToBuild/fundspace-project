@@ -3,14 +3,23 @@
 import { createClient } from '@supabase/supabase-js';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+// Use service role key to bypass RLS policies
+const supabase = createClient(
+    process.env.SUPABASE_URL, 
+    process.env.SUPABASE_SERVICE_ROLE_KEY
+);
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
-// Add database helper functions
+// Database helper functions
 function generateSlug(name) {
     if (!name) return null;
-    return name.toLowerCase().replace(/&/g, 'and').replace(/[^a-z0-9\s-]/g, '').trim().replace(/[\s_]+/g, '-').replace(/--+/g, '-');
+    return name.toLowerCase()
+        .replace(/&/g, 'and')
+        .replace(/[^a-z0-9\s-]/g, '')
+        .trim()
+        .replace(/[\s_]+/g, '-')
+        .replace(/--+/g, '-');
 }
 
 function parseFundingAmount(text) {
@@ -31,13 +40,20 @@ async function getOrCreateOrganization(name, website) {
         .single();
     
     if (existing) {
+        console.log(`🔍 Found existing organization: ${existing.name}`);
         return existing;
     }
     
     // Create new organization
+    console.log(`🆕 Creating new organization: ${name}`);
     const { data, error } = await supabase
         .from('organizations')
-        .insert({ name: name, website: website, slug: generateSlug(name), type: 'funder' })
+        .insert({ 
+            name: name, 
+            website: website, 
+            slug: generateSlug(name), 
+            type: 'funder' 
+        })
         .select('id, name')
         .single();
     
@@ -130,6 +146,7 @@ async function saveGrantsToSupabase(grants, primaryUrl) {
                         await supabase
                             .from('grant_categories')
                             .insert({ grant_id: grantResult.id, category_id: categoryId });
+                        console.log(`🏷️ Added category: ${categoryName}`);
                     }
                 }
             }
@@ -170,7 +187,7 @@ export const handler = async function(event, context) {
         const html = await response.text();
         console.log(`✅ Fetched ${html.length} characters of HTML`);
         
-        // Basic text extraction
+        // Basic text extraction (remove HTML tags)
         const text = html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
         console.log(`✅ Extracted ${text.length} characters of text`);
         
@@ -178,7 +195,7 @@ export const handler = async function(event, context) {
             throw new Error('Insufficient content found on the page.');
         }
 
-        // Use AI to analyze
+        // Use AI to analyze content
         console.log(`🤖 Sending to AI for analysis...`);
         const prompt = `
         Analyze this webpage content for grant opportunities. Extract any grants mentioned.
@@ -189,7 +206,10 @@ export const handler = async function(event, context) {
             "title": "Grant name", 
             "description": "Grant description",
             "deadline": "YYYY-MM-DD if found",
-            "funding_amount_text": "Amount text if found"
+            "funding_amount_text": "Amount text if found",
+            "eligibility_criteria": "Who can apply",
+            "grant_type": "Type of grant",
+            "categories": ["Focus areas if mentioned"]
         }
         
         Return array of grants or empty array if none found.
@@ -201,7 +221,7 @@ export const handler = async function(event, context) {
         const response_text = result.response.text();
         console.log(`✅ AI response received: ${response_text.length} characters`);
         
-        // Try to parse JSON from response
+        // Parse JSON from AI response
         let grants = [];
         try {
             const jsonMatch = response_text.match(/\[[\s\S]*\]/);
@@ -213,6 +233,7 @@ export const handler = async function(event, context) {
             }
         } catch (e) {
             console.log(`⚠️ Could not parse AI response as JSON: ${e.message}`);
+            console.log(`Raw AI response: ${response_text}`);
         }
 
         // Save grants to database
@@ -220,35 +241,51 @@ export const handler = async function(event, context) {
         if (grants.length > 0) {
             console.log(`💾 Saving ${grants.length} grants to database...`);
             savedCount = await saveGrantsToSupabase(grants, url);
-            console.log(`✅ Saved ${savedCount} grants to database`);
+            console.log(`✅ Database operation complete: ${savedCount} grants saved`);
         }
 
         // Update final status
         const finalMessage = savedCount > 0 
             ? `Processing complete. Found and saved ${savedCount} grant(s).`
-            : grants.length > 0 ? 'Grants found but already exist in database.' : 'No grant opportunities found after analysis.';
+            : grants.length > 0 
+                ? 'Grants found but already exist in database.' 
+                : 'No grant opportunities found after analysis.';
+
+        const finalStatus = savedCount > 0 ? 'success' : 'failed';
 
         await supabase
             .from('grant_submissions')
             .update({ 
-                status: savedCount > 0 ? 'success' : 'failed', 
+                status: finalStatus, 
                 error_message: finalMessage 
             })
             .eq('id', submissionId);
 
-        console.log(`🎉 Processing complete! Status: ${savedCount > 0 ? 'success' : 'failed'}`);
+        console.log(`🎉 Processing complete! Status: ${finalStatus}`);
+        console.log(`📊 Final results: Found ${grants.length} grants, saved ${savedCount} to database`);
 
         return {
             statusCode: 202,
-            body: JSON.stringify({ message: "Processing complete" }),
+            body: JSON.stringify({ 
+                message: "Processing complete",
+                grantsFound: grants.length,
+                grantsSaved: savedCount,
+                status: finalStatus
+            }),
         };
 
     } catch (error) {
         console.error(`💥 Error processing submission:`, error.message);
-        await supabase
-            .from('grant_submissions')
-            .update({ status: 'failed', error_message: error.message })
-            .eq('id', submissionId);
+        
+        // Update submission status to failed
+        try {
+            await supabase
+                .from('grant_submissions')
+                .update({ status: 'failed', error_message: error.message })
+                .eq('id', submissionId);
+        } catch (updateError) {
+            console.error(`💥 Failed to update submission status:`, updateError.message);
+        }
         
         return {
             statusCode: 400,
