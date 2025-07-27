@@ -7,6 +7,81 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
+// Add database helper functions
+function generateSlug(name) {
+    if (!name) return null;
+    return name.toLowerCase().replace(/&/g, 'and').replace(/[^a-z0-9\s-]/g, '').trim().replace(/[\s_]+/g, '-').replace(/--+/g, '-');
+}
+
+function parseFundingAmount(text) {
+    if (!text) return null;
+    const cleaned = String(text).replace(/[$,]/g, '');
+    const numberMatch = cleaned.match(/(\d+)/);
+    return numberMatch ? parseInt(numberMatch[0], 10) : null;
+}
+
+async function getOrCreateOrganization(name, website) {
+    if (!name) throw new Error("Organization name is required.");
+    const { data, error } = await supabase
+        .from('organizations')
+        .upsert({ name: name, website: website, slug: generateSlug(name), type: 'funder' }, { onConflict: 'name', ignoreDuplicates: false })
+        .select('id, name')
+        .single();
+    if (error) throw error;
+    if (!data) throw new Error(`Could not create or find organization: ${name}`);
+    return data;
+}
+
+async function getOrCreateCategory(categoryName) {
+    if (!categoryName) return null;
+    const { data } = await supabase.from('categories').upsert({ name: categoryName }, { onConflict: 'name' }).select('id').single();
+    return data?.id;
+}
+
+async function saveGrantsToSupabase(grants, primaryUrl) {
+    if (!grants || grants.length === 0) return 0;
+    let savedCount = 0;
+    for (const grant of grants) {
+        try {
+            const organization = await getOrCreateOrganization(grant.funder_name, new URL(primaryUrl).origin);
+            const deadlineMatch = grant.deadline ? String(grant.deadline).match(/(\d{4}-\d{2}-\d{2})/) : null;
+            const deadlineToInsert = deadlineMatch ? deadlineMatch[0] : null;
+            const fundingAmount = parseFundingAmount(grant.funding_amount_text);
+
+            const { data: grantResult, error } = await supabase
+                .from('grants')
+                .upsert({
+                    organization_id: organization.id,
+                    title: grant.title,
+                    description: grant.description,
+                    status: grant.status || 'Open',
+                    application_url: grant.application_url || primaryUrl,
+                    max_funding_amount: fundingAmount,
+                    funding_amount_text: grant.funding_amount_text,
+                    deadline: deadlineToInsert,
+                    eligibility_criteria: grant.eligibility_criteria,
+                    grant_type: grant.grant_type,
+                    slug: generateSlug(`${organization.name} ${grant.title}`),
+                    date_added: new Date().toISOString().split('T')[0],
+                    last_updated: new Date().toISOString()
+                }, { onConflict: 'organization_id, title' })
+                .select('id').single();
+            if (error) throw error;
+            savedCount++;
+
+            if (grant.categories && Array.isArray(grant.categories)) {
+                for (const categoryName of grant.categories) {
+                    const categoryId = await getOrCreateCategory(categoryName);
+                    if (categoryId) await supabase.from('grant_categories').upsert({ grant_id: grantResult.id, category_id: categoryId });
+                }
+            }
+        } catch (err) {
+            console.error(`❗ Error saving "${grant.title}":`, err.message);
+        }
+    }
+    return savedCount;
+}
+
 export const handler = async function(event, context) {
     const authHeader = event.headers.authorization || '';
     const token = authHeader.split(' ')[1];
@@ -81,20 +156,28 @@ export const handler = async function(event, context) {
             console.log(`⚠️ Could not parse AI response as JSON: ${e.message}`);
         }
 
+        // *** ADD THIS: Save grants to database ***
+        let savedCount = 0;
+        if (grants.length > 0) {
+            console.log(`💾 Saving ${grants.length} grants to database...`);
+            savedCount = await saveGrantsToSupabase(grants, url);
+            console.log(`✅ Saved ${savedCount} grants to database`);
+        }
+
         // Update final status
-        const finalMessage = grants.length > 0 
-            ? `Found ${grants.length} potential grant(s). Manual review needed.`
+        const finalMessage = savedCount > 0 
+            ? `Processing complete. Found and saved ${savedCount} grant(s).`
             : 'No grant opportunities found after analysis.';
 
         await supabase
             .from('grant_submissions')
             .update({ 
-                status: grants.length > 0 ? 'success' : 'failed', 
+                status: savedCount > 0 ? 'success' : 'failed', 
                 error_message: finalMessage 
             })
             .eq('id', submissionId);
 
-        console.log(`🎉 Processing complete! Status: ${grants.length > 0 ? 'success' : 'failed'}`);
+        console.log(`🎉 Processing complete! Status: ${savedCount > 0 ? 'success' : 'failed'}`);
 
         return {
             statusCode: 202,
