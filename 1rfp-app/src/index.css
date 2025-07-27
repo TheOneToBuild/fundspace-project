@@ -321,3 +321,40 @@ span.mention:active,
 .magical-hover:hover {
   background-position: right center;
 }
+
+/* Mobile Search Enhancements - Add to your main CSS file */
+
+/* Ensure search dropdown doesn't overflow on mobile */
+@media (max-width: 768px) {
+  .header-search-dropdown {
+    left: 0;
+    right: 0;
+    margin-left: 1rem;
+    margin-right: 1rem;
+    max-width: calc(100vw - 2rem);
+  }
+}
+
+/* Smooth transitions for mobile search toggle */
+.mobile-search-enter {
+  opacity: 0;
+  transform: translateY(-10px);
+}
+
+.mobile-search-enter-active {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 200ms ease-out, transform 200ms ease-out;
+}
+
+.mobile-search-exit {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.mobile-search-exit-active {
+  opacity: 0;
+  transform: translateY(-10px);
+  transition: opacity 200ms ease-in, transform 200ms ease-in;
+}
+

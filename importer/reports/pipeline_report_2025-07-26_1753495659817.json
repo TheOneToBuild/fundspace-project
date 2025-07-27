@@ -1,0 +1,17 @@
+{
+  "timestamp": "2025-07-26T02:07:39.816Z",
+  "mode": "full",
+  "duration": 218718,
+  "results": {
+    "discovery": {
+      "status": "success",
+      "grants": 0,
+      "duration": 214260
+    },
+    "import": {
+      "status": "success",
+      "grants": 0,
+      "duration": 450
+    }
+  }
+}

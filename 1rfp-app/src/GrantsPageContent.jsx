@@ -1,5 +1,6 @@
 // src/GrantsPageContent.jsx
 import React, { useState, useEffect, useMemo, useCallback, useContext } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { supabase } from './supabaseClient.js';
 import { Search, Users, MapPin, Calendar, DollarSign, Info, ChevronDown, ExternalLink, Zap, Clock, Target, Briefcase as IconBriefcase, BarChart3, ClipboardList, TrendingUp, Loader, XCircle, Heart, Bot, Briefcase, LayoutGrid, List, SlidersHorizontal, Bookmark, ArrowRight, Sparkles, Star, TrendingUp as TrendingUpIcon } from './components/Icons.jsx';
 import GrantCard from './components/GrantCard.jsx';
@@ -145,6 +146,7 @@ const GrantListItem = ({ grant, onOpenDetailModal, isSaved, onSave, onUnsave, se
 
 const GrantsPageContent = ({ isProfileView = false }) => {
   const { setPageBgColor } = useContext(LayoutContext);
+  const [searchParams, setSearchParams] = useSearchParams();
 
   useEffect(() => {
     if (!isProfileView) {
@@ -233,6 +235,31 @@ const GrantsPageContent = ({ isProfileView = false }) => {
     return () => { authListener.subscription.unsubscribe(); };
   }, []);
 
+  const openDetail = useCallback((grant) => { 
+    setSelectedGrant(grant); 
+    setIsDetailModal(true); 
+  }, []);
+
+  const closeDetail = useCallback(() => { 
+    setSelectedGrant(null); 
+    setIsDetailModal(false); 
+    // Clean up the URL by removing the grant ID parameter
+    searchParams.delete('open_grant');
+    setSearchParams(searchParams, { replace: true });
+  }, [searchParams, setSearchParams]);
+
+  // This effect checks the URL on load and whenever the grants data changes
+  // to see if a specific grant modal needs to be opened.
+  useEffect(() => {
+    const grantIdToOpen = searchParams.get('open_grant');
+    if (grantIdToOpen && grants.length > 0 && !selectedGrant) {
+      const grantToOpen = grants.find(g => g.id.toString() === grantIdToOpen);
+      if (grantToOpen) {
+        openDetail(grantToOpen);
+      }
+    }
+  }, [searchParams, grants, openDetail, selectedGrant]);
+
   const handleSaveGrant = async (grantId) => {
     if (!session) return;
     setSavedGrantIds(prev => new Set(prev).add(grantId));
@@ -260,9 +287,7 @@ const GrantsPageContent = ({ isProfileView = false }) => {
   const uniqueCategories = useMemo(() => Array.from(new Set(grants.flatMap(g => g.categories?.map(c => c.name) || []).filter(Boolean))).sort(), [grants]);
   const uniqueGrantTypes = useMemo(() => Array.from(new Set(grants.map(g => g.grantType).filter(Boolean))).sort(), [grants]);
   const uniqueLocations = useMemo(() => Array.from(new Set(grants.flatMap(g => g.locations?.map(l => l.name) || []).filter(Boolean))).sort(), [grants]);
-  const grantsPerPageOptions = [6, 9, 12, 15, 21, 24, 30, 45, 60, 86];
   
-  // UPDATED: Using filterGrantsWithTaxonomy instead of filterGrants
   const { paginatedItems: currentList = [], totalPages, totalFilteredItems, filteredAndSortedItems } = usePaginatedFilteredData(
     grants, 
     filterConfig, 
@@ -286,7 +311,6 @@ const GrantsPageContent = ({ isProfileView = false }) => {
     setCurrentPage(1); 
   }, []);
 
-  // NEW: Taxonomy filter handler
   const handleTaxonomyChange = useCallback((selectedTaxonomies) => {
     handleFilterChange('taxonomyFilter', selectedTaxonomies);
   }, [handleFilterChange]);
@@ -319,17 +343,6 @@ const GrantsPageContent = ({ isProfileView = false }) => {
     setCurrentPage(1); 
   }, []);
 
-  const openDetail = useCallback((grant) => { 
-    setSelectedGrant(grant); 
-    setIsDetailModal(true); 
-  }, []);
-
-  const closeDetail = useCallback(() => { 
-    setSelectedGrant(null); 
-    setIsDetailModal(false); 
-  }, []);
-
-  // UPDATED: Include taxonomyFilter in clear filters
   const handleClearFilters = useCallback(() => { 
     setFilterConfig({ 
       searchTerm: '', 
@@ -355,7 +368,6 @@ const GrantsPageContent = ({ isProfileView = false }) => {
     document.title = '1RFP - Find Your Next Funding Opportunity'; 
   }, []);
 
-  // UPDATED: Include taxonomyFilter in active filters
   const activeGrantFilters = useMemo(() => {
     let filters = [];
     if (filterConfig.searchTerm) filters.push({ key: 'searchTerm', label: `Search: "${filterConfig.searchTerm}"` });
@@ -388,7 +400,6 @@ const GrantsPageContent = ({ isProfileView = false }) => {
       setGrantTypeFilter: (value) => handleFilterChange('grantTypeFilter', value),
       sortCriteria: filterConfig.sortCriteria,
       setSortCriteria: (value) => handleFilterChange('sortCriteria', value),
-      // NEW: Taxonomy filter props
       taxonomyFilter: filterConfig.taxonomyFilter,
       setTaxonomyFilter: handleTaxonomyChange,
       uniqueCategories: uniqueCategories,
@@ -406,7 +417,6 @@ const GrantsPageContent = ({ isProfileView = false }) => {
       <div className={isProfileView ? "" : "container mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12"}>
         {!isProfileView && (
           <section id="funding-opportunity-intro" className="text-center mb-12 relative">
-            {/* Magical background elements */}
             <div className="absolute inset-0 overflow-hidden pointer-events-none">
               <div className="absolute top-10 left-10 w-32 h-32 bg-gradient-to-r from-blue-400 to-purple-600 rounded-full opacity-10 animate-pulse"></div>
               <div className="absolute top-32 right-20 w-24 h-24 bg-gradient-to-r from-pink-400 to-rose-600 rounded-full opacity-10 animate-pulse delay-1000"></div>
@@ -426,7 +436,6 @@ const GrantsPageContent = ({ isProfileView = false }) => {
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-pink-600 font-semibold"> Discover your perfect match.</span>
               </p>
 
-              {/* Mobile filter button with enhanced styling */}
               <div className="mt-8 md:hidden">
                 <button 
                   onClick={() => setIsMobileFiltersVisible(!isMobileFiltersVisible)} 
@@ -508,7 +517,6 @@ const GrantsPageContent = ({ isProfileView = false }) => {
                     <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none text-slate-400" size={16} />
                 </div>
                 
-                {/* View Mode Toggle - Available for all users */}
                 <div className="flex items-center bg-white rounded-xl border border-slate-300 p-1 shadow-sm">
                     <button 
                       onClick={() => setViewMode('grid')} 
@@ -567,7 +575,6 @@ const GrantsPageContent = ({ isProfileView = false }) => {
             </>
           ) : (
             <div className="text-center py-16 relative">
-              {/* Background decoration */}
               <div className="absolute inset-0 flex items-center justify-center opacity-5">
                 <Search size={200} className="text-slate-400" />
               </div>

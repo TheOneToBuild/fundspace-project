@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link, NavLink } from 'react-router-dom';
 import NotificationsPanel from './NotificationsPanel';
 import UserMenu from './UserMenu.jsx';
+import GlobalSearch from './GlobalSearch'; // Import the new search component
 import headerLogoImage from '../assets/1rfp-logo.png';
 import { Search, PlusCircle, Home, Building, FileText, ClipboardList, Bell, Menu, X, Users } from './Icons';
 
@@ -37,7 +38,6 @@ export default function DashboardHeader({
 }) {
     const [isPanelOpen, setIsPanelOpen] = useState(false);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-    const [isSearchFocused, setIsSearchFocused] = useState(false);
     const panelRef = useRef(null);
     const mobileMenuRef = useRef(null);
 
@@ -92,18 +92,11 @@ export default function DashboardHeader({
                             
                             {/* Desktop Search */}
                             <div className="relative hidden lg:block">
-                                <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                                <input 
-                                    type="text" 
-                                    placeholder="Search grants, organizations..." 
-                                    className="pl-10 pr-4 py-2 w-64 border border-slate-300 rounded-lg bg-slate-50 focus:bg-white focus:ring-1 focus:ring-blue-500 transition-colors"
-                                    onFocus={() => setIsSearchFocused(true)}
-                                    onBlur={() => setIsSearchFocused(false)}
-                                />
+                                <GlobalSearch />
                             </div>
                         </div>
 
-                        {/* Desktop Navigation - UPDATED: Unified Organizations */}
+                        {/* Desktop Navigation */}
                         <nav className="hidden md:flex items-center justify-center h-full">
                             <HeaderNavLink to="/profile" Icon={Home}>Home</HeaderNavLink>
                             <HeaderNavLink to="/profile/grants" Icon={ClipboardList}>Grants</HeaderNavLink>
@@ -113,10 +106,10 @@ export default function DashboardHeader({
 
                         {/* Right side - Actions and Profile */}
                         <div className="flex items-center space-x-1 sm:space-x-2 md:space-x-4 flex-1 justify-end">
-                            {/* Mobile Search Button */}
-                            <button className="lg:hidden p-2 rounded-full hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors">
-                                <Search size={20} />
-                            </button>
+                            {/* Mobile Search Button - This can be removed or adapted if the mobile search bar below is sufficient */}
+                            <div className="lg:hidden">
+                                {/* The mobile search bar is now below, this can be a trigger if we want to hide it initially */}
+                            </div>
 
                             {/* Submit Grant Button - Hidden on smallest screens */}
                             <Link 
@@ -163,16 +156,9 @@ export default function DashboardHeader({
                         </div>
                     </div>
 
-                    {/* Mobile Search Bar - Shows below header on mobile when needed */}
+                    {/* Mobile Search Bar */}
                     <div className="lg:hidden border-t border-slate-200 bg-white px-4 py-3">
-                        <div className="relative">
-                            <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                            <input 
-                                type="text" 
-                                placeholder="Search grants, organizations..." 
-                                className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg bg-slate-50 focus:bg-white focus:ring-1 focus:ring-blue-500 transition-colors"
-                            />
-                        </div>
+                        <GlobalSearch mobile={true} />
                     </div>
                 </div>
             </header>
@@ -200,7 +186,7 @@ export default function DashboardHeader({
                             </button>
                         </div>
 
-                        {/* Mobile Navigation Links - UPDATED: Unified Organizations */}
+                        {/* Mobile Navigation Links */}
                         <nav className="py-4">
                             <HeaderNavLink to="/profile" Icon={Home} mobile onClick={closeMobileMenu}>
                                 Dashboard Home
@@ -211,7 +197,7 @@ export default function DashboardHeader({
                             <HeaderNavLink to="/profile/organizations" Icon={Building} mobile onClick={closeMobileMenu}>
                                 Explore Organizations
                             </HeaderNavLink>
-                            <HeaderNavLink to="/profile/members" Icon={Users} mobile onClick={closeMobileMenu}>
+                             <HeaderNavLink to="/profile/members" Icon={Users} mobile onClick={closeMobileMenu}>
                                 Explore Members
                             </HeaderNavLink>
                         </nav>

@@ -1,32 +1,31 @@
-# Correct Netlify build settings
+# Netlify build settings for your React app
 [build]
-  command = "npm run build"
-  publish = "dist"
+  # This command navigates into your app folder, installs dependencies, and builds it
+  command = "cd 1rfp-app && npm install && npm run build"
+  # This tells Netlify where the final built site is located
+  publish = "1rfp-app/dist"
 
-# Functions configuration
+# Main functions configuration
 [functions]
-  directory = "netlify/functions"
+  # CORRECTED PATH: Points to the functions directory inside your 1rfp-app
+  directory = "1rfp-app/netlify/functions"
+  # Preserving your existing settings
   external_node_modules = ["axios", "jsdom", "rss-parser", "@supabase/supabase-js"]
   node_bundler = "esbuild"
 
-# Add this block to explicitly configure the dev server
+# Development server settings
 [dev]
-  functions = "netlify/functions"
+  # CORRECTED PATH: For running locally with the Netlify CLI
+  functions = "1rfp-app/netlify/functions"
 
-# Disable the problematic Neon database extension
-[extensions]
-  [extensions.neon]
-    disabled = true
-
-# Schedule the background function to run once every hour
-[functions.fetch-and-cache-news]
+# Preserving your scheduled functions
+[functions."fetch-and-cache-news"]
   schedule = "0 * * * *"
 
-# Schedule the cleanup function to run once a day
-[functions.cleanup-old-news]
+[functions."cleanup-old-news"]
   schedule = "0 0 * * *"
 
-# CORS headers for functions
+# Preserving your headers configuration
 [[headers]]
   for = "/.netlify/functions/*"
   [headers.values]
