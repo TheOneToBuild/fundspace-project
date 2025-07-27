@@ -1,15 +1,13 @@
 # Netlify build settings for your React app
 [build]
-  # CORRECTED: Since the build starts in 1rfp-app, we just need to run npm install.
   command = "npm install && npm run build"
-  # CORRECTED: The publish directory is relative to the build's base directory.
   publish = "dist"
 
 # Main functions configuration
 [functions]
-  # CORRECTED: The functions directory is also relative to the base directory.
   directory = "netlify/functions"
-  external_node_modules = ["axios", "jsdom", "rss-parser", "@supabase/supabase-js"]
+  # ADDED @sparticuz/chromium HERE
+  external_node_modules = ["axios", "jsdom", "rss-parser", "@supabase/supabase-js", "@sparticuz/chromium"]
   node_bundler = "esbuild"
 
 # Preserving your scheduled functions

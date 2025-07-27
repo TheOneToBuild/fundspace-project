@@ -1,10 +1,9 @@
 // importer/grant_processor_core.js
-// V2 - Updated to use puppeteer-core and chrome-aws-lambda for serverless environments
+// V3 - Updated to use @sparticuz/chromium for serverless environments
 
 const { createClient } = require('@supabase/supabase-js');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
-// UPDATED: Import puppeteer and chrome-aws-lambda
-const chromium = require('chrome-aws-lambda');
+const chromium = require('@sparticuz/chromium');
 const puppeteer = require('puppeteer-core');
 const axios = require('axios');
 const pdf = require('pdf-parse');
@@ -19,9 +18,9 @@ const CONFIG = {
     CONTENT_RELEVANCE_THRESHOLD: 0.6,
 };
 
-// ... IntelligentContentProcessor class and other helper functions remain the same ...
-// [For brevity, only the changed functions are shown below the main processor]
-
+// =================================================================
+// INTELLIGENT CONTENT PROCESSOR CLASS (from import_grants.js)
+// =================================================================
 class IntelligentContentProcessor {
     constructor() {
         this.grantKeywords = [
@@ -38,6 +37,7 @@ class IntelligentContentProcessor {
             'call for proposals', 'funding announcement'
         ];
     }
+
     extractGrantSections(text) {
         if (!text) return '';
         const sections = text.split(/\n\s*(?:\n|---|\*\*\*|#{1,3})\s*/);
@@ -64,6 +64,7 @@ class IntelligentContentProcessor {
         }
         return combinedText;
     }
+
     async assessContentRelevance(content) {
         if (!content || content.length < 200) return 0;
         const preview = content.substring(0, 3000);
@@ -77,6 +78,7 @@ class IntelligentContentProcessor {
             return 0.5;
         }
     }
+
     async processLargeContent(text, sourceUrl) {
         const relevantContent = this.extractGrantSections(text);
         const relevanceScore = await this.assessContentRelevance(relevantContent);
@@ -86,20 +88,32 @@ class IntelligentContentProcessor {
         }
         return await this.extractFromChunk(relevantContent, sourceUrl);
     }
+
     async extractFromChunk(content, sourceUrl) {
         return await extractGrantInfo(content, sourceUrl);
     }
 }
+
+
+// =================================================================
+// UTILITY FUNCTIONS
+// =================================================================
 function generateSlug(name) {
     if (!name) return null;
     return name.toLowerCase().replace(/&/g, 'and').replace(/[^a-z0-9\s-]/g, '').trim().replace(/[\s_]+/g, '-').replace(/--+/g, '-');
 }
+
 function parseFundingAmount(text) {
     if (!text) return null;
     const cleaned = String(text).replace(/[$,]/g, '');
     const numberMatch = cleaned.match(/(\d+)/);
     return numberMatch ? parseInt(numberMatch[0], 10) : null;
 }
+
+
+// =================================================================
+// AI EXTRACTION LOGIC
+// =================================================================
 async function extractGrantInfo(text, sourceUrl) {
     if (!text || text.length < 100) return [];
     const prompt = `
@@ -136,6 +150,11 @@ async function extractGrantInfo(text, sourceUrl) {
         return [];
     }
 }
+
+
+// =================================================================
+// DATABASE HELPERS
+// =================================================================
 async function getOrCreateOrganization(name, website) {
     if (!name) throw new Error("Organization name is required.");
     const { data, error } = await supabase
@@ -147,16 +166,13 @@ async function getOrCreateOrganization(name, website) {
     if (!data) throw new Error(`Could not create or find organization: ${name}`);
     return data;
 }
+
 async function getOrCreateCategory(categoryName) {
     if (!categoryName) return null;
     const { data } = await supabase.from('categories').upsert({ name: categoryName }, { onConflict: 'name' }).select('id').single();
     return data?.id;
 }
-async function getOrCreateLocation(locationName) {
-    if (!locationName) return null;
-    const { data } = await supabase.from('locations').upsert({ name: locationName }, { onConflict: 'name' }).select('id').single();
-    return data?.id;
-}
+
 async function saveGrantsToSupabase(grants, primaryUrl) {
     if (!grants || grants.length === 0) return 0;
     let savedCount = 0;
@@ -205,64 +221,63 @@ async function saveGrantsToSupabase(grants, primaryUrl) {
 // =================================================================
 // MAIN ORCHESTRATOR FUNCTION (UPDATED FOR SERVERLESS)
 // =================================================================
-
 async function processUrlAndUpdateSubmission(url, submissionId) {
-    console.log(`--- CORE V2: Processing Submission ${submissionId}: ${url} ---`);
+    console.log(`--- CORE V3: Processing Submission ${submissionId}: ${url} ---`);
     let browser = null;
 
     try {
         await supabase.from('grant_submissions').update({ status: 'processing' }).eq('id', submissionId);
 
-        // UPDATED: Launch browser using serverless-friendly libraries
-        console.log("--- CORE V2: Launching browser... ---");
+        console.log("--- CORE V3: Launching browser... ---");
         browser = await puppeteer.launch({
             args: chromium.args,
             defaultViewport: chromium.defaultViewport,
-            executablePath: await chromium.executablePath,
+            executablePath: await chromium.executablePath(),
             headless: chromium.headless,
         });
-        console.log("--- CORE V2: Browser launched successfully. ---");
+        console.log("--- CORE V3: Browser launched successfully. ---");
 
         const page = await browser.newPage();
-        console.log(`--- CORE V2: Navigating to ${url}... ---`);
+        
+        console.log(`--- CORE V3: Navigating to ${url}... ---`);
         await page.goto(url, { waitUntil: 'networkidle2', timeout: 45000 });
-        console.log("--- CORE V2: Page loaded. Extracting text... ---");
+        console.log("--- CORE V3: Page loaded. Extracting text... ---");
 
         const relevantContent = await page.evaluate(() => document.body.innerText);
         if (!relevantContent || relevantContent.length < 200) {
             throw new Error('Insufficient relevant content found on the page.');
         }
-        console.log(`--- CORE V2: Extracted ${relevantContent.length} characters. Processing with AI... ---`);
+        console.log(`--- CORE V3: Extracted ${relevantContent.length} characters. Processing with AI... ---`);
 
         const contentProcessor = new IntelligentContentProcessor();
         const grants = await contentProcessor.processLargeContent(relevantContent, url);
         if (!grants || grants.length === 0) {
             throw new Error('No active grant opportunities were found after analysis.');
         }
-        console.log(`--- CORE V2: Found ${grants.length} grants. Saving to database... ---`);
+        console.log(`--- CORE V3: Found ${grants.length} grants. Saving to database... ---`);
 
         const savedCount = await saveGrantsToSupabase(grants, url);
         if (savedCount === 0) {
             throw new Error('Extracted grants could not be saved to the database.');
         }
-        console.log("--- CORE V2: Grants saved successfully. ---");
+        console.log("--- CORE V3: Grants saved successfully. ---");
 
         await supabase
             .from('grant_submissions')
             .update({ status: 'success', error_message: `Processing complete. Found and saved ${savedCount} grant(s).` })
             .eq('id', submissionId);
 
-        console.log(`--- ✅ CORE V2: Successfully processed submission ${submissionId}. ---`);
+        console.log(`--- ✅ CORE V3: Successfully processed submission ${submissionId}. ---`);
 
     } catch (error) {
-        console.error(`--- ❗ CORE V2: Error processing submission ${submissionId}:`, error.message);
+        console.error(`--- ❗ CORE V3: Error processing submission ${submissionId}:`, error.message);
         await supabase
             .from('grant_submissions')
             .update({ status: 'failed', error_message: error.message })
             .eq('id', submissionId);
     } finally {
         if (browser !== null) {
-            console.log("--- CORE V2: Closing browser... ---");
+            console.log("--- CORE V3: Closing browser... ---");
             await browser.close();
         }
     }
