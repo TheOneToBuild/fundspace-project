@@ -1,14 +1,16 @@
-# Netlify build settings for your React app
 [build]
   command = "npm install && npm run build"
   publish = "dist"
 
-# Main functions configuration
 [functions]
   directory = "netlify/functions"
-  # ADDED @sparticuz/chromium HERE
-  external_node_modules = ["axios", "jsdom", "rss-parser", "@supabase/supabase-js", "@sparticuz/chromium"]
+  external_node_modules = ["axios", "jsdom", "rss-parser", "@supabase/supabase-js"]
   node_bundler = "esbuild"
+
+# THIS IS THE NEW, CRUCIAL PART
+# This targets our specific function and forces files to be included.
+[functions."process-grant-submission-background"]
+  included_files = ["node_modules/@sparticuz/chromium/**"]
 
 # Preserving your scheduled functions
 [functions."fetch-and-cache-news"]
