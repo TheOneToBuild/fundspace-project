@@ -1,13 +1,16 @@
+# Netlify build settings
 [build]
+  # Tell Netlify the root of your app is here
+  base = "1rfp-app"
+  # The build command, Netlify runs "npm install" automatically
   command = "npm run build"
-  publish = "dist"
+  # The final built site to publish
+  publish = "1rfp-app/dist"
 
+# Functions configuration
 [functions]
-  # This now points to the output directory where netlify-lambda builds the functions.
-  directory = "netlify/functions-dist"
-
-# We no longer need external_node_modules or included_files because
-# the build:functions script bundles everything together for us.
+  # Where the bundled functions will be placed by netlify-lambda
+  directory = "1rfp-app/netlify/functions-dist"
 
 # Preserving your scheduled functions
 [functions."fetch-and-cache-news"]
