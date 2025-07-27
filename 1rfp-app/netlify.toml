@@ -1,16 +1,13 @@
 [build]
-  command = "npm install && npm run build"
+  command = "npm run build"
   publish = "dist"
 
 [functions]
-  directory = "netlify/functions"
-  external_node_modules = ["axios", "jsdom", "rss-parser", "@supabase/supabase-js"]
-  node_bundler = "esbuild"
+  # This now points to the output directory where netlify-lambda builds the functions.
+  directory = "netlify/functions-dist"
 
-# THIS IS THE NEW, CRUCIAL PART
-# This targets our specific function and forces files to be included.
-[functions."process-grant-submission-background"]
-  included_files = ["node_modules/@sparticuz/chromium/**"]
+# We no longer need external_node_modules or included_files because
+# the build:functions script bundles everything together for us.
 
 # Preserving your scheduled functions
 [functions."fetch-and-cache-news"]
