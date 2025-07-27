@@ -86,11 +86,6 @@ export default function OrganizationSetupStep({ formData, updateFormData }) {
       'nonprofit.501c10': 'Fraternal societies (no insurance), Domestic fraternal societies',
       'nonprofit.501c19': 'American Legion, VFW, Veterans organizations, War veterans groups',
       
-      // Government examples
-      'government.federal': 'EPA, Department of Education, USAID',
-      'government.state': 'California Department of Health, State Universities',
-      'government.local': 'City Council, County Board, School Districts',
-      
       // Education examples
       'education.university': 'Stanford University, UC Berkeley, Santa Clara University',
       'education.k12': 'San Francisco Unified School District, Charter Schools',

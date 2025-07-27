@@ -1,13 +1,13 @@
-// 1rfp-app/netlify/functions/process-grant-submission-background.js
+// netlify/functions/process-grant-submission-background.js
 
-const { createClient } = require('@supabase/supabase-js');
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+import { createClient } from '@supabase/supabase-js';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
-exports.handler = async function(event, context) {
+export const handler = async function(event, context) {
     // Security check
     const authHeader = event.headers.authorization || '';
     const token = authHeader.split(' ')[1];
