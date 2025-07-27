@@ -1,4 +1,4 @@
-// src/components/CreatePost.jsx - Robust version with organization channels
+// src/components/CreatePost.jsx - Complete with Fixed Channel Logic
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { supabase } from '../supabaseClient';
 import { Camera, X, Smile, AtSign } from 'lucide-react';
@@ -70,34 +70,30 @@ export default function CreatePost({
     // Determine which table to use
     const postsTable = isOrganizationPost ? 'organization_posts' : 'posts';
 
-    // ROBUST: Auto-detect the correct channel based on organization type
+    // 🚀 FIXED: Simple and reliable channel detection
     const finalChannel = (() => {
-      // If explicitly passed a specific org channel, use it
-      if (channel && channel !== 'hello-world' && channel !== 'hello-community') {
+      // Always respect explicitly passed channels first
+      if (channel && channel !== 'organization') {
         return channel;
       }
       
-      // If organization type is provided, get the correct channel
-      if (organizationType) {
+      // Only for organization posts, or when no explicit channel provided
+      if (isOrganizationPost) {
+        return 'organization';
+      }
+      
+      // Fallback for community channels when no explicit channel
+      if (!channel && organizationType) {
         return getDbChannelFromOrgType(organizationType);
       }
       
-      // If profile has organization type, use that
-      if (profile?.organization_type) {
+      if (!channel && profile?.organization_type) {
         return getDbChannelFromOrgType(profile.organization_type);
       }
       
-      // Default fallback
-      return channel;
+      // Ultimate fallback
+      return 'hello-world';
     })();
-
-    console.log('🎯 CreatePost channel logic:', {
-      passedChannel: channel,
-      organizationType,
-      profileOrgType: profile?.organization_type,
-      finalChannel,
-      isOrganizationPost
-    });
 
     const availableTags = [
         { id: 'education', label: 'Education', color: 'bg-blue-100 text-blue-800 border-blue-200' },
@@ -557,7 +553,7 @@ export default function CreatePost({
                     mentions: mentionsForStorage.length > 0 ? JSON.stringify(mentionsForStorage) : null,
                 };
             } else {
-                // ROBUST: Regular post data with proper channel and organization type
+                // FIXED: Regular post data with proper channel
                 postData = {
                     content: editorHtmlContent.trim() || '',
                     user_id: user.id,
@@ -565,18 +561,11 @@ export default function CreatePost({
                     image_urls: imageUrls.length > 0 ? imageUrls : null,
                     image_url: imageUrls.length === 1 ? imageUrls[0] : null,
                     tags: selectedTags.length > 0 ? JSON.stringify(selectedTags) : null,
-                    channel: finalChannel, // Use the robust channel detection
+                    channel: finalChannel, // Use the fixed channel detection
                     mentions: mentionsForStorage.length > 0 ? JSON.stringify(mentionsForStorage) : null,
                     // Store organization type for additional filtering/organization purposes
                     organization_type: organizationType || profile?.organization_type || null
                 };
-
-                console.log('🎯 Creating post with data:', {
-                    channel: postData.channel,
-                    organization_type: postData.organization_type,
-                    finalChannel,
-                    organizationType
-                });
             }
 
             const { data: newPost, error: postError } = await supabase
@@ -597,7 +586,6 @@ export default function CreatePost({
                 await createMentionRecords(newPost.id, mentionsForStorage);
                 
                 // CREATE MENTION NOTIFICATIONS - Now works for both regular and organization posts
-                console.log('🔔 Creating mention notifications...');
                 const notificationResult = await processMentionsForNotifications(
                     newPost.id, 
                     editorHtmlContent, 
@@ -606,7 +594,7 @@ export default function CreatePost({
                 );
                 
                 if (notificationResult.success) {
-                    console.log(`✅ Created ${notificationResult.count} mention notifications for ${isOrganizationPost ? 'organization' : 'regular'} post`);
+                    // Notifications created successfully
                 } else {
                     console.error('❌ Failed to create mention notifications:', notificationResult.error);
                 }
@@ -646,13 +634,6 @@ export default function CreatePost({
 
     return (
         <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
-            {/* Debug info in development */}
-            {process.env.NODE_ENV === 'development' && (
-                <div className="mb-3 p-2 bg-gray-100 rounded text-xs">
-                    <strong>Debug:</strong> Channel: {finalChannel} | Org Type: {organizationType || 'none'}
-                </div>
-            )}
-            
             <div className="flex items-start space-x-3">
                 <div className="flex-shrink-0">
                     {isOrganizationPost && organization ? (
@@ -731,171 +712,171 @@ export default function CreatePost({
                                     <div key={image.id} className="relative group">
                                         <img
                                             src={image.preview}
-                            alt={`Upload preview ${index + 1}`}
-                            className="w-full h-32 object-cover rounded-lg"
-                        />
-                        <button
-                            onClick={() => removeImage(image.id)}
-                            className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                            disabled={isLoading}
-                            type="button"
-                        >
-                            <X size={14} />
-                        </button>
-                    </div>
-                ))}
-            </div>
-        </div>
-    )}
-    
-    {selectedTags.length > 0 && (
-        <div className="mt-3 flex flex-wrap gap-2">
-            {selectedTags.map(tag => (
-                <div key={tag.id} className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border ${tag.color} group`}>
-                    <span>{tag.label}</span>
-                    <button
-                        onClick={() => removeTag(tag.id)}
-                        className="ml-2 p-0.5 rounded-full hover:bg-black hover:bg-opacity-10 transition-colors"
-                        type="button"
-                    >
-                        <X size={12} />
-                    </button>
-                </div>
-            ))}
-        </div>
-    )}
-
-    {error && (
-        <div className="mt-2 text-red-600 text-sm bg-red-50 p-2 rounded">{error}</div>
-    )}
-
-    <div className="flex items-center justify-between mt-4">
-        <div className="flex items-center space-x-4">
-            {selectedImages.length < 6 && (
-                <>
-                    <input
-                        ref={fileInputRef}
-                        type="file"
-                        id="imageUpload"
-                        multiple
-                        accept="image/*"
-                        onChange={handleImageSelect}
-                        className="hidden"
-                        disabled={isLoading}
-                    />
-                    <label
-                        htmlFor="imageUpload"
-                        className="flex items-center space-x-2 text-slate-600 hover:text-blue-600 cursor-pointer transition-colors py-1"
-                    >
-                        <Camera size={20} />
-                        <span className="text-sm font-medium">
-                            {selectedImages.length > 0 ? 'Add More' : 'Photos'}
-                        </span>
-                    </label>
-                </>
-            )}
-            
-            <div className="relative">
-                <button
-                    onClick={() => setShowTagSelector(!showTagSelector)}
-                    className="flex items-center space-x-2 text-slate-600 hover:text-blue-600 cursor-pointer transition-colors py-1"
-                    type="button"
-                >
-                    <div className="w-5 h-5 rounded-full bg-gradient-to-r from-blue-400 to-purple-500 flex items-center justify-center">
-                        <span className="text-white text-xs font-bold">#</span>
-                    </div>
-                    <span className="text-sm font-medium">Tags</span>
-                </button>
-
-                {showTagSelector && (
-                    <div className="absolute top-full mt-2 bg-white rounded-lg shadow-lg border p-4 z-50 w-96">
-                        <p className="text-sm font-medium text-slate-700 mb-3">Add tags to categorize your post (max 6)</p>
-                        
-                        <div className="mb-4">
-                            <div className="flex space-x-2">
-                                <input
-                                    type="text"
-                                    value={customTagInput}
-                                    onChange={(e) => setCustomTagInput(e.target.value)}
-                                    placeholder="Create custom tag..."
-                                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    onKeyPress={(e) => e.key === 'Enter' && addCustomTag()}
-                                    maxLength={20}
-                                    disabled={selectedTags.length >= 6}
-                                />
-                                <button
-                                    onClick={addCustomTag}
-                                    disabled={!customTagInput.trim() || selectedTags.length >= 6}
-                                    className="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                                    type="button"
-                                >
-                                    Add
-                                </button>
+                                            alt={`Upload preview ${index + 1}`}
+                                            className="w-full h-32 object-cover rounded-lg"
+                                        />
+                                        <button
+                                            onClick={() => removeImage(image.id)}
+                                            className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                                            disabled={isLoading}
+                                            type="button"
+                                        >
+                                            <X size={14} />
+                                        </button>
+                                    </div>
+                                ))}
                             </div>
                         </div>
-
-                        <div className="grid grid-cols-2 gap-2 mb-4">
-                            {availableTags.map(tag => (
-                                <button
-                                    key={tag.id}
-                                    onClick={() => handleTagToggle(tag.id)}
-                                    disabled={selectedTags.length >= 6 && !selectedTags.some(t => t.id === tag.id)}
-                                    className={`text-left px-3 py-2 rounded-lg text-sm font-medium border transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
-                                        selectedTags.some(t => t.id === tag.id)
-                                            ? tag.color + ' ring-2 ring-blue-300'
-                                            : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
-                                    }`}
-                                    type="button"
-                                >
-                                    {tag.label}
-                                </button>
+                    )}
+                    
+                    {selectedTags.length > 0 && (
+                        <div className="mt-3 flex flex-wrap gap-2">
+                            {selectedTags.map(tag => (
+                                <div key={tag.id} className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border ${tag.color} group`}>
+                                    <span>{tag.label}</span>
+                                    <button
+                                        onClick={() => removeTag(tag.id)}
+                                        className="ml-2 p-0.5 rounded-full hover:bg-black hover:bg-opacity-10 transition-colors"
+                                        type="button"
+                                    >
+                                        <X size={12} />
+                                    </button>
+                                </div>
                             ))}
                         </div>
+                    )}
 
-                        <div className="flex items-center justify-between">
-                            <span className="text-xs text-gray-500">{selectedTags.length}/6 tags selected</span>
-                            <button
-                                onClick={() => setShowTagSelector(false)}
-                                className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
-                                type="button"
-                            >
-                                Done
-                            </button>
+                    {error && (
+                        <div className="mt-2 text-red-600 text-sm bg-red-50 p-2 rounded">{error}</div>
+                    )}
+
+                    <div className="flex items-center justify-between mt-4">
+                        <div className="flex items-center space-x-4">
+                            {selectedImages.length < 6 && (
+                                <>
+                                    <input
+                                        ref={fileInputRef}
+                                        type="file"
+                                        id="imageUpload"
+                                        multiple
+                                        accept="image/*"
+                                        onChange={handleImageSelect}
+                                        className="hidden"
+                                        disabled={isLoading}
+                                    />
+                                    <label
+                                        htmlFor="imageUpload"
+                                        className="flex items-center space-x-2 text-slate-600 hover:text-blue-600 cursor-pointer transition-colors py-1"
+                                    >
+                                        <Camera size={20} />
+                                        <span className="text-sm font-medium">
+                                            {selectedImages.length > 0 ? 'Add More' : 'Photos'}
+                                        </span>
+                                    </label>
+                                </>
+                            )}
+                            
+                            <div className="relative">
+                                <button
+                                    onClick={() => setShowTagSelector(!showTagSelector)}
+                                    className="flex items-center space-x-2 text-slate-600 hover:text-blue-600 cursor-pointer transition-colors py-1"
+                                    type="button"
+                                >
+                                    <div className="w-5 h-5 rounded-full bg-gradient-to-r from-blue-400 to-purple-500 flex items-center justify-center">
+                                        <span className="text-white text-xs font-bold">#</span>
+                                    </div>
+                                    <span className="text-sm font-medium">Tags</span>
+                                </button>
+
+                                {showTagSelector && (
+                                    <div className="absolute top-full mt-2 bg-white rounded-lg shadow-lg border p-4 z-50 w-96">
+                                        <p className="text-sm font-medium text-slate-700 mb-3">Add tags to categorize your post (max 6)</p>
+                                        
+                                        <div className="mb-4">
+                                            <div className="flex space-x-2">
+                                                <input
+                                                    type="text"
+                                                    value={customTagInput}
+                                                    onChange={(e) => setCustomTagInput(e.target.value)}
+                                                    placeholder="Create custom tag..."
+                                                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                    onKeyPress={(e) => e.key === 'Enter' && addCustomTag()}
+                                                    maxLength={20}
+                                                    disabled={selectedTags.length >= 6}
+                                                />
+                                                <button
+                                                    onClick={addCustomTag}
+                                                    disabled={!customTagInput.trim() || selectedTags.length >= 6}
+                                                    className="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                                    type="button"
+                                                >
+                                                    Add
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-2 mb-4">
+                                            {availableTags.map(tag => (
+                                                <button
+                                                    key={tag.id}
+                                                    onClick={() => handleTagToggle(tag.id)}
+                                                    disabled={selectedTags.length >= 6 && !selectedTags.some(t => t.id === tag.id)}
+                                                    className={`text-left px-3 py-2 rounded-lg text-sm font-medium border transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+                                                        selectedTags.some(t => t.id === tag.id)
+                                                            ? tag.color + ' ring-2 ring-blue-300'
+                                                            : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
+                                                    }`}
+                                                    type="button"
+                                                >
+                                                    {tag.label}
+                                                </button>
+                                            ))}
+                                        </div>
+
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-xs text-gray-500">{selectedTags.length}/6 tags selected</span>
+                                            <button
+                                                onClick={() => setShowTagSelector(false)}
+                                                className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+                                                type="button"
+                                            >
+                                                Done
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {selectedImages.length > 0 && (
+                                <span className="text-xs text-slate-500 bg-slate-100 px-2 py-1 rounded-full">
+                                    {selectedImages.length}/6 photos
+                                </span>
+                            )}
+                            {selectedTags.length > 0 && (
+                                <span className="text-xs text-slate-500 bg-slate-100 px-2 py-1 rounded-full">
+                                    {selectedTags.length} tag{selectedTags.length !== 1 ? 's' : ''}
+                                </span>
+                            )}
                         </div>
+                        
+                        <button
+                            onClick={handlePostSubmit}
+                            disabled={isLoading || (isEditorContentEmpty && selectedImages.length === 0)}
+                            className={`
+                                bg-blue-600 text-white px-6 py-2 rounded-lg font-medium
+                                hover:bg-blue-700 transition-colors shadow-sm
+                                disabled:opacity-50 disabled:cursor-not-allowed
+                            `}
+                            type="button"
+                        >
+                            {uploading ? 'Uploading...' : isLoading ? 'Posting...' : 'Post'}
+                        </button>
                     </div>
-                )}
-            </div>
-
-            {selectedImages.length > 0 && (
-                <span className="text-xs text-slate-500 bg-slate-100 px-2 py-1 rounded-full">
-                    {selectedImages.length}/6 photos
-                </span>
-            )}
-            {selectedTags.length > 0 && (
-                <span className="text-xs text-slate-500 bg-slate-100 px-2 py-1 rounded-full">
-                    {selectedTags.length} tag{selectedTags.length !== 1 ? 's' : ''}
-                </span>
-            )}
-        </div>
-        
-        <button
-            onClick={handlePostSubmit}
-            disabled={isLoading || (isEditorContentEmpty && selectedImages.length === 0)}
-            className={`
-                bg-blue-600 text-white px-6 py-2 rounded-lg font-medium
-                hover:bg-blue-700 transition-colors shadow-sm
-                disabled:opacity-50 disabled:cursor-not-allowed
-            `}
-            type="button"
-        >
-            {uploading ? 'Uploading...' : isLoading ? 'Posting...' : 'Post'}
-        </button>
-    </div>
-    
-    <div className="mt-2 text-xs text-slate-500">
-        💡 Type @ to mention users or organizations
-    </div>
-</div>
+                    
+                    <div className="mt-2 text-xs text-slate-500">
+                        💡 Type @ to mention users or organizations
+                    </div>
+                </div>
             </div>
         </div>
     );

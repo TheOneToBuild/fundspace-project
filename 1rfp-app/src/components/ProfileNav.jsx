@@ -1,8 +1,9 @@
-// src/components/ProfileNav.jsx - Complete Instant Organization Updates
+// src/components/ProfileNav.jsx - Clean version without "No organization" text
 import React, { useState, useEffect, useCallback } from 'react';
 import { NavLink, useOutletContext, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import { isPlatformAdmin } from '../utils/permissions.js';
+import { addOrganizationEventListener } from '../utils/organizationEvents';
 
 // Helper function to get available community channels for user
 const getUserCommunityChannels = (profile) => {
@@ -326,23 +327,13 @@ export default function ProfileNav() {
                         {profile?.full_name || 'Your Name'}
                     </h2>
                     
-                    {/* INSTANT Organization Display */}
-                    {displayOrg ? (
+                    {/* CLEAN: Only show organization if user has one */}
+                    {displayOrg && (
                         <div className="mb-3">
                             <p className="text-xs text-slate-500 transition-all duration-300" title={`${displayOrg.name} (${displayOrg.role})`}>
                                 {displayOrg.name}
                             </p>
                         </div>
-                    ) : (
-                        <div className="mb-3">
-                            <p className="text-xs text-slate-500">No organization</p>
-                        </div>
-                    )}
-                    
-                    {!displayOrg && profile?.role && (
-                        <p className="text-xs text-slate-500 mb-3">
-                            {profile.role}
-                        </p>
                     )}
                 </div>
                 

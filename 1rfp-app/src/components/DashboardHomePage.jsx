@@ -1,12 +1,13 @@
-// src/components/DashboardHomePage.jsx
+// src/components/DashboardHomePage.jsx - Updated with Instant Organization Support
 import React, { useState, useEffect, useRef, useCallback, memo } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import { ChevronLeft, ChevronRight, Clock, ArrowRight, Users, MessageCircle, Globe } from 'lucide-react';
 import PostCard from './PostCard.jsx';
 import CreatePost from './CreatePost.jsx';
-import ProfileCompletionBanner from './ProfileCompletionBanner.jsx'; // 🎯 Import the separate component
+import ProfileCompletionBanner from './ProfileCompletionBanner.jsx';
 import { rssNewsService as newsService } from '../services/rssNewsService.js';
+import { addOrganizationEventListener } from '../utils/organizationEvents';
 import PropTypes from 'prop-types';
 
 const NewsCard = memo(({ title, summary, timeAgo, image, url }) => {
@@ -134,6 +135,9 @@ export default function DashboardHomePage() {
   const [hasMore, setHasMore] = useState(true);
   const [hasEnteredWorld, setHasEnteredWorld] = useState(false);
   const [showWelcome, setShowWelcome] = useState(false);
+  
+  // 🚀 NEW: State to track current organization info
+  const [organizationInfo, setOrganizationInfo] = useState(null);
 
   const observer = useRef();
   const loaderRef = useCallback(node => {
@@ -146,6 +150,134 @@ export default function DashboardHomePage() {
     });
     if (node) observer.current.observe(node);
   }, [isLoading, hasMore]);
+
+  // 🚀 INSTANT: Listen for organization changes
+  useEffect(() => {
+    if (!profile?.id) return;
+
+    console.log('⚡ DashboardHomePage: Setting up instant organization change listener');
+
+    // Listen for instant organization changes
+    const cleanup = addOrganizationEventListener('organizationChanged', (event) => {
+      const { profileId, organization } = event.detail;
+      
+      // Only process if this event is for the current user
+      if (profileId === profile.id) {
+        console.log('⚡ DashboardHomePage: INSTANT organization change detected!', {
+          profileId,
+          organization
+        });
+
+        // Update organization info immediately
+        if (organization) {
+          console.log('✅ DashboardHomePage: Setting new organization info');
+          setOrganizationInfo({
+            id: organization.id,
+            name: organization.name,
+            type: organization.type,
+            tagline: organization.tagline,
+            image_url: organization.image_url,
+            role: 'member' // Default role for joined organizations
+          });
+        } else {
+          console.log('✅ DashboardHomePage: Clearing organization info (user left org)');
+          setOrganizationInfo(null);
+        }
+      }
+    });
+
+    // Also listen for cross-tab changes
+    const handleStorageChange = (e) => {
+      if (e.key === 'orgChangeEvent' && e.newValue) {
+        try {
+          const message = JSON.parse(e.newValue);
+          if (message.profileId === profile.id) {
+            console.log('📡 DashboardHomePage: Cross-tab organization change detected');
+            if (message.organization) {
+              setOrganizationInfo({
+                id: message.organization.id,
+                name: message.organization.name,
+                type: message.organization.type,
+                tagline: message.organization.tagline,
+                image_url: message.organization.image_url,
+                role: 'member'
+              });
+            } else {
+              setOrganizationInfo(null);
+            }
+          }
+        } catch (error) {
+          console.error('❌ DashboardHomePage: Failed to parse cross-tab message:', error);
+        }
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+
+    // Cleanup function
+    return () => {
+      console.log('🧹 DashboardHomePage: Cleaning up instant organization listeners');
+      cleanup();
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, [profile?.id]);
+
+  // 🚀 Fetch user's organization info on initial load
+  useEffect(() => {
+    const fetchOrganizationInfo = async () => {
+      if (!profile?.id) return;
+      
+      try {
+        console.log('🔍 DashboardHomePage: Fetching organization info for profile:', profile.id);
+        
+        const { data: memberships, error } = await supabase
+          .from('organization_memberships')
+          .select(`
+            *,
+            organizations!inner(
+              id,
+              name,
+              tagline,
+              type,
+              image_url
+            )
+          `)
+          .eq('profile_id', profile.id)
+          .order('joined_at', { ascending: false })
+          .limit(1);
+
+        if (error) {
+          console.error('❌ DashboardHomePage: Error fetching organization memberships:', error);
+          return;
+        }
+
+        if (memberships && memberships.length > 0) {
+          const membership = memberships[0];
+          const org = membership.organizations;
+          
+          const orgData = {
+            id: org.id,
+            name: org.name,
+            tagline: org.tagline,
+            type: org.type,
+            image_url: org.image_url,
+            role: membership.role
+          };
+          
+          setOrganizationInfo(orgData);
+          console.log('🏢 DashboardHomePage: Organization info loaded:', orgData);
+        } else {
+          console.log('👤 DashboardHomePage: No organization membership found');
+          setOrganizationInfo(null);
+        }
+      } catch (err) {
+        console.error('❌ DashboardHomePage: Error fetching organization info:', err);
+        setOrganizationInfo(null);
+      }
+    };
+
+    fetchOrganizationInfo();
+  }, [profile?.id]);
 
   useEffect(() => {
     if (profile?.id) {
@@ -162,43 +294,90 @@ export default function DashboardHomePage() {
         setIsLoading(true);
         
         try {
-            const { data: newPosts, error: rpcError } = await supabase.rpc('get_ranked_feed', {
-                page_number: page,
-                page_size: POSTS_PER_PAGE
-            });
+            // 🚀 ENHANCED: Try to get posts with full profile information
+            const { data: postsData, error: postsError } = await supabase
+                .from('posts')
+                .select(`
+                    *,
+                    profiles:profile_id(
+                        id,
+                        full_name,
+                        avatar_url,
+                        title,
+                        organization_name,
+                        role,
+                        organization_type
+                    )
+                `)
+                .eq('channel', 'hello-world')
+                .order('created_at', { ascending: false })
+                .range(page * POSTS_PER_PAGE, (page + 1) * POSTS_PER_PAGE - 1);
 
-            if (rpcError) throw rpcError;
-
-            if (newPosts && newPosts.length > 0) {
-                const postIds = newPosts.map(p => p.id);
-                const { data: allReactions } = await supabase.from('post_likes').select('post_id, reaction_type').in('post_id', postIds);
-                const userIds = [...new Set(newPosts.map(p => p.profile_id))];
-                const { data: profiles, error: profileError } = await supabase.from('profiles').select('*').in('id', userIds);
-                if (profileError) throw profileError;
-
-                const profilesById = profiles.reduce((acc, p) => { acc[p.id] = p; return acc; }, {});
+            if (postsError) {
+                console.warn('⚠️ DashboardHomePage: Direct query failed, falling back to RPC:', postsError);
                 
-                const enrichedPosts = newPosts.map(post => {
-                    const reactionsForPost = allReactions?.filter(r => r.post_id === post.id) || [];
-                    const reactionSummary = reactionsForPost.reduce((acc, r) => {
-                        const type = r.reaction_type || 'like';
-                        acc[type] = (acc[type] || 0) + 1;
-                        return acc;
-                    }, {});
-                    return {
-                        ...post,
-                        profiles: profilesById[post.profile_id],
-                        reactions: { summary: Object.entries(reactionSummary).map(([type, count]) => ({ type, count })), sample: [] }
-                    };
+                // Fallback to original RPC method
+                const { data: newPosts, error: rpcError } = await supabase.rpc('get_ranked_feed', {
+                    page_number: page,
+                    page_size: POSTS_PER_PAGE
                 });
-                
-                setPosts(prevPosts => (page === 0 ? enrichedPosts : [...prevPosts, ...enrichedPosts]));
-                if (newPosts.length < POSTS_PER_PAGE) setHasMore(false);
+
+                if (rpcError) throw rpcError;
+
+                if (newPosts && newPosts.length > 0) {
+                    const userIds = [...new Set(newPosts.map(p => p.profile_id))];
+                    const { data: profiles, error: profileError } = await supabase.from('profiles').select('*').in('id', userIds);
+                    if (profileError) throw profileError;
+
+                    const profilesById = profiles.reduce((acc, p) => { acc[p.id] = p; return acc; }, {});
+                    
+                    const enrichedPosts = newPosts.map(post => ({
+                        ...post,
+                        profiles: profilesById[post.profile_id]
+                    }));
+                    
+                    setPosts(prevPosts => (page === 0 ? enrichedPosts : [...prevPosts, ...enrichedPosts]));
+                    if (newPosts.length < POSTS_PER_PAGE) setHasMore(false);
+                } else {
+                    setHasMore(false);
+                }
             } else {
-                setHasMore(false);
+                // Success with direct query
+                console.log('✅ DashboardHomePage: Direct query success - fetched posts:', postsData?.length || 0);
+                
+                if (postsData && postsData.length > 0) {
+                    // Get reactions for posts
+                    const postIds = postsData.map(post => post.id);
+                    const { data: allReactions } = await supabase
+                        .from('post_likes')
+                        .select('post_id, reaction_type')
+                        .in('post_id', postIds);
+
+                    const enrichedPosts = postsData.map(post => {
+                        const reactionsForPost = allReactions?.filter(r => r.post_id === post.id) || [];
+                        const reactionSummary = reactionsForPost.reduce((acc, r) => {
+                            const type = r.reaction_type || 'like';
+                            acc[type] = (acc[type] || 0) + 1;
+                            return acc;
+                        }, {});
+                        
+                        return {
+                            ...post,
+                            reactions: { 
+                                summary: Object.entries(reactionSummary).map(([type, count]) => ({ type, count })), 
+                                sample: [] 
+                            }
+                        };
+                    });
+                    
+                    setPosts(prevPosts => (page === 0 ? enrichedPosts : [...prevPosts, ...enrichedPosts]));
+                    if (postsData.length < POSTS_PER_PAGE) setHasMore(false);
+                } else {
+                    setHasMore(false);
+                }
             }
         } catch (error) {
-            console.error("Error fetching ranked posts:", error);
+            console.error("❌ DashboardHomePage: Error fetching posts:", error);
             setHasMore(false);
         } finally {
             setIsLoading(false);
@@ -227,9 +406,15 @@ export default function DashboardHomePage() {
     
     channel
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'posts', filter: 'channel=eq.hello-world' }, async (payload) => {
+        console.log('🔴 DashboardHomePage: Real-time post insert:', payload.new);
+        
         const { data: profileData } = await supabase.from('profiles').select('*').eq('id', payload.new.profile_id).single();
         if (profileData) {
-            const newPostWithProfile = { ...payload.new, profiles: profileData };
+            const newPostWithProfile = { 
+                ...payload.new, 
+                profiles: profileData, 
+                reactions: { summary: [], sample: [] } 
+            };
             setPosts(currentPosts => {
                 if (currentPosts.some(p => p.id === newPostWithProfile.id)) return currentPosts;
                 return [newPostWithProfile, ...currentPosts];
@@ -237,9 +422,11 @@ export default function DashboardHomePage() {
         }
       })
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'posts', filter: 'channel=eq.hello-world' }, (payload) => {
+        console.log('🔴 DashboardHomePage: Real-time post delete:', payload.old);
         setPosts(currentPosts => currentPosts.filter(p => p.id !== payload.old.id));
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'posts', filter: 'channel=eq.hello-world' }, (payload) => {
+        console.log('🟡 DashboardHomePage: Real-time post update:', payload.new);
         setPosts(currentPosts => currentPosts.map(p => 
           p.id === payload.new.id ? { ...p, ...payload.new } : p
         ));
@@ -258,10 +445,13 @@ export default function DashboardHomePage() {
       })
       .subscribe();
 
+    console.log('🔔 DashboardHomePage: Subscribed to real-time updates for hello-world channel');
+
     return () => {
       supabase.removeChannel(channel);
+      console.log('🔕 DashboardHomePage: Unsubscribed from hello-world channel');
     };
-  }, [posts]); // Added posts as dependency to ensure we have the latest posts for filtering
+  }, [posts]);
 
   const handleEnterWorld = () => {
     if (profile?.id) {
@@ -271,18 +461,32 @@ export default function DashboardHomePage() {
     }
   };
 
-  const handleNewPost = (newPost) => {
-      const postWithProfile = { ...newPost, profiles: profile, likes_count: 0, comments_count: 0, reactions: { summary: [], sample: [] } };
-      setPosts(p => [postWithProfile, ...p]);
-  };
+  // 🚀 ENHANCED: Include current organization info when creating new posts
+  const handleNewPost = useCallback((newPost) => {
+    const postWithOrgInfo = { 
+      ...newPost, 
+      profiles: {
+        ...profile,
+        // Update with current organization info if available
+        organization_name: organizationInfo?.name || profile?.organization_name,
+        organization_type: organizationInfo?.type || profile?.organization_type,
+      },
+      likes_count: 0, 
+      comments_count: 0, 
+      reactions: { summary: [], sample: [] } 
+    };
+    
+    console.log('📝 DashboardHomePage: Adding new post with org info:', postWithOrgInfo.profiles);
+    setPosts(p => [postWithOrgInfo, ...p]);
+  }, [profile, organizationInfo]);
   
-  const handleDeletePost = (postId) => {
+  const handleDeletePost = useCallback((postId) => {
       setPosts(p => p.filter(post => post.id !== postId));
-  };
+  }, []);
 
   return (
     <div className="space-y-6">
-      {/* 🎯 Use the separate ProfileCompletionBanner component (non-dismissible) */}
+      {/* Profile Completion Banner */}
       <ProfileCompletionBanner profile={profile} />
       
       <TrendingNewsSection />
@@ -290,7 +494,12 @@ export default function DashboardHomePage() {
       {(hasEnteredWorld || posts.length > 0) && (
         <>
           <HelloWorldChannelIdentifier />
-          <CreatePost profile={profile} onNewPost={handleNewPost} channel="hello-world" />
+          <CreatePost 
+            profile={profile} 
+            onNewPost={handleNewPost} 
+            channel="hello-world" 
+            organizationType={organizationInfo?.type}
+          />
           {posts.length > 0 && (
             <div className="space-y-6">
               {posts.filter(post => post.profiles).map(post => (

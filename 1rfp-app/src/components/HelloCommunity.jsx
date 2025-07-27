@@ -6,6 +6,7 @@ import { supabase } from '../supabaseClient';
 import CreatePost from './CreatePost.jsx';
 import PostCard from './PostCard.jsx';
 import { rssNewsService as newsService } from '../services/rssNewsService.js';
+import { addOrganizationEventListener } from '../utils/organizationEvents';
 
 // Organization channel configuration - now maps to actual database channels
 const ORGANIZATION_CHANNELS = {
@@ -295,12 +296,92 @@ function HelloCommunity() {
     if (node) observer.current.observe(node);
   }, [isPageLoading, hasMore]);
 
-  // Fetch user's organization info
+  // 🚀 INSTANT: Listen for organization changes
+  useEffect(() => {
+    if (!profile?.id) return;
+
+    console.log('⚡ HelloCommunity: Setting up instant organization change listener');
+
+    // Listen for instant organization changes
+    const cleanup = addOrganizationEventListener('organizationChanged', (event) => {
+      const { profileId, organization } = event.detail;
+      
+      // Only process if this event is for the current user
+      if (profileId === profile.id) {
+        console.log('⚡ HelloCommunity: INSTANT organization change detected!', {
+          profileId,
+          organization
+        });
+
+        // Update organization info immediately
+        if (organization) {
+          console.log('✅ HelloCommunity: Setting new organization info');
+          setOrganizationInfo({
+            id: organization.id,
+            name: organization.name,
+            type: organization.type,
+            tagline: organization.tagline,
+            image_url: organization.image_url,
+            role: 'member' // Default role for joined organizations
+          });
+        } else {
+          console.log('✅ HelloCommunity: Clearing organization info (user left org)');
+          setOrganizationInfo(null);
+          // Clear posts when user leaves organization
+          setPosts([]);
+          setPage(0);
+          setHasMore(true);
+        }
+      }
+    });
+
+    // Also listen for cross-tab changes
+    const handleStorageChange = (e) => {
+      if (e.key === 'orgChangeEvent' && e.newValue) {
+        try {
+          const message = JSON.parse(e.newValue);
+          if (message.profileId === profile.id) {
+            console.log('📡 HelloCommunity: Cross-tab organization change detected');
+            if (message.organization) {
+              setOrganizationInfo({
+                id: message.organization.id,
+                name: message.organization.name,
+                type: message.organization.type,
+                tagline: message.organization.tagline,
+                image_url: message.organization.image_url,
+                role: 'member'
+              });
+            } else {
+              setOrganizationInfo(null);
+              setPosts([]);
+              setPage(0);
+              setHasMore(true);
+            }
+          }
+        } catch (error) {
+          console.error('❌ HelloCommunity: Failed to parse cross-tab message:', error);
+        }
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+
+    // Cleanup function
+    return () => {
+      console.log('🧹 HelloCommunity: Cleaning up instant organization listeners');
+      cleanup();
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, [profile?.id]);
+
+  // Fetch user's organization info on initial load
   useEffect(() => {
     const fetchOrganizationInfo = async () => {
       if (!profile?.id) return;
       
       try {
+        console.log('🔍 HelloCommunity: Fetching organization info for profile:', profile.id);
+        
         const { data: memberships, error } = await supabase
           .from('organization_memberships')
           .select(`
@@ -318,7 +399,7 @@ function HelloCommunity() {
           .limit(1);
 
         if (error) {
-          console.error('Error fetching organization memberships:', error);
+          console.error('❌ HelloCommunity: Error fetching organization memberships:', error);
           return;
         }
 
@@ -336,13 +417,13 @@ function HelloCommunity() {
           };
           
           setOrganizationInfo(orgData);
-          console.log('🏢 Organization info loaded:', orgData);
+          console.log('🏢 HelloCommunity: Organization info loaded:', orgData);
         } else {
-          console.log('👤 No organization membership found');
+          console.log('👤 HelloCommunity: No organization membership found');
           setOrganizationInfo(null);
         }
       } catch (err) {
-        console.error('Error fetching organization info:', err);
+        console.error('❌ HelloCommunity: Error fetching organization info:', err);
         setOrganizationInfo(null);
       }
     };
@@ -350,22 +431,24 @@ function HelloCommunity() {
     fetchOrganizationInfo();
   }, [profile?.id]);
 
-  // Get user's organization type and channel info
-  const userOrgType = getOrgBaseType(organizationInfo?.type || profile?.organization_type);
+  // Get user's organization type and channel info - FIXED: Only use organizationInfo
+  const userOrgType = getOrgBaseType(organizationInfo?.type); // Remove fallback to profile?.organization_type
   const channelInfo = getChannelInfo(userOrgType);
-  const canPost = !!userOrgType && !!channelInfo;
+  const canPost = !!organizationInfo && !!userOrgType && !!channelInfo; // Require organizationInfo
   
   // Get the database channel name
   const dbChannel = channelInfo?.dbChannel;
 
-  console.log('User org type:', userOrgType);
-  console.log('Channel info:', channelInfo);
-  console.log('Database channel:', dbChannel);
-  console.log('Can post:', canPost);
+  console.log('🎯 HelloCommunity: Organization info:', organizationInfo);
+  console.log('🎯 HelloCommunity: User org type:', userOrgType);
+  console.log('🎯 HelloCommunity: Channel info:', channelInfo);
+  console.log('🎯 HelloCommunity: Database channel:', dbChannel);
+  console.log('🎯 HelloCommunity: Can post:', canPost);
 
   // Reset posts when channel changes
   useEffect(() => {
     if (userOrgType && dbChannel) {
+      console.log('🔄 HelloCommunity: Channel changed, resetting posts');
       setPosts([]);
       setPage(0);
       setHasMore(true);
@@ -384,7 +467,7 @@ function HelloCommunity() {
       page === 0 ? setInitialLoading(true) : setIsPageLoading(true);
 
       try {
-        console.log('🔍 Fetching posts for channel:', dbChannel);
+        console.log('🔍 HelloCommunity: Fetching posts for channel:', dbChannel);
         
         // Try using the RPC function first (more robust)
         try {
@@ -396,7 +479,7 @@ function HelloCommunity() {
             });
 
           if (!rpcError && rpcData) {
-            console.log('✅ Using RPC function - fetched posts:', rpcData);
+            console.log('✅ HelloCommunity: Using RPC function - fetched posts:', rpcData);
             
             // Transform RPC data to match expected format
             const transformedPosts = rpcData.map(post => ({
@@ -439,13 +522,13 @@ function HelloCommunity() {
               setPosts(prev => (page === 0 ? enrichedPosts : [...prev, ...enrichedPosts]));
               if (enrichedPosts.length < POSTS_PER_PAGE) setHasMore(false);
             } else {
-              if (page === 0) console.log('📭 No posts found for this organization type');
+              if (page === 0) console.log('📭 HelloCommunity: No posts found for this organization type');
               setHasMore(false);
             }
             return; // Success with RPC
           }
         } catch (rpcError) {
-          console.warn('⚠️ RPC function failed, falling back to direct query:', rpcError);
+          console.warn('⚠️ HelloCommunity: RPC function failed, falling back to direct query:', rpcError);
         }
 
         // Fallback: Direct database query
@@ -469,7 +552,7 @@ function HelloCommunity() {
 
         if (postsError) throw postsError;
 
-        console.log('📄 Fallback query - fetched posts:', postsData);
+        console.log('📄 HelloCommunity: Fallback query - fetched posts:', postsData);
 
         if (postsData && postsData.length > 0) {
           // Get reactions for posts
@@ -502,7 +585,7 @@ function HelloCommunity() {
           setHasMore(false);
         }
       } catch (error) {
-        console.error('❌ Error fetching community posts:', error);
+        console.error('❌ HelloCommunity: Error fetching community posts:', error);
       } finally {
         setInitialLoading(false);
         setIsPageLoading(false);
@@ -513,14 +596,23 @@ function HelloCommunity() {
   }, [userOrgType, dbChannel, page, hasMore]);
 
   const handleNewPost = useCallback((newPostData) => {
-    setPosts(prev => [{ 
+    // Enhanced: Include current organization info in the new post
+    const postWithOrgInfo = { 
       ...newPostData, 
-      profiles: profile,
+      profiles: {
+        ...profile,
+        // Update with current organization info if available
+        organization_name: organizationInfo?.name || profile?.organization_name,
+        organization_type: organizationInfo?.type || profile?.organization_type,
+      },
       reactions: { summary: [], sample: [] }, 
       likes_count: 0, 
       comments_count: 0 
-    }, ...prev]);
-  }, [profile]);
+    };
+    
+    console.log('📝 HelloCommunity: Adding new post with org info:', postWithOrgInfo.profiles);
+    setPosts(prev => [postWithOrgInfo, ...prev]);
+  }, [profile, organizationInfo]);
 
   const handleDeletePost = useCallback((deletedPostId) => {
     setPosts(prev => prev.filter((p) => p.id !== deletedPostId));
@@ -533,7 +625,7 @@ function HelloCommunity() {
     const channel = supabase.channel(`public:org_community:${dbChannel}`);
     
     const handlePostInsert = async (payload) => {
-      console.log('🔴 Real-time post insert:', payload.new);
+      console.log('🔴 HelloCommunity: Real-time post insert:', payload.new);
       
       const { data: profileData } = await supabase
         .from('profiles')
@@ -555,14 +647,14 @@ function HelloCommunity() {
     };
 
     const handlePostUpdate = (payload) => {
-      console.log('🟡 Real-time post update:', payload.new);
+      console.log('🟡 HelloCommunity: Real-time post update:', payload.new);
       setPosts(currentPosts => currentPosts.map(p => 
         p.id === payload.new.id ? { ...p, ...payload.new } : p
       ));
     };
 
     const handlePostDelete = (payload) => {
-      console.log('🔴 Real-time post delete:', payload.old);
+      console.log('🔴 HelloCommunity: Real-time post delete:', payload.old);
       setPosts(currentPosts => currentPosts.filter(p => p.id !== payload.old.id));
     };
 
@@ -587,16 +679,19 @@ function HelloCommunity() {
       }, handlePostDelete)
       .subscribe();
 
-    console.log(`🔔 Subscribed to real-time updates for channel: ${dbChannel}`);
+    console.log(`🔔 HelloCommunity: Subscribed to real-time updates for channel: ${dbChannel}`);
 
     return () => {
       supabase.removeChannel(channel);
-      console.log(`🔕 Unsubscribed from channel: ${dbChannel}`);
+      console.log(`🔕 HelloCommunity: Unsubscribed from channel: ${dbChannel}`);
     };
   }, [dbChannel]);
 
-  // If user has no organization, show join prompt
-  if (!userOrgType) {
+  // 🚀 INSTANT: Show join prompt when user has no organization - FIXED
+  if (!organizationInfo || !userOrgType) {
+    console.log('👤 HelloCommunity: No organization info or type - showing join prompt');
+    console.log('👤 HelloCommunity: organizationInfo:', organizationInfo);
+    console.log('👤 HelloCommunity: userOrgType:', userOrgType);
     return (
       <div className="space-y-6">
         <JoinOrganizationPrompt />

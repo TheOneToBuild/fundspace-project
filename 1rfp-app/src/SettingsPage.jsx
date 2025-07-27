@@ -1,7 +1,8 @@
-// src/SettingsPage.jsx - Updated for New Database Structure
+// src/SettingsPage.jsx - Updated for Instant Organization Changes
 import React, { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
 import { useOutletContext } from 'react-router-dom';
+import { addOrganizationEventListener } from './utils/organizationEvents';
 
 // Icons - keeping your existing ones
 const PlusIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>;
@@ -457,36 +458,105 @@ export default function SettingsPage() {
   const [privacyMessage, setPrivacyMessage] = useState('');
   const [privacyError, setPrivacyError] = useState('');
 
-  // Fetch organization name from their actual organization
-  const fetchOrganizationName = async (profile) => {
-    if (!profile?.selected_organization_id) {
-      return profile?.organization_name || ''; // Fallback to old field
-    }
+  // 🚀 INSTANT: Listen for organization changes
+  useEffect(() => {
+    if (!initialProfile?.id) return;
 
-    try {
-      const { data: orgData, error } = await supabase
-        .from('organizations')
-        .select('name')
-        .eq('id', profile.selected_organization_id)
-        .single();
+    console.log('⚡ SettingsPage: Setting up instant organization change listener');
 
-      if (error) {
-        console.error('Error fetching organization:', error);
-        return profile?.organization_name || '';
+    // Listen for instant organization changes
+    const cleanup = addOrganizationEventListener('organizationChanged', (event) => {
+      const { profileId, organization } = event.detail;
+      
+      // Only process if this event is for the current user
+      if (profileId === initialProfile.id) {
+        console.log('⚡ SettingsPage: INSTANT organization change detected!', {
+          profileId,
+          organization
+        });
+
+        // Update organization name immediately
+        if (organization) {
+          console.log('✅ SettingsPage: Setting new organization name:', organization.name);
+          setOrganizationName(organization.name);
+        } else {
+          console.log('✅ SettingsPage: Clearing organization name (user left org)');
+          setOrganizationName(''); // Clear when user leaves organization
+        }
       }
+    });
 
-      return orgData?.name || '';
-    } catch (err) {
-      console.error('Error fetching organization name:', err);
-      return profile?.organization_name || '';
+    // Also listen for cross-tab changes
+    const handleStorageChange = (e) => {
+      if (e.key === 'orgChangeEvent' && e.newValue) {
+        try {
+          const message = JSON.parse(e.newValue);
+          if (message.profileId === initialProfile.id) {
+            console.log('📡 SettingsPage: Cross-tab organization change detected');
+            if (message.organization) {
+              setOrganizationName(message.organization.name);
+            } else {
+              setOrganizationName('');
+            }
+          }
+        } catch (error) {
+          console.error('❌ SettingsPage: Failed to parse cross-tab message:', error);
+        }
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+
+    // Cleanup function
+    return () => {
+      console.log('🧹 SettingsPage: Cleaning up instant organization listeners');
+      cleanup();
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, [initialProfile?.id]);
+
+  // Enhanced fetchOrganizationName function - FIXED to return empty when no org
+  const fetchOrganizationName = async (profile) => {
+    console.log('🔍 SettingsPage: Fetching organization name for profile:', profile?.id);
+    
+    // First, try to get from organization membership (this is the authoritative source)
+    if (profile?.id) {
+      try {
+        const { data: memberships, error } = await supabase
+          .from('organization_memberships')
+          .select(`
+            organizations!inner(
+              id,
+              name
+            )
+          `)
+          .eq('profile_id', profile.id)
+          .order('joined_at', { ascending: false })
+          .limit(1);
+
+        if (!error && memberships && memberships.length > 0) {
+          const orgName = memberships[0].organizations.name;
+          console.log('✅ SettingsPage: Found organization from membership:', orgName);
+          return orgName;
+        } else {
+          console.log('📝 SettingsPage: No current organization membership found');
+          return ''; // Return empty string when no membership exists
+        }
+      } catch (err) {
+        console.error('❌ SettingsPage: Error fetching organization from membership:', err);
+        return ''; // Return empty on error
+      }
     }
+
+    console.log('📝 SettingsPage: No profile ID available');
+    return ''; // Return empty when no profile
   };
 
   // Enhanced useEffect to properly map all profile data
   useEffect(() => {
     const loadProfileData = async () => {
       if (initialProfile) {
-        console.log('📋 Loading profile data:', initialProfile);
+        console.log('📋 SettingsPage: Loading profile data:', initialProfile);
         
         setProfile(initialProfile);
         setFullName(initialProfile.full_name || '');
@@ -514,7 +584,8 @@ export default function SettingsPage() {
         setProfileMessage('');
         setProfileError('');
         
-        console.log('✅ Profile loaded with interests:', profileInterests);
+        console.log('✅ SettingsPage: Profile loaded with interests:', profileInterests);
+        console.log('🏢 SettingsPage: Organization name set to:', orgName);
       }
     };
 
@@ -526,7 +597,7 @@ export default function SettingsPage() {
     const handleAvatarUpdate = (event) => {
       const { newAvatarUrl, userId } = event.detail;
       if (userId === session?.user?.id) {
-        console.log('🔄 Received global avatar update event');
+        console.log('🔄 SettingsPage: Received global avatar update event');
         setAvatarUrl(newAvatarUrl);
       }
     };
@@ -853,18 +924,22 @@ export default function SettingsPage() {
             />
           </div>
 
+          {/* 🚀 ENHANCED: Organization Name with instant updates */}
           <div>
             <label htmlFor="organization" className="text-sm font-medium text-slate-700 block mb-1">Organization Name</label>
             <input 
               id="organization" 
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-slate-50 text-slate-600 cursor-not-allowed" 
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-slate-50 text-slate-600 cursor-not-allowed transition-all duration-300" 
               type="text" 
-              value={organizationName} 
+              value={organizationName || ''} // Handle empty state
               disabled
-              placeholder="No organization linked"
+              placeholder={organizationName ? organizationName : "No organization linked"}
             />
             <p className="text-xs text-slate-500 mt-1">
-              This is automatically populated from your linked organization. To change this, you'll need to join a different organization.
+              {organizationName 
+                ? "This is automatically populated from your linked organization. To change this, you'll need to join a different organization."
+                : "You're not currently a member of any organization. Join an organization to have it displayed here."
+              }
             </p>
           </div>
 

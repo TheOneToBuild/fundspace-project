@@ -1,7 +1,8 @@
-// MODIFIED: Added 'useMemo' to the import statement
+// PostCard.jsx - Updated with Instant Organization Support
 import React, { useState, useEffect, useMemo, memo, lazy, Suspense } from 'react';
 import { supabase } from '../supabaseClient';
 import { useOutletContext } from 'react-router-dom';
+import { addOrganizationEventListener } from '../utils/organizationEvents';
 
 // Import components
 import PostHeader from './post/PostHeader';
@@ -32,10 +33,142 @@ function PostCard({ post, onDelete, disabled = false, showOrganizationAsAuthor =
     const [showReactorsPreview, setShowReactorsPreview] = useState(false);
     const reactorsTimeoutRef = React.useRef(null);
 
+    // 🚀 NEW: State to track current organization info for author
+    const [authorOrganizationInfo, setAuthorOrganizationInfo] = useState(null);
+
     const { content, created_at, profiles: individualAuthor, image_url, image_urls, tags } = post;
     const isAuthor = currentUserProfile?.id === individualAuthor?.id;
     const displayImages = image_urls && image_urls.length > 0 ? image_urls : (image_url ? [image_url] : []);
 
+    // 🚀 ENHANCED: Fetch current organization info for the post author
+    useEffect(() => {
+        const fetchAuthorOrganizationInfo = async () => {
+            if (!individualAuthor?.id) return;
+            
+            try {
+                console.log('🔍 PostCard: Fetching organization info for author:', individualAuthor.id);
+                
+                const { data: memberships, error } = await supabase
+                    .from('organization_memberships')
+                    .select(`
+                        *,
+                        organizations!inner(
+                            id,
+                            name,
+                            tagline,
+                            type,
+                            image_url
+                        )
+                    `)
+                    .eq('profile_id', individualAuthor.id)
+                    .order('joined_at', { ascending: false })
+                    .limit(1);
+
+                if (error) {
+                    console.error('❌ PostCard: Error fetching author organization:', error);
+                    return;
+                }
+
+                if (memberships && memberships.length > 0) {
+                    const membership = memberships[0];
+                    const org = membership.organizations;
+                    
+                    const orgInfo = {
+                        id: org.id,
+                        name: org.name,
+                        tagline: org.tagline,
+                        type: org.type,
+                        image_url: org.image_url,
+                        role: membership.role
+                    };
+                    
+                    setAuthorOrganizationInfo(orgInfo);
+                    console.log('✅ PostCard: Author organization info loaded:', orgInfo);
+                } else {
+                    console.log('👤 PostCard: No organization found for author');
+                    setAuthorOrganizationInfo(null);
+                }
+            } catch (err) {
+                console.error('❌ PostCard: Error fetching author organization info:', err);
+                setAuthorOrganizationInfo(null);
+            }
+        };
+
+        fetchAuthorOrganizationInfo();
+    }, [individualAuthor?.id]);
+
+    // 🚀 INSTANT: Listen for organization changes if this is the current user's post
+    useEffect(() => {
+        if (!isAuthor || !currentUserProfile?.id) return;
+
+        console.log('⚡ PostCard: Setting up instant organization listener for author post');
+
+        // Listen for instant organization changes for the current user
+        const cleanup = addOrganizationEventListener('organizationChanged', (event) => {
+            const { profileId, organization } = event.detail;
+            
+            // Only update if this is the current user's post
+            if (profileId === currentUserProfile.id) {
+                console.log('⚡ PostCard: INSTANT organization change for author post!', {
+                    profileId,
+                    organization
+                });
+
+                // Update organization info immediately
+                if (organization) {
+                    console.log('✅ PostCard: Updating author organization info');
+                    setAuthorOrganizationInfo({
+                        id: organization.id,
+                        name: organization.name,
+                        type: organization.type,
+                        tagline: organization.tagline,
+                        image_url: organization.image_url,
+                        role: 'member' // Default role
+                    });
+                } else {
+                    console.log('✅ PostCard: Clearing author organization info');
+                    setAuthorOrganizationInfo(null);
+                }
+            }
+        });
+
+        // Also listen for cross-tab changes
+        const handleStorageChange = (e) => {
+            if (e.key === 'orgChangeEvent' && e.newValue) {
+                try {
+                    const message = JSON.parse(e.newValue);
+                    if (message.profileId === currentUserProfile.id) {
+                        console.log('📡 PostCard: Cross-tab organization change for author post');
+                        if (message.organization) {
+                            setAuthorOrganizationInfo({
+                                id: message.organization.id,
+                                name: message.organization.name,
+                                type: message.organization.type,
+                                tagline: message.organization.tagline,
+                                image_url: message.organization.image_url,
+                                role: 'member'
+                            });
+                        } else {
+                            setAuthorOrganizationInfo(null);
+                        }
+                    }
+                } catch (error) {
+                    console.error('❌ PostCard: Failed to parse cross-tab message:', error);
+                }
+            }
+        };
+
+        window.addEventListener('storage', handleStorageChange);
+
+        // Cleanup function
+        return () => {
+            console.log('🧹 PostCard: Cleaning up instant organization listeners');
+            cleanup();
+            window.removeEventListener('storage', handleStorageChange);
+        };
+    }, [isAuthor, currentUserProfile?.id]);
+
+    // 🚀 ENHANCED: Display author with current organization info
     const displayAuthor = useMemo(() => {
         if (showOrganizationAsAuthor && organization) {
             return {
@@ -44,9 +177,22 @@ function PostCard({ post, onDelete, disabled = false, showOrganizationAsAuthor =
                 organization_name: organization.funder_type?.name || 'Funder'
             };
         }
-        return individualAuthor;
-    }, [showOrganizationAsAuthor, organization, individualAuthor]);
-
+        
+        // Enhanced individual author display with current org info
+        const author = { ...individualAuthor };
+        
+        // If we have current organization info for this author, use it
+        if (authorOrganizationInfo) {
+            author.organization_name = authorOrganizationInfo.name;
+            author.organization_type = authorOrganizationInfo.type;
+            // You could also update the role/title if needed
+            if (authorOrganizationInfo.role && !author.title) {
+                author.title = authorOrganizationInfo.role.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
+            }
+        }
+        
+        return author;
+    }, [showOrganizationAsAuthor, organization, individualAuthor, authorOrganizationInfo]);
 
     useEffect(() => {
         setCommentCount(post.comments_count || 0);
@@ -124,13 +270,17 @@ function PostCard({ post, onDelete, disabled = false, showOrganizationAsAuthor =
         await refreshPostData();
     };
 
+    // 🚀 FIXED: Update the updateMentionRecords function to handle non-arrays
     const updateMentionRecords = async (postId, mentions) => {
         try {
             await supabase.from('post_mentions').delete().eq('post_id', postId);
 
-            if (!mentions || mentions.length === 0) return;
+            // 🚀 FIXED: Ensure mentions is always an array
+            const mentionsArray = Array.isArray(mentions) ? mentions : [];
+            
+            if (mentionsArray.length === 0) return;
 
-            const mentionRecords = mentions.map(mention => {
+            const mentionRecords = mentionsArray.map(mention => {
                 const record = { post_id: postId, mention_type: mention.type };
                 if (mention.type === 'user') {
                     record.mentioned_profile_id = mention.id;
@@ -150,16 +300,24 @@ function PostCard({ post, onDelete, disabled = false, showOrganizationAsAuthor =
         }
     };
 
+    // 🚀 FIXED: Fixed handleEditPost function for PostCard.jsx
     const handleEditPost = async (editData) => {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user || user.id !== post.user_id) return;
 
+        // 🚀 FIXED: Handle the correct property names from EditPost component
+        // EditPost returns: { content, image_urls, tags, mentions }
+        const content = editData.content || '';
+        const imageUrls = editData.image_urls || []; // Use image_urls, not images
+        const tags = editData.tags ? JSON.parse(editData.tags) : []; // Parse if string
+        const mentions = editData.mentions ? JSON.parse(editData.mentions) : []; // Parse if string
+
         const updateData = {
-            content: editData.content.trim(),
-            tags: editData.tags.length > 0 ? JSON.stringify(editData.tags) : null,
-            image_urls: editData.images.length > 0 ? editData.images : null,
-            image_url: editData.images.length === 1 ? editData.images[0] : null,
-            mentions: editData.mentions.length > 0 ? JSON.stringify(editData.mentions) : null,
+            content: content.trim(),
+            tags: tags.length > 0 ? JSON.stringify(tags) : null,
+            image_urls: imageUrls.length > 0 ? imageUrls : null,
+            image_url: imageUrls.length === 1 ? imageUrls[0] : null,
+            mentions: mentions.length > 0 ? JSON.stringify(mentions) : null,
         };
 
         const { data: updatedPost, error } = await supabase
@@ -173,13 +331,15 @@ function PostCard({ post, onDelete, disabled = false, showOrganizationAsAuthor =
             alert('Failed to update post. Please try again.');
             console.error("Post update error:", error);
         } else {
+            // 🚀 FIXED: Update post object with safe parsing
             post.content = updatedPost.content;
             post.tags = updatedPost.tags ? JSON.parse(updatedPost.tags) : [];
             post.image_urls = updatedPost.image_urls;
             post.image_url = updatedPost.image_url;
             post.mentions = updatedPost.mentions ? JSON.parse(updatedPost.mentions) : [];
             
-            await updateMentionRecords(post.id, editData.mentions);
+            // 🚀 FIXED: Pass safe mentions array to updateMentionRecords
+            await updateMentionRecords(post.id, mentions);
             
             setIsEditing(false);
         }
