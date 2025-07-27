@@ -44,6 +44,7 @@ import DashboardHeader from './components/DashboardHeader.jsx';
 import './components/skeleton-animations.css';
 import headerLogoImage from './assets/1rfp-logo.png';
 import { PlusCircle, Menu, X } from './components/Icons.jsx';
+import NotificationsPage from './components/NotificationsPage.jsx';
 
 export const LayoutContext = createContext({ setPageBgColor: () => {} });
 
@@ -410,6 +411,7 @@ export default function App() {
               <Route path="omega-admin/organizations" element={<OmegaAdminOrgSelector />} />
               <Route path="omega-admin/organizations/edit/:orgType/:orgId" element={<OmegaAdminEditOrg />} />
               <Route path="omega-admin/organizations/members/:orgType/:orgId" element={<OmegaAdminManageMembers />} />
+              <Route path="notifications" element={<NotificationsPage />} />
             </Route>
             <Route path="/onboarding" element={<ProtectedRoute><OnboardingWizard /></ProtectedRoute>} />
           </Route>

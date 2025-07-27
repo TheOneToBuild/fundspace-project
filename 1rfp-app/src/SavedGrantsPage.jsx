@@ -1,4 +1,4 @@
-// src/SavedGrantsPage.jsx
+// src/SavedGrantsPage.jsx - COMPLETELY REPLACE YOUR CURRENT FILE WITH THIS VERSION
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from './supabaseClient';
 import { useOutletContext, Link } from 'react-router-dom';
@@ -75,32 +75,49 @@ export default function SavedGrantsPage() {
 
   const fetchSavedGrants = useCallback(async (userId) => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from('saved_grants')
-      .select(`id, grant_id, grants(*, funders(name, logo_url, slug), grant_categories(categories(id, name)), grant_locations(locations(id, name)))`)
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false });
+    try {
+      // FIXED: Updated query to match the actual database schema
+      const { data, error } = await supabase
+        .from('saved_grants')
+        .select(`
+          id, 
+          grant_id, 
+          grants(
+            *, 
+            organizations(name, image_url, slug), 
+            grant_categories(categories(id, name)), 
+            grant_locations(locations(id, name))
+          )
+        `)
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
 
-    if (error) {
-      console.error('Error fetching saved grants:', error);
+      if (error) {
+        console.error('Error fetching saved grants:', error);
+        setAllSavedGrants([]);
+      } else {
+        const formattedData = data.map(item => ({
+          ...item.grants,
+          save_id: item.id,
+          // FIXED: Updated to use organizations instead of funders
+          foundationName: item.grants.organizations?.name || 'Unknown Organization',
+          funderLogoUrl: item.grants.organizations?.image_url || null,
+          fundingAmount: item.grants.max_funding_amount || item.grants.funding_amount_text || 'Not specified',
+          dueDate: item.grants.deadline,
+          grantType: item.grants.grant_type,
+          categories: item.grants.grant_categories.map(gc => gc.categories),
+          locations: item.grants.grant_locations.map(gl => gl.locations),
+          eligibility_criteria: item.grants.eligibility_criteria,
+          save_count: item.grants.save_count
+        }));
+        setAllSavedGrants(formattedData);
+      }
+    } catch (err) {
+      console.error('Unexpected error in fetchSavedGrants:', err);
       setAllSavedGrants([]);
-    } else {
-      const formattedData = data.map(item => ({
-        ...item.grants,
-        save_id: item.id,
-        foundationName: item.grants.funders?.name || 'Unknown Funder',
-        funderLogoUrl: item.grants.funders?.logo_url || null,
-        fundingAmount: item.grants.max_funding_amount || item.grants.funding_amount_text || 'Not specified',
-        dueDate: item.grants.deadline,
-        grantType: item.grants.grant_type,
-        categories: item.grants.grant_categories.map(gc => gc.categories),
-        locations: item.grants.grant_locations.map(gl => gl.locations),
-        eligibility_criteria: item.grants.eligibility_criteria,
-        save_count: item.grants.save_count
-      }));
-      setAllSavedGrants(formattedData);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, []);
 
   useEffect(() => {
@@ -171,8 +188,23 @@ export default function SavedGrantsPage() {
   const handleUnsaveGrant = async (grantId) => {
     const grantToUnsave = allSavedGrants.find(g => g.id === grantId);
     if (!grantToUnsave) return;
-    await supabase.from('saved_grants').delete().eq('id', grantToUnsave.save_id);
-    fetchSavedGrants(session.user.id);
+    
+    try {
+      const { error } = await supabase
+        .from('saved_grants')
+        .delete()
+        .eq('id', grantToUnsave.save_id);
+      
+      if (error) {
+        console.error('Error unsaving grant:', error);
+        return;
+      }
+      
+      // Refresh the list after successful deletion
+      fetchSavedGrants(session.user.id);
+    } catch (err) {
+      console.error('Unexpected error unsaving grant:', err);
+    }
   };
   
   const openDetail = useCallback((grant) => { setSelectedGrant(grant); setIsDetailModal(true); }, []);
@@ -190,8 +222,7 @@ export default function SavedGrantsPage() {
         <FilterBar
             isMobileVisible={true}
             searchTerm={filterConfig.searchTerm}
-            // FIX: Pass the correct handler for the search input
-            onSuggestionSelect={(value) => handleFilterChange('searchTerm', value)}
+            setSearchTerm={(value) => handleFilterChange('searchTerm', value)}
             locationFilter={filterConfig.locationFilter}
             setLocationFilter={(value) => handleFilterChange('locationFilter', value)}
             categoryFilter={filterConfig.categoryFilter}
@@ -213,13 +244,29 @@ export default function SavedGrantsPage() {
         />
 
         {loading ? (
-          <p>Loading saved grants...</p>
+          <div className="bg-white p-8 rounded-xl shadow-md border border-slate-200">
+            <div className="animate-pulse space-y-4">
+              <div className="h-6 bg-slate-200 rounded w-1/4"></div>
+              <div className="space-y-3">
+                {[...Array(3)].map((_, i) => (
+                  <div key={i} className="h-32 bg-slate-200 rounded"></div>
+                ))}
+              </div>
+            </div>
+          </div>
         ) : allSavedGrants.length === 0 ? (
           <div className="bg-white p-8 rounded-xl shadow-md border border-slate-200 text-center">
-            <div className="mx-auto w-12 h-12 flex items-center justify-center bg-slate-100 rounded-full mb-4"><BookmarkIcon /></div>
+            <div className="mx-auto w-12 h-12 flex items-center justify-center bg-slate-100 rounded-full mb-4">
+              <BookmarkIcon className="w-6 h-6 text-slate-500" />
+            </div>
             <h3 className="text-xl font-semibold mt-4">No Saved Grants Yet</h3>
             <p className="text-slate-500 mt-2">Start exploring and save grants to see them here.</p>
-            <Link to="/" className="mt-4 inline-block px-5 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700">Explore Grants</Link>
+            <Link 
+              to="/profile/grants" 
+              className="mt-4 inline-block px-5 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              Explore Grants
+            </Link>
           </div>
         ) : currentGrants.length > 0 ? (
           <>
@@ -244,7 +291,10 @@ export default function SavedGrantsPage() {
               <Search size={40} className="mx-auto text-slate-400 mb-3" />
               <p className="text-lg font-medium">No saved grants match your criteria.</p>
               <p className="text-sm mb-4">Try using a broader search term or removing a filter.</p>
-              <button onClick={handleClearFilters} className="inline-flex items-center px-4 py-2 border border-slate-300 rounded-md shadow-sm text-sm font-medium text-slate-700 bg-white hover:bg-slate-100">
+              <button 
+                onClick={handleClearFilters} 
+                className="inline-flex items-center px-4 py-2 border border-slate-300 rounded-md shadow-sm text-sm font-medium text-slate-700 bg-white hover:bg-slate-100 transition-colors"
+              >
                 <XCircle size={16} className="mr-2" />
                 Clear All Filters
               </button>

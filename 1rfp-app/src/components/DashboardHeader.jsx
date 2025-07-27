@@ -4,7 +4,7 @@ import { Link, NavLink } from 'react-router-dom';
 import NotificationsPanel from './NotificationsPanel';
 import UserMenu from './UserMenu.jsx';
 import headerLogoImage from '../assets/1rfp-logo.png';
-import { Search, PlusCircle, Home, Building, FileText, ClipboardList, Bell, Menu, X } from './Icons';
+import { Search, PlusCircle, Home, Building, FileText, ClipboardList, Bell, Menu, X, Users } from './Icons';
 
 const HeaderNavLink = ({ to, children, Icon, mobile = false, onClick }) => {
     const navLinkClass = ({ isActive }) => mobile 
@@ -108,6 +108,7 @@ export default function DashboardHeader({
                             <HeaderNavLink to="/profile" Icon={Home}>Home</HeaderNavLink>
                             <HeaderNavLink to="/profile/grants" Icon={ClipboardList}>Grants</HeaderNavLink>
                             <HeaderNavLink to="/profile/organizations" Icon={Building}>Organizations</HeaderNavLink>
+                            <HeaderNavLink to="/profile/members" Icon={Users}>Members</HeaderNavLink>
                         </nav>
 
                         {/* Right side - Actions and Profile */}
@@ -209,6 +210,9 @@ export default function DashboardHeader({
                             </HeaderNavLink>
                             <HeaderNavLink to="/profile/organizations" Icon={Building} mobile onClick={closeMobileMenu}>
                                 Explore Organizations
+                            </HeaderNavLink>
+                            <HeaderNavLink to="/profile/members" Icon={Users} mobile onClick={closeMobileMenu}>
+                                Explore Members
                             </HeaderNavLink>
                         </nav>
 

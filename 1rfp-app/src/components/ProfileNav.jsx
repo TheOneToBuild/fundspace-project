@@ -240,10 +240,6 @@ export default function ProfileNav() {
                             {displayOrg?.hasManagementAccess && (<span className="text-xs bg-blue-100 text-blue-700 px-1 py-0.5 rounded">Admin</span>)}
                         </NavLink>
                     )}
-                    <NavLink to="/profile/members" className={navLinkClass}>
-                        <div className="w-6 h-6 bg-green-200 rounded-md flex items-center justify-center text-xs shadow-sm">👥</div>
-                        <span className="font-medium">Explore Members</span>
-                    </NavLink>
                     <NavLink to="/profile/saved-grants" className={navLinkClass}>
                         <div className="w-6 h-6 bg-yellow-200 rounded-md flex items-center justify-center text-xs shadow-sm">📑</div>
                         <span className="font-medium">Saved Grants</span>
