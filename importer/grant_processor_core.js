@@ -1,6 +1,6 @@
 // importer/grant_processor_core.js
-// This is the core "engine" for processing grants. It will be used by both
-// your batch pipeline and the new on-demand user submission worker.
+// This is the complete, reusable "engine" for processing grants.
+// It combines the logic from your import_grants.js script into a module.
 
 const { createClient } = require('@supabase/supabase-js');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
@@ -15,19 +15,19 @@ const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
 const CONFIG = {
     MAX_CONTENT_LENGTH: 100000,
+    CHUNK_OVERLAP: 1000,
     MAX_PAGES_PER_SITE: 6,
     MAX_PDFS_PER_SITE: 3,
     CONTENT_RELEVANCE_THRESHOLD: 0.6,
     REQUEST_DELAY: 1500
 };
 
-// --- LOGIC (Copied and adapted from import_grants.js) ---
 
-// NOTE: The `IntelligentContentProcessor` class and its methods from import_grants.js
-// should be copied here verbatim. For brevity, I'm omitting the full class code.
-// Please copy the entire `IntelligentContentProcessor` class here.
+// =================================================================
+// INTELLIGENT CONTENT PROCESSOR CLASS (from import_grants.js)
+// =================================================================
+
 class IntelligentContentProcessor {
-    // ... PASTE THE FULL CLASS FROM import_grants.js HERE ...
     constructor() {
         this.grantKeywords = [
             'deadline', 'application', 'eligibility', 'funding amount',
@@ -43,21 +43,75 @@ class IntelligentContentProcessor {
             'call for proposals', 'funding announcement'
         ];
     }
-    extractGrantSections(text) { /* ... same as in your file ... */ return text.substring(0, CONFIG.MAX_CONTENT_LENGTH); }
-    async assessContentRelevance(content) { /* ... same as in your file ... */ return 1.0; }
-    createIntelligentChunks(text) { /* ... same as in your file ... */ return [text]; }
-    async processLargeContent(text, sourceUrl) { /* ... same as in your file ... */ return await this.extractFromChunk(text, sourceUrl); }
-    async extractFromChunk(content, sourceUrl) { /* ... same as in your file ... */ return await extractGrantInfo(content, sourceUrl); }
-    deduplicateGrants(grants) { /* ... same as in your file ... */ return grants; }
+
+    extractGrantSections(text) {
+        if (!text) return '';
+        const sections = text.split(/\n\s*(?:\n|---|\*\*\*|#{1,3})\s*/);
+        const scoredSections = sections.map(section => {
+            const lowerSection = section.toLowerCase();
+            let score = 0;
+            this.strongGrantIndicators.forEach(indicator => { if (lowerSection.includes(indicator)) score += 3; });
+            this.grantKeywords.forEach(keyword => { if (lowerSection.includes(keyword)) score += 1; });
+            if (/\$[\d,]+/.test(section)) score += 2;
+            if (/\b\d{1,2}[\/-]\d{1,2}[\/-]\d{4}\b|\b\w+\s+\d{1,2},?\s+\d{4}\b/.test(section)) score += 2;
+            return { section, score, length: section.length };
+        });
+        scoredSections.sort((a, b) => b.score - a.score);
+        let combinedText = '';
+        let totalLength = 0;
+        for (const scored of scoredSections) {
+            if (scored.score > 0 && totalLength + scored.length <= CONFIG.MAX_CONTENT_LENGTH) {
+                combinedText += scored.section + '\n\n';
+                totalLength += scored.length;
+            }
+        }
+        if (combinedText.length < 500) {
+            combinedText = text.substring(0, CONFIG.MAX_CONTENT_LENGTH);
+        }
+        return combinedText;
+    }
+
+    async assessContentRelevance(content) {
+        if (!content || content.length < 200) return 0;
+        const preview = content.substring(0, 3000);
+        try {
+            const prompt = `Rate the likelihood (0.0-1.0) that this content contains active grant opportunities. Consider mentions of deadlines, funding amounts, and application processes. Return only a number.`;
+            const result = await model.generateContent(prompt);
+            const score = parseFloat(result.response.text().trim()) || 0;
+            return Math.min(Math.max(score, 0), 1);
+        } catch (error) {
+            console.log(`     -> Content relevance check failed: ${error.message}`);
+            return 0.5;
+        }
+    }
+
+    async processLargeContent(text, sourceUrl) {
+        const relevantContent = this.extractGrantSections(text);
+        const relevanceScore = await this.assessContentRelevance(relevantContent);
+        if (relevanceScore < CONFIG.CONTENT_RELEVANCE_THRESHOLD) {
+            console.log(`     -> Content relevance ${relevanceScore} too low, skipping.`);
+            return [];
+        }
+        return await this.extractFromChunk(relevantContent, sourceUrl);
+    }
+
+    async extractFromChunk(content, sourceUrl) {
+        return await extractGrantInfo(content, sourceUrl);
+    }
 }
 
 
-// Copy the helper functions as well
+// =================================================================
+// UTILITY FUNCTIONS (from import_grants.js)
+// =================================================================
+
 const sleep = ms => new Promise(r => setTimeout(r, ms));
+
 function generateSlug(name) {
     if (!name) return null;
     return name.toLowerCase().replace(/&/g, 'and').replace(/[^a-z0-9\s-]/g, '').trim().replace(/[\s_]+/g, '-').replace(/--+/g, '-');
 }
+
 function parseFundingAmount(text) {
     if (!text) return null;
     const cleaned = String(text).replace(/[$,]/g, '');
@@ -65,70 +119,166 @@ function parseFundingAmount(text) {
     return numberMatch ? parseInt(numberMatch[0], 10) : null;
 }
 
-// Copy the crawling and data fetching logic
-async function discoverHighValueLinks(primaryUrl, page) { /* ... PASTE FROM import_grants.js ... */ return { html: [], pdf: [] }; }
-async function crawlAndGetRelevantText(primaryUrl, context) { /* ... PASTE FROM import_grants.js ... */ 
-    const page = await context.newPage();
-    await page.goto(primaryUrl, { waitUntil: 'networkidle', timeout: 60000 });
-    const text = await page.evaluate(() => document.body.innerText);
-    await page.close();
-    return text;
-}
-async function extractGrantInfo(text, sourceUrl) { /* ... PASTE FROM import_grants.js ... */ return []; }
 
-// Copy and adapt the database helpers
+// =================================================================
+// CRAWLING & EXTRACTION LOGIC (from import_grants.js)
+// =================================================================
+
+async function crawlAndGetRelevantText(primaryUrl, context) {
+    console.log(`  -> Crawling: ${primaryUrl}`);
+    const page = await context.newPage();
+    try {
+        await page.goto(primaryUrl, { waitUntil: 'networkidle', timeout: 60000 });
+        const primaryText = await page.evaluate(() => {
+            document.querySelectorAll('script, style, nav, footer, header, aside').forEach(el => el.remove());
+            return document.body.innerText.replace(/\s+/g, ' ').trim();
+        });
+        // For this on-demand worker, we will only process the primary URL for speed.
+        // You can re-add the multi-page/PDF logic here if needed.
+        return primaryText;
+    } finally {
+        if (!page.isClosed()) await page.close();
+    }
+}
+
+async function extractGrantInfo(text, sourceUrl) {
+    if (!text || text.length < 100) return [];
+    const prompt = `
+    Analyze the following content from ${sourceUrl} for active grant opportunities. Extract ALL distinct grant programs mentioned.
+
+    For each grant, return a JSON object with:
+    {
+        "funder_name": "Organization providing the grant (required)",
+        "title": "Specific grant program name (required)", 
+        "description": "Grant purpose and focus (required)",
+        "status": "Open/Upcoming/Closed",
+        "deadline": "Application deadline in YYYY-MM-DD format",
+        "eligibility_criteria": "Who can apply",
+        "funding_amount_text": "Original funding text (e.g. '$10,000-$50,000')",
+        "application_url": "Direct application link if found",
+        "categories": ["Focus areas"], "locations": ["Geographic areas served"], "grant_type": "Type of grant"
+    }
+    CRITICAL: Return a JSON array of grant objects. If no valid grants, return [].
+    Content:
+    ${text.substring(0, 120000)}
+    `;
+    try {
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        let jsonText = response.text().trim().replace(/^```json\s*/, '').replace(/```$/, '').trim();
+        const jsonStart = jsonText.indexOf('[');
+        const jsonEnd = jsonText.lastIndexOf(']') + 1;
+        if (jsonStart === -1) return [];
+        jsonText = jsonText.substring(jsonStart, jsonEnd);
+        const grants = JSON.parse(jsonText);
+        return grants.filter(g => g && g.title && g.description && g.funder_name);
+    } catch (error) {
+        console.error('     -> Grant extraction failed:', error.message);
+        return [];
+    }
+}
+
+
+// =================================================================
+// DATABASE HELPERS (from import_grants.js, adapted for consistency)
+// =================================================================
+
 async function getOrCreateOrganization(name, website) {
-    if (!name) return null;
-    const { data } = await supabase
+    if (!name) throw new Error("Organization name is required.");
+    const { data, error } = await supabase
         .from('organizations')
-        .upsert({ name: name, website: website, slug: generateSlug(name) }, { onConflict: 'name', ignoreDuplicates: false })
+        .upsert({ name: name, website: website, slug: generateSlug(name), type: 'funder' }, { onConflict: 'name', ignoreDuplicates: false })
         .select('id, name')
         .single();
+    if (error) throw error;
     if (!data) throw new Error(`Could not create or find organization: ${name}`);
     return data;
 }
-async function getOrCreateCategory(categoryName) { /* ... PASTE FROM import_grants.js ... */ }
-async function getOrCreateLocation(locationName) { /* ... PASTE FROM import_grants.js ... */ }
-async function saveGrantsToSupabase(grants, primaryUrl) { /* ... PASTE FROM import_grants.js ... */ 
-    // This function needs the getOrCreateOrganization call
+
+async function getOrCreateCategory(categoryName) {
+    if (!categoryName) return null;
+    const { data } = await supabase.from('categories').upsert({ name: categoryName }, { onConflict: 'name' }).select('id').single();
+    return data?.id;
+}
+
+async function getOrCreateLocation(locationName) {
+    if (!locationName) return null;
+    const { data } = await supabase.from('locations').upsert({ name: locationName }, { onConflict: 'name' }).select('id').single();
+    return data?.id;
+}
+
+async function saveGrantsToSupabase(grants, primaryUrl) {
+    if (!grants || grants.length === 0) return 0;
     let savedCount = 0;
-    for(const grant of grants) {
-        const organization = await getOrCreateOrganization(grant.funder_name, new URL(primaryUrl).origin);
-        // ... rest of the saving logic
-        savedCount++;
+    for (const grant of grants) {
+        try {
+            const organization = await getOrCreateOrganization(grant.funder_name, new URL(primaryUrl).origin);
+            const deadlineMatch = grant.deadline ? String(grant.deadline).match(/(\d{4}-\d{2}-\d{2})/) : null;
+            const deadlineToInsert = deadlineMatch ? deadlineMatch[0] : null;
+            const fundingAmount = parseFundingAmount(grant.funding_amount_text);
+
+            const { data: grantResult, error } = await supabase
+                .from('grants')
+                .upsert({
+                    organization_id: organization.id,
+                    title: grant.title,
+                    description: grant.description,
+                    status: grant.status || 'Open',
+                    application_url: grant.application_url || primaryUrl,
+                    max_funding_amount: fundingAmount,
+                    funding_amount_text: grant.funding_amount_text,
+                    deadline: deadlineToInsert,
+                    eligibility_criteria: grant.eligibility_criteria,
+                    grant_type: grant.grant_type,
+                    slug: generateSlug(`${organization.name} ${grant.title}`),
+                    date_added: new Date().toISOString().split('T')[0],
+                    last_updated: new Date().toISOString()
+                }, { onConflict: 'organization_id, title' })
+                .select('id').single();
+            if (error) throw error;
+            savedCount++;
+
+            if (grant.categories && Array.isArray(grant.categories)) {
+                for (const categoryName of grant.categories) {
+                    const categoryId = await getOrCreateCategory(categoryName);
+                    if (categoryId) await supabase.from('grant_categories').upsert({ grant_id: grantResult.id, category_id: categoryId });
+                }
+            }
+        } catch (err) {
+            console.error(`     -> ❗ Error saving "${grant.title}":`, err.message);
+        }
     }
     return savedCount;
 }
 
-/**
- * This is the main exported function. It processes a single URL and updates
- * the submission record in the database with the result.
- * @param {string} url - The URL of the grant opportunity to process.
- * @param {string} submissionId - The UUID of the record in the `grant_submissions` table.
- */
+
+// =================================================================
+// MAIN ORCHESTRATOR FUNCTION (for the on-demand worker)
+// =================================================================
+
 async function processUrlAndUpdateSubmission(url, submissionId) {
     console.log(`--- CORE: Processing Submission ${submissionId}: ${url} ---`);
-
-    await supabase.from('grant_submissions').update({ status: 'processing' }).eq('id', submissionId);
-
-    const browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
-    const context = await browser.newContext({ userAgent: 'Mozilla/5.0 (compatible; 1RFP-GrantBot/3.0; +https://1rfp.org)' });
-
+    let browser;
     try {
+        await supabase.from('grant_submissions').update({ status: 'processing' }).eq('id', submissionId);
+
+        browser = await chromium.launch({ headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox'] });
+        const context = await browser.newContext({ userAgent: 'Mozilla/5.0 (compatible; 1RFP-GrantBot/3.0; +https://1rfp.org)' });
+
         const contentProcessor = new IntelligentContentProcessor();
         const relevantContent = await crawlAndGetRelevantText(url, context);
         if (!relevantContent || relevantContent.length < 200) {
-            throw new Error('Insufficient relevant content found.');
+            throw new Error('Insufficient relevant content found on the page.');
         }
 
         const grants = await contentProcessor.processLargeContent(relevantContent, url);
         if (!grants || grants.length === 0) {
-            throw new Error('No active grant opportunities were found.');
+            throw new Error('No active grant opportunities were found after analysis.');
         }
 
         const savedCount = await saveGrantsToSupabase(grants, url);
         if (savedCount === 0) {
-            throw new Error('Extracted grants could not be saved to the database.');
+            throw new Error('Extracted grants could not be saved to the database, possibly due to validation errors.');
         }
 
         await supabase
@@ -145,7 +295,7 @@ async function processUrlAndUpdateSubmission(url, submissionId) {
             .update({ status: 'failed', error_message: error.message })
             .eq('id', submissionId);
     } finally {
-        await browser.close();
+        if (browser) await browser.close();
     }
 }
 

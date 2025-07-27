@@ -1,7 +1,7 @@
 // src/SubmitGrantPage.jsx
 import React, { useState, useEffect, useContext } from 'react';
 import { supabase } from './supabaseClient.js';
-import { UploadCloud, Loader, CheckCircle2, ExternalLink, Sparkles, Heart, Users, Target, Search, ArrowRight } from './components/Icons.jsx';
+import { UploadCloud, Loader, CheckCircle2, XCircle, Sparkles, Heart, Users, Target, Search, ArrowRight } from './components/Icons.jsx';
 import { LayoutContext } from './App.jsx';
 
 const SubmitGrantPage = () => {
@@ -13,9 +13,7 @@ const SubmitGrantPage = () => {
 
   useEffect(() => {
     setPageBgColor('bg-gradient-to-br from-slate-50 via-emerald-50 to-teal-50');
-    return () => {
-      setPageBgColor('bg-white');
-    };
+    return () => setPageBgColor('bg-white');
   }, [setPageBgColor]);
 
   const isValidUrl = (string) => {
@@ -39,30 +37,40 @@ const SubmitGrantPage = () => {
     setIsSubmitting(true);
 
     try {
-      const { error } = await supabase
-        .from('grant_submissions')
-        .insert([{ url, notes }]);
+      // ** THIS IS THE UPDATED PART **
+      // We now call the Edge Function instead of inserting directly.
+      const { data, error } = await supabase.functions.invoke('submit-grant', {
+        body: { url, notes },
+      });
 
       if (error) {
-        throw error;
+        // Try to parse a more specific error message from the function response
+        const errorData = await error.context.json();
+        throw new Error(errorData.error || 'An unexpected error occurred.');
       }
 
-      setMessage({ type: 'success', text: 'Thank you! Your submission has been received and will be reviewed by our team.' });
+      // Use the success message from our Edge Function
+      setMessage({ type: 'success', text: data.message });
       setUrl('');
       setNotes('');
     } catch (error) {
       console.error('Error submitting grant:', error);
-      setMessage({ type: 'error', text: 'An error occurred. Please try again.' });
+      setMessage({ type: 'error', text: error.message || 'An error occurred. Please try again.' });
     } finally {
       setIsSubmitting(false);
     }
   };
+  
+  const getIconForMessage = () => {
+      if (message.type === 'success') return <CheckCircle2 size={16} className="text-green-600" />;
+      if (message.type === 'error') return <XCircle size={16} className="text-red-600" />;
+      return null;
+  }
 
   return (
     <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
       {/* HERO SECTION */}
       <section className="text-center mb-16 relative">
-        {/* Magical background elements */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div className="absolute top-10 left-10 w-32 h-32 bg-gradient-to-r from-emerald-400 to-teal-600 rounded-full opacity-10 animate-pulse"></div>
           <div className="absolute top-32 right-20 w-24 h-24 bg-gradient-to-r from-blue-400 to-indigo-600 rounded-full opacity-10 animate-pulse delay-1000"></div>
@@ -149,7 +157,7 @@ const SubmitGrantPage = () => {
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="w-full inline-flex items-center justify-center px-8 py-4 font-semibold rounded-2xl text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full inline-flex items-center justify-center px-8 py-4 font-semibold rounded-2xl text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-600 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isSubmitting ? (
                     <>
@@ -173,11 +181,7 @@ const SubmitGrantPage = () => {
                     : 'bg-gradient-to-r from-red-100 to-rose-100 text-red-800 border border-red-200'
                 }`}>
                   <div className="flex items-center gap-2">
-                    {message.type === 'success' ? (
-                      <CheckCircle2 size={16} className="text-green-600" />
-                    ) : (
-                      <ExternalLink size={16} className="text-red-600" />
-                    )}
+                    {getIconForMessage()}
                     {message.text}
                   </div>
                 </div>
@@ -224,33 +228,6 @@ const SubmitGrantPage = () => {
                 <p>✅ <strong>Public access:</strong> Information publicly available</p>
               </div>
             </div>
-
-            {/* Quick Actions */}
-            <div className="bg-gradient-to-r from-emerald-600 to-teal-600 p-6 rounded-3xl text-white shadow-xl">
-              <h4 className="font-bold mb-3 flex items-center gap-2">
-                <Sparkles className="h-5 w-5" />
-                Explore While You're Here
-              </h4>
-              <p className="text-sm mb-4 opacity-90">
-                Check out what grants are already available in our database.
-              </p>
-              <div className="space-y-3">
-                <a 
-                  href="/grants" 
-                  className="block w-full text-center px-4 py-2 bg-white/20 hover:bg-white/30 backdrop-blur-sm border border-white/20 rounded-xl text-white font-semibold text-sm transition-all duration-300 hover:scale-105"
-                >
-                  <Search className="inline mr-2" size={16} />
-                  Browse Grants
-                </a>
-                <a 
-                  href="/contact" 
-                  className="block w-full text-center px-4 py-2 bg-white/10 hover:bg-white/20 backdrop-blur-sm border border-white/20 rounded-xl text-white font-medium text-sm transition-all duration-300"
-                >
-                  <ArrowRight className="inline mr-2" size={16} />
-                  Contact Us
-                </a>
-              </div>
-            </div>
           </div>
         </div>
       </section>
@@ -264,20 +241,6 @@ const SubmitGrantPage = () => {
           <p className="text-lg md:text-xl opacity-90 mb-6 max-w-2xl mx-auto">
             Every grant submission brings us closer to our goal of connecting every Bay Area nonprofit with the perfect funding opportunity. Together, we're making social impact more accessible.
           </p>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <a 
-              href="/about" 
-              className="inline-flex items-center justify-center px-6 py-3 bg-white/20 hover:bg-white/30 backdrop-blur-sm border border-white/20 rounded-xl text-white font-semibold transition-all duration-300 hover:scale-105"
-            >
-              Learn About Our Mission
-            </a>
-            <a 
-              href="/grants" 
-              className="inline-flex items-center justify-center px-6 py-3 bg-white text-slate-900 hover:bg-gray-100 rounded-xl font-semibold transition-all duration-300 hover:scale-105"
-            >
-              Explore Grants Now
-            </a>
-          </div>
         </div>
       </section>
     </div>
