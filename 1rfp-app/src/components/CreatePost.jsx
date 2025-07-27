@@ -579,8 +579,6 @@ const PostModal = ({
         return;
       }
 
-      console.log('✅ Post created successfully:', newPost);
-
       if (mentionsForStorage.length > 0) {
         const notificationResult = await processMentionsForNotifications(
           newPost.id, 

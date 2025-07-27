@@ -1,20 +1,10 @@
 // src/components/ProfileCompletionBanner.jsx
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight, User, MapPin, Heart, Users, Building2 } from 'lucide-react';
+import { ArrowRight, User, Heart, Building2 } from 'lucide-react';
 
 export default function ProfileCompletionBanner({ profile }) {
   const navigate = useNavigate();
-
-  // Debug logging
-  console.log('ProfileCompletionBanner - profile data:', {
-    onboarding_completed: profile?.onboarding_completed,
-    avatar_url: profile?.avatar_url,
-    interests: profile?.interests,
-    organization_choice: profile?.organization_choice,
-    full_name: profile?.full_name,
-    email: profile?.email
-  });
 
   // Get user's first name
   const firstName = profile?.name?.split(' ')[0] || profile?.full_name?.split(' ')[0] || 'there';
@@ -34,31 +24,19 @@ export default function ProfileCompletionBanner({ profile }) {
     const totalCompleted = additionalCompleted + baseCompleted;
     const percentage = Math.round((totalCompleted / total) * 100);
 
-    console.log('Completion calculation:', {
-      checks,
-      baseCompleted,
-      additionalCompleted,
-      total,
-      totalCompleted,
-      percentage
-    });
-
     return { checks, completed: additionalCompleted, total, percentage };
   };
 
-  const { checks, completed, total, percentage } = getCompletionData();
+  const { checks, percentage } = getCompletionData();
 
   const handleCompleteProfile = () => {
     navigate('/onboarding');
   };
 
-  // Show banner if ANY of the main items are missing (ignore onboarding_completed for now)
+  // Show banner if ANY of the main items are missing
   const shouldShowBanner = checks.some(check => !check.completed);
-  
-  console.log('Should show banner:', shouldShowBanner, 'Percentage:', percentage);
 
   if (!shouldShowBanner) {
-    console.log('Banner hidden - all items complete');
     return null;
   }
 
@@ -82,7 +60,7 @@ export default function ProfileCompletionBanner({ profile }) {
             {checks.filter(check => !check.completed).length > 0 && (
               <div className="flex items-center space-x-4 text-sm text-slate-600">
                 <span className="font-medium">Still needed:</span>
-                {checks.filter(check => !check.completed).slice(0, 3).map((item, index) => (
+                {checks.filter(check => !check.completed).slice(0, 3).map((item) => (
                   <div key={item.key} className="flex items-center space-x-1">
                     <item.icon size={14} className="text-emerald-600" />
                     <span>{item.label}</span>

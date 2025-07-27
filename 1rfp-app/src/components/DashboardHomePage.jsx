@@ -1,4 +1,4 @@
-// src/components/DashboardHomePage.jsx - Updated with Instant Organization Support
+// src/components/DashboardHomePage.jsx - Cleaned
 import React, { useState, useEffect, useRef, useCallback, memo } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
@@ -12,7 +12,7 @@ import PropTypes from 'prop-types';
 
 const NewsCard = memo(({ title, summary, timeAgo, image, url }) => {
   return (
-    <div 
+    <div
       className="flex-shrink-0 w-80 bg-white rounded-xl border border-slate-200 overflow-hidden hover:shadow-lg transition-shadow cursor-pointer"
       onClick={() => url && window.open(url, '_blank')}
     >
@@ -135,8 +135,6 @@ export default function DashboardHomePage() {
   const [hasMore, setHasMore] = useState(true);
   const [hasEnteredWorld, setHasEnteredWorld] = useState(false);
   const [showWelcome, setShowWelcome] = useState(false);
-  
-  // 🚀 NEW: State to track current organization info
   const [organizationInfo, setOrganizationInfo] = useState(null);
 
   const observer = useRef();
@@ -151,48 +149,30 @@ export default function DashboardHomePage() {
     if (node) observer.current.observe(node);
   }, [isLoading, hasMore]);
 
-  // 🚀 INSTANT: Listen for organization changes
   useEffect(() => {
     if (!profile?.id) return;
-
-    console.log('⚡ DashboardHomePage: Setting up instant organization change listener');
-
-    // Listen for instant organization changes
     const cleanup = addOrganizationEventListener('organizationChanged', (event) => {
       const { profileId, organization } = event.detail;
-      
-      // Only process if this event is for the current user
       if (profileId === profile.id) {
-        console.log('⚡ DashboardHomePage: INSTANT organization change detected!', {
-          profileId,
-          organization
-        });
-
-        // Update organization info immediately
         if (organization) {
-          console.log('✅ DashboardHomePage: Setting new organization info');
           setOrganizationInfo({
             id: organization.id,
             name: organization.name,
             type: organization.type,
             tagline: organization.tagline,
             image_url: organization.image_url,
-            role: 'member' // Default role for joined organizations
+            role: 'member'
           });
         } else {
-          console.log('✅ DashboardHomePage: Clearing organization info (user left org)');
           setOrganizationInfo(null);
         }
       }
     });
-
-    // Also listen for cross-tab changes
     const handleStorageChange = (e) => {
       if (e.key === 'orgChangeEvent' && e.newValue) {
         try {
           const message = JSON.parse(e.newValue);
           if (message.profileId === profile.id) {
-            console.log('📡 DashboardHomePage: Cross-tab organization change detected');
             if (message.organization) {
               setOrganizationInfo({
                 id: message.organization.id,
@@ -211,63 +191,35 @@ export default function DashboardHomePage() {
         }
       }
     };
-
     window.addEventListener('storage', handleStorageChange);
-
-    // Cleanup function
     return () => {
-      console.log('🧹 DashboardHomePage: Cleaning up instant organization listeners');
       cleanup();
       window.removeEventListener('storage', handleStorageChange);
     };
   }, [profile?.id]);
 
-  // 🚀 Fetch user's organization info on initial load
   useEffect(() => {
     const fetchOrganizationInfo = async () => {
       if (!profile?.id) return;
-      
       try {
-        console.log('🔍 DashboardHomePage: Fetching organization info for profile:', profile.id);
-        
         const { data: memberships, error } = await supabase
           .from('organization_memberships')
-          .select(`
-            *,
-            organizations!inner(
-              id,
-              name,
-              tagline,
-              type,
-              image_url
-            )
-          `)
+          .select(`*, organizations!inner(id, name, tagline, type, image_url)`)
           .eq('profile_id', profile.id)
           .order('joined_at', { ascending: false })
           .limit(1);
 
-        if (error) {
-          console.error('❌ DashboardHomePage: Error fetching organization memberships:', error);
-          return;
-        }
+        if (error) throw error;
 
         if (memberships && memberships.length > 0) {
           const membership = memberships[0];
           const org = membership.organizations;
-          
           const orgData = {
-            id: org.id,
-            name: org.name,
-            tagline: org.tagline,
-            type: org.type,
-            image_url: org.image_url,
-            role: membership.role
+            id: org.id, name: org.name, tagline: org.tagline,
+            type: org.type, image_url: org.image_url, role: membership.role
           };
-          
           setOrganizationInfo(orgData);
-          console.log('🏢 DashboardHomePage: Organization info loaded:', orgData);
         } else {
-          console.log('👤 DashboardHomePage: No organization membership found');
           setOrganizationInfo(null);
         }
       } catch (err) {
@@ -275,7 +227,6 @@ export default function DashboardHomePage() {
         setOrganizationInfo(null);
       }
     };
-
     fetchOrganizationInfo();
   }, [profile?.id]);
 
@@ -292,36 +243,17 @@ export default function DashboardHomePage() {
     const fetchPosts = async () => {
         if (!hasMore) return;
         setIsLoading(true);
-        
         try {
-            // 🚀 ENHANCED: Try to get posts with full profile information
             const { data: postsData, error: postsError } = await supabase
                 .from('posts')
-                .select(`
-                    *,
-                    profiles:profile_id(
-                        id,
-                        full_name,
-                        avatar_url,
-                        title,
-                        organization_name,
-                        role,
-                        organization_type
-                    )
-                `)
+                .select(`*, profiles:profile_id(id, full_name, avatar_url, title, organization_name, role, organization_type)`)
                 .eq('channel', 'hello-world')
                 .order('created_at', { ascending: false })
                 .range(page * POSTS_PER_PAGE, (page + 1) * POSTS_PER_PAGE - 1);
 
             if (postsError) {
                 console.warn('⚠️ DashboardHomePage: Direct query failed, falling back to RPC:', postsError);
-                
-                // Fallback to original RPC method
-                const { data: newPosts, error: rpcError } = await supabase.rpc('get_ranked_feed', {
-                    page_number: page,
-                    page_size: POSTS_PER_PAGE
-                });
-
+                const { data: newPosts, error: rpcError } = await supabase.rpc('get_ranked_feed', { page_number: page, page_size: POSTS_PER_PAGE });
                 if (rpcError) throw rpcError;
 
                 if (newPosts && newPosts.length > 0) {
@@ -330,29 +262,16 @@ export default function DashboardHomePage() {
                     if (profileError) throw profileError;
 
                     const profilesById = profiles.reduce((acc, p) => { acc[p.id] = p; return acc; }, {});
-                    
-                    const enrichedPosts = newPosts.map(post => ({
-                        ...post,
-                        profiles: profilesById[post.profile_id]
-                    }));
-                    
+                    const enrichedPosts = newPosts.map(post => ({ ...post, profiles: profilesById[post.profile_id] }));
                     setPosts(prevPosts => (page === 0 ? enrichedPosts : [...prevPosts, ...enrichedPosts]));
                     if (newPosts.length < POSTS_PER_PAGE) setHasMore(false);
                 } else {
                     setHasMore(false);
                 }
             } else {
-                // Success with direct query
-                console.log('✅ DashboardHomePage: Direct query success - fetched posts:', postsData?.length || 0);
-                
                 if (postsData && postsData.length > 0) {
-                    // Get reactions for posts
                     const postIds = postsData.map(post => post.id);
-                    const { data: allReactions } = await supabase
-                        .from('post_likes')
-                        .select('post_id, reaction_type')
-                        .in('post_id', postIds);
-
+                    const { data: allReactions } = await supabase.from('post_likes').select('post_id, reaction_type').in('post_id', postIds);
                     const enrichedPosts = postsData.map(post => {
                         const reactionsForPost = allReactions?.filter(r => r.post_id === post.id) || [];
                         const reactionSummary = reactionsForPost.reduce((acc, r) => {
@@ -360,16 +279,8 @@ export default function DashboardHomePage() {
                             acc[type] = (acc[type] || 0) + 1;
                             return acc;
                         }, {});
-                        
-                        return {
-                            ...post,
-                            reactions: { 
-                                summary: Object.entries(reactionSummary).map(([type, count]) => ({ type, count })), 
-                                sample: [] 
-                            }
-                        };
+                        return { ...post, reactions: { summary: Object.entries(reactionSummary).map(([type, count]) => ({ type, count })), sample: [] } };
                     });
-                    
                     setPosts(prevPosts => (page === 0 ? enrichedPosts : [...prevPosts, ...enrichedPosts]));
                     if (postsData.length < POSTS_PER_PAGE) setHasMore(false);
                 } else {
@@ -388,33 +299,21 @@ export default function DashboardHomePage() {
   
   useEffect(() => {
     const refreshPostCounts = async (postId) => {
-      // First check if this post is in our current posts (hello-world channel)
       const isInCurrentPosts = posts.some(p => p.id === postId);
       if (!isInCurrentPosts) return;
 
       const { data: postData } = await supabase.from('posts').select('likes_count, comments_count').eq('id', postId).single();
       if (postData) {
-        setPosts(currentPosts => currentPosts.map(p => 
-          p.id === postId 
-            ? { ...p, likes_count: postData.likes_count, comments_count: postData.comments_count }
-            : p
-        ));
+        setPosts(currentPosts => currentPosts.map(p => p.id === postId ? { ...p, likes_count: postData.likes_count, comments_count: postData.comments_count } : p));
       }
     };
 
     const channel = supabase.channel('public:posts_feed_hello_world');
-    
     channel
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'posts', filter: 'channel=eq.hello-world' }, async (payload) => {
-        console.log('🔴 DashboardHomePage: Real-time post insert:', payload.new);
-        
         const { data: profileData } = await supabase.from('profiles').select('*').eq('id', payload.new.profile_id).single();
         if (profileData) {
-            const newPostWithProfile = { 
-                ...payload.new, 
-                profiles: profileData, 
-                reactions: { summary: [], sample: [] } 
-            };
+            const newPostWithProfile = { ...payload.new, profiles: profileData, reactions: { summary: [], sample: [] } };
             setPosts(currentPosts => {
                 if (currentPosts.some(p => p.id === newPostWithProfile.id)) return currentPosts;
                 return [newPostWithProfile, ...currentPosts];
@@ -422,35 +321,22 @@ export default function DashboardHomePage() {
         }
       })
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'posts', filter: 'channel=eq.hello-world' }, (payload) => {
-        console.log('🔴 DashboardHomePage: Real-time post delete:', payload.old);
         setPosts(currentPosts => currentPosts.filter(p => p.id !== payload.old.id));
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'posts', filter: 'channel=eq.hello-world' }, (payload) => {
-        console.log('🟡 DashboardHomePage: Real-time post update:', payload.new);
-        setPosts(currentPosts => currentPosts.map(p => 
-          p.id === payload.new.id ? { ...p, ...payload.new } : p
-        ));
+        setPosts(currentPosts => currentPosts.map(p => p.id === payload.new.id ? { ...p, ...payload.new } : p));
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'post_likes' }, (payload) => {
         const postId = payload.new?.post_id || payload.old?.post_id;
-        if (postId) {
-            refreshPostCounts(postId);
-        }
+        if (postId) { refreshPostCounts(postId); }
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'post_comments' }, (payload) => {
         const postId = payload.new?.post_id || payload.old?.post_id;
-        if (postId) {
-            refreshPostCounts(postId);
-        }
+        if (postId) { refreshPostCounts(postId); }
       })
       .subscribe();
 
-    console.log('🔔 DashboardHomePage: Subscribed to real-time updates for hello-world channel');
-
-    return () => {
-      supabase.removeChannel(channel);
-      console.log('🔕 DashboardHomePage: Unsubscribed from hello-world channel');
-    };
+    return () => { supabase.removeChannel(channel); };
   }, [posts]);
 
   const handleEnterWorld = () => {
@@ -461,13 +347,11 @@ export default function DashboardHomePage() {
     }
   };
 
-  // 🚀 ENHANCED: Include current organization info when creating new posts
   const handleNewPost = useCallback((newPost) => {
     const postWithOrgInfo = { 
       ...newPost, 
       profiles: {
         ...profile,
-        // Update with current organization info if available
         organization_name: organizationInfo?.name || profile?.organization_name,
         organization_type: organizationInfo?.type || profile?.organization_type,
       },
@@ -475,8 +359,6 @@ export default function DashboardHomePage() {
       comments_count: 0, 
       reactions: { summary: [], sample: [] } 
     };
-    
-    console.log('📝 DashboardHomePage: Adding new post with org info:', postWithOrgInfo.profiles);
     setPosts(p => [postWithOrgInfo, ...p]);
   }, [profile, organizationInfo]);
   
@@ -486,20 +368,13 @@ export default function DashboardHomePage() {
 
   return (
     <div className="space-y-6">
-      {/* Profile Completion Banner */}
       <ProfileCompletionBanner profile={profile} />
-      
       <TrendingNewsSection />
       {showWelcome && <HelloWorldWelcomeSection onEnterWorld={handleEnterWorld} hasEnteredWorld={hasEnteredWorld}/>}
       {(hasEnteredWorld || posts.length > 0) && (
         <>
           <HelloWorldChannelIdentifier />
-          <CreatePost 
-            profile={profile} 
-            onNewPost={handleNewPost} 
-            channel="hello-world" 
-            organizationType={organizationInfo?.type}
-          />
+          <CreatePost profile={profile} onNewPost={handleNewPost} channel="hello-world" organizationType={organizationInfo?.type} />
           {posts.length > 0 && (
             <div className="space-y-6">
               {posts.filter(post => post.profiles).map(post => (
