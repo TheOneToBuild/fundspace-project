@@ -267,12 +267,11 @@ const GrantCard = ({ grant, onOpenDetailModal, onFilterByCategory, onSave, onUns
                     </div>
                 )}
                 
-                {grant.save_count > 0 && (
-                    <div className="bg-gradient-to-r from-indigo-500 to-purple-600 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg flex items-center gap-1">
-                        <Bookmark size={12} fill="currentColor" />
-                        {grant.save_count}
-                    </div>
-                )}
+                {/* Always show bookmark count, even if 0 */}
+                <div className="bg-gradient-to-r from-indigo-500 to-purple-600 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg flex items-center gap-1">
+                    <Bookmark size={12} fill="currentColor" />
+                    {grant.save_count || 0}
+                </div>
             </div>
 
             {/* Main content */}

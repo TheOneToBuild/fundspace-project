@@ -16,20 +16,18 @@ const getInitials = (name) => {
 const SearchResultItem = ({ item, onClick }) => {
     const navigate = useNavigate();
 
-    const handleClick = (e) => {
-        e.preventDefault();
-        // For grants, navigate to the grants page with a query param that will trigger the modal
-        if (item.type === 'grant') {
-            navigate(`/profile/grants?open_grant=${item.id}`);
-        } else {
-            // For users and orgs, navigate directly to their respective pages
-            const path = item.type === 'organization' 
-                ? `/profile/organizations/${item.slug}` 
-                : `/profile/${item.slug}`;
-            navigate(path);
-        }
-        onClick(); // This closes the search dropdown
-    };
+   const handleClick = (e) => {
+    e.preventDefault();
+    if (item.type === 'grant') {
+        navigate(`/profile/grants?open_grant=${item.id}`);
+    } else if (item.type === 'organization') {
+        navigate(`/organizations/${item.slug}`);
+    } else {
+        // For users, navigate to members profile page
+        navigate(`/profile/members/${item.id}`);
+    }
+    onClick(); // This closes the search dropdown
+};
 
     const renderIconOrAvatar = () => {
         // If an avatar/logo URL exists, display the image

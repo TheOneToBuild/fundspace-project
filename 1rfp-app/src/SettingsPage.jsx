@@ -9,6 +9,7 @@ import PrivacySettings from './components/settings/PrivacySettings';
 import NotificationSettings from './components/settings/NotificationSettings';
 import PasswordSettings from './components/settings/PasswordSettings';
 import EmailSettings from './components/settings/EmailSettings';
+import AccountDeletionSettings from './components/settings/AccountDeletionSettings';
 
 export default function SettingsPage() {
   const { profile: initialProfile, session, refreshProfile } = useOutletContext();
@@ -152,7 +153,6 @@ export default function SettingsPage() {
                 loading={loading}
             />
             
-            {/* --- MOVED TO HERE --- */}
             <div className="border-t pt-6">
                 <LocationSelector location={location} onChange={(val) => { setLocation(val); handleAutoSave('location', val); }} loading={loading} />
             </div>
@@ -160,8 +160,6 @@ export default function SettingsPage() {
             <div className="border-t pt-6">
                 <InterestSelector interests={interests} onChange={(val) => { setInterests(val); handleAutoSave('interests', val); }} loading={loading} />
             </div>
-            
-            {/* --- LocationSelector was moved from here --- */}
             
             <div className="pt-4">
                 <button type="submit" disabled={loading} className="bg-blue-600 text-white py-2.5 px-6 rounded-lg hover:bg-blue-700 disabled:bg-blue-400 font-semibold">
@@ -190,6 +188,8 @@ export default function SettingsPage() {
       <PasswordSettings />
       
       <EmailSettings />
+      
+      <AccountDeletionSettings session={session} />
     </div>
   );
 }

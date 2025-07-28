@@ -1,6 +1,7 @@
 // We need to import supabase at the top
 import React, { useState, useEffect, createContext, useContext, useRef } from 'react';
 import { supabase } from './supabaseClient.js';
+import { parseMaxFundingAmount } from './utils.js';
 
 // ---------- FONT & STYLING ----------
 const Styles = () => (
@@ -107,7 +108,18 @@ const PlatformFeatureCard = ({ feature }) => (
 
 const AnimatedCounter = ({ targetValue }) => {
   const [count, setCount] = useState(0);
+  const [isMobile, setIsMobile] = useState(false);
   const countRef = useRef(null);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   useEffect(() => {
     const observer = new IntersectionObserver(([entry]) => {
@@ -134,9 +146,15 @@ const AnimatedCounter = ({ targetValue }) => {
   }, [targetValue]);
 
   const formatCurrency = (amount) => {
-    if (amount >= 1000000) return `${(amount / 1000000).toFixed(1)}M`;
-    if (amount >= 1000) return `${(amount / 1000).toFixed(0)}K`;
-    return amount.toLocaleString();
+    if (isMobile) {
+      // Mobile: Use shorthand format (87.5M)
+      if (amount >= 1000000) return `${(amount / 1000000).toFixed(1)}M`;
+      if (amount >= 1000) return `${(amount / 1000).toFixed(0)}K`;
+      return amount.toLocaleString();
+    } else {
+      // Desktop: Use full format (87,500,000)
+      return amount.toLocaleString();
+    }
   };
 
   return <span ref={countRef}>{formatCurrency(count)}</span>;
@@ -155,27 +173,56 @@ function HomePage() {
   useEffect(() => {
     const fetchGrantsData = async () => {
       try {
+        console.log('Fetching grants data for homepage counter...');
         const { data, error } = await supabase
-          .from('grants')
-          .select('max_funding_amount, funding_amount_text, due_date')
-          .not('max_funding_amount', 'is', null);
+          .from('grants_with_taxonomy')
+          .select('max_funding_amount, funding_amount_text, deadline, status')
+          .order('id', { ascending: false });
         
-        if (error) throw error;
+        if (error) {
+          console.error('Supabase error:', error);
+          throw error;
+        }
         
-        if (data) {
-          // Calculate total funding from active grants
-          const activeFunding = data
-            .filter(grant => {
-              if (!grant.due_date) return true;
-              return new Date(grant.due_date) >= new Date();
-            })
-            .reduce((sum, grant) => {
-              const amount = parseFloat(grant.max_funding_amount) || 0;
+        console.log('Raw grants data:', data?.length || 0, 'grants found');
+        
+        if (data && data.length > 0) {
+          // Filter for active grants (same logic as GrantsPageContent)
+          const activeGrants = data.filter(grant => {
+            // Include grants without deadline (rolling deadlines) or future deadlines
+            if (!grant.deadline) return true;
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            return new Date(grant.deadline) >= today;
+          });
+
+          console.log('Active grants:', activeGrants.length, 'out of', data.length);
+
+          // Calculate total funding using same method as GrantsPageContent
+          const activeFunding = activeGrants.reduce((sum, grant) => {
+            let amount = 0;
+            
+            // Try max_funding_amount first, then fall back to parsing funding_amount_text
+            if (grant.max_funding_amount) {
+              amount = parseFloat(grant.max_funding_amount);
+            } else if (grant.funding_amount_text) {
+              amount = parseMaxFundingAmount(grant.funding_amount_text);
+            }
+            
+            if (amount && !isNaN(amount) && amount > 0) {
+              console.log('Adding grant funding:', amount, 'from grant:', grant.max_funding_amount || grant.funding_amount_text);
               return sum + amount;
-            }, 0);
+            }
+            
+            return sum;
+          }, 0);
           
+          console.log('Total calculated funding:', activeFunding);
           setTotalFunding(activeFunding);
           setGrants(data);
+        } else {
+          console.log('No grants data found, using fallback');
+          setTotalFunding(87500000); // Fallback
         }
       } catch (error) {
         console.error('Error fetching grants data:', error);
