@@ -1,4 +1,6 @@
+// We need to import supabase at the top
 import React, { useState, useEffect, createContext, useContext, useRef } from 'react';
+import { supabase } from './supabaseClient.js';
 
 // ---------- FONT & STYLING ----------
 const Styles = () => (
@@ -18,10 +20,28 @@ const Styles = () => (
       display: flex;
       gap: 1.5rem;
       animation: scroll 80s linear infinite;
+      width: calc(300px * 16 + 1.5rem * 15); /* Explicit width for smooth animation */
     }
     @keyframes scroll {
       to {
         transform: translate(calc(-50% - 0.75rem));
+      }
+    }
+    .scroller:hover .scroller-inner {
+      animation-play-state: paused;
+    }
+    .magical-hover {
+      transition: all 0.3s ease;
+      cursor: pointer;
+    }
+    .magical-hover:hover {
+      text-shadow: 0 0 20px rgba(255, 255, 255, 0.8);
+      transform: scale(1.05);
+    }
+    /* Mobile optimization */
+    @media (max-width: 768px) {
+      .scroller-inner {
+        animation-duration: 60s;
       }
     }
   `}</style>
@@ -72,12 +92,12 @@ const CarouselCard = ({ item }) => (
 );
 
 const PlatformFeatureCard = ({ feature }) => (
-  <div className="relative rounded-2xl overflow-hidden shadow-lg h-full group transition-transform duration-300 ease-in-out hover:scale-105">
+  <div className="relative rounded-2xl overflow-hidden shadow-lg h-full min-h-[400px] md:min-h-[600px] group transition-transform duration-300 ease-in-out hover:scale-105">
     <img src={feature.image} alt={feature.title} className="absolute inset-0 w-full h-full object-cover" />
     <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-black/10"></div>
-    <div className="relative h-full flex flex-col justify-end p-6 text-white">
-      <h3 className="text-xl font-bold">{feature.title}</h3>
-      <p className="mt-2 text-white/90">{feature.description}</p>
+    <div className="relative h-full flex flex-col justify-end p-4 md:p-6 text-white">
+      <h3 className="text-lg md:text-xl font-bold">{feature.title}</h3>
+      <p className="mt-2 text-sm md:text-base text-white/90">{feature.description}</p>
       <div className="absolute top-4 right-4 h-8 w-8 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center group-hover:bg-white transition-colors">
         <Plus className="h-5 w-5 text-white group-hover:text-black transition-colors" />
       </div>
@@ -113,7 +133,13 @@ const AnimatedCounter = ({ targetValue }) => {
     return () => observer.disconnect();
   }, [targetValue]);
 
-  return <span ref={countRef}>{new Intl.NumberFormat('en-US').format(count)}</span>;
+  const formatCurrency = (amount) => {
+    if (amount >= 1000000) return `${(amount / 1000000).toFixed(1)}M`;
+    if (amount >= 1000) return `${(amount / 1000).toFixed(0)}K`;
+    return amount.toLocaleString();
+  };
+
+  return <span ref={countRef}>{formatCurrency(count)}</span>;
 };
 
 // ---------- MAIN ----------
@@ -122,6 +148,44 @@ function HomePage() {
   const [wordIndex, setWordIndex] = useState(0);
   const [displayedText, setDisplayedText] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
+  const [grants, setGrants] = useState([]);
+  const [totalFunding, setTotalFunding] = useState(0);
+
+  // Fetch grants data to calculate actual total funding
+  useEffect(() => {
+    const fetchGrantsData = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('grants')
+          .select('max_funding_amount, funding_amount_text, due_date')
+          .not('max_funding_amount', 'is', null);
+        
+        if (error) throw error;
+        
+        if (data) {
+          // Calculate total funding from active grants
+          const activeFunding = data
+            .filter(grant => {
+              if (!grant.due_date) return true;
+              return new Date(grant.due_date) >= new Date();
+            })
+            .reduce((sum, grant) => {
+              const amount = parseFloat(grant.max_funding_amount) || 0;
+              return sum + amount;
+            }, 0);
+          
+          setTotalFunding(activeFunding);
+          setGrants(data);
+        }
+      } catch (error) {
+        console.error('Error fetching grants data:', error);
+        // Fallback to the previous static number
+        setTotalFunding(87500000);
+      }
+    };
+
+    fetchGrantsData();
+  }, []);
 
   useEffect(() => {
     const handleTyping = () => {
@@ -153,12 +217,12 @@ function HomePage() {
   return (
     <div className="w-full">
       {/* HERO */}
-      <section className="relative text-center py-20 md:py-28 overflow-hidden bg-white">
+      <section className="relative text-center py-16 sm:py-20 md:py-28 overflow-hidden bg-white">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-extrabold text-slate-900 mb-6 leading-tight tracking-tighter">
-            Where community <span className="inline-block min-w-[220px] text-transparent bg-clip-text bg-gradient-to-r from-purple-500 to-blue-600">{displayedText}</span> together.
+          <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-extrabold text-slate-900 mb-4 sm:mb-6 leading-tight tracking-tighter">
+            Where community <span className="inline-block min-w-[160px] sm:min-w-[200px] md:min-w-[220px] text-transparent bg-clip-text bg-gradient-to-r from-purple-500 to-blue-600">{displayedText}</span> together.
           </h1>
-          <p className="max-w-xl md:max-w-2xl mx-auto text-lg md:text-xl text-slate-700 mb-10 leading-relaxed font-display">
+          <p className="max-w-lg sm:max-w-xl md:max-w-2xl mx-auto text-base sm:text-lg md:text-xl text-slate-700 mb-8 sm:mb-10 leading-relaxed font-display px-4 sm:px-0">
   A space for Bay Area 🌉  changemakers to 
   <span className="text-pink-500 font-semibold animate-bounce-slow"> connect </span> 🤝, 
   <span className="text-emerald-500 font-semibold animate-bounce-slow"> collaborate </span> 🫶, and 
@@ -166,19 +230,19 @@ function HomePage() {
   something 
   <span className="magical-hover font-semibold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-pink-500 to-yellow-400 transition-all duration-500 ease-in-out hover:brightness-125 hover:drop-shadow-[0_0_5px_rgba(255,255,255,0.8)]"> magical </span> 🌟 together.
 </p>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <a href="/grants" className="inline-flex items-center justify-center px-8 py-3.5 font-semibold rounded-full text-white bg-blue-600 hover:bg-blue-700 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 w-full sm:w-auto">
-              Explore Grants <Search className="ml-2" />
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 px-4 sm:px-0">
+            <a href="/grants" className="inline-flex items-center justify-center px-6 sm:px-8 py-3 sm:py-3.5 font-semibold rounded-full text-white bg-blue-600 hover:bg-blue-700 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 w-full sm:w-auto text-sm sm:text-base">
+              Find Grants <Search className="ml-2" size={18} />
             </a>
-            <a href="/login?view=signup" className="inline-flex items-center justify-center px-8 py-3.5 font-semibold rounded-full text-blue-700 bg-blue-100 hover:bg-blue-200/70 transition-colors duration-300 w-full sm:w-auto">
-              Join the Network <ArrowRight className="ml-2" />
+            <a href="/login?view=sign_up" className="inline-flex items-center justify-center px-6 sm:px-8 py-3 sm:py-3.5 font-semibold rounded-full text-blue-700 bg-blue-100 hover:bg-blue-200/70 transition-colors duration-300 w-full sm:w-auto text-sm sm:text-base">
+              Sign Up <ArrowRight className="ml-2" size={18} />
             </a>
           </div>
         </div>
       </section>
 
       {/* CAROUSEL */}
-      <section className="py-10 md:py-16 bg-white">
+      <section className="py-8 md:py-16 bg-white">
         <div className="scroller w-full overflow-hidden">
           <div className="scroller-inner">
             {[...carouselData, ...carouselData].map((item, i) => <CarouselCard key={i} item={item} />)}
@@ -187,35 +251,35 @@ function HomePage() {
       </section>
 
       {/* COUNTER */}
-      <section className="py-20 md:py-28">
+      <section className="py-16 md:py-28">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
+          <div className="grid lg:grid-cols-2 gap-8 md:gap-12 items-center">
             <div className="text-center lg:text-left">
-              <h2 className="text-4xl font-extrabold text-slate-800 leading-tight">Unlock Millions in Funding Opportunities</h2>
-              <p className="mt-4 text-lg text-slate-600 max-w-xl mx-auto lg:mx-0">
+              <h2 className="text-3xl md:text-4xl font-extrabold text-slate-800 leading-tight">Unlock Millions in Funding Opportunities</h2>
+              <p className="mt-4 text-base md:text-lg text-slate-600 max-w-xl mx-auto lg:mx-0">
                 Our platform aggregates grants from across the Bay Area, putting a comprehensive database of funding at your fingertips.
               </p>
             </div>
             <div className="text-center">
-              <div className="text-6xl md:text-8xl font-black text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-teal-500">
-                $<AnimatedCounter targetValue={87500000} />
+              <div className="text-5xl md:text-6xl lg:text-8xl font-black text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-teal-500">
+                $<AnimatedCounter targetValue={totalFunding || 87500000} />
               </div>
-              <p className="mt-2 text-lg font-semibold text-slate-600">Total Funding Available</p>
+              <p className="mt-2 text-base md:text-lg font-semibold text-slate-600">Total Funding Available</p>
             </div>
           </div>
         </div>
       </section>
 
       {/* FEATURES */}
-      <section className="py-20 md:py-28">
+      <section className="py-16 md:py-28">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-slate-800 mb-4">Designed by Community. Built for Community.</h2>
-            <p className="text-lg text-slate-600 max-w-2xl mx-auto">
+          <div className="text-center mb-12 md:mb-16">
+            <h2 className="text-3xl md:text-4xl font-bold text-slate-800 mb-4">Designed by Community. Built for Community.</h2>
+            <p className="text-base md:text-lg text-slate-600 max-w-2xl mx-auto">
               Our platform is built by community members, for community members. We understand the unique challenges and opportunities in the Bay Area, and we're here to support you every step of the way.
             </p>
           </div>
-          <div className="grid md:grid-cols-3 gap-8 h-[600px]">
+          <div className="grid md:grid-cols-3 gap-6 md:gap-8 h-auto md:h-[600px]">
             {platformFeatures.map((f, i) => <PlatformFeatureCard key={i} feature={f} />)}
           </div>
         </div>

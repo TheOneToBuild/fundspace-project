@@ -15,19 +15,23 @@ const OrganizationHeader = ({
 }) => {
   if (!organization) return null;
 
-  // Get organization type display info
+  // FIXED: Get organization type display info with proper case handling
   const getTypeInfo = (type) => {
+    // Normalize type to lowercase for consistent lookup
+    const normalizedType = type?.toLowerCase();
+    
     const typeMap = {
       'nonprofit': { label: '501(c)(3) Nonprofit', color: 'bg-green-100 text-green-700 border-green-200', icon: '💙' },
       'foundation': { label: 'Foundation', color: 'bg-blue-100 text-blue-700 border-blue-200', icon: '🏛️' },
       'for-profit': { label: 'Company', color: 'bg-purple-100 text-purple-700 border-purple-200', icon: '🏢' },
+      'forprofit': { label: 'Company', color: 'bg-purple-100 text-purple-700 border-purple-200', icon: '🏢' },
       'government': { label: 'Government Agency', color: 'bg-indigo-100 text-indigo-700 border-indigo-200', icon: '🏛️' },
       'healthcare': { label: 'Healthcare Organization', color: 'bg-red-100 text-red-700 border-red-200', icon: '🏥' },
       'education': { label: 'Educational Institution', color: 'bg-yellow-100 text-yellow-700 border-yellow-200', icon: '🎓' },
       'religious': { label: 'Religious Organization', color: 'bg-pink-100 text-pink-700 border-pink-200', icon: '⛪' },
       'international': { label: 'International Organization', color: 'bg-teal-100 text-teal-700 border-teal-200', icon: '🌍' }
     };
-    return typeMap[type] || { label: 'Organization', color: 'bg-slate-100 text-slate-700 border-slate-200', icon: '🏢' };
+    return typeMap[normalizedType] || { label: 'Organization', color: 'bg-slate-100 text-slate-700 border-slate-200', icon: '🏢' };
   };
 
   const typeInfo = getTypeInfo(organization.type);

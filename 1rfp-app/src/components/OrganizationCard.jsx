@@ -80,7 +80,10 @@ const getEnhancedPillClasses = (focusArea) => {
 
 const OrganizationCard = ({ organization, handleFilterChange, linkTo, buttonText = "View Profile" }) => {
   const [isHovered, setIsHovered] = useState(false);
-  const typeConfig = ORG_TYPE_CONFIG[organization.type] || ORG_TYPE_CONFIG.nonprofit;
+  
+  // FIXED: Normalize organization type for consistent lookup
+  const normalizedType = organization.type?.toLowerCase();
+  const typeConfig = ORG_TYPE_CONFIG[normalizedType] || ORG_TYPE_CONFIG.nonprofit;
   
   const getInitials = (name) => {
     if (!name) return '?';
@@ -252,7 +255,7 @@ const OrganizationCard = ({ organization, handleFilterChange, linkTo, buttonText
           </div>
           
           {/* Type-specific fields */}
-          {organization.type === 'foundation' && organization.total_funding_annually && (
+          {normalizedType === 'foundation' && organization.total_funding_annually && (
             <div className="bg-gradient-to-br from-green-50 to-emerald-50 p-4 rounded-xl border border-green-100 group-hover:shadow-lg transition-shadow duration-300 h-20"> {/* Fixed height */}
               <div className="flex items-center gap-2 mb-2">
                 <div className="p-1 bg-green-100 rounded-lg">
@@ -266,7 +269,7 @@ const OrganizationCard = ({ organization, handleFilterChange, linkTo, buttonText
             </div>
           )}
           
-          {organization.type === 'nonprofit' && organization.budget && (
+          {normalizedType === 'nonprofit' && organization.budget && (
             <div className="bg-gradient-to-br from-green-50 to-emerald-50 p-4 rounded-xl border border-green-100 group-hover:shadow-lg transition-shadow duration-300 h-20"> {/* Fixed height */}
               <div className="flex items-center gap-2 mb-2">
                 <div className="p-1 bg-green-100 rounded-lg">

@@ -26,25 +26,69 @@ const TAXONOMY_DISPLAY_NAMES = {
   'religious.church': 'Religious Organizations'
 };
 
-// Enhanced gradient pill classes for categories
+// Enhanced gradient pill classes for categories - each with unique colors
 const getEnhancedPillClasses = (categoryName) => {
   const categoryMap = {
     'Arts': 'bg-gradient-to-r from-purple-100 to-pink-100 text-purple-700 border-purple-200',
-    'Culture': 'bg-gradient-to-r from-purple-100 to-pink-100 text-purple-700 border-purple-200',
+    'Culture': 'bg-gradient-to-r from-fuchsia-100 to-rose-100 text-fuchsia-700 border-fuchsia-200',
     'Education': 'bg-gradient-to-r from-blue-100 to-indigo-100 text-blue-700 border-blue-200',
     'Health': 'bg-gradient-to-r from-emerald-100 to-green-100 text-emerald-700 border-emerald-200',
-    'Healthcare': 'bg-gradient-to-r from-emerald-100 to-green-100 text-emerald-700 border-emerald-200',
-    'Environment': 'bg-gradient-to-r from-green-100 to-teal-100 text-green-700 border-green-200',
+    'Healthcare': 'bg-gradient-to-r from-teal-100 to-cyan-100 text-teal-700 border-teal-200',
+    'Environment': 'bg-gradient-to-r from-green-100 to-lime-100 text-green-700 border-green-200',
     'Housing': 'bg-gradient-to-r from-orange-100 to-amber-100 text-orange-700 border-orange-200',
-    'Technology': 'bg-gradient-to-r from-cyan-100 to-blue-100 text-cyan-700 border-cyan-200',
+    'Technology': 'bg-gradient-to-r from-cyan-100 to-sky-100 text-cyan-700 border-cyan-200',
     'Innovation': 'bg-gradient-to-r from-violet-100 to-purple-100 text-violet-700 border-violet-200',
     'Community': 'bg-gradient-to-r from-rose-100 to-pink-100 text-rose-700 border-rose-200',
-    'Community Development': 'bg-gradient-to-r from-rose-100 to-pink-100 text-rose-700 border-rose-200',
-    'Social Impact': 'bg-gradient-to-r from-indigo-100 to-purple-100 text-indigo-700 border-indigo-200',
-    'Research': 'bg-gradient-to-r from-slate-100 to-blue-100 text-slate-700 border-slate-200'
+    'Community Development': 'bg-gradient-to-r from-red-100 to-rose-100 text-red-700 border-red-200',
+    'Community Engagement': 'bg-gradient-to-r from-pink-100 to-rose-100 text-pink-700 border-pink-200',
+    'Social Impact': 'bg-gradient-to-r from-indigo-100 to-blue-100 text-indigo-700 border-indigo-200',
+    'Research': 'bg-gradient-to-r from-slate-100 to-gray-100 text-slate-700 border-slate-200',
+    'Medical Research': 'bg-gradient-to-r from-zinc-100 to-stone-100 text-zinc-700 border-zinc-200',
+    'Mental Health': 'bg-gradient-to-r from-purple-100 to-violet-100 text-purple-700 border-purple-200',
+    'Health Equity': 'bg-gradient-to-r from-emerald-100 to-teal-100 text-emerald-700 border-emerald-200',
+    'Chronic Disease Prevention': 'bg-gradient-to-r from-amber-100 to-yellow-100 text-amber-700 border-amber-200',
+    'Pediatric Health': 'bg-gradient-to-r from-yellow-100 to-lime-100 text-yellow-700 border-yellow-200',
+    'Child Health Research': 'bg-gradient-to-r from-lime-100 to-green-100 text-lime-700 border-lime-200',
+    'Pediatric Education': 'bg-gradient-to-r from-sky-100 to-blue-100 text-sky-700 border-sky-200',
+    
+    // Environmental and Climate Focus Areas
+    'Flood Management': 'bg-gradient-to-r from-blue-100 to-cyan-100 text-blue-700 border-blue-200',
+    'Habitat Restoration': 'bg-gradient-to-r from-green-100 to-emerald-100 text-green-700 border-green-200',
+    'Climate Justice': 'bg-gradient-to-r from-teal-100 to-green-100 text-teal-700 border-teal-200',
+    'Climate Change': 'bg-gradient-to-r from-sky-100 to-indigo-100 text-sky-700 border-sky-200',
+    'Renewable Energy': 'bg-gradient-to-r from-yellow-100 to-green-100 text-yellow-700 border-yellow-200',
+    'Sustainability': 'bg-gradient-to-r from-emerald-100 to-lime-100 text-emerald-700 border-emerald-200',
+    'Conservation': 'bg-gradient-to-r from-green-100 to-teal-100 text-green-700 border-green-200',
+    'Wildlife': 'bg-gradient-to-r from-teal-100 to-cyan-100 text-teal-700 border-teal-200',
+    
+    // Worker and Labor Rights
+    'Food Production Workers\' Health and Safety': 'bg-gradient-to-r from-orange-100 to-red-100 text-orange-700 border-orange-200',
+    'Worker Safety': 'bg-gradient-to-r from-red-100 to-orange-100 text-red-700 border-red-200',
+    'Labor Rights': 'bg-gradient-to-r from-purple-100 to-indigo-100 text-purple-700 border-purple-200',
+    'Workplace Safety': 'bg-gradient-to-r from-amber-100 to-orange-100 text-amber-700 border-amber-200',
+    
+    // Additional Categories
+    'Sports': 'bg-gradient-to-r from-orange-100 to-red-100 text-orange-700 border-orange-200',
+    'Recreation': 'bg-gradient-to-r from-pink-100 to-rose-100 text-pink-700 border-pink-200',
+    'Youth Development': 'bg-gradient-to-r from-green-100 to-emerald-100 text-green-700 border-green-200',
+    'Senior Services': 'bg-gradient-to-r from-gray-100 to-slate-100 text-gray-700 border-gray-200',
+    'Disability Services': 'bg-gradient-to-r from-blue-100 to-cyan-100 text-blue-700 border-blue-200',
+    'Economic Development': 'bg-gradient-to-r from-emerald-100 to-green-100 text-emerald-700 border-emerald-200',
+    'Food Security': 'bg-gradient-to-r from-amber-100 to-orange-100 text-amber-700 border-amber-200',
+    'Agriculture': 'bg-gradient-to-r from-lime-100 to-yellow-100 text-lime-700 border-lime-200',
+    'Social Justice': 'bg-gradient-to-r from-red-100 to-pink-100 text-red-700 border-red-200',
+    'Human Rights': 'bg-gradient-to-r from-purple-100 to-indigo-100 text-purple-700 border-purple-200',
+    'Civil Rights': 'bg-gradient-to-r from-indigo-100 to-violet-100 text-indigo-700 border-indigo-200',
+    'Immigration': 'bg-gradient-to-r from-blue-100 to-purple-100 text-blue-700 border-blue-200',
+    'Criminal Justice': 'bg-gradient-to-r from-slate-100 to-zinc-100 text-slate-700 border-slate-200',
+    'International Development': 'bg-gradient-to-r from-cyan-100 to-blue-100 text-cyan-700 border-cyan-200',
+    'Global Health': 'bg-gradient-to-r from-teal-100 to-emerald-100 text-teal-700 border-teal-200',
+    'Disaster Relief': 'bg-gradient-to-r from-red-100 to-orange-100 text-red-700 border-red-200',
+    'Emergency Services': 'bg-gradient-to-r from-orange-100 to-amber-100 text-orange-700 border-orange-200',
+    'Public Safety': 'bg-gradient-to-r from-amber-100 to-yellow-100 text-amber-700 border-amber-200'
   };
   
-  return categoryMap[categoryName] || 'bg-gradient-to-r from-slate-100 to-gray-100 text-slate-700 border-slate-200';
+  return categoryMap[categoryName] || 'bg-gradient-to-r from-slate-100 to-zinc-100 text-slate-700 border-slate-200';
 };
 
 // Organization type colors for pills
@@ -62,6 +106,68 @@ const getOrgTypePillClasses = (taxonomyCode) => {
   
   const prefix = taxonomyCode.split('.')[0];
   return typeMap[prefix] || 'bg-gradient-to-r from-slate-100 to-gray-100 text-slate-700 border-slate-200';
+};
+
+// Location-specific colors for different counties and regions
+const getLocationPillClasses = (locationName) => {
+  const locationMap = {
+    // Bay Area Counties - each with unique colors
+    'San Francisco': 'bg-gradient-to-r from-red-100 to-rose-100 text-red-700 border-red-200',
+    'San Francisco County': 'bg-gradient-to-r from-red-100 to-rose-100 text-red-700 border-red-200',
+    'Alameda': 'bg-gradient-to-r from-orange-100 to-amber-100 text-orange-700 border-orange-200',
+    'Alameda County': 'bg-gradient-to-r from-orange-100 to-amber-100 text-orange-700 border-orange-200',
+    'Contra Costa': 'bg-gradient-to-r from-yellow-100 to-lime-100 text-yellow-700 border-yellow-200',
+    'Contra Costa County': 'bg-gradient-to-r from-yellow-100 to-lime-100 text-yellow-700 border-yellow-200',
+    'San Mateo': 'bg-gradient-to-r from-lime-100 to-green-100 text-lime-700 border-lime-200',
+    'San Mateo County': 'bg-gradient-to-r from-lime-100 to-green-100 text-lime-700 border-lime-200',
+    'Santa Clara': 'bg-gradient-to-r from-emerald-100 to-teal-100 text-emerald-700 border-emerald-200',
+    'Santa Clara County': 'bg-gradient-to-r from-emerald-100 to-teal-100 text-emerald-700 border-emerald-200',
+    'Marin': 'bg-gradient-to-r from-teal-100 to-cyan-100 text-teal-700 border-teal-200',
+    'Marin County': 'bg-gradient-to-r from-teal-100 to-cyan-100 text-teal-700 border-teal-200',
+    'Sonoma': 'bg-gradient-to-r from-sky-100 to-blue-100 text-sky-700 border-sky-200',
+    'Sonoma County': 'bg-gradient-to-r from-sky-100 to-blue-100 text-sky-700 border-sky-200',
+    'Solano': 'bg-gradient-to-r from-indigo-100 to-purple-100 text-indigo-700 border-indigo-200',
+    'Solano County': 'bg-gradient-to-r from-indigo-100 to-purple-100 text-indigo-700 border-indigo-200',
+    'Napa': 'bg-gradient-to-r from-purple-100 to-pink-100 text-purple-700 border-purple-200',
+    'Napa County': 'bg-gradient-to-r from-purple-100 to-pink-100 text-purple-700 border-purple-200',
+    
+    // Major Cities - unique colors
+    'Oakland': 'bg-gradient-to-r from-amber-100 to-orange-100 text-amber-700 border-amber-200',
+    'Berkeley': 'bg-gradient-to-r from-blue-100 to-indigo-100 text-blue-700 border-blue-200',
+    'San Jose': 'bg-gradient-to-r from-green-100 to-emerald-100 text-green-700 border-green-200',
+    'Fremont': 'bg-gradient-to-r from-orange-100 to-red-100 text-orange-700 border-orange-200',
+    'Hayward': 'bg-gradient-to-r from-yellow-100 to-orange-100 text-yellow-700 border-yellow-200',
+    'Sunnyvale': 'bg-gradient-to-r from-cyan-100 to-teal-100 text-cyan-700 border-cyan-200',
+    'Santa Clara': 'bg-gradient-to-r from-emerald-100 to-green-100 text-emerald-700 border-emerald-200',
+    'Mountain View': 'bg-gradient-to-r from-teal-100 to-emerald-100 text-teal-700 border-teal-200',
+    'Palo Alto': 'bg-gradient-to-r from-lime-100 to-green-100 text-lime-700 border-lime-200',
+    'Redwood City': 'bg-gradient-to-r from-green-100 to-lime-100 text-green-700 border-green-200',
+    
+    // Regional descriptors
+    'Bay Area': 'bg-gradient-to-r from-blue-100 to-cyan-100 text-blue-700 border-blue-200',
+    'San Francisco Bay Area': 'bg-gradient-to-r from-blue-100 to-cyan-100 text-blue-700 border-blue-200',
+    'Northern California': 'bg-gradient-to-r from-indigo-100 to-blue-100 text-indigo-700 border-indigo-200',
+    'California': 'bg-gradient-to-r from-purple-100 to-indigo-100 text-purple-700 border-purple-200',
+    'United States': 'bg-gradient-to-r from-red-100 to-blue-100 text-slate-700 border-slate-200',
+    'National': 'bg-gradient-to-r from-slate-100 to-zinc-100 text-slate-700 border-slate-200',
+    'International': 'bg-gradient-to-r from-teal-100 to-cyan-100 text-teal-700 border-teal-200'
+  };
+  
+  // Try exact match first
+  if (locationMap[locationName]) {
+    return locationMap[locationName];
+  }
+  
+  // Try partial matches for flexibility
+  const locationLower = locationName.toLowerCase();
+  for (const [key, value] of Object.entries(locationMap)) {
+    if (locationLower.includes(key.toLowerCase())) {
+      return value;
+    }
+  }
+  
+  // Default fallback
+  return 'bg-gradient-to-r from-slate-100 to-gray-100 text-slate-700 border-slate-200';
 };
 
 const GrantCard = ({ grant, onOpenDetailModal, onFilterByCategory, onSave, onUnsave, isSaved, session, userOrganizationType = null }) => {
@@ -190,7 +296,7 @@ const GrantCard = ({ grant, onOpenDetailModal, onFilterByCategory, onSave, onUns
                     
                     <div className="flex-1">
                         <Link 
-                            to={`/funders/${grant.funderSlug}`} 
+                            to={`/organizations/${grant.funderSlug}`} 
                             className="font-semibold text-slate-700 text-sm hover:text-blue-600 transition-colors duration-300 block"
                             onClick={(e) => { if(isExpired) e.preventDefault(); e.stopPropagation(); }}
                         >
@@ -205,7 +311,7 @@ const GrantCard = ({ grant, onOpenDetailModal, onFilterByCategory, onSave, onUns
                 </div>
 
                 {/* Title */}
-                <h3 className="text-xl font-bold text-slate-800 mb-3 group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r group-hover:from-blue-600 group-hover:to-purple-600 transition-all duration-300 line-clamp-2">
+                <h3 className="text-xl font-bold text-slate-800 mb-3 group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r group-hover:from-blue-600 group-hover:to-purple-600 transition-all duration-300 line-clamp-1">
                     {grant.title}
                 </h3>
 
@@ -241,7 +347,7 @@ const GrantCard = ({ grant, onOpenDetailModal, onFilterByCategory, onSave, onUns
                     </div>
                 </div>
 
-                {/* Location with better design */}
+                {/* Location with better design and unique colors */}
                 <div className="mb-4">
                     <div className="flex items-center gap-2 mb-2">
                         <MapPin size={14} className="text-blue-500" />
@@ -252,7 +358,7 @@ const GrantCard = ({ grant, onOpenDetailModal, onFilterByCategory, onSave, onUns
                             grant.locations.slice(0, 3).map((location, index) => (
                                 <span 
                                     key={index}
-                                    className="text-xs font-medium px-3 py-1.5 bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 rounded-full border border-blue-200"
+                                    className={`text-xs font-medium px-3 py-1.5 rounded-full border transition-all duration-300 ${getLocationPillClasses(location.name)}`}
                                 >
                                     {location.name}
                                 </span>
