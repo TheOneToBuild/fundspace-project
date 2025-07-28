@@ -15,6 +15,12 @@
 [functions."cleanup-old-news"]
   schedule = "0 0 * * *"
 
+# SPA redirect for client-side routing
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
 # Preserving your headers configuration
 [[headers]]
   for = "/.netlify/functions/*"
