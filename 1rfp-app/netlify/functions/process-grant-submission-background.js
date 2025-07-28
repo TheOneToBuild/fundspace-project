@@ -25,9 +25,24 @@ function generateSlug(organizationName, grantTitle) {
 
 function parseFundingAmount(text) {
     if (!text) return null;
-    const cleaned = String(text).replace(/[$,]/g, '');
-    const numberMatch = cleaned.match(/(\d+)/);
-    return numberMatch ? parseInt(numberMatch[0], 10) : null;
+    
+    const cleaned = String(text).toLowerCase().replace(/[\$,]/g, '');
+    
+    // Handle "million" amounts
+    const millionMatch = cleaned.match(/(\d+(?:\.\d+)?)\s*(?:million|m)/);
+    if (millionMatch) {
+        return Math.floor(parseFloat(millionMatch[1]) * 1000000);
+    }
+    
+    // Handle "thousand" or "k" amounts
+    const thousandMatch = cleaned.match(/(\d+(?:\.\d+)?)\s*(?:thousand|k)/);
+    if (thousandMatch) {
+        return Math.floor(parseFloat(thousandMatch[1]) * 1000);
+    }
+    
+    // Handle regular dollar amounts
+    const numberMatch = cleaned.match(/(\d+(?:\.\d+)?)/);
+    return numberMatch ? Math.floor(parseFloat(numberMatch[0])) : null;
 }
 
 // Enhanced grant validation with deadline and funding checks
@@ -451,6 +466,87 @@ async function getOrCreateOrganizationEnhanced(orgData, primaryUrl) {
     return newOrg.id;
 }
 
+// Location handling functions
+async function getOrCreateLocation(locationName) {
+    if (!locationName) return null;
+    
+    // First try to find existing location
+    const { data: existing } = await supabase
+        .from('locations')
+        .select('id')
+        .eq('name', locationName)
+        .single();
+    
+    if (existing) return existing.id;
+    
+    // Create new location
+    const { data, error } = await supabase
+        .from('locations')
+        .insert({ name: locationName })
+        .select('id')
+        .single();
+    
+    if (error) {
+        console.error(`Error creating location "${locationName}":`, error.message);
+        return null;
+    }
+    
+    return data?.id;
+}
+
+async function linkGrantToLocations(grantId, locationNames) {
+    if (!grantId || !locationNames || !Array.isArray(locationNames)) return;
+    
+    // Handle "San Francisco Bay Area" and similar broad terms
+    let processedLocations = [];
+    for (const loc of locationNames) {
+        if (loc.toLowerCase().includes('bay area') || loc.toLowerCase().includes('nine county') || loc.toLowerCase().includes('9 county')) {
+            // Add all Bay Area counties
+            processedLocations.push(
+                'Alameda County', 'Contra Costa County', 'Marin County', 'Napa County',
+                'San Francisco County', 'San Mateo County', 'Santa Clara County', 
+                'Solano County', 'Sonoma County'
+            );
+        } else {
+            processedLocations.push(loc);
+        }
+    }
+    
+    // Remove duplicates
+    processedLocations = [...new Set(processedLocations)];
+    
+    console.log(`📍 Linking grant to ${processedLocations.length} locations: ${processedLocations.join(', ')}`);
+    
+    for (const locationName of processedLocations) {
+        const locationId = await getOrCreateLocation(locationName.trim());
+        if (locationId) {
+            const { error } = await supabase
+                .from('grant_locations')
+                .insert({ grant_id: grantId, location_id: locationId });
+            
+            if (error && !error.message.includes('already exists')) {
+                console.error(`Error linking location "${locationName}":`, error.message);
+            }
+        }
+    }
+}
+
+async function linkGrantToEligibleTaxonomies(grantId, taxonomyCodes) {
+    if (!grantId || !taxonomyCodes || !Array.isArray(taxonomyCodes)) return;
+    
+    console.log(`🏷️ Linking grant to ${taxonomyCodes.length} taxonomy codes: ${taxonomyCodes.join(', ')}`);
+    
+    for (const taxonomyCode of taxonomyCodes) {
+        const { error } = await supabase
+            .from('grant_eligible_taxonomies')
+            .insert({ grant_id: grantId, taxonomy_code: taxonomyCode });
+        
+        if (error && !error.message.includes('already exists')) {
+            console.error(`Error linking taxonomy "${taxonomyCode}":`, error.message);
+        }
+    }
+}
+
 async function getOrCreateCategory(categoryName) {
     if (!categoryName) return null;
     
@@ -473,20 +569,61 @@ async function getOrCreateCategory(categoryName) {
     return data?.id;
 }
 
-// Enhanced eligibility extraction
+// Extract location information from grant content
+function extractLocationInfo(description, eligibility_criteria, grantTitle) {
+    const text = `${description || ''} ${eligibility_criteria || ''} ${grantTitle || ''}`.toLowerCase();
+    const locations = [];
+    
+    // Check for Bay Area references
+    if (text.includes('bay area') || text.includes('nine county') || text.includes('9 county') || 
+        text.includes('san francisco bay') || text.includes('all bay area counties')) {
+        return ['San Francisco Bay Area'];
+    }
+    
+    // Check for specific county/city mentions
+    const locationMappings = {
+        'San Francisco County': ['san francisco', 'sf'],
+        'Alameda County': ['alameda', 'oakland', 'berkeley', 'fremont'],
+        'Santa Clara County': ['santa clara', 'san jose', 'palo alto', 'mountain view'],
+        'San Mateo County': ['san mateo', 'redwood city', 'menlo park'],
+        'Contra Costa County': ['contra costa', 'richmond', 'concord'],
+        'Marin County': ['marin', 'san rafael', 'novato'],
+        'Solano County': ['solano', 'vallejo', 'fairfield'],
+        'Napa County': ['napa'],
+        'Sonoma County': ['sonoma', 'santa rosa', 'petaluma']
+    };
+    
+    for (const [county, terms] of Object.entries(locationMappings)) {
+        if (terms.some(term => text.includes(term))) {
+            locations.push(county);
+        }
+    }
+    
+    return locations.length > 0 ? locations : ['San Francisco Bay Area']; // Default to Bay Area
+}
+
+// Enhanced eligibility extraction using proper taxonomy codes
 function extractEligibilityTypes(description, eligibility_criteria) {
     const text = `${description || ''} ${eligibility_criteria || ''}`.toLowerCase();
     const eligibilityTypes = [];
     
-    // Map common terms to taxonomy codes
+    // Map common terms to proper taxonomy codes from grant_eligible_taxonomies
     const mappings = {
-        'nonprofit': ['nonprofit', 'non-profit', 'not-for-profit'],
-        'nonprofit.501c3': ['501(c)(3)', '501c3', 'tax-exempt'],
-        'individual': ['individual', 'artists', 'researchers', 'students'],
-        'government.schools': ['schools', 'educational', 'universities', 'colleges'],
-        'government': ['government', 'municipal', 'federal', 'state agencies'],
-        'for_profit': ['for-profit', 'businesses', 'companies', 'enterprises'],
-        'collaborative': ['collaborative', 'partnerships', 'coalitions']
+        'nonprofit.501c3': ['501(c)(3)', '501c3', 'tax-exempt', 'nonprofit', 'non-profit'],
+        'nonprofit.service': ['service organization', 'direct service', 'community service'],
+        'nonprofit.advocacy': ['advocacy', 'policy', 'social change'],
+        'government.local': ['local government', 'city', 'municipal', 'county'],
+        'government.state': ['state government', 'state agency', 'state department'],
+        'government.federal': ['federal', 'federal agency', 'federal government'],
+        'government.schools': ['schools', 'school district', 'educational institution', 'universities', 'colleges'],
+        'foundation.private': ['private foundation', 'family foundation'],
+        'foundation.community': ['community foundation'],
+        'foundation.corporate': ['corporate foundation'],
+        'for_profit.small': ['small business', 'startup', 'entrepreneur'],
+        'for_profit.large': ['corporation', 'large business', 'enterprise'],
+        'individual': ['individual', 'artists', 'researchers', 'students', 'scholars'],
+        'collaborative': ['collaborative', 'partnerships', 'coalitions', 'consortium'],
+        'faith_based': ['faith-based', 'religious', 'church', 'synagogue', 'mosque']
     };
     
     for (const [code, terms] of Object.entries(mappings)) {
@@ -495,7 +632,8 @@ function extractEligibilityTypes(description, eligibility_criteria) {
         }
     }
     
-    return eligibilityTypes.length > 0 ? eligibilityTypes : ['nonprofit']; // Default to nonprofit
+    // Default to nonprofit.501c3 if no specific match found
+    return eligibilityTypes.length > 0 ? eligibilityTypes : ['nonprofit.501c3'];
 }
 
 async function saveGrantsToSupabase(grants, primaryUrl, organizationId) {
@@ -536,6 +674,9 @@ async function saveGrantsToSupabase(grants, primaryUrl, organizationId) {
             
             // Extract eligibility types from grant content
             const eligibilityTypes = extractEligibilityTypes(grant.description, grant.eligibility_criteria);
+            
+            // Extract location information
+            const grantLocations = extractLocationInfo(grant.description, grant.eligibility_criteria, grant.title);
 
             // Insert new grant with proper organization-based slug
             const { data: grantResult, error } = await supabase
@@ -564,6 +705,12 @@ async function saveGrantsToSupabase(grants, primaryUrl, organizationId) {
             console.log(`✅ Grant saved: "${grant.title}" (ID: ${grantResult.id})`);
             console.log(`📋 Eligibility: ${eligibilityTypes.join(', ')}`);
             savedCount++;
+
+            // Link grant to locations
+            await linkGrantToLocations(grantResult.id, grantLocations);
+            
+            // Link grant to eligible taxonomies
+            await linkGrantToEligibleTaxonomies(grantResult.id, eligibilityTypes);
 
             // Add categories if provided
             if (grant.categories && Array.isArray(grant.categories)) {
@@ -629,9 +776,10 @@ export const handler = async function(event, context) {
 
         PART 1 - GRANT EXTRACTION:
         Extract ACTIVE grants with confirmed funding amounts and future deadlines:
-        - ONLY grants with specific funding amounts (e.g., "$50,000", "$10K-$25K")
-        - EXCLUDE grants with $0, "varies", "TBD", or past deadlines
+        - ONLY grants with specific funding amounts (e.g., "$50,000", "$10K-$25K", "$4.4 million")
+        - EXCLUDE grants with $0, "varies", "TBD", or past deadlines  
         - EXCLUDE invitation-only grants unless funding >$5,000
+        - If funding says "over $X million" or "awarded $X million", use the X amount as max funding
 
         PART 2 - ORGANIZATION EXTRACTION:
         Extract comprehensive organization details from ALL pages:
