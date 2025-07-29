@@ -154,7 +154,7 @@ async function discoverGrantPages(baseUrl) {
 async function extractContentFromPages(urls) {
     let combinedContent = '';
     let successfulPages = 0;
-    let grantInfo = {
+    const grantInfo = {
         hasTitle: false,
         hasDescription: false,
         hasEligibility: false,
@@ -163,9 +163,7 @@ async function extractContentFromPages(urls) {
         hasApplicationUrl: false,
         hasEligibleOrgs: false
     };
-    
-    // Track organization information as we discover it
-    let organizationInfo = {
+    const organizationInfo = {
         hasOrgName: false,
         hasOrgType: false,
         hasOrgDescription: false,
@@ -173,33 +171,24 @@ async function extractContentFromPages(urls) {
         hasOrgLocation: false,
         hasFocusAreas: false
     };
-    
+
     for (const url of urls) {
         try {
             console.log(`📄 Fetching: ${url.substring(0, 80)}...`);
             
             let text = '';
-            
-            // Handle PDF files
             if (url.toLowerCase().endsWith('.pdf')) {
                 console.log(`📋 Processing PDF: ${url}`);
                 const response = await fetch(url);
                 const arrayBuffer = await response.arrayBuffer();
-                
-                // Basic PDF text extraction
                 const uint8Array = new Uint8Array(arrayBuffer);
-                const textDecoder = new TextDecoder('utf-8');
-                text = textDecoder.decode(uint8Array);
-                
-                // Clean up PDF text
-                text = text.replace(/[^\x20-\x7E\n]/g, ' ').replace(/\s+/g, ' ').trim();
-                
+                text = new TextDecoder('utf-8').decode(uint8Array)
+                    .replace(/[^\x20-\x7E\n]/g, ' ')
+                    .replace(/\s+/g, ' ')
+                    .trim();
             } else {
-                // Handle HTML pages
                 const response = await fetch(url);
                 const html = await response.text();
-                
-                // Basic text extraction (remove HTML tags but keep structure)
                 text = html
                     .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
                     .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
@@ -207,36 +196,20 @@ async function extractContentFromPages(urls) {
                     .replace(/\s+/g, ' ')
                     .trim();
             }
-            
+
             if (text.length > 200) {
                 combinedContent += `\n\n--- Content from ${url} ---\n\n${text}`;
                 successfulPages++;
-                
-                // Check if we have all essential grant information
+
                 const lowerText = text.toLowerCase();
-                if (!grantInfo.hasTitle && (lowerText.includes('grant') || lowerText.includes('funding'))) {
-                    grantInfo.hasTitle = true;
-                }
-                if (!grantInfo.hasDescription && lowerText.length > 500) {
-                    grantInfo.hasDescription = true;
-                }
-                if (!grantInfo.hasEligibility && (lowerText.includes('eligible') || lowerText.includes('nonprofit'))) {
-                    grantInfo.hasEligibility = true;
-                }
-                if (!grantInfo.hasDeadline && (lowerText.includes('deadline') || lowerText.includes('due'))) {
-                    grantInfo.hasDeadline = true;
-                }
-                if (!grantInfo.hasFundingAmount && (lowerText.includes('$') || lowerText.includes('amount'))) {
-                    grantInfo.hasFundingAmount = true;
-                }
-                if (!grantInfo.hasApplicationUrl && (lowerText.includes('apply') || lowerText.includes('application'))) {
-                    grantInfo.hasApplicationUrl = true;
-                }
-                if (!grantInfo.hasEligibleOrgs && (lowerText.includes('organization') || lowerText.includes('501'))) {
-                    grantInfo.hasEligibleOrgs = true;
-                }
-                
-                // Track organization information discovery
+                if (!grantInfo.hasTitle && (lowerText.includes('grant') || lowerText.includes('funding'))) grantInfo.hasTitle = true;
+                if (!grantInfo.hasDescription && lowerText.length > 500) grantInfo.hasDescription = true;
+                if (!grantInfo.hasEligibility && (lowerText.includes('eligible') || lowerText.includes('nonprofit'))) grantInfo.hasEligibility = true;
+                if (!grantInfo.hasDeadline && (lowerText.includes('deadline') || lowerText.includes('due'))) grantInfo.hasDeadline = true;
+                if (!grantInfo.hasFundingAmount && (lowerText.includes('$') || lowerText.includes('amount'))) grantInfo.hasFundingAmount = true;
+                if (!grantInfo.hasApplicationUrl && (lowerText.includes('apply') || lowerText.includes('application'))) grantInfo.hasApplicationUrl = true;
+                if (!grantInfo.hasEligibleOrgs && (lowerText.includes('organization') || lowerText.includes('501'))) grantInfo.hasEligibleOrgs = true;
+
                 if (!organizationInfo.hasOrgDescription && (lowerText.includes('mission') || lowerText.includes('about us') || lowerText.includes('our organization'))) {
                     organizationInfo.hasOrgDescription = true;
                     console.log(`📋 Found organization description indicators on page ${successfulPages}`);
@@ -253,8 +226,7 @@ async function extractContentFromPages(urls) {
                     organizationInfo.hasOrgType = true;
                     console.log(`🏢 Found organization type indicators on page ${successfulPages}`);
                 }
-                
-                // Smart stopping: if we have comprehensive info (both grants AND organization), we can stop earlier
+
                 const essentialInfoCount = Object.values(grantInfo).filter(Boolean).length;
                 const orgInfoCount = Object.values({
                     hasOrgDescription: organizationInfo.hasOrgDescription,
@@ -262,27 +234,23 @@ async function extractContentFromPages(urls) {
                     hasFocusAreas: organizationInfo.hasFocusAreas,
                     hasOrgType: organizationInfo.hasOrgType
                 }).filter(Boolean).length;
-                
+
                 if (successfulPages >= 3 && essentialInfoCount >= 5 && orgInfoCount >= 2) {
                     console.log(`✅ Found comprehensive grant (${essentialInfoCount}/7) and organization info (${orgInfoCount}/4), stopping early after ${successfulPages} pages`);
                     break;
                 }
-                
-                // Hard limit: stop after 15 pages
                 if (successfulPages >= 15) {
                     console.log(`⏹️ Reached maximum page limit (15), stopping`);
                     break;
                 }
             }
-            
-            // Small delay between requests
+
             await new Promise(resolve => setTimeout(resolve, 500));
-            
         } catch (error) {
             console.log(`⚠️ Failed to fetch ${url}: ${error.message}`);
         }
     }
-    
+
     console.log(`✅ Successfully extracted content from ${successfulPages}/${urls.length} pages`);
     console.log(`📊 Grant completeness: ${Object.values(grantInfo).filter(Boolean).length}/7 categories found`);
     console.log(`🏢 Organization completeness: ${Object.values({
@@ -292,7 +260,7 @@ async function extractContentFromPages(urls) {
         hasOrgType: organizationInfo.hasOrgType
     }).filter(Boolean).length}/4 categories found`);
     
-    return combinedContent;
+    return { content: combinedContent, successfulPages, grantInfo, organizationInfo };
 }
 
 // Basic organization creation/update
@@ -331,7 +299,7 @@ async function getOrCreateOrganization(name, website) {
 
 // Enhanced organization creation/update with comprehensive data
 async function getOrCreateOrganizationEnhanced(orgData, primaryUrl) {
-    if (!orgData || !orgData.name) {
+    if (!orgData?.name) {
         console.error(`⚠️ Organization data missing or invalid`);
         return null;
     }
@@ -374,26 +342,57 @@ async function getOrCreateOrganizationEnhanced(orgData, primaryUrl) {
             console.log(`🏷️ Updating type: ${orgData.type}`);
         }
         
-        // Update additional fields
-        const additionalFields = ['taxonomy_code', 'annual_budget', 'year_founded', 'staff_count'];
-        additionalFields.forEach(field => {
-            if (orgData[field]) {
-                updates[field] = orgData[field];
-                console.log(`➕ Adding ${field}: ${orgData[field]}`);
+        // Update additional fields with sanitization
+        if (orgData.taxonomy_code) {
+            updates.taxonomy_code = orgData.taxonomy_code;
+            console.log(`➕ Adding taxonomy_code: ${orgData.taxonomy_code}`);
+        }
+        
+        if (orgData.annual_budget) {
+            // Sanitize annual_budget
+            if (typeof orgData.annual_budget === 'string') {
+                const budgetMatch = String(orgData.annual_budget).match(/\d+/);
+                updates.annual_budget = budgetMatch ? parseInt(budgetMatch[0]) : null;
+            } else {
+                updates.annual_budget = orgData.annual_budget;
             }
-        });
+            console.log(`➕ Adding annual_budget: ${updates.annual_budget}`);
+        }
+        
+        if (orgData.year_founded) {
+            // CRITICAL FIX: Sanitize year_founded to extract only the numeric year
+            const yearMatch = String(orgData.year_founded).match(/\b(19|20)\d{2}\b/);
+            updates.year_founded = yearMatch ? parseInt(yearMatch[0]) : null;
+            
+            if (updates.year_founded) {
+                console.log(`📅 Extracted year founded: ${updates.year_founded} from "${orgData.year_founded}"`);
+            } else {
+                console.log(`⚠️ Could not extract valid year from: "${orgData.year_founded}"`);
+            }
+        }
+        
+        if (orgData.staff_count) {
+            // Sanitize staff_count
+            if (typeof orgData.staff_count === 'string') {
+                const staffMatch = String(orgData.staff_count).match(/\d+/);
+                updates.staff_count = staffMatch ? parseInt(staffMatch[0]) : null;
+            } else {
+                updates.staff_count = orgData.staff_count;
+            }
+            console.log(`➕ Adding staff_count: ${updates.staff_count}`);
+        }
         
         // Handle extended data (focus areas, contact info, etc.)
-        if (orgData.focus_areas || orgData.geographic_scope || orgData.contact_info) {
+        if (orgData.focus_areas?.length || orgData.geographic_scope?.length || orgData.contact_info) {
             const currentExtended = existing.extended_data || {};
             const newExtended = { ...currentExtended };
             
-            if (orgData.focus_areas && Array.isArray(orgData.focus_areas)) {
+            if (orgData.focus_areas?.length) {
                 newExtended.focus_areas = orgData.focus_areas;
                 console.log(`🎯 Adding focus areas: ${orgData.focus_areas.join(', ')}`);
             }
             
-            if (orgData.geographic_scope && Array.isArray(orgData.geographic_scope)) {
+            if (orgData.geographic_scope?.length) {
                 newExtended.geographic_scope = orgData.geographic_scope;
                 console.log(`🗺️ Adding geographic scope: ${orgData.geographic_scope.join(', ')}`);
             }
@@ -436,9 +435,6 @@ async function getOrCreateOrganizationEnhanced(orgData, primaryUrl) {
         website: orgData.website || primaryUrl,
         location: orgData.location || null,
         taxonomy_code: orgData.taxonomy_code || null,
-        annual_budget: orgData.annual_budget || null,
-        year_founded: orgData.year_founded || null,
-        staff_count: orgData.staff_count || null,
         extended_data: {
             focus_areas: orgData.focus_areas || [],
             geographic_scope: orgData.geographic_scope || [],
@@ -448,6 +444,43 @@ async function getOrCreateOrganizationEnhanced(orgData, primaryUrl) {
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
     };
+    
+    // CRITICAL FIX: Sanitize numeric fields before insertion
+    if (orgData.annual_budget) {
+        if (typeof orgData.annual_budget === 'string') {
+            const budgetMatch = String(orgData.annual_budget).match(/\d+/);
+            newOrgData.annual_budget = budgetMatch ? parseInt(budgetMatch[0]) : null;
+        } else {
+            newOrgData.annual_budget = orgData.annual_budget;
+        }
+    } else {
+        newOrgData.annual_budget = null;
+    }
+    
+    if (orgData.year_founded) {
+        // Extract only the first 4-digit year from strings like "2007 (Investing in Artists program)"
+        const yearMatch = String(orgData.year_founded).match(/\b(19|20)\d{2}\b/);
+        newOrgData.year_founded = yearMatch ? parseInt(yearMatch[0]) : null;
+        
+        if (newOrgData.year_founded) {
+            console.log(`📅 Extracted year founded: ${newOrgData.year_founded} from "${orgData.year_founded}"`);
+        } else {
+            console.log(`⚠️ Could not extract valid year from: "${orgData.year_founded}"`);
+        }
+    } else {
+        newOrgData.year_founded = null;
+    }
+    
+    if (orgData.staff_count) {
+        if (typeof orgData.staff_count === 'string') {
+            const staffMatch = String(orgData.staff_count).match(/\d+/);
+            newOrgData.staff_count = staffMatch ? parseInt(staffMatch[0]) : null;
+        } else {
+            newOrgData.staff_count = orgData.staff_count;
+        }
+    } else {
+        newOrgData.staff_count = null;
+    }
     
     const { data: newOrg, error: insertError } = await supabase
         .from('organizations')
@@ -495,28 +528,18 @@ async function getOrCreateLocation(locationName) {
 }
 
 async function linkGrantToLocations(grantId, locationNames) {
-    if (!grantId || !locationNames || !Array.isArray(locationNames)) return;
+    if (!grantId || !locationNames?.length) return;
+
+    let processedLocations = locationNames.flatMap(loc => 
+        loc.toLowerCase().includes('bay area') || loc.toLowerCase().includes('nine county') || loc.toLowerCase().includes('9 county')
+            ? ['Alameda County', 'Contra Costa County', 'Marin County', 'Napa County', 'San Francisco County', 'San Mateo County', 'Santa Clara County', 'Solano County', 'Sonoma County']
+            : [loc]
+    );
     
-    // Handle "San Francisco Bay Area" and similar broad terms
-    let processedLocations = [];
-    for (const loc of locationNames) {
-        if (loc.toLowerCase().includes('bay area') || loc.toLowerCase().includes('nine county') || loc.toLowerCase().includes('9 county')) {
-            // Add all Bay Area counties
-            processedLocations.push(
-                'Alameda County', 'Contra Costa County', 'Marin County', 'Napa County',
-                'San Francisco County', 'San Mateo County', 'Santa Clara County', 
-                'Solano County', 'Sonoma County'
-            );
-        } else {
-            processedLocations.push(loc);
-        }
-    }
-    
-    // Remove duplicates
     processedLocations = [...new Set(processedLocations)];
     
     console.log(`📍 Linking grant to ${processedLocations.length} locations: ${processedLocations.join(', ')}`);
-    
+
     for (const locationName of processedLocations) {
         const locationId = await getOrCreateLocation(locationName.trim());
         if (locationId) {
@@ -532,7 +555,7 @@ async function linkGrantToLocations(grantId, locationNames) {
 }
 
 async function linkGrantToEligibleTaxonomies(grantId, taxonomyCodes) {
-    if (!grantId || !taxonomyCodes || !Array.isArray(taxonomyCodes)) return;
+    if (!grantId || !taxonomyCodes?.length) return;
     
     console.log(`🏷️ Linking grant to ${taxonomyCodes.length} taxonomy codes: ${taxonomyCodes.join(', ')}`);
     
@@ -572,15 +595,12 @@ async function getOrCreateCategory(categoryName) {
 // Extract location information from grant content
 function extractLocationInfo(description, eligibility_criteria, grantTitle) {
     const text = `${description || ''} ${eligibility_criteria || ''} ${grantTitle || ''}`.toLowerCase();
-    const locations = [];
     
-    // Check for Bay Area references
     if (text.includes('bay area') || text.includes('nine county') || text.includes('9 county') || 
         text.includes('san francisco bay') || text.includes('all bay area counties')) {
         return ['San Francisco Bay Area'];
     }
-    
-    // Check for specific county/city mentions
+
     const locationMappings = {
         'San Francisco County': ['san francisco', 'sf'],
         'Alameda County': ['alameda', 'oakland', 'berkeley', 'fremont'],
@@ -592,22 +612,17 @@ function extractLocationInfo(description, eligibility_criteria, grantTitle) {
         'Napa County': ['napa'],
         'Sonoma County': ['sonoma', 'santa rosa', 'petaluma']
     };
-    
-    for (const [county, terms] of Object.entries(locationMappings)) {
-        if (terms.some(term => text.includes(term))) {
-            locations.push(county);
-        }
-    }
-    
-    return locations.length > 0 ? locations : ['San Francisco Bay Area']; // Default to Bay Area
+
+    const locations = Object.entries(locationMappings)
+        .filter(([_, terms]) => terms.some(term => text.includes(term)))
+        .map(([county]) => county);
+
+    return locations.length > 0 ? locations : ['San Francisco Bay Area'];
 }
 
 // Enhanced eligibility extraction using proper taxonomy codes
 function extractEligibilityTypes(description, eligibility_criteria) {
     const text = `${description || ''} ${eligibility_criteria || ''}`.toLowerCase();
-    const eligibilityTypes = [];
-    
-    // Map common terms to proper taxonomy codes from grant_eligible_taxonomies
     const mappings = {
         'nonprofit.501c3': ['501(c)(3)', '501c3', 'tax-exempt', 'nonprofit', 'non-profit'],
         'nonprofit.service': ['service organization', 'direct service', 'community service'],
@@ -625,19 +640,16 @@ function extractEligibilityTypes(description, eligibility_criteria) {
         'collaborative': ['collaborative', 'partnerships', 'coalitions', 'consortium'],
         'faith_based': ['faith-based', 'religious', 'church', 'synagogue', 'mosque']
     };
-    
-    for (const [code, terms] of Object.entries(mappings)) {
-        if (terms.some(term => text.includes(term))) {
-            eligibilityTypes.push(code);
-        }
-    }
-    
-    // Default to nonprofit.501c3 if no specific match found
+
+    const eligibilityTypes = Object.entries(mappings)
+        .filter(([_, terms]) => terms.some(term => text.includes(term)))
+        .map(([code]) => code);
+
     return eligibilityTypes.length > 0 ? eligibilityTypes : ['nonprofit.501c3'];
 }
 
 async function saveGrantsToSupabase(grants, primaryUrl, organizationId) {
-    if (!grants || grants.length === 0 || !organizationId) {
+    if (!grants?.length || !organizationId) {
         console.log('💾 No grants to save or organizationId missing.');
         return 0;
     }
@@ -669,16 +681,10 @@ async function saveGrantsToSupabase(grants, primaryUrl, organizationId) {
             }
             
             const deadlineMatch = grant.deadline ? String(grant.deadline).match(/(\d{4}-\d{2}-\d{2})/) : null;
-            const deadlineToInsert = deadlineMatch ? deadlineMatch[0] : null;
             const fundingAmount = parseFundingAmount(grant.funding_amount_text);
-            
-            // Extract eligibility types from grant content
             const eligibilityTypes = extractEligibilityTypes(grant.description, grant.eligibility_criteria);
-            
-            // Extract location information
             const grantLocations = extractLocationInfo(grant.description, grant.eligibility_criteria, grant.title);
 
-            // Insert new grant with proper organization-based slug
             const { data: grantResult, error } = await supabase
                 .from('grants')
                 .insert({
@@ -689,7 +695,7 @@ async function saveGrantsToSupabase(grants, primaryUrl, organizationId) {
                     application_url: grant.application_url || primaryUrl,
                     max_funding_amount: fundingAmount,
                     funding_amount_text: grant.funding_amount_text,
-                    deadline: deadlineToInsert,
+                    deadline: deadlineMatch ? deadlineMatch[0] : null,
                     eligibility_criteria: grant.eligibility_criteria,
                     grant_type: grant.grant_type,
                     eligible_organization_types: eligibilityTypes,
@@ -713,7 +719,7 @@ async function saveGrantsToSupabase(grants, primaryUrl, organizationId) {
             await linkGrantToEligibleTaxonomies(grantResult.id, eligibilityTypes);
 
             // Add categories if provided
-            if (grant.categories && Array.isArray(grant.categories)) {
+            if (grant.categories?.length) {
                 for (const categoryName of grant.categories) {
                     const categoryId = await getOrCreateCategory(categoryName);
                     if (categoryId) {
@@ -761,7 +767,7 @@ export const handler = async function(event, context) {
         // Enhanced multi-page content extraction
         console.log(`🔍 Discovering and extracting content from multiple pages...`);
         const pagesToScrape = await discoverGrantPages(url);
-        const combinedContent = await extractContentFromPages(pagesToScrape);
+        const { content: combinedContent, successfulPages } = await extractContentFromPages(pagesToScrape);
         
         console.log(`✅ Extracted ${combinedContent.length} characters from ${pagesToScrape.length} pages`);
         
@@ -769,64 +775,97 @@ export const handler = async function(event, context) {
             throw new Error('Insufficient content found across all discovered pages.');
         }
 
-        // Enhanced AI analysis with both grant and organization extraction
+        // Enhanced AI analysis with comprehensive prompt and examples
         console.log(`🤖 Sending to AI for comprehensive grant and organization analysis...`);
         const prompt = `
-        Analyze this multi-page content (including PDFs) for BOTH active grant opportunities AND detailed organization information.
+Analyze the following content for BOTH active grant opportunities AND detailed organization information.
 
-        PART 1 - GRANT EXTRACTION:
-        Extract ACTIVE grants with confirmed funding amounts and future deadlines:
-        - ONLY grants with specific funding amounts (e.g., "$50,000", "$10K-$25K", "$4.4 million")
-        - EXCLUDE grants with $0, "varies", "TBD", or past deadlines  
-        - EXCLUDE invitation-only grants unless funding >$5,000
-        - If funding says "over $X million" or "awarded $X million", use the X amount as max funding
+### PART 1: GRANT EXTRACTION
+Extract ACTIVE grants with confirmed funding amounts and future deadlines:
+- Include grants with specific funding amounts (e.g., "$50,000", "$10K-$25K", "$4.4 million").
+- Exclude grants with $0, "varies", "TBD", or past deadlines.
+- Exclude invitation-only grants unless funding >$5,000.
+- If funding says "over $X million" or "awarded $X million", use the X amount as max funding.
 
-        PART 2 - ORGANIZATION EXTRACTION:
-        Extract comprehensive organization details from ALL pages:
+### PART 2: ORGANIZATION EXTRACTION
+Extract comprehensive organization details:
+{
+    "name": "Organization name",
+    "type": "foundation/nonprofit/government/corporate",
+    "description": "Detailed mission/purpose (200+ characters)",
+    "website": "Official website URL",
+    "location": "City, State or full address",
+    "focus_areas": ["Education", "Health", "Environment"],
+    "annual_budget": "Budget information if found",
+    "year_founded": "Year established if mentioned",
+    "staff_count": "Number of employees if found",
+    "geographic_scope": ["Counties/regions served"],
+    "contact_info": {
+        "email": "Contact email",
+        "phone": "Phone number",
+        "address": "Physical address"
+    }
+}
+
+### EXAMPLES
+Grant Example:
+{
+    "funder_name": "ABC Foundation",
+    "title": "Community Development Grant",
+    "description": "Funding for community projects focused on education and health.",
+    "deadline": "2025-12-31",
+    "funding_amount_text": "$50,000",
+    "eligibility_criteria": "Nonprofits with 501(c)(3) status",
+    "application_url": "https://example.com/apply",
+    "grant_type": "Project",
+    "categories": ["Education", "Health"],
+    "eligible_organization_types": ["nonprofit", "501c3"]
+}
+
+Organization Example:
+{
+    "name": "ABC Foundation",
+    "type": "foundation",
+    "description": "A nonprofit organization focused on community development.",
+    "website": "https://abcfoundation.org",
+    "location": "San Francisco, CA",
+    "focus_areas": ["Education", "Health"],
+    "annual_budget": "$10 million",
+    "year_founded": "1995",
+    "staff_count": "50",
+    "geographic_scope": ["California", "Nevada"],
+    "contact_info": {
+        "email": "info@abcfoundation.org",
+        "phone": "123-456-7890",
+        "address": "123 Main St, San Francisco, CA"
+    }
+}
+
+Return JSON with TWO sections:
+{
+    "grants": [
         {
-            "name": "Primary organization name",
-            "type": "foundation/nonprofit/government/corporate",
-            "taxonomy_code": "501c3/foundation/government if determinable",
-            "description": "Detailed mission/purpose (200+ characters)",
-            "website": "Official website URL",
-            "location": "City, State or full address",
-            "focus_areas": ["Education", "Health", "Environment", etc.],
-            "annual_budget": "Budget information if found",
-            "year_founded": "Year established if mentioned",
-            "staff_count": "Number of employees if found",
-            "geographic_scope": ["Counties/regions served"],
-            "contact_info": {
-                "email": "Contact email",
-                "phone": "Phone number",
-                "address": "Physical address"
-            }
+            "funder_name": "Organization name",
+            "title": "Grant name",
+            "description": "Detailed description (100+ chars)",
+            "deadline": "YYYY-MM-DD or null if rolling",
+            "funding_amount_text": "Exact dollar amounts",
+            "eligibility_criteria": "Specific requirements",
+            "application_url": "Direct application link",
+            "grant_type": "Operating/Project/etc",
+            "categories": ["Focus areas"],
+            "eligible_organization_types": ["nonprofit", "501c3", etc.]
         }
+    ],
+    "organization": {
+        /* Organization details as specified above */
+    }
+}
 
-        Return JSON with TWO sections:
-        {
-            "grants": [
-                {
-                    "funder_name": "Organization name",
-                    "title": "Grant name",
-                    "description": "Detailed description (100+ chars)",
-                    "deadline": "YYYY-MM-DD or null if rolling",
-                    "funding_amount_text": "Exact dollar amounts",
-                    "eligibility_criteria": "Specific requirements",
-                    "application_url": "Direct application link",
-                    "grant_type": "Operating/Project/etc",
-                    "categories": ["Focus areas"],
-                    "eligible_organization_types": ["nonprofit", "501c3", etc.]
-                }
-            ],
-            "organization": {
-                /* Organization details as specified above */
-            }
-        }
+CRITICAL: Extract ALL available organization information from across ALL pages.
+Look for About Us, Mission, Contact, Staff, History sections in both HTML and PDF content.
 
-        CRITICAL: Extract ALL available organization information from across ALL pages.
-        Look for About Us, Mission, Contact, Staff, History sections in both HTML and PDF content.
-
-        Content from ${pagesToScrape.length} pages: ${combinedContent.substring(0, 150000)}
+Content from ${pagesToScrape.length} pages: ${combinedContent.substring(0, 150000)}
         `;
 
         const result = await model.generateContent(prompt);
@@ -858,7 +897,7 @@ export const handler = async function(event, context) {
             
             // Get or create organization with enhanced data
             let organizationId;
-            if (organizationData && organizationData.name) {
+            if (organizationData?.name) {
                 console.log(`🏢 Processing organization: ${organizationData.name}`);
                 organizationId = await getOrCreateOrganizationEnhanced(organizationData, url);
             } else if (grants.length > 0) {
@@ -903,7 +942,7 @@ export const handler = async function(event, context) {
                 message: "Enhanced processing complete",
                 grantsFound: grants.length,
                 grantsSaved: savedCount,
-                pagesAnalyzed: pagesToScrape.length,
+                pagesAnalyzed: successfulPages,
                 status: finalStatus
             }),
         };
