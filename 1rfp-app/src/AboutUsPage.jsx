@@ -40,10 +40,10 @@ const advisoryBoard = [
     bio: 'We are excited to announce the remaining members of our esteemed advisory board soon. Stay tuned for more experts from both sides of the funding table.'
   },
   {
-    name: 'Advisory Board Member',
-    title: 'To be announced',
-    imageUrl: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcS54fTMFER5qn-WC_z4w-Se7FNH9Zu65itdALCQU0LO9QugGV_xTTH8rlH88rlsgMEQol8&usqp=CAU',
-    bio: 'We are excited to announce the remaining members of our esteemed advisory board soon. Stay tuned for more experts from both sides of the funding table.'
+    name: 'Yen Pang',
+    title: 'Advisory Board, San Mateo County Manager’s Office',
+    imageUrl: 'https://media.licdn.com/dms/image/v2/C5603AQFAMGYFJIyhzA/profile-displayphoto-shrink_200_200/profile-displayphoto-shrink_200_200/0/1600903357926?e=1756944000&v=beta&t=t_MdadgWSG5ei1r_su5CiUgwnUQ167iWvefbSAogAIY',
+    bio: 'Yen Pang brings a decade of experience advancing equity and opportunity through data-driven policy, strategic implementation, and public sector innovation. At the San Mateo County Manager’s Office, Yen led the Measure K redesign—overseeing its implementation and evaluation to ensure more effective, transparent, and community-informed use of public funds. Her work has strengthened local governance and deepened impact across education, health, and social services.'
   },
   {
     name: 'Advisory Board Member',

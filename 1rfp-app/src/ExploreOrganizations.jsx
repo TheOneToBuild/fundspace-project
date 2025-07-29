@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useEffect, useCallback, useContext } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { supabase } from './supabaseClient.js';
-import { Search, MapPin, LayoutGrid, List, SlidersHorizontal, Building, Heart, Shield, GraduationCap, Stethoscope, Church, XCircle, ChevronDown, TrendingUp, Sparkles, Star } from './components/Icons.jsx';
+import { Search, MapPin, LayoutGrid, List, SlidersHorizontal, Building, Heart, Shield, GraduationCap, Stethoscope, Church, XCircle, ChevronDown, TrendingUp, Sparkles, Star, Target } from './components/Icons.jsx';
 import FilterBar from './components/FilterBar.jsx';
 import Pagination from './components/Pagination.jsx';
 import OrganizationCard from './components/OrganizationCard.jsx';
@@ -74,23 +74,23 @@ const OrganizationListItem = ({ organization }) => {
   return (
     <Link 
       to={`/organizations/${organization.slug}`} 
-      className="group bg-white p-6 rounded-2xl border border-slate-200 hover:border-blue-300 hover:shadow-xl transition-all duration-300 flex items-center gap-6 cursor-pointer transform hover:-translate-y-1"
+      className="group bg-white p-4 md:p-5 rounded-2xl border border-slate-200 hover:border-blue-400 hover:shadow-2xl transition-all duration-300 flex flex-col md:flex-row items-start md:items-center gap-4 cursor-pointer transform hover:-translate-y-1"
     >
       <div className="flex-shrink-0">
         {organization.logo_url ? (
           <img 
             src={organization.logo_url} 
             alt={`${organization.name} logo`}
-            className="h-16 w-16 rounded-xl object-contain border-2 border-white shadow-lg group-hover:shadow-xl transition-shadow duration-300" 
+            className="h-14 w-14 md:h-16 md:w-16 rounded-xl object-contain border-2 border-white shadow-lg group-hover:shadow-xl transition-shadow duration-300" 
           />
         ) : (
-          <div className="h-16 w-16 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-lg shadow-lg group-hover:shadow-xl transition-shadow duration-300">
+          <div className="h-14 w-14 md:h-16 md:w-16 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-xl shadow-lg group-hover:shadow-xl transition-shadow duration-300">
             {getInitials(organization.name)}
           </div>
         )}
       </div>
       
-      <div className="flex-grow min-w-0">
+      <div className="flex-grow min-w-0 w-full">
         <div className="flex items-center gap-3 mb-2">
           <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full bg-gradient-to-r ${
             typeConfig.color === 'purple' ? 'from-purple-100 to-pink-100 text-purple-700 border-purple-200' :
@@ -104,35 +104,42 @@ const OrganizationListItem = ({ organization }) => {
             {typeConfig.icon} {typeConfig.label}
           </span>
         </div>
-        <h4 className="font-bold text-slate-800 text-lg mb-2 group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r group-hover:from-blue-600 group-hover:to-purple-600 transition-all duration-300">
+        <h4 className="font-bold text-slate-800 text-lg mb-3 group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r group-hover:from-blue-600 group-hover:to-purple-600 transition-all duration-300">
           {organization.name}
         </h4>
-        <div className="flex items-center gap-6 text-sm text-slate-600">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-slate-600">
           {organization.location && (
-            <div className="flex items-center gap-2 px-3 py-1 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-100">
+            <div className="flex items-center gap-1.5">
               <MapPin size={14} className="text-blue-600" />
               <span className="font-semibold text-blue-700">{organization.location}</span>
             </div>
           )}
           {organization.focus_areas && organization.focus_areas.length > 0 && (
-            <div className="flex items-center gap-2">
-              <span className="text-slate-500 text-xs">Focus:</span>
-              <span className="text-slate-700 font-medium text-xs">
-                {organization.focus_areas.slice(0, 2).join(', ')}
-                {organization.focus_areas.length > 2 && ' +' + (organization.focus_areas.length - 2) + ' more'}
-              </span>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <Target size={14} className="text-purple-600"/>
+              {organization.focus_areas.slice(0, 2).map((area, index) => (
+                  <span key={index} className="text-xs font-medium px-2 py-1 bg-purple-100 text-purple-700 rounded-full border border-purple-200">
+                      {area}
+                  </span>
+              ))}
+              {organization.focus_areas.length > 2 && (
+                  <span className="text-xs font-medium px-2 py-1 bg-slate-100 text-slate-600 rounded-full border border-slate-200">
+                      +{organization.focus_areas.length - 2}
+                  </span>
+              )}
             </div>
           )}
         </div>
       </div>
       
-      <div className="flex-shrink-0">
-        <button
-          className="px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold rounded-xl hover:from-blue-700 hover:to-purple-700 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105 flex items-center gap-2"
+      <div className="w-full md:w-auto flex-shrink-0 flex items-center mt-4 md:mt-0">
+        <Link
+          to={`/organizations/${organization.slug}`}
+          className="w-full px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold rounded-xl hover:from-blue-700 hover:to-purple-700 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105 flex items-center justify-center gap-2"
         >
           <Sparkles size={16} />
           View Profile
-        </button>
+        </Link>
       </div>
     </Link>
   );
@@ -178,7 +185,6 @@ const ExploreOrganizations = ({ isProfileView = false }) => {
     const fetchOrganizations = async () => {
       setLoading(true);
       try {
-        // First, try to use the view with engagement counts
         let { data, error } = await supabase
           .from('organizations_with_engagement')
           .select(`
@@ -186,7 +192,6 @@ const ExploreOrganizations = ({ isProfileView = false }) => {
             organization_categories(categories(name))
           `);
 
-        // If the view doesn't exist, fall back to regular query
         if (error && error.message.includes('relation "organizations_with_engagement" does not exist')) {
           console.log('📊 Engagement view not found, fetching without counts...');
           
@@ -207,7 +212,6 @@ const ExploreOrganizations = ({ isProfileView = false }) => {
           const formattedData = data.map(org => ({
             ...org,
             focus_areas: org.organization_categories?.map(oc => oc.categories?.name).filter(Boolean) || [],
-            // Include engagement counts if available
             followers_count: org.followers_count || 0,
             likes_count: org.likes_count || 0
           }));
@@ -326,25 +330,23 @@ const ExploreOrganizations = ({ isProfileView = false }) => {
 
   return (
     <div className={isProfileView ? "" : "container mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12"}>
-      {/* Only show intro section when NOT in profile view */}
       {!isProfileView && (
         <section id="organization-intro" className="text-center mb-12 relative">
-          {/* Magical background elements */}
           <div className="absolute inset-0 overflow-hidden pointer-events-none">
             <div className="absolute top-10 left-10 w-32 h-32 bg-gradient-to-r from-blue-400 to-purple-600 rounded-full opacity-10 animate-pulse"></div>
             <div className="absolute top-32 right-20 w-24 h-24 bg-gradient-to-r from-pink-400 to-rose-600 rounded-full opacity-10 animate-pulse delay-1000"></div>
             <div className="absolute bottom-10 left-1/3 w-20 h-20 bg-gradient-to-r from-emerald-400 to-teal-600 rounded-full opacity-10 animate-pulse delay-2000"></div>
           </div>
           
-          <div className="relative bg-white/80 backdrop-blur-sm p-8 md:p-12 rounded-3xl border border-white/60 shadow-2xl">
-            <h2 className="text-4xl md:text-6xl font-extrabold tracking-tight mb-4">
+          <div className="relative bg-white/80 backdrop-blur-sm p-6 md:p-10 rounded-3xl border border-white/60 shadow-2xl">
+            <h2 className="text-3xl md:text-5xl font-extrabold tracking-tight mb-3">
               <span className="text-slate-900">Explore </span>
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600">
                 Organizations
               </span>
             </h2>
             
-            <p className="text-lg md:text-xl text-slate-600 mb-8 max-w-3xl mx-auto leading-relaxed">
+            <p className="text-md md:text-lg text-slate-600 mb-6 max-w-3xl mx-auto leading-relaxed">
               Discover nonprofits, foundations, government agencies, and other organizations making an impact in the Bay Area.
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-pink-600 font-semibold"> Find your community.</span>
             </p>
@@ -355,7 +357,6 @@ const ExploreOrganizations = ({ isProfileView = false }) => {
       )}
 
       <section id="organizations-list" className="scroll-mt-20">
-        {/* Only show this filter section when IN profile view */}
         {isProfileView && (
           <div className="bg-white/80 backdrop-blur-sm p-6 rounded-2xl shadow-lg border border-white/60 mb-8">
             <button 
@@ -378,7 +379,7 @@ const ExploreOrganizations = ({ isProfileView = false }) => {
 
         <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-6">
           <div className="text-center md:text-left">
-            <h2 className="text-3xl md:text-4xl font-bold mb-2">
+            <h2 className="text-2xl md:text-3xl font-bold mb-2">
               <span className="text-slate-800">Organizations </span>
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600 font-extrabold">
                 ({totalFilteredItems})
@@ -399,7 +400,6 @@ const ExploreOrganizations = ({ isProfileView = false }) => {
               <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none text-slate-400" size={16} />
             </div>
             
-            {/* View Mode Toggle */}
             <div className="flex items-center bg-white rounded-xl border border-slate-300 p-1 shadow-sm">
               <button 
                 onClick={() => setViewMode('grid')} 
@@ -436,7 +436,7 @@ const ExploreOrganizations = ({ isProfileView = false }) => {
                 ))}
               </div>
             ) : (
-              <div className="space-y-6">
+              <div className="space-y-4">
                 {currentOrganizations.map((organization) => (
                   <OrganizationListItem key={organization.id} organization={organization} />
                 ))}
@@ -445,7 +445,6 @@ const ExploreOrganizations = ({ isProfileView = false }) => {
           </>
         ) : (
           <div className="text-center py-16 relative">
-            {/* Background decoration */}
             <div className="absolute inset-0 flex items-center justify-center opacity-5">
               <Search size={200} className="text-slate-400" />
             </div>

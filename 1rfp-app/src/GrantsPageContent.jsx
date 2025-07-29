@@ -15,11 +15,34 @@ import { filterGrantsWithTaxonomy } from './filtering.js';
 import { SearchResultsSkeleton } from './components/SkeletonLoader.jsx';
 import { LayoutContext } from './App.jsx';
 
-// --- Helper functions ---
+// --- Helper functions & objects (some might be from GrantCard.jsx for consistency) ---
+
+// Taxonomy code to display name mapping (shortened for list view)
+const TAXONOMY_DISPLAY_NAMES = {
+  'nonprofit.501c3': '501(c)(3)',
+  'nonprofit.501c4': '501(c)(4)',
+  'nonprofit.501c6': 'Business Leagues',
+  'education.university': 'Universities',
+  'education.k12': 'K-12 Schools',
+  'education.research': 'Research Institutions',
+  'healthcare.hospital': 'Hospitals',
+  'healthcare.clinic': 'Clinics',
+  'government.federal': 'Federal Agencies',
+  'government.state': 'State Agencies',
+  'government.local': 'Local Government',
+  'foundation.family': 'Family Foundations',
+  'foundation.community': 'Community Foundations',
+  'foundation.corporate': 'Corporate Foundations',
+  'forprofit.startup': 'Startups',
+  'forprofit.socialenterprise': 'Social Enterprises',
+  'forprofit.socialenterprise.bcorp': 'B-Corps',
+  'religious.church': 'Religious Orgs'
+};
+
 const formatCurrency = (amount) => {
-    if (amount >= 1000000) return `${(amount / 1000000).toFixed(1)}M+`;
-    if (amount >= 1000) return `${(amount / 1000).toFixed(0)}K+`;
-    return `${amount}`;
+    if (amount >= 1000000) return `$${(amount / 1000000).toFixed(1)}M+`;
+    if (amount >= 1000) return `$${(amount / 1000).toFixed(0)}K+`;
+    return `$${amount.toLocaleString()}`;
 };
 
 const isGrantActive = (grant) => {
@@ -56,10 +79,10 @@ const sortGrants = (grants, sortCriteria) => {
     });
 };
 
-// Enhanced List Item Component
+// --- New and Improved Grant List Item Component ---
 const GrantListItem = ({ grant, onOpenDetailModal, isSaved, onSave, onUnsave, session }) => {
     const dueDateText = grant.dueDate ? new Date(grant.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'Rolling';
-    const fundingText = formatCurrency(parseMaxFundingAmount(grant.fundingAmount));
+    const fundingText = grant.fundingAmount ? formatCurrency(parseMaxFundingAmount(grant.fundingAmount.toString())) : 'Not Specified';
 
     const handleBookmarkClick = (e) => {
         e.stopPropagation();
@@ -70,55 +93,66 @@ const GrantListItem = ({ grant, onOpenDetailModal, isSaved, onSave, onUnsave, se
     const getInitials = (name) => {
         if (!name) return '?';
         const words = name.split(' ');
-        return words.length > 1 ? 
-            (words[0][0] + words[1][0]).toUpperCase() : 
-            name.substring(0, 2).toUpperCase();
+        return words.length > 1 
+            ? (words[0][0] + words[1][0]).toUpperCase() 
+            : name.substring(0, 2).toUpperCase();
     };
 
     return (
         <div 
             onClick={() => onOpenDetailModal(grant)} 
-            className="group bg-white p-6 rounded-2xl border border-slate-200 hover:border-blue-300 hover:shadow-xl transition-all duration-300 flex items-center gap-6 cursor-pointer transform hover:-translate-y-1"
+            className="group bg-white p-4 md:p-5 rounded-2xl border border-slate-200 hover:border-blue-400 hover:shadow-2xl transition-all duration-300 flex flex-col md:flex-row items-start md:items-center gap-4 cursor-pointer transform hover:-translate-y-1"
         >
             <div className="flex-shrink-0">
                 {grant.funderLogoUrl ? (
                     <img 
                         src={grant.funderLogoUrl} 
                         alt={`${grant.foundationName} logo`}
-                        className="h-16 w-16 rounded-xl object-contain border-2 border-white shadow-lg group-hover:shadow-xl transition-shadow duration-300" 
+                        className="h-14 w-14 md:h-16 md:w-16 rounded-xl object-contain border-2 border-white shadow-lg group-hover:shadow-xl transition-shadow duration-300" 
                     />
                 ) : (
-                    <div className="h-16 w-16 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-lg shadow-lg group-hover:shadow-xl transition-shadow duration-300">
+                    <div className="h-14 w-14 md:h-16 md:w-16 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-xl shadow-lg group-hover:shadow-xl transition-shadow duration-300">
                         {getInitials(grant.foundationName)}
                     </div>
                 )}
             </div>
             
-            <div className="flex-grow min-w-0">
-                <div className="flex items-center gap-3 mb-2">
-                    <p className="text-sm text-slate-500 font-medium">{grant.foundationName}</p>
+            <div className="flex-grow min-w-0 w-full">
+                <div className="flex items-center gap-3 mb-1.5">
+                    <p className="text-sm text-slate-500 font-medium truncate">{grant.foundationName}</p>
                     {grant.grantType && (
-                        <span className="text-xs bg-gradient-to-r from-blue-100 to-indigo-100 text-blue-700 px-2 py-1 rounded-full font-medium border border-blue-200">
+                        <span className="flex-shrink-0 text-xs bg-gradient-to-r from-blue-100 to-indigo-100 text-blue-700 px-2 py-0.5 rounded-full font-medium border border-blue-200">
                             {grant.grantType}
                         </span>
                     )}
                 </div>
-                <h4 className="font-bold text-slate-800 text-lg mb-2 group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r group-hover:from-blue-600 group-hover:to-purple-600 transition-all duration-300">
+                <h4 className="font-bold text-slate-800 text-lg mb-3 group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r group-hover:from-blue-600 group-hover:to-purple-600 transition-all duration-300">
                     {grant.title}
                 </h4>
-                <div className="flex items-center gap-6 text-sm text-slate-600">
-                    <div className="flex items-center gap-2 px-3 py-1 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border border-green-100">
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-slate-600">
+                    <div className="flex items-center gap-1.5" title="Funding Amount">
                         <DollarSign size={14} className="text-green-600" />
                         <span className="font-semibold text-green-700">{fundingText}</span>
                     </div>
-                    <div className="flex items-center gap-2 px-3 py-1 bg-gradient-to-r from-red-50 to-orange-50 rounded-lg border border-red-100">
+                    <div className="flex items-center gap-1.5" title="Due Date">
                         <Calendar size={14} className="text-red-600" />
                         <span className="font-semibold text-red-700">{dueDateText}</span>
                     </div>
+                    {grant.eligible_organization_types && grant.eligible_organization_types.length > 0 && (
+                        <div className="flex items-center gap-1.5" title="Eligibility">
+                            <Users size={14} className="text-indigo-600" />
+                            <span className="font-semibold text-indigo-700">
+                                {TAXONOMY_DISPLAY_NAMES[grant.eligible_organization_types[0]] || grant.eligible_organization_types[0]}
+                                {grant.eligible_organization_types.length > 1 && (
+                                    <span className="text-slate-500 font-medium"> +{grant.eligible_organization_types.length - 1} more</span>
+                                )}
+                            </span>
+                        </div>
+                    )}
                 </div>
             </div>
             
-            <div className="flex-shrink-0 flex items-center gap-3">
+            <div className="w-full md:w-auto flex-shrink-0 flex flex-row items-center gap-3 mt-4 md:mt-0">
                 {session && (
                     <button
                         onClick={handleBookmarkClick}
@@ -134,7 +168,7 @@ const GrantListItem = ({ grant, onOpenDetailModal, isSaved, onSave, onUnsave, se
                 )}
                 <button
                     onClick={(e) => { e.stopPropagation(); onOpenDetailModal(grant); }}
-                    className="px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold rounded-xl hover:from-blue-700 hover:to-purple-700 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105 flex items-center gap-2"
+                    className="w-full md:w-auto px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold rounded-xl hover:from-blue-700 hover:to-purple-700 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105 flex items-center justify-center gap-2"
                 >
                     <Sparkles size={16} />
                     Details
@@ -143,6 +177,7 @@ const GrantListItem = ({ grant, onOpenDetailModal, isSaved, onSave, onUnsave, se
         </div>
     );
 };
+
 
 const GrantsPageContent = ({ isProfileView = false }) => {
   const { setPageBgColor } = useContext(LayoutContext);
@@ -243,13 +278,10 @@ const GrantsPageContent = ({ isProfileView = false }) => {
   const closeDetail = useCallback(() => { 
     setSelectedGrant(null); 
     setIsDetailModal(false); 
-    // Clean up the URL by removing the grant ID parameter
     searchParams.delete('open_grant');
     setSearchParams(searchParams, { replace: true });
   }, [searchParams, setSearchParams]);
 
-  // This effect checks the URL on load and whenever the grants data changes
-  // to see if a specific grant modal needs to be opened.
   useEffect(() => {
     const grantIdToOpen = searchParams.get('open_grant');
     if (grantIdToOpen && grants.length > 0 && !selectedGrant) {
@@ -423,15 +455,15 @@ const GrantsPageContent = ({ isProfileView = false }) => {
               <div className="absolute bottom-10 left-1/3 w-20 h-20 bg-gradient-to-r from-emerald-400 to-teal-600 rounded-full opacity-10 animate-pulse delay-2000"></div>
             </div>
             
-            <div className="relative bg-white/80 backdrop-blur-sm p-8 md:p-12 rounded-3xl border border-white/60 shadow-2xl">
-              <h2 className="text-4xl md:text-6xl font-extrabold tracking-tight mb-4">
+            <div className="relative bg-white/80 backdrop-blur-sm p-6 md:p-10 rounded-3xl border border-white/60 shadow-2xl">
+              <h2 className="text-3xl md:text-5xl font-extrabold tracking-tight mb-3">
                 <span className="text-slate-900">Find Your Next </span>
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600">
                   Funding Opportunity
                 </span>
               </h2>
               
-              <p className="text-lg md:text-xl text-slate-600 mb-8 max-w-3xl mx-auto leading-relaxed">
+              <p className="text-md md:text-lg text-slate-600 mb-6 max-w-3xl mx-auto leading-relaxed">
                 Our comprehensive database connects you with RFPs and grants from across the Bay Area. 
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-pink-600 font-semibold"> Discover your perfect match.</span>
               </p>
@@ -476,39 +508,36 @@ const GrantsPageContent = ({ isProfileView = false }) => {
             </div>
           )}
 
-          <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-6">
-            <div className="text-center md:text-left">
-              <h2 className="text-3xl md:text-4xl font-bold mb-2">
-                <span className="text-slate-800">Available Grants </span>
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600 font-extrabold">
-                  ({totalFilteredItems})
-                </span>
-              </h2>
-
-              {totalFilteredItems > 0 && !loading && (
-                <div className="flex items-center justify-center md:justify-start gap-4 mt-2">
-                  <div className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-100 to-emerald-100 rounded-full border border-green-200">
-                    <TrendingUpIcon size={20} className="text-green-600" />
-                    <span className="text-green-700 font-semibold">
-                      <AnimatedCounter 
-                        targetValue={totalFilteredFunding} 
-                        duration={1000} 
-                        prefix="$" 
-                        formatValue={formatCurrency}
-                      /> Available
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:gap-4 text-center sm:text-left w-full">
+                <h2 className="text-2xl md:text-3xl font-bold">
+                    <span className="text-slate-800">Available Grants </span>
+                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600 font-extrabold">
+                    ({totalFilteredItems})
                     </span>
-                  </div>
-                </div>
-              )}
+                </h2>
+                {totalFilteredItems > 0 && !loading && (
+                    <div className="mt-2 sm:mt-0 flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-100 to-emerald-100 rounded-full border border-green-200 shadow-sm">
+                        <TrendingUpIcon size={20} className="text-green-600" />
+                        <span className="text-green-700 font-semibold">
+                            <AnimatedCounter 
+                                targetValue={totalFilteredFunding} 
+                                duration={1000} 
+                                prefix="$" 
+                                formatValue={formatCurrency}
+                            /> Available
+                        </span>
+                    </div>
+                )}
             </div>
             
-            <div className="flex items-center gap-3">
-                <div className="relative">
+            <div className="flex items-center gap-3 w-full sm:w-auto flex-shrink-0">
+                <div className="relative w-full sm:w-auto">
                     <select 
                       id="grants-per-page" 
                       value={grantsPerPage} 
                       onChange={handlePerPageChange} 
-                      className="pl-4 pr-10 py-3 border border-slate-300 rounded-xl bg-white text-sm font-medium focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none appearance-none shadow-sm hover:shadow-md transition-shadow duration-300"
+                      className="w-full pl-4 pr-10 py-3 border border-slate-300 rounded-xl bg-white text-sm font-medium focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none appearance-none shadow-sm hover:shadow-md transition-shadow duration-300"
                     >
                         {[6, 12, 24, 48].map((option) => (
                           <option key={option} value={option}>Show {option}</option>
@@ -524,7 +553,6 @@ const GrantsPageContent = ({ isProfileView = false }) => {
                       title="Grid View"
                     >
                       <LayoutGrid size={18}/>
-                      <span className="hidden sm:inline text-sm font-medium">Grid</span>
                     </button>
                     <button 
                       onClick={() => setViewMode('list')} 
@@ -532,7 +560,6 @@ const GrantsPageContent = ({ isProfileView = false }) => {
                       title="List View"
                     >
                       <List size={18}/>
-                      <span className="hidden sm:inline text-sm font-medium">List</span>
                     </button>
                 </div>
             </div>
@@ -558,7 +585,7 @@ const GrantsPageContent = ({ isProfileView = false }) => {
                   ))}
                 </div>
               ) : (
-                <div className="space-y-6">
+                <div className="space-y-4">
                   {currentList.map((grant) => ( 
                     <GrantListItem 
                       key={grant.id} 
