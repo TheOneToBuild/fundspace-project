@@ -5,7 +5,7 @@ import { Eye, EyeOff, Mail, Lock, ArrowRight, Sparkles } from '../Icons.jsx';
 import { supabase } from '../../supabaseClient.js';
 import MessageDisplay from './shared/MessageDisplay';
 
-export default function LoginForm({ onSwitchToSignUp, onLoginSuccess }) {
+export default function LoginForm({ onSwitchToSignUp, onSwitchToForgotPassword, onLoginSuccess }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
@@ -137,9 +137,18 @@ export default function LoginForm({ onSwitchToSignUp, onLoginSuccess }) {
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.5, delay: 0.2 }}
         >
-          <label className="block text-sm font-semibold text-slate-700 mb-3">
-            Password
-          </label>
+          <div className="flex items-center justify-between mb-3">
+            <label className="block text-sm font-semibold text-slate-700">
+              Password
+            </label>
+            <button
+              type="button"
+              onClick={onSwitchToForgotPassword}
+              className="text-xs text-blue-600 hover:text-blue-700 hover:underline transition-colors"
+            >
+              Forgot password?
+            </button>
+          </div>
           <div className="relative">
             <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
               <Lock className={`w-5 h-5 transition-colors ${

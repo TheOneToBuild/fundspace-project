@@ -1,5 +1,5 @@
 import React, { useState, useEffect, createContext, useRef } from 'react';
-import { BrowserRouter, Routes, Route, Link, NavLink, Outlet, useOutletContext, useLocation, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Link, NavLink, Outlet, useOutletContext, useLocation, Navigate, useNavigate } from 'react-router-dom';
 import ScrollToTop from './components/ScrollToTop.jsx';
 import { supabase } from './supabaseClient';
 import { clearAllNotifications, markAllAsRead } from './utils/notificationCleanup';
@@ -45,6 +45,8 @@ import './components/skeleton-animations.css';
 import headerLogoImage from './assets/1rfp-logo.png';
 import { PlusCircle, Menu, X } from './components/Icons.jsx';
 import NotificationsPage from './components/NotificationsPage.jsx';
+import ResetPasswordForm from './components/auth/ResetPasswordForm';
+import AuthLayout from './components/auth/AuthLayout';
 
 export const LayoutContext = createContext({ setPageBgColor: () => {} });
 
@@ -240,6 +242,22 @@ const AppLayout = () => {
   );
 };
 
+function ResetPasswordPage() {
+  const navigate = useNavigate();
+
+  const handleResetSuccess = () => {
+    navigate('/login', { 
+      state: { message: 'Password updated successfully! You can now sign in.' }
+    });
+  };
+
+  return (
+    <AuthLayout>
+      <ResetPasswordForm onResetSuccess={handleResetSuccess} />
+    </AuthLayout>
+  );
+}
+
 export default function App() {
   const [session, setSession] = useState(null);
   const [profile, setProfile] = useState(null);
@@ -373,6 +391,7 @@ export default function App() {
         <Route element={<Outlet context={outletContext} />}>
           <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
           <Route path="/signup" element={<PublicRoute><SignUpWizard /></PublicRoute>} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/" element={<AppLayout />}>
             <Route index element={<AuthRedirect><HomePage /></AuthRedirect>} />
             <Route path="grants" element={<GrantsPageContent />} />

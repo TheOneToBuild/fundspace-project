@@ -214,16 +214,6 @@ export default function ProfileNav() {
                             <span className="flex-1 font-medium">{channel.name}</span>
                         </NavLink>
                     ))}
-                    <div className="flex items-center space-x-2 w-full px-3 py-2 text-sm font-medium text-slate-500 cursor-not-allowed">
-                        <div className="w-6 h-6 bg-orange-200 rounded-md flex items-center justify-center text-xs opacity-60">🏢</div>
-                        <span className="flex-1">Hello Workplace</span>
-                        <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full">Soon</span>
-                    </div>
-                    <div className="flex items-center space-x-2 w-full px-3 py-2 text-sm font-medium text-slate-500 cursor-not-allowed">
-                        <div className="w-6 h-6 bg-teal-200 rounded-md flex items-center justify-center text-xs opacity-60">👥</div>
-                        <span className="flex-1">Hello Team</span>
-                        <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full">Soon</span>
-                    </div>
                 </nav>
             </div>
             

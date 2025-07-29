@@ -1,10 +1,11 @@
-// src/LoginPage.jsx - Redesigned
+// src/LoginPage.jsx - Updated with forgot password support
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation, useOutletContext } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import AuthLayout from './components/auth/AuthLayout';
-import LoginForm from './components/auth/LoginForm';
+import LoginForm from './components/Auth/LoginForm';
 import MinimalSignupForm from './components/auth/MinimalSignupForm';
+import ForgotPasswordForm from './components/auth/ForgotPasswordForm';
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -15,9 +16,11 @@ export default function LoginPage() {
   const urlParams = new URLSearchParams(location.search);
   const viewParam = urlParams.get('view');
   
-  // Determine initial view - simplified to just sign_in or signup
+  // Determine initial view - now includes forgot-password
   const getInitialView = () => {
-    return viewParam === 'signup' ? 'signup' : 'sign_in';
+    if (viewParam === 'signup') return 'signup';
+    if (viewParam === 'forgot-password') return 'forgot-password';
+    return 'sign_in';
   };
   
   const [view, setView] = useState(getInitialView());
@@ -30,7 +33,13 @@ export default function LoginPage() {
     const urlParams = new URLSearchParams(location.search);
     const viewParam = urlParams.get('view');
     
-    setView(viewParam === 'signup' ? 'signup' : 'sign_in');
+    if (viewParam === 'signup') {
+      setView('signup');
+    } else if (viewParam === 'forgot-password') {
+      setView('forgot-password');
+    } else {
+      setView('sign_in');
+    }
   }, [location.search]);
 
   // If already logged in, redirect immediately
@@ -64,6 +73,12 @@ export default function LoginPage() {
   const handleSwitchToLogin = () => {
     setView('sign_in');
     navigate('/login', { replace: true });
+  };
+
+  // Handler to switch to forgot password view
+  const handleSwitchToForgotPassword = () => {
+    setView('forgot-password');
+    navigate('/login?view=forgot-password', { replace: true });
   };
 
   // Enhanced loading screen with modern design
@@ -126,37 +141,36 @@ export default function LoginPage() {
     return null; // Will redirect via useEffect
   }
 
-  const renderAuthForm = () => {
-    switch (view) {
-      case 'sign_in':
-        return (
-          <LoginForm 
+  return (
+    <AuthLayout>
+      <motion.div
+        key={view} // This will trigger re-animation when view changes
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -20 }}
+        transition={{ duration: 0.3 }}
+      >
+        {view === 'sign_in' && (
+          <LoginForm
             onSwitchToSignUp={handleSwitchToSignUp}
+            onSwitchToForgotPassword={handleSwitchToForgotPassword}
             onLoginSuccess={handleLoginSuccess}
           />
-        );
-      
-      case 'signup':
-        return (
-          <MinimalSignupForm 
+        )}
+
+        {view === 'signup' && (
+          <MinimalSignupForm
             onSwitchToLogin={handleSwitchToLogin}
             onSignupSuccess={handleSignupSuccess}
           />
-        );
-      
-      default:
-        return (
-          <LoginForm 
-            onSwitchToSignUp={handleSwitchToSignUp}
-            onLoginSuccess={handleLoginSuccess}
-          />
-        );
-    }
-  };
+        )}
 
-  return (
-    <AuthLayout>
-      {renderAuthForm()}
+        {view === 'forgot-password' && (
+          <ForgotPasswordForm
+            onSwitchToLogin={handleSwitchToLogin}
+          />
+        )}
+      </motion.div>
     </AuthLayout>
   );
 }
