@@ -41,9 +41,9 @@ const advisoryBoard = [
   },
   {
     name: 'Yen Pang',
-    title: 'Advisory Board, San Mateo County Manager’s Office',
+    title: "Advisory Board, San Mateo County Manager's Office",
     imageUrl: 'https://media.licdn.com/dms/image/v2/C5603AQFAMGYFJIyhzA/profile-displayphoto-shrink_200_200/profile-displayphoto-shrink_200_200/0/1600903357926?e=1756944000&v=beta&t=t_MdadgWSG5ei1r_su5CiUgwnUQ167iWvefbSAogAIY',
-    bio: 'Yen Pang brings a decade of experience advancing equity and opportunity through data-driven policy, strategic implementation, and public sector innovation. At the San Mateo County Manager’s Office, Yen led the Measure K redesign—overseeing its implementation and evaluation to ensure more effective, transparent, and community-informed use of public funds. Her work has strengthened local governance and deepened impact across education, health, and social services.'
+    bio: 'Yen Pang brings a decade of experience advancing equity and opportunity through data-driven policy, strategic implementation, and public sector innovation. At the San Mateo County Manager\'s Office, Yen led the Measure K redesign—overseeing its implementation and evaluation to ensure more effective, transparent, and community-informed use of public funds. Her work has strengthened local governance and deepened impact across education, health, and social services.'
   },
   {
     name: 'Advisory Board Member',
@@ -229,16 +229,44 @@ const AboutUsPage = () => {
             <div className="inline-block bg-gradient-to-br from-purple-100 to-blue-100 p-4 rounded-2xl mb-6 border border-purple-200">
               <Bot className="h-10 w-10 text-purple-600" />
             </div>
-            <h2 className="text-4xl font-bold text-slate-800 leading-tight mb-6">From Complexity to Connection</h2>
+            
+            <h2 className="text-4xl font-bold text-slate-800 leading-tight mb-8">Our Mission</h2>
+            
+            {/* Hero Mission Statement */}
+            <div className="bg-gradient-to-r from-purple-100 via-blue-100 to-teal-100 p-8 rounded-3xl mb-8 text-slate-900 shadow-xl border border-slate-200">
+              <h3 className="text-2xl md:text-3xl font-bold leading-tight">
+                To democratize access to funding — so dreamers can dream bigger 💭, builders can build faster 🏗️, and momentum is never lost to bureaucracy 🏃‍♂️💨.
+              </h3>
+            </div>
+            
             <div className="text-lg text-slate-600 space-y-6 leading-relaxed">
               <p>The numbers tell a story of disconnected resources. Critical funding information is scattered across thousands of foundation websites, outdated databases, and word-of-mouth networks. Nonprofits lose countless hours prospecting instead of focusing on their missions. Funders struggle to discover emerging organizations and innovative solutions.</p>
               
-              <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-6 rounded-2xl border border-blue-100">
+              <div className="bg-gradient-to-r from-red-50 to-rose-50 p-6 rounded-2xl border border-red-100">
                 <p className="text-slate-700 font-semibold text-xl mb-2">This inefficiency is a tax on progress.</p>
                 <p className="text-slate-600">It slows the very work that aims to uplift our communities.</p>
               </div>
               
-              <p>1RFP was created to solve this problem. Our mission is simple: <strong className="text-slate-800">build an intelligent, equitable platform that connects purpose with progress</strong>. We use AI not as a replacement for human connection, but as a tool to foster deeper relationships, stronger partnerships, and faster resource flows to where they're needed most.</p>
+              <p>1RFP was created to solve this problem. We use AI not as a replacement for human connection, but as a tool to foster deeper relationships, stronger partnerships, and faster resource flows to where they're needed most.</p>
+              
+              {/* Mission Pillars */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-8">
+                <div className="text-center p-4 bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl border border-purple-200">
+                  <Sparkles className="h-8 w-8 text-purple-600 mx-auto mb-2" />
+                  <h4 className="font-bold text-slate-800 mb-1">Dream Bigger</h4>
+                  <p className="text-sm text-slate-600">Discover opportunities you never knew existed</p>
+                </div>
+                <div className="text-center p-4 bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl border border-blue-200">
+                  <Zap className="h-8 w-8 text-blue-600 mx-auto mb-2" />
+                  <h4 className="font-bold text-slate-800 mb-1">Build Faster</h4>
+                  <p className="text-sm text-slate-600">Spend time on mission, not grant hunting</p>
+                </div>
+                <div className="text-center p-4 bg-gradient-to-br from-teal-50 to-teal-100 rounded-xl border border-teal-200">
+                  <Target className="h-8 w-8 text-teal-600 mx-auto mb-2" />
+                  <h4 className="font-bold text-slate-800 mb-1">Never Lose Momentum</h4>
+                  <p className="text-sm text-slate-600">Cut through red tape with intelligent matching</p>
+                </div>
+              </div>
             </div>
           </motion.div>
 
@@ -264,57 +292,7 @@ const AboutUsPage = () => {
           </motion.div>
         </div>
       </StorySection>
-
-      {/* PLATFORM FEATURES SECTION */}
-      <StorySection className="bg-white/60 backdrop-blur-sm rounded-3xl border border-white/80 shadow-xl">
-        <div className="text-center mb-16">
-          <motion.h2 variants={fadeIn} className="text-4xl md:text-5xl font-bold mb-6">
-            <span className="text-slate-800">How We're </span>
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">Different</span>
-          </motion.h2>
-          <motion.p variants={{...fadeIn, transition: {...fadeIn.transition, delay: 0.2}}} className="text-lg text-slate-600 max-w-3xl mx-auto">
-            Built by community members who understand the challenges from both sides of the funding table.
-          </motion.p>
-        </div>
-        
-        <motion.div 
-          variants={{ hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.2, delayChildren: 0.4 } } }}
-          className="grid md:grid-cols-2 lg:grid-cols-4 gap-8 max-w-6xl"
-        >
-          <motion.div variants={fadeIn} className="text-center">
-            <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-red-100 to-pink-100 rounded-2xl flex items-center justify-center border border-red-200 shadow-lg">
-              <Clock className="h-10 w-10 text-red-600" />
-            </div>
-            <h3 className="text-xl font-bold text-slate-800 mb-3">Save 75% Time</h3>
-            <p className="text-slate-600 text-sm">AI-powered matching finds relevant grants in minutes, not weeks.</p>
-          </motion.div>
-
-          <motion.div variants={fadeIn} className="text-center">
-            <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-2xl flex items-center justify-center border border-blue-200 shadow-lg">
-              <Target className="h-10 w-10 text-blue-600" />
-            </div>
-            <h3 className="text-xl font-bold text-slate-800 mb-3">Laser Focus</h3>
-            <p className="text-slate-600 text-sm">Bay Area-only data means deeper insights and stronger local connections.</p>
-          </motion.div>
-
-          <motion.div variants={fadeIn} className="text-center">
-            <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-green-100 to-emerald-100 rounded-2xl flex items-center justify-center border border-green-200 shadow-lg">
-              <Zap className="h-10 w-10 text-green-600" />
-            </div>
-            <h3 className="text-xl font-bold text-slate-800 mb-3">Always Current</h3>
-            <p className="text-slate-600 text-sm">Hybrid AI + community model keeps data fresh and accurate.</p>
-          </motion.div>
-
-          <motion.div variants={fadeIn} className="text-center">
-            <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-purple-100 to-pink-100 rounded-2xl flex items-center justify-center border border-purple-200 shadow-lg">
-              <Heart className="h-10 w-10 text-purple-600" />
-            </div>
-            <h3 className="text-xl font-bold text-slate-800 mb-3">Free for Good</h3>
-            <p className="text-slate-600 text-sm">Core tools always free for 501(c)(3) nonprofits. Period.</p>
-          </motion.div>
-        </motion.div>
-      </StorySection>
-
+    
       {/* ADVISORY BOARD SECTION */}
       <StorySection>
         <div className="text-center mb-16">

@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation, useOutletContext } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import AuthLayout from './components/auth/AuthLayout';
-import LoginForm from './components/Auth/LoginForm';
+import LoginForm from './components/auth/LoginForm';
 import MinimalSignupForm from './components/auth/MinimalSignupForm';
 import ForgotPasswordForm from './components/auth/ForgotPasswordForm';
 
