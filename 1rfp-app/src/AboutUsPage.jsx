@@ -43,7 +43,7 @@ const advisoryBoard = [
     name: 'Yen Pang',
     title: "Advisory Board, San Mateo County Manager's Office",
     imageUrl: 'https://media.licdn.com/dms/image/v2/C5603AQFAMGYFJIyhzA/profile-displayphoto-shrink_200_200/profile-displayphoto-shrink_200_200/0/1600903357926?e=1756944000&v=beta&t=t_MdadgWSG5ei1r_su5CiUgwnUQ167iWvefbSAogAIY',
-    bio: 'Yen Pang brings a decade of experience advancing equity and opportunity through data-driven policy, strategic implementation, and public sector innovation. At the San Mateo County Manager\'s Office, Yen led the Measure K redesign—overseeing its implementation and evaluation to ensure more effective, transparent, and community-informed use of public funds. Her work has strengthened local governance and deepened impact across education, health, and social services.'
+    bio: 'Yen brings over 20 years of expertise in government procurement and contract management, driving improvements across San Mateo County and the City and County of San Francisco. As Manager at the County of San Mateo, she led the redesign of Measure K, streamlining its process, implementation, and evaluation to maximize community impact. Previously, as Principal Contracts Analyst at San Francisco International Airport, she oversaw contracts up to $1B, directing complex solicitations and enhancing contract monitoring systems.'
   },
   {
     name: 'Advisory Board Member',
