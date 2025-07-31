@@ -237,6 +237,38 @@ const GrantCard = ({ grant, onOpenDetailModal, onFilterByCategory, onSave, onUns
             onMouseLeave={() => setIsHovered(false)}
             onClick={() => onOpenDetailModal(grant)}
         >
+            {/* Banner & Avatar */}
+            <div className="relative">
+                {/* Banner */}
+                <div className="h-28 bg-gradient-to-br from-slate-100 via-white to-slate-100">
+                    {grant.funderBannerImageUrl && (
+                        <img
+                            src={grant.funderBannerImageUrl}
+                            alt={`${grant.foundationName} banner`}
+                            className="w-full h-full object-cover"
+                        />
+                    )}
+                </div>
+
+                {/* Avatar */}
+                <div
+                    className="absolute bottom-0 left-4 translate-y-1/2 transform transition-transform duration-300 group-hover:scale-105 cursor-pointer"
+                    onClick={(e) => { e.stopPropagation(); navigate(`/organizations/${grant.funderSlug}`); }}
+                >
+                    {grant.funderLogoUrl ? (
+                        <img
+                            src={grant.funderLogoUrl}
+                            alt={`${grant.foundationName} logo`}
+                            className="h-16 w-16 rounded-xl object-cover border-4 border-white shadow-lg bg-white"
+                        />
+                    ) : (
+                         <div className="h-16 w-16 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 text-white flex items-center justify-center font-bold text-xl shadow-lg border-4 border-white">
+                            {getInitials(grant.foundationName)}
+                        </div>
+                    )}
+                </div>
+            </div>
+            
             {/* Reduced gradient overlay */}
             <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 via-purple-500/5 to-pink-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
 
@@ -270,39 +302,23 @@ const GrantCard = ({ grant, onOpenDetailModal, onFilterByCategory, onSave, onUns
                 </div>
             </div>
 
-            {/* Compact main content */}
-            <div className="p-4 relative z-0 flex-grow flex flex-col">
-                {/* Compact header with funder info */}
-                <div className="flex items-center mb-3">
-                    {grant.funderLogoUrl ? (
-                        <img 
-                            src={grant.funderLogoUrl} 
-                            alt={`${grant.foundationName} logo`}
-                            className="h-8 w-8 rounded-lg object-cover border border-white shadow-sm mr-3 group-hover:shadow-md transition-shadow duration-300"
-                            onError={(e) => { 
-                                e.currentTarget.style.display = 'none'; 
-                                e.currentTarget.nextElementSibling.style.display = 'flex'; 
-                            }}
-                        />
-                    ) : null}
-                    <div className={`h-8 w-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 text-white flex items-center justify-center font-bold text-xs shadow-sm mr-3 group-hover:shadow-md transition-shadow duration-300 ${grant.funderLogoUrl ? 'hidden' : 'flex'}`}>
-                        {getInitials(grant.foundationName)}
-                    </div>
-                    
-                    <div className="flex-1 min-w-0">
-                        <Link 
-                            to={`/organizations/${grant.funderSlug}`} 
-                            className="font-medium text-slate-600 text-xs hover:text-blue-600 transition-colors duration-300 block truncate"
-                            onClick={(e) => { if(isExpired) e.preventDefault(); e.stopPropagation(); }}
-                        >
-                            {grant.foundationName}
-                        </Link>
-                        {grant.grantType && (
-                            <span className="inline-block mt-0.5 text-xs bg-gradient-to-r from-blue-100 to-indigo-100 text-blue-700 px-2 py-0.5 rounded-full font-medium border border-blue-200">
-                                {grant.grantType}
-                            </span>
-                        )}
-                    </div>
+            {/* Main content - Added pt-12 for avatar overlap */}
+            <div className="p-4 pt-12 relative z-0 flex-grow flex flex-col">
+                
+                {/* Funder Name & Grant Type */}
+                <div className="mb-3">
+                    <Link 
+                        to={`/organizations/${grant.funderSlug}`} 
+                        className="font-semibold text-slate-800 text-base hover:text-blue-600 transition-colors duration-300 block truncate"
+                        onClick={(e) => { if(isExpired) e.preventDefault(); e.stopPropagation(); }}
+                    >
+                        {grant.foundationName}
+                    </Link>
+                    {grant.grantType && (
+                        <span className="inline-block mt-1 text-xs bg-gradient-to-r from-blue-100 to-indigo-100 text-blue-700 px-2 py-0.5 rounded-full font-medium border border-blue-200">
+                            {grant.grantType}
+                        </span>
+                    )}
                 </div>
 
                 {/* Compact title */}

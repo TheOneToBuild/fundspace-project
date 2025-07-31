@@ -9,7 +9,7 @@ import {
     acceptConnectionRequest, 
     declineConnectionRequest,
     getPendingConnectionRequests,
-    getUserConnections 
+    getUserConnections
 } from '../utils/userConnectionsUtils';
 
 export default function ConnectionsPage() {
@@ -29,28 +29,36 @@ export default function ConnectionsPage() {
 
     const fetchConnections = async () => {
         try {
+            console.log('🔍 Fetching connections for user:', currentUserProfile.id);
             const result = await getUserConnections(currentUserProfile.id, 100);
+            
             if (!result.error) {
                 setConnections(result.connections || []);
+                console.log('✅ Successfully set connections:', result.connections?.length || 0);
             } else {
-                console.error('Error fetching connections:', result.error);
+                console.error('❌ Error fetching connections:', result.error);
             }
         } catch (error) {
-            console.error('Error in fetchConnections:', error);
+            console.error('❌ Error in fetchConnections:', error);
         }
     };
 
     const fetchPendingRequests = async () => {
         try {
             setLoading(true);
+            console.log('🔍 Fetching pending requests for user:', currentUserProfile.id);
             const result = await getPendingConnectionRequests(currentUserProfile.id);
+            
+            console.log('📊 Pending requests result:', result);
+            
             if (!result.error) {
                 setPendingRequests(result.requests || []);
+                console.log('✅ Successfully set pending requests:', result.requests?.length || 0);
             } else {
-                console.error('Error fetching pending requests:', result.error);
+                console.error('❌ Error fetching pending requests:', result.error);
             }
         } catch (error) {
-            console.error('Error in fetchPendingRequests:', error);
+            console.error('❌ Error in fetchPendingRequests:', error);
         } finally {
             setLoading(false);
         }

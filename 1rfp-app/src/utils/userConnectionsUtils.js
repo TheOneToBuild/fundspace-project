@@ -254,6 +254,7 @@ export const withdrawConnectionRequest = async (requesterId, recipientId) => {
     return { success: false, error: error.message };
   }
 };
+
 export const getMutualConnectionsCount = async (userId1, userId2) => {
   try {
     const { data, error } = await supabase
@@ -274,57 +275,73 @@ export const getMutualConnectionsCount = async (userId1, userId2) => {
 };
 
 /**
- * Get user's connections (accepted connections only)
+ * Get user's connections (accepted connections only) - FIXED VERSION
  * @param {string} userId - The user's ID
  * @param {number} limit - Maximum number of connections to return
  * @returns {Promise<{connections: Array, error?: string}>}
  */
 export const getUserConnections = async (userId, limit = 50) => {
   try {
-    const { data, error } = await supabase
+    // First, get the user_connections data
+    const { data: connectionsData, error: connectionsError } = await supabase
       .from('user_connections')
-      .select(`
-        id,
-        status,
-        created_at,
-        requester_id,
-        recipient_id,
-        requester_profile:requester_id (
-          id,
-          full_name,
-          avatar_url,
-          title,
-          organization_name
-        ),
-        recipient_profile:recipient_id (
-          id,
-          full_name,
-          avatar_url,
-          title,
-          organization_name
-        )
-      `)
+      .select('id, status, created_at, requester_id, recipient_id')
       .or(`requester_id.eq.${userId},recipient_id.eq.${userId}`)
       .eq('status', 'accepted')
       .order('created_at', { ascending: false })
       .limit(limit);
 
-    if (error) {
-      return { connections: [], error: error.message };
+    if (connectionsError) {
+      console.error('Error fetching connections:', connectionsError);
+      return { connections: [], error: connectionsError.message };
     }
 
+    if (!connectionsData || connectionsData.length === 0) {
+      return { connections: [] };
+    }
+
+    // Get all unique user IDs (the "other" users in each connection)
+    const otherUserIds = connectionsData.map(conn => {
+      return conn.requester_id === userId ? conn.recipient_id : conn.requester_id;
+    });
+
+    // Fetch profile data for all the other users
+    const { data: profilesData, error: profilesError } = await supabase
+      .from('profiles')
+      .select('id, full_name, avatar_url, title, organization_name')
+      .in('id', otherUserIds);
+
+    if (profilesError) {
+      console.error('Error fetching profiles:', profilesError);
+      return { connections: [], error: profilesError.message };
+    }
+
+    // Create a map of profiles by ID for easy lookup
+    const profilesMap = {};
+    profilesData.forEach(profile => {
+      profilesMap[profile.id] = profile;
+    });
+
     // Format the connections to always show the "other" user
-    const formattedConnections = data.map(conn => {
+    const formattedConnections = connectionsData.map(conn => {
       const isRequester = conn.requester_id === userId;
-      const otherUser = isRequester ? conn.recipient_profile : conn.requester_profile;
+      const otherUserId = isRequester ? conn.recipient_id : conn.requester_id;
+      const otherUser = profilesMap[otherUserId];
       
       return {
         id: conn.id,
-        user: otherUser,
+        user: otherUser || {
+          id: otherUserId,
+          full_name: 'Unknown User',
+          avatar_url: null,
+          title: null,
+          organization_name: null
+        },
         connected_at: conn.created_at
       };
     });
 
+    console.log(`✅ Successfully fetched ${formattedConnections.length} connections for user ${userId}`);
     return { connections: formattedConnections };
   } catch (error) {
     console.error('Error getting user connections:', error);
@@ -333,34 +350,68 @@ export const getUserConnections = async (userId, limit = 50) => {
 };
 
 /**
- * Get pending connection requests for a user
+ * Get pending connection requests for a user - FIXED VERSION
  * @param {string} userId - The user's ID
  * @returns {Promise<{requests: Array, error?: string}>}
  */
 export const getPendingConnectionRequests = async (userId) => {
   try {
-    const { data, error } = await supabase
+    // First, get the connection requests
+    const { data: requestsData, error: requestsError } = await supabase
       .from('user_connections')
-      .select(`
-        id,
-        created_at,
-        requester_profile:requester_id (
-          id,
-          full_name,
-          avatar_url,
-          title,
-          organization_name
-        )
-      `)
+      .select('id, created_at, requester_id')
       .eq('recipient_id', userId)
       .eq('status', 'pending')
       .order('created_at', { ascending: false });
 
-    if (error) {
-      return { requests: [], error: error.message };
+    if (requestsError) {
+      console.error('Error fetching pending requests:', requestsError);
+      return { requests: [], error: requestsError.message };
     }
 
-    return { requests: data || [] };
+    if (!requestsData || requestsData.length === 0) {
+      return { requests: [] };
+    }
+
+    // Get all requester IDs
+    const requesterIds = requestsData.map(req => req.requester_id);
+
+    // Fetch profile data for all requesters
+    const { data: profilesData, error: profilesError } = await supabase
+      .from('profiles')
+      .select('id, full_name, avatar_url, title, organization_name')
+      .in('id', requesterIds);
+
+    if (profilesError) {
+      console.error('Error fetching requester profiles:', profilesError);
+      return { requests: [], error: profilesError.message };
+    }
+
+    // Create a map of profiles by ID for easy lookup
+    const profilesMap = {};
+    profilesData.forEach(profile => {
+      profilesMap[profile.id] = profile;
+    });
+
+    // Format the requests with profile data
+    const formattedRequests = requestsData.map(req => {
+      const requesterProfile = profilesMap[req.requester_id];
+      
+      return {
+        id: req.id,
+        created_at: req.created_at,
+        requester_profile: requesterProfile || {
+          id: req.requester_id,
+          full_name: 'Unknown User',
+          avatar_url: null,
+          title: null,
+          organization_name: null
+        }
+      };
+    });
+
+    console.log(`✅ Successfully fetched ${formattedRequests.length} pending requests for user ${userId}`);
+    return { requests: formattedRequests };
   } catch (error) {
     console.error('Error getting pending connection requests:', error);
     return { requests: [], error: error.message };

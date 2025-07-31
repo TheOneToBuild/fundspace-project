@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { NavLink, useOutletContext, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import { isPlatformAdmin } from '../utils/permissions.js';
@@ -13,9 +13,44 @@ export default function ProfileNav() {
     const navigate = useNavigate();
     const [isExpanded, setIsExpanded] = useState(false);
     const [stats, setStats] = useState({ followersCount: 0, followingCount: 0, connectionsCount: 0 });
+    const [organizationName, setOrganizationName] = useState('');
+    const [organizationSlug, setOrganizationSlug] = useState('');
     const isOmegaAdmin = isPlatformAdmin(profile?.is_omega_admin);
+    const sidebarRef = useRef(null);
 
-    // --- DATA FETCHING & LOGIC (Unchanged) ---
+    // Click outside to collapse
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (sidebarRef.current && !sidebarRef.current.contains(event.target) && isExpanded) {
+                setIsExpanded(false);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [isExpanded]);
+
+    // --- DATA FETCHING & LOGIC ---
+    const fetchOrganizationData = useCallback(async (profileId) => {
+        if (!profileId) return { name: '', slug: '' };
+        try {
+            const { data } = await supabase
+                .from('organization_memberships')
+                .select('organizations!inner(name, slug)')
+                .eq('profile_id', profileId)
+                .order('joined_at', { ascending: false })
+                .limit(1)
+                .single();
+            return {
+                name: data?.organizations?.name || '',
+                slug: data?.organizations?.slug || ''
+            };
+        } catch (error) {
+            console.error('Error fetching organization data:', error);
+            return { name: '', slug: '' };
+        }
+    }, []);
+
     const fetchProfileStats = useCallback(async () => {
         if (!profile?.id) return;
         try {
@@ -36,12 +71,29 @@ export default function ProfileNav() {
 
     useEffect(() => {
         fetchProfileStats();
+        
+        // Fetch organization data
+        if (profile?.id) {
+            fetchOrganizationData(profile.id).then(({ name, slug }) => {
+                setOrganizationName(name);
+                setOrganizationSlug(slug);
+            });
+        }
+        
         const channel = supabase.channel(`profile-stats-changes:${profile?.id}`)
             .on('postgres_changes', { event: '*', schema: 'public', table: 'followers', filter: `or(follower_id.eq.${profile?.id},following_id.eq.${profile?.id})` }, fetchProfileStats)
             .on('postgres_changes', { event: '*', schema: 'public', table: 'user_connections', filter: `or(requester_id.eq.${profile?.id},recipient_id.eq.${profile?.id})` }, fetchProfileStats)
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'organization_memberships', filter: `profile_id.eq.${profile?.id}` }, () => {
+                if (profile?.id) {
+                    fetchOrganizationData(profile.id).then(({ name, slug }) => {
+                        setOrganizationName(name);
+                        setOrganizationSlug(slug);
+                    });
+                }
+            })
             .subscribe();
         return () => { supabase.removeChannel(channel); };
-    }, [profile?.id, fetchProfileStats]);
+    }, [profile?.id, fetchProfileStats, fetchOrganizationData]);
 
     // --- NAVIGATION STRUCTURE ---
     const navItems = [
@@ -77,9 +129,10 @@ export default function ProfileNav() {
 
     return (
         <motion.aside
+            ref={sidebarRef}
             initial={false}
             animate={{ width: isExpanded ? 270 : 80 }}
-            className="flex flex-col h-full bg-white border-r border-slate-200 shadow-sm rounded-xl" // FIX: Added rounded-xl
+            className="flex flex-col h-full bg-white border-r border-slate-200 shadow-sm rounded-xl"
         >
             {/* Header */}
             <div className={`flex items-center ${isExpanded ? 'justify-between' : 'justify-center'} p-4 h-[65px] border-b border-slate-200`}>
@@ -119,7 +172,7 @@ export default function ProfileNav() {
                         transition={{ duration: 0.3 }}
                         className="overflow-hidden"
                     >
-                        <ProfileCard profile={profile} stats={stats} navigate={navigate} />
+                        <ProfileCard profile={profile} stats={stats} organizationName={organizationName} organizationSlug={organizationSlug} navigate={navigate} />
                     </motion.div>
                 )}
             </AnimatePresence>
@@ -131,13 +184,18 @@ export default function ProfileNav() {
                         initial={{ scale: 0, opacity: 0 }}
                         animate={{ scale: 1, opacity: 1, transition: { delay: 0.2 } }}
                         exit={{ scale: 0, opacity: 0 }}
-                        className="p-4"
+                        className="p-4 flex justify-center"
                     >
-                        <Avatar profile={profile} />
+                        <button 
+                            onClick={() => setIsExpanded(true)} 
+                            className="hover:scale-105 transition-transform"
+                            title={`${profile?.full_name || 'Your Profile'} - Click to expand navigation`}
+                        >
+                            <Avatar profile={profile} />
+                        </button>
                     </motion.div>
                 )}
             </AnimatePresence>
-
 
             {/* Navigation */}
             <nav className="flex-1 px-3 py-4 space-y-4 overflow-y-auto">
@@ -173,13 +231,20 @@ export default function ProfileNav() {
 
 function NavItem({ to, icon, text, badge, isExpanded }) {
     const navLinkClass = ({ isActive }) =>
-        `group relative flex items-center h-10 px-3 rounded-lg cursor-pointer transition-colors ${
+        `group relative flex items-center justify-start h-10 px-3 rounded-lg cursor-pointer transition-colors ${
         isActive ? 'bg-blue-500 text-white' : 'text-slate-600 hover:bg-slate-100'
     }`;
 
     return (
-        <NavLink to={to} className={navLinkClass} end={to === "/profile/omega-admin" || to === "/profile"} title={!isExpanded ? text : ''}> {/* FIX: Added title attribute for hover tooltip */}
-            {icon}
+        <NavLink 
+            to={to} 
+            className={navLinkClass} 
+            end={to === "/profile/omega-admin" || to === "/profile"} 
+            title={!isExpanded ? text : ''}
+        >
+            <div className="flex items-center justify-center w-5 h-5 flex-shrink-0">
+                {icon}
+            </div>
             <AnimatePresence>
                 {isExpanded && (
                     <motion.span
@@ -202,36 +267,83 @@ function NavItem({ to, icon, text, badge, isExpanded }) {
                     {badge}
                 </motion.span>
             )}
-            {/* FIX: Removed the custom tooltip text in minimized view */}
         </NavLink>
     );
 }
 
-function ProfileCard({ profile, stats, navigate }) {
+function ProfileCard({ profile, stats, organizationName, organizationSlug, navigate }) {
+    const handleOrganizationClick = () => {
+        if (organizationSlug) {
+            navigate(`/organizations/${organizationSlug}`);
+        } else {
+            // Fallback to my-organization page if no slug
+            navigate('/profile/my-organization');
+        }
+    };
+
     return (
         <div className="p-4 border-b border-slate-200">
             <div className="flex flex-col items-center text-center">
                 <Avatar profile={profile} size="large" />
-                <h2 className="text-lg font-semibold text-slate-800 mt-2">{profile?.full_name || 'Your Name'}</h2>
+                <h2 className="text-lg font-semibold text-blue-600 mt-2">{profile?.full_name || 'Your Name'}</h2>
                 <p className="text-sm text-slate-500">{profile?.title || 'No title specified'}</p>
+                {organizationName && (
+                    <button 
+                        onClick={handleOrganizationClick}
+                        className="text-xs text-slate-400 mt-1 hover:text-blue-500 hover:underline transition-colors cursor-pointer"
+                    >
+                        {organizationName}
+                    </button>
+                )}
             </div>
-            {/* FIX: Changed stats layout from grid to flex for better spacing */}
+            {/* Enhanced stats section with vibrant colors and animations */}
             <div className="flex justify-around items-center mt-4 pt-4 border-t border-slate-100">
-                <StatButton label="Connections" value={stats.connectionsCount} onClick={() => navigate('/profile/connections')} />
-                <StatButton label="Followers" value={stats.followersCount} onClick={() => navigate('/profile/followers')} />
-                <StatButton label="Following" value={stats.followingCount} onClick={() => navigate('/profile/following')} />
+                <StatButton 
+                    label="Connections" 
+                    value={stats.connectionsCount} 
+                    onClick={() => navigate('/profile/connections')}
+                    color="emerald"
+                    icon="🤝"
+                />
+                <StatButton 
+                    label="Followers" 
+                    value={stats.followersCount} 
+                    onClick={() => navigate('/profile/followers')}
+                    color="purple"
+                    icon="👥"
+                />
+                <StatButton 
+                    label="Following" 
+                    value={stats.followingCount} 
+                    onClick={() => navigate('/profile/following')}
+                    color="blue"
+                    icon="🌟"
+                />
             </div>
         </div>
     );
 }
 
-function StatButton({ label, value, onClick }) {
+function StatButton({ label, value, onClick, color, icon }) {
     return (
-        // FIX: Adjusted padding and font sizes to prevent text from being squished
-        <button onClick={onClick} className="flex flex-col items-center text-center hover:bg-slate-50 rounded-lg p-2 transition-colors w-20">
-            <p className="text-xl font-bold text-slate-800">{value}</p>
-            <p className="text-[10px] font-medium text-slate-500 uppercase tracking-normal">{label}</p>
-        </button>
+        <motion.button 
+            onClick={onClick} 
+            className="flex flex-col items-center text-center rounded-xl p-3 transition-all duration-200 w-20 hover:bg-slate-50 hover:scale-105"
+            whileHover={{ y: -2 }}
+            whileTap={{ scale: 0.95 }}
+        >
+            <div className="text-lg mb-1">{icon}</div>
+            <motion.p 
+                className="text-xl font-bold text-slate-800"
+                key={value}
+                initial={{ scale: 1.2, color: '#3b82f6' }}
+                animate={{ scale: 1, color: '#1e293b' }}
+                transition={{ duration: 0.3 }}
+            >
+                {value}
+            </motion.p>
+            <p className="text-[10px] font-medium text-slate-500 uppercase tracking-normal leading-tight">{label}</p>
+        </motion.button>
     );
 }
 
@@ -241,7 +353,7 @@ function Avatar({ profile, size = 'medium' }) {
         large: 'w-16 h-16 text-2xl',
     };
     return (
-        <div className={`relative ${sizeClasses}[size]`}>
+        <div className={`relative ${sizeClasses[size]}`}>
             <div className="w-full h-full bg-slate-200 rounded-full flex items-center justify-center overflow-hidden ring-2 ring-white shadow-sm">
                 {profile?.avatar_url ? (
                     <img src={profile.avatar_url} alt="Profile" className="w-full h-full object-cover" />
