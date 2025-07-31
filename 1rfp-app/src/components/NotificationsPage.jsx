@@ -1,13 +1,10 @@
-// src/components/NotificationsPage.jsx
-// Add this route to your App.jsx:
-// <Route path="notifications" element={<NotificationsPage />} />
-// 
-// Import statement for App.jsx:
-// import NotificationsPage from './components/NotificationsPage.jsx';
+// src/components/NotificationsPage.jsx - Updated with connection notifications support
 import React, { useState, useEffect } from 'react';
 import { useOutletContext, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
-import { UserPlus, ThumbsUp, MessageSquare, AtSign, Building, Bell, BellOff, Check, X, Filter, Calendar, Clock } from 'lucide-react';
+import { UserPlus, ThumbsUp, MessageSquare, AtSign, Building, Bell, BellOff, Check, X, Filter, Calendar, Clock, Users, UserCheck } from 'lucide-react';
+// Add the missing import at the top
+import { acceptConnectionRequest, declineConnectionRequest, getConnectionStatus } from '../utils/userConnectionsUtils';
 
 const timeAgo = (date) => {
     const seconds = Math.floor((new Date() - new Date(date)) / 1000);
@@ -36,11 +33,23 @@ const NotificationIcon = ({ type, actor }) => {
         );
     }
     
-    // For follower notifications without avatar, show initials
-    if (type === 'new_follower' && actor?.full_name) {
-        const initials = actor.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+    // For connection notifications, show the actor's avatar
+    if ((type === 'connection_request' || type === 'connection_accepted') && actor?.avatar_url) {
         return (
-            <div className="w-10 h-10 rounded-full bg-blue-500 text-white flex items-center justify-center text-sm font-medium border-2 border-blue-200">
+            <img 
+                src={actor.avatar_url} 
+                alt={actor.full_name}
+                className="w-10 h-10 rounded-full object-cover border-2 border-green-200"
+            />
+        );
+    }
+    
+    // For notifications without avatar, show initials
+    if ((type === 'new_follower' || type === 'connection_request' || type === 'connection_accepted') && actor?.full_name) {
+        const initials = actor.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+        const colorClass = type === 'new_follower' ? 'bg-blue-500 border-blue-200' : 'bg-green-500 border-green-200';
+        return (
+            <div className={`w-10 h-10 rounded-full text-white flex items-center justify-center text-sm font-medium border-2 ${colorClass}`}>
                 {initials}
             </div>
         );
@@ -51,6 +60,10 @@ const NotificationIcon = ({ type, actor }) => {
     switch (type) {
         case 'new_follower':
             return <div className={`${iconClass} bg-blue-100`}><UserPlus className="w-5 h-5 text-blue-500" /></div>;
+        case 'connection_request':
+            return <div className={`${iconClass} bg-green-100`}><Users className="w-5 h-5 text-green-500" /></div>;
+        case 'connection_accepted':
+            return <div className={`${iconClass} bg-green-100`}><UserCheck className="w-5 h-5 text-green-500" /></div>;
         case 'new_like':
             return <div className={`${iconClass} bg-pink-100`}><ThumbsUp className="w-5 h-5 text-pink-500" /></div>;
         case 'new_comment':
@@ -64,21 +77,49 @@ const NotificationIcon = ({ type, actor }) => {
     }
 };
 
-const NotificationItem = ({ notification, onViewPost, onMarkAsRead, onDelete }) => {
+const NotificationItem = ({ notification, onViewPost, onMarkAsRead, onDelete, currentUserId, onRefresh }) => {
     const navigate = useNavigate();
+    const [actionLoading, setActionLoading] = useState(false);
+    const [localConnectionStatus, setLocalConnectionStatus] = useState(null); // Track local status changes
+    
     const { 
         actor_id: actor, 
         type, 
         created_at, 
         post_id, 
         organization_post_id,
-        is_read
+        is_read,
+        connection_id
     } = notification;
+
+    // Check connection status for connection notifications
+    useEffect(() => {
+        const checkConnectionStatus = async () => {
+            if (type === 'connection_request' && actor?.id && currentUserId) {
+                try {
+                    const { status } = await getConnectionStatus(currentUserId, actor.id);
+                    setLocalConnectionStatus(status);
+                } catch (error) {
+                    console.error('Error checking connection status:', error);
+                }
+            }
+        };
+
+        checkConnectionStatus();
+    }, [type, actor?.id, currentUserId]);
 
     const notificationText = () => {
         switch (type) {
             case 'new_follower':
                 return <><strong className="font-semibold text-slate-900">{actor.full_name}</strong> started following you.</>;
+            case 'connection_request':
+                // Show different text based on current connection status
+                if (localConnectionStatus === 'accepted') {
+                    return <><strong className="font-semibold text-slate-900">{actor.full_name}</strong> is now connected with you.</>;
+                }
+                return <><strong className="font-semibold text-slate-900">{actor.full_name}</strong> wants to connect with you.</>;
+            case 'connection_accepted':
+                return <><strong className="font-semibold text-slate-900">{actor.full_name}</strong> accepted your connection request.</>;
             case 'new_like':
                 return <><strong className="font-semibold text-slate-900">{actor.full_name}</strong> liked your post.</>;
             case 'new_comment':
@@ -89,6 +130,48 @@ const NotificationItem = ({ notification, onViewPost, onMarkAsRead, onDelete }) 
                 return <><strong className="font-semibold text-slate-900">{actor.full_name}</strong> mentioned your organization in a post.</>;
             default:
                 return 'New notification';
+        }
+    };
+
+    const handleAcceptConnection = async (e) => {
+        e.stopPropagation();
+        setActionLoading(true);
+        
+        try {
+            const result = await acceptConnectionRequest(currentUserId, actor.id);
+            if (result.success) {
+                // Update local status immediately
+                setLocalConnectionStatus('accepted');
+                // Mark notification as read and refresh
+                await onMarkAsRead(notification.id);
+                if (onRefresh) onRefresh();
+            } else {
+                console.error('Failed to accept connection:', result.error);
+            }
+        } catch (error) {
+            console.error('Error accepting connection:', error);
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
+    const handleDeclineConnection = async (e) => {
+        e.stopPropagation();
+        setActionLoading(true);
+        
+        try {
+            const result = await declineConnectionRequest(currentUserId, actor.id);
+            if (result.success) {
+                // Remove this notification
+                await onDelete(notification.id);
+                if (onRefresh) onRefresh();
+            } else {
+                console.error('Failed to decline connection:', result.error);
+            }
+        } catch (error) {
+            console.error('Error declining connection:', error);
+        } finally {
+            setActionLoading(false);
         }
     };
 
@@ -175,9 +258,9 @@ const NotificationItem = ({ notification, onViewPost, onMarkAsRead, onDelete }) 
         }
         
         // Handle different notification types
-        if (type === 'new_follower') {
-            // For follower notifications, navigate to the follower's profile
-            console.log('👥 New follower notification - navigating to follower profile:', actor?.id);
+        if (type === 'new_follower' || type === 'connection_request' || type === 'connection_accepted') {
+            // For people-related notifications, navigate to the person's profile
+            console.log('👥 User notification - navigating to user profile:', actor?.id);
             const profileUrl = `/profile/members/${actor.id}`;
             console.log('🔗 Navigating to:', profileUrl);
             navigate(profileUrl);
@@ -261,6 +344,33 @@ const NotificationItem = ({ notification, onViewPost, onMarkAsRead, onDelete }) 
                 
                 {/* Action buttons */}
                 <div className="flex flex-wrap gap-2 mt-3">
+                    {/* Connection request actions - only show if not already connected */}
+                    {type === 'connection_request' && localConnectionStatus !== 'accepted' && (
+                        <>
+                            <button 
+                                onClick={handleAcceptConnection}
+                                disabled={actionLoading}
+                                className="text-xs bg-green-100 text-green-700 px-3 py-1.5 rounded-full hover:bg-green-200 transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50"
+                            >
+                                {actionLoading ? 'Accepting...' : 'Accept'}
+                            </button>
+                            <button 
+                                onClick={handleDeclineConnection}
+                                disabled={actionLoading}
+                                className="text-xs bg-slate-100 text-slate-700 px-3 py-1.5 rounded-full hover:bg-slate-200 transition-colors focus:outline-none focus:ring-2 focus:ring-slate-500 disabled:opacity-50"
+                            >
+                                {actionLoading ? 'Declining...' : 'Decline'}
+                            </button>
+                        </>
+                    )}
+                    
+                    {/* Show "Connected" status for accepted connections */}
+                    {type === 'connection_request' && localConnectionStatus === 'accepted' && (
+                        <div className="text-xs bg-green-100 text-green-700 px-3 py-1.5 rounded-full font-medium border border-green-200">
+                            ✓ Connected
+                        </div>
+                    )}
+                    
                     {/* Show "View Post" button only for post-related notifications */}
                     {(post_id || organization_post_id) && (
                         <button 
@@ -271,14 +381,14 @@ const NotificationItem = ({ notification, onViewPost, onMarkAsRead, onDelete }) 
                         </button>
                     )}
                     
-                    {/* Show "View Profile" button for follower notifications */}
-                    {type === 'new_follower' && (
+                    {/* Show "View Profile" button for people-related notifications */}
+                    {(type === 'new_follower' || type === 'connection_request' || type === 'connection_accepted') && (
                         <button 
                             onClick={(e) => {
                                 e.stopPropagation();
                                 navigate(`/profile/members/${actor.id}`);
                             }}
-                            className="text-xs bg-green-100 text-green-700 px-3 py-1.5 rounded-full hover:bg-green-200 transition-colors focus:outline-none focus:ring-2 focus:ring-green-500"
+                            className="text-xs bg-purple-100 text-purple-700 px-3 py-1.5 rounded-full hover:bg-purple-200 transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500"
                         >
                             View Profile
                         </button>
@@ -293,7 +403,7 @@ export default function NotificationsPage() {
     const { session, profile, handleViewPost } = useOutletContext();
     const [notifications, setNotifications] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [filter, setFilter] = useState('all'); // all, unread, read
+    const [filter, setFilter] = useState('all'); // all, unread, read, connections
     const [sortBy, setSortBy] = useState('newest'); // newest, oldest
 
     useEffect(() => {
@@ -309,7 +419,7 @@ export default function NotificationsPage() {
             let query = supabase
                 .from('notifications')
                 .select(`
-                    id, type, post_id, organization_post_id, is_read, created_at,
+                    id, type, post_id, organization_post_id, is_read, created_at, connection_id,
                     actor_id:profiles!notifications_actor_id_fkey (id, full_name, avatar_url, title, organization_name)
                 `)
                 .eq('user_id', session.user.id);
@@ -319,6 +429,8 @@ export default function NotificationsPage() {
                 query = query.eq('is_read', false);
             } else if (filter === 'read') {
                 query = query.eq('is_read', true);
+            } else if (filter === 'connections') {
+                query = query.in('type', ['connection_request', 'connection_accepted', 'connection_declined']);
             }
 
             // Apply sorting
@@ -437,6 +549,7 @@ export default function NotificationsPage() {
 
     const filteredNotifications = notifications;
     const unreadCount = notifications.filter(n => !n.is_read).length;
+    const connectionRequestsCount = notifications.filter(n => n.type === 'connection_request' && !n.is_read).length;
 
     if (loading) {
         return (
@@ -473,7 +586,18 @@ export default function NotificationsPage() {
                         <div>
                             <h1 className="text-2xl font-bold text-slate-900">Notifications</h1>
                             <p className="text-sm text-slate-600">
-                                {unreadCount > 0 ? `${unreadCount} unread notification${unreadCount === 1 ? '' : 's'}` : 'All caught up!'}
+                                {unreadCount > 0 ? (
+                                    <>
+                                        {unreadCount} unread notification{unreadCount === 1 ? '' : 's'}
+                                        {connectionRequestsCount > 0 && (
+                                            <span className="ml-2 text-green-600 font-medium">
+                                                • {connectionRequestsCount} connection request{connectionRequestsCount === 1 ? '' : 's'}
+                                            </span>
+                                        )}
+                                    </>
+                                ) : (
+                                    'All caught up!'
+                                )}
                             </p>
                         </div>
                     </div>
@@ -511,6 +635,7 @@ export default function NotificationsPage() {
                             <option value="all">All</option>
                             <option value="unread">Unread</option>
                             <option value="read">Read</option>
+                            <option value="connections">Connections</option>
                         </select>
                     </div>
                     
@@ -542,7 +667,9 @@ export default function NotificationsPage() {
                                 ? "You don't have any unread notifications."
                                 : filter === 'read'
                                 ? "You don't have any read notifications."
-                                : "You don't have any notifications yet. When people interact with your posts or follow you, you'll see them here."
+                                : filter === 'connections'
+                                ? "You don't have any connection notifications."
+                                : "You don't have any notifications yet. When people interact with your posts, follow you, or send connection requests, you'll see them here."
                             }
                         </p>
                     </div>
@@ -554,6 +681,8 @@ export default function NotificationsPage() {
                             onViewPost={handleViewPost}
                             onMarkAsRead={handleMarkAsRead}
                             onDelete={handleDelete}
+                            currentUserId={session?.user?.id}
+                            onRefresh={fetchNotifications}
                         />
                     ))
                 )}

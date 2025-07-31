@@ -47,6 +47,7 @@ import { PlusCircle, Menu, X } from './components/Icons.jsx';
 import NotificationsPage from './components/NotificationsPage.jsx';
 import ResetPasswordForm from './components/auth/ResetPasswordForm';
 import AuthLayout from './components/auth/AuthLayout';
+import ConnectionsPage from './components/ConnectionsPage.jsx';
 
 export const LayoutContext = createContext({ setPageBgColor: () => {} });
 
@@ -414,7 +415,6 @@ export default function App() {
               <Route index element={<DashboardHomePage />} />
               <Route path="grants" element={<GrantsPageContent hideHero={true} isProfileView={true} />} />
               <Route path="organizations" element={<ExploreOrganizations isProfileView={true} />} />
-              {/* REMOVED: funders and nonprofits profile routes */}
               <Route path="members" element={<ExploreMembersPage />} />
               <Route path="members/:profileId" element={<MemberProfilePage />} />
               <Route path="saved-grants" element={<SavedGrantsPage />} />
@@ -422,6 +422,7 @@ export default function App() {
               <Route path="settings" element={<SettingsPage />} />
               <Route path="followers" element={<FollowersPage />} />
               <Route path="following" element={<FollowingPage />} />
+              <Route path="connections" element={<ConnectionsPage />} />
               <Route path="my-organization" element={<MyOrganizationPage />} />
               <Route path="my-organization/edit" element={<EditOrganizationPage />} />
               <Route path="omega-admin" element={<OmegaAdminDashboard />} />

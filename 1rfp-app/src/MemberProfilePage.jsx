@@ -1,25 +1,42 @@
-// MemberProfilePage.jsx - Updated with Follow Notifications
+// MemberProfilePage.jsx - Updated with Follow and Connection Notifications
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useOutletContext } from 'react-router-dom';
 import { supabase } from './supabaseClient';
 import PostCard from './components/PostCard';
 import { followUser, unfollowUser, checkFollowStatus } from './utils/followUtils';
-import { UserPlus, UserCheck, MapPin, Building, User, Mail, ExternalLink } from 'lucide-react';
+import { 
+  sendConnectionRequest, 
+  getConnectionStatus, 
+  acceptConnectionRequest, 
+  declineConnectionRequest,
+  withdrawConnectionRequest,
+  removeConnection,
+  getMutualConnectionsCount 
+} from './utils/userConnectionsUtils';
+import { UserPlus, UserCheck, MapPin, Building, User, Mail, ExternalLink, Users, UserX } from 'lucide-react';
 
-// Inline MemberProfileHeader component with enhanced features
+// Enhanced MemberProfileHeader component with connection features
 const MemberProfileHeader = ({ 
     member, 
     isFollowing, 
     onFollow, 
     onUnfollow, 
     isCurrentUser, 
-    followingInProgress = false 
+    followingInProgress = false,
+    currentUserId 
 }) => {
     const [followStats, setFollowStats] = useState({
         followersCount: 0,
         followingCount: 0
     });
+    const [connectionStats, setConnectionStats] = useState({
+        connectionStatus: 'none', // 'none', 'pending', 'accepted', 'declined'
+        isRequester: false,
+        mutualConnections: 0,
+        connectionsCount: 0
+    });
     const [statsLoading, setStatsLoading] = useState(true);
+    const [connectionLoading, setConnectionLoading] = useState(false);
 
     useEffect(() => {
         const fetchStats = async () => {
@@ -28,6 +45,7 @@ const MemberProfileHeader = ({
             try {
                 setStatsLoading(true);
                 
+                // Fetch follow stats
                 const [followersResult, followingResult] = await Promise.all([
                     supabase
                         .from('followers')
@@ -43,15 +61,34 @@ const MemberProfileHeader = ({
                     followersCount: followersResult.count || 0,
                     followingCount: followingResult.count || 0
                 });
+
+                // Fetch connection stats if not current user
+                if (currentUserId && currentUserId !== member.id) {
+                    const [connectionStatusResult, mutualConnectionsResult, connectionsCountResult] = await Promise.all([
+                        getConnectionStatus(currentUserId, member.id),
+                        getMutualConnectionsCount(currentUserId, member.id),
+                        supabase
+                            .from('user_connections')
+                            .select('*', { count: 'exact', head: true })
+                            .or(`and(requester_id.eq.${member.id},status.eq.accepted),and(recipient_id.eq.${member.id},status.eq.accepted)`)
+                    ]);
+
+                    setConnectionStats({
+                        connectionStatus: connectionStatusResult.status,
+                        isRequester: connectionStatusResult.isRequester,
+                        mutualConnections: mutualConnectionsResult.count,
+                        connectionsCount: connectionsCountResult.count || 0
+                    });
+                }
             } catch (error) {
-                console.error('Error fetching follow stats:', error);
+                console.error('Error fetching stats:', error);
             } finally {
                 setStatsLoading(false);
             }
         };
 
         fetchStats();
-    }, [member?.id]);
+    }, [member?.id, currentUserId]);
 
     if (!member) return null;
 
@@ -61,6 +98,154 @@ const MemberProfileHeader = ({
         } else {
             onFollow(member.id);
         }
+    };
+
+    const handleConnectionAction = async (action) => {
+        if (!currentUserId || connectionLoading) return;
+        
+        setConnectionLoading(true);
+        try {
+            let result;
+            switch (action) {
+                case 'connect':
+                    result = await sendConnectionRequest(currentUserId, member.id);
+                    if (result.success) {
+                        setConnectionStats(prev => ({ 
+                            ...prev, 
+                            connectionStatus: 'pending', 
+                            isRequester: true 
+                        }));
+                    }
+                    break;
+                    
+                case 'accept':
+                    result = await acceptConnectionRequest(currentUserId, member.id);
+                    if (result.success) {
+                        setConnectionStats(prev => ({ 
+                            ...prev, 
+                            connectionStatus: 'accepted',
+                            connectionsCount: prev.connectionsCount + 1
+                        }));
+                    }
+                    break;
+                    
+                case 'decline':
+                    result = await declineConnectionRequest(currentUserId, member.id);
+                    if (result.success) {
+                        setConnectionStats(prev => ({ 
+                            ...prev, 
+                            connectionStatus: 'none' 
+                        }));
+                    }
+                    break;
+                    
+                case 'withdraw':
+                    result = await withdrawConnectionRequest(currentUserId, member.id);
+                    if (result.success) {
+                        setConnectionStats(prev => ({ 
+                            ...prev, 
+                            connectionStatus: 'none', 
+                            isRequester: false 
+                        }));
+                    }
+                    break;
+                    
+                case 'disconnect':
+                    result = await removeConnection(currentUserId, member.id);
+                    if (result.success) {
+                        setConnectionStats(prev => ({ 
+                            ...prev, 
+                            connectionStatus: 'none',
+                            connectionsCount: Math.max(0, prev.connectionsCount - 1)
+                        }));
+                    }
+                    break;
+            }
+            
+            if (!result.success) {
+                console.error(`Error with ${action}:`, result.error);
+            }
+        } catch (error) {
+            console.error(`Error in ${action}:`, error);
+        } finally {
+            setConnectionLoading(false);
+        }
+    };
+
+    const getConnectionButton = () => {
+        const { connectionStatus, isRequester } = connectionStats;
+        
+        switch (connectionStatus) {
+            case 'none':
+                return (
+                    <button
+                        onClick={() => handleConnectionAction('connect')}
+                        disabled={connectionLoading}
+                        className="inline-flex items-center px-4 py-2 text-sm font-medium bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        <Users className="w-4 h-4 mr-2" />
+                        {connectionLoading ? 'Connecting...' : 'Connect'}
+                    </button>
+                );
+                
+            case 'pending':
+                if (isRequester) {
+                    return (
+                        <button
+                            onClick={() => handleConnectionAction('withdraw')}
+                            disabled={connectionLoading}
+                            className="inline-flex items-center px-4 py-2 text-sm font-medium bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            <UserX className="w-4 h-4 mr-2" />
+                            {connectionLoading ? 'Withdrawing...' : 'Withdraw'}
+                        </button>
+                    );
+                } else {
+                    return (
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => handleConnectionAction('accept')}
+                                disabled={connectionLoading}
+                                className="inline-flex items-center px-3 py-2 text-sm font-medium bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                <UserCheck className="w-4 h-4 mr-1" />
+                                {connectionLoading ? 'Accepting...' : 'Accept'}
+                            </button>
+                            <button
+                                onClick={() => handleConnectionAction('decline')}
+                                disabled={connectionLoading}
+                                className="inline-flex items-center px-3 py-2 text-sm font-medium bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                <UserX className="w-4 h-4 mr-1" />
+                                {connectionLoading ? 'Declining...' : 'Decline'}
+                            </button>
+                        </div>
+                    );
+                }
+                
+            case 'accepted':
+                return (
+                    <button
+                        onClick={() => handleConnectionAction('disconnect')}
+                        disabled={connectionLoading}
+                        className="inline-flex items-center px-4 py-2 text-sm font-medium bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        <UserCheck className="w-4 h-4 mr-2" />
+                        {connectionLoading ? 'Disconnecting...' : 'Connected'}
+                    </button>
+                );
+                
+            default:
+                return null;
+        }
+    };
+
+    const getMutualConnectionsText = () => {
+        const { mutualConnections } = connectionStats;
+        if (mutualConnections > 0) {
+            return `${mutualConnections} mutual connection${mutualConnections === 1 ? '' : 's'}`;
+        }
+        return 'Connect to see mutual connections';
     };
 
     return (
@@ -139,20 +324,31 @@ const MemberProfileHeader = ({
                                     {member.bio}
                                 </p>
                             )}
+
+                            {/* Mutual connections info */}
+                            {!isCurrentUser && (
+                                <p className="text-sm text-slate-500 mt-3">
+                                    {getMutualConnectionsText()}
+                                </p>
+                            )}
                         </div>
                     </div>
 
-                    {/* Right side - Follow button and stats */}
+                    {/* Right side - Action buttons and stats */}
                     <div className="flex-shrink-0">
                         <div className="flex flex-col items-end space-y-4">
-                            {/* Follow button */}
+                            {/* Action buttons */}
                             {!isCurrentUser && (
-                                <div>
+                                <div className="flex flex-col gap-2">
+                                    {/* Connection button */}
+                                    {getConnectionButton()}
+                                    
+                                    {/* Follow button */}
                                     {isFollowing ? (
                                         <button
                                             onClick={handleFollowClick}
                                             disabled={followingInProgress}
-                                            className="inline-flex items-center px-4 py-2 text-sm font-medium bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                            className="inline-flex items-center px-4 py-2 text-sm font-medium bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                         >
                                             <UserCheck className="w-4 h-4 mr-2" />
                                             {followingInProgress ? 'Updating...' : 'Following'}
@@ -170,8 +366,16 @@ const MemberProfileHeader = ({
                                 </div>
                             )}
 
-                            {/* Follow stats */}
+                            {/* Stats */}
                             <div className="flex space-x-6 text-sm">
+                                <div className="text-center">
+                                    <div className="font-semibold text-slate-900">
+                                        {statsLoading ? '...' : connectionStats.connectionsCount}
+                                    </div>
+                                    <div className="text-slate-500">
+                                        {connectionStats.connectionsCount === 1 ? 'Connection' : 'Connections'}
+                                    </div>
+                                </div>
                                 <div className="text-center">
                                     <div className="font-semibold text-slate-900">
                                         {statsLoading ? '...' : followStats.followersCount}
@@ -384,6 +588,7 @@ export default function MemberProfilePage() {
                 onUnfollow={handleUnfollow}
                 isCurrentUser={currentUserProfile?.id === member?.id}
                 followingInProgress={followingInProgress}
+                currentUserId={currentUserProfile?.id}
             />
             
             <div>
