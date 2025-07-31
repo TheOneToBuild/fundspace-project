@@ -79,7 +79,7 @@ const sortGrants = (grants, sortCriteria) => {
     });
 };
 
-// --- New and Improved Grant List Item Component ---
+// --- Updated Grant List Item Component ---
 const GrantListItem = ({ grant, onOpenDetailModal, isSaved, onSave, onUnsave, session }) => {
     const dueDateText = grant.dueDate ? new Date(grant.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'Rolling';
     const fundingText = grant.fundingAmount ? formatCurrency(parseMaxFundingAmount(grant.fundingAmount.toString())) : 'Not Specified';
@@ -104,9 +104,9 @@ const GrantListItem = ({ grant, onOpenDetailModal, isSaved, onSave, onUnsave, se
             className="group bg-white p-4 md:p-5 rounded-2xl border border-slate-200 hover:border-blue-400 hover:shadow-2xl transition-all duration-300 flex flex-col md:flex-row items-start md:items-center gap-4 cursor-pointer transform hover:-translate-y-1"
         >
             <div className="flex-shrink-0">
-                {grant.funderLogoUrl ? (
+                {grant.organization?.image_url ? (
                     <img 
-                        src={grant.funderLogoUrl} 
+                        src={grant.organization.image_url} 
                         alt={`${grant.foundationName} logo`}
                         className="h-14 w-14 md:h-16 md:w-16 rounded-xl object-contain border-2 border-white shadow-lg group-hover:shadow-xl transition-shadow duration-300" 
                     />
@@ -219,9 +219,17 @@ const GrantsPageContent = ({ isProfileView = false }) => {
         const { data: { session } } = await supabase.auth.getSession();
         setSession(session);
 
+        // Updated query to join with organizations table to get banner images
         const { data: grantsData, error: grantsError } = await supabase
             .from('grants_with_taxonomy')
-            .select('*')
+            .select(`
+                *,
+                organizations!inner(
+                    image_url,
+                    banner_image_url,
+                    slug
+                )
+            `)
             .order('id', { ascending: false });
 
         if (grantsError) {
@@ -230,15 +238,19 @@ const GrantsPageContent = ({ isProfileView = false }) => {
             const formattedData = grantsData.map(grant => ({
                 ...grant,
                 foundationName: grant.funder_name || 'Unknown Funder',
-                funderLogoUrl: grant.funder_logo_url || null,
-                funderSlug: grant.funder_slug || null,
+                funderSlug: grant.funder_slug || grant.organizations?.slug || null,
                 fundingAmount: grant.max_funding_amount || grant.funding_amount_text || 'Not specified',
                 dueDate: grant.deadline,
                 grantType: grant.grant_type,
                 eligibility_criteria: grant.eligibility_criteria,
                 categories: grant.category_names ? grant.category_names.map((name, idx) => ({ id: idx, name })) : [],
                 locations: grant.location_names ? grant.location_names.map((name, idx) => ({ id: idx, name })) : [],
-                eligible_organization_types: grant.taxonomy_codes || []
+                eligible_organization_types: grant.taxonomy_codes || [],
+                // Updated organization object to use joined data
+                organization: {
+                    image_url: grant.organizations?.image_url || grant.funder_logo_url || null,
+                    banner_image_url: grant.organizations?.banner_image_url || null
+                }
             }));
             setGrants(formattedData);
         }
@@ -258,10 +270,14 @@ const GrantsPageContent = ({ isProfileView = false }) => {
     
     const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
         setSession(session);
-        if(session){
-            supabase.from('saved_grants').select('grant_id').eq('user_id', session.user.id).then(({ data, error }) => { 
-                if(!error) setSavedGrantIds(new Set(data.map(g => g.grant_id)))
-            })
+        if (session) {
+            supabase
+                .from('saved_grants')
+                .select('grant_id')
+                .eq('user_id', session.user.id)
+                .then(({ data, error }) => { 
+                    if (!error) setSavedGrantIds(new Set(data.map(g => g.grant_id)));
+                });
         } else { 
             setSavedGrantIds(new Set()); 
         }

@@ -239,25 +239,25 @@ const GrantCard = ({ grant, onOpenDetailModal, onFilterByCategory, onSave, onUns
         >
             {/* Banner & Avatar */}
             <div className="relative">
-                {/* Banner */}
+                {/* Banner - Updated to use organization banner */}
                 <div className="h-28 bg-gradient-to-br from-slate-100 via-white to-slate-100">
-                    {grant.funderBannerImageUrl && (
+                    {grant.organization?.banner_image_url && (
                         <img
-                            src={grant.funderBannerImageUrl}
+                            src={grant.organization.banner_image_url}
                             alt={`${grant.foundationName} banner`}
                             className="w-full h-full object-cover"
                         />
                     )}
                 </div>
 
-                {/* Avatar */}
+                {/* Avatar - Updated to use organization image */}
                 <div
                     className="absolute bottom-0 left-4 translate-y-1/2 transform transition-transform duration-300 group-hover:scale-105 cursor-pointer"
                     onClick={(e) => { e.stopPropagation(); navigate(`/organizations/${grant.funderSlug}`); }}
                 >
-                    {grant.funderLogoUrl ? (
+                    {grant.organization?.image_url ? (
                         <img
-                            src={grant.funderLogoUrl}
+                            src={grant.organization.image_url}
                             alt={`${grant.foundationName} logo`}
                             className="h-16 w-16 rounded-xl object-cover border-4 border-white shadow-lg bg-white"
                         />

@@ -77,9 +77,9 @@ const OrganizationListItem = ({ organization }) => {
       className="group bg-white p-4 md:p-5 rounded-2xl border border-slate-200 hover:border-blue-400 hover:shadow-2xl transition-all duration-300 flex flex-col md:flex-row items-start md:items-center gap-4 cursor-pointer transform hover:-translate-y-1"
     >
       <div className="flex-shrink-0">
-        {organization.logo_url ? (
+        {organization.image_url ? (
           <img 
-            src={organization.logo_url} 
+            src={organization.image_url} 
             alt={`${organization.name} logo`}
             className="h-14 w-14 md:h-16 md:w-16 rounded-xl object-contain border-2 border-white shadow-lg group-hover:shadow-xl transition-shadow duration-300" 
           />
@@ -185,40 +185,47 @@ const ExploreOrganizations = ({ isProfileView = false }) => {
     const fetchOrganizations = async () => {
       setLoading(true);
       try {
-        let { data, error } = await supabase
-          .from('organizations_with_engagement')
+        // Start with the simplest query first - just organizations table
+        console.log('🔍 Fetching organizations...');
+        
+        const { data, error } = await supabase
+          .from('organizations')
           .select(`
             *,
             organization_categories(categories(name))
           `);
-
-        if (error && error.message.includes('relation "organizations_with_engagement" does not exist')) {
-          console.log('📊 Engagement view not found, fetching without counts...');
-          
-          const { data: fallbackData, error: fallbackError } = await supabase
-            .from('organizations')
-            .select(`
-              *,
-              organization_categories(categories(name))
-            `);
-          
-          if (fallbackError) throw fallbackError;
-          data = fallbackData;
-        } else if (error) {
+        
+        if (error) {
+          console.error('❌ Database error:', error);
           throw error;
         }
 
         if (data) {
-          const formattedData = data.map(org => ({
-            ...org,
-            focus_areas: org.organization_categories?.map(oc => oc.categories?.name).filter(Boolean) || [],
-            followers_count: org.followers_count || 0,
-            likes_count: org.likes_count || 0
-          }));
+          console.log('✅ Fetched organizations:', data.length);
+          console.log('🎯 First organization sample:', data[0]);
+          
+          const formattedData = data.map(org => {
+            console.log(`🏢 Processing ${org.name}:`, {
+              has_banner: !!org.banner_image_url,
+              banner_url: org.banner_image_url,
+              has_logo: !!org.image_url,
+              logo_url: org.image_url
+            });
+            
+            return {
+              ...org,
+              focus_areas: org.organization_categories?.map(oc => oc.categories?.name).filter(Boolean) || [],
+              followers_count: 0, // Default since we're not using engagement view
+              likes_count: 0      // Default since we're not using engagement view
+            };
+          });
+          
+          console.log('📊 Final formatted data sample:', formattedData[0]);
           setOrganizations(formattedData);
         }
       } catch (error) {
-        console.error('Error fetching organizations:', error);
+        console.error('💥 Error fetching organizations:', error);
+        setError('Failed to load organizations');
       } finally {
         setLoading(false);
       }

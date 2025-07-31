@@ -163,73 +163,87 @@ const OrganizationCard = ({ organization, handleFilterChange, linkTo, buttonText
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
+      {/* Banner & Avatar Section */}
+      <div className="relative">
+        {/* Banner */}
+        <div className="h-24 bg-gradient-to-br from-slate-100 via-white to-slate-100">
+          {organization.banner_image_url && (
+            <img
+              src={organization.banner_image_url}
+              alt={`${organization.name} banner`}
+              className="w-full h-full object-cover"
+            />
+          )}
+        </div>
+
+        {/* Avatar - positioned to overlap banner */}
+        <div className="absolute bottom-0 left-4 translate-y-1/2 transform transition-transform duration-300 group-hover:scale-105">
+          {organization.image_url ? (
+            <img 
+              src={organization.image_url} 
+              alt={`${organization.name} logo`} 
+              className="h-14 w-14 rounded-xl object-cover border-3 border-white shadow-lg bg-white"
+              onError={(e) => { 
+                e.currentTarget.style.display = 'none'; 
+                e.currentTarget.nextElementSibling.style.display = 'flex'; 
+              }}
+            />
+          ) : null}
+          <div className={`h-14 w-14 rounded-xl ${colorClasses.avatar} text-white flex items-center justify-center font-bold text-lg shadow-lg border-3 border-white ${organization.image_url ? 'hidden' : 'flex'}`}>
+            {getInitials(organization.name)}
+          </div>
+        </div>
+      </div>
+
       {/* Magical gradient overlay that appears on hover */}
       <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 via-purple-500/10 to-pink-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
       
       {/* Magical border effect */}
       <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 opacity-0 group-hover:opacity-20 transition-opacity duration-500 -z-10 blur-xl scale-110" />
 
-      {/* Main content */}
-      <div className="p-6 relative z-0 flex-grow flex flex-col">
+      {/* Main content - Added pt-10 for avatar overlap */}
+      <div className="p-6 pt-10 relative z-0 flex-grow flex flex-col">
         {/* Header with organization info */}
-        <div className="flex items-start gap-4 mb-4">
-          <div className="flex-shrink-0">
-            {organization.logo_url ? (
-              <img 
-                src={organization.logo_url} 
-                alt={`${organization.name} logo`} 
-                className="h-16 w-16 rounded-xl object-cover border-2 border-white shadow-lg group-hover:shadow-xl transition-shadow duration-300"
-                onError={(e) => { 
-                  e.currentTarget.style.display = 'none'; 
-                  e.currentTarget.nextElementSibling.style.display = 'flex'; 
+        <div className="mb-4">
+          <h3 className="text-xl font-bold text-slate-800 mb-2 group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r group-hover:from-blue-600 group-hover:to-purple-600 transition-all duration-300 line-clamp-1 h-7">{organization.name}</h3>
+          
+          {/* Organization type badge and engagement stats */}
+          <div className="flex flex-wrap items-center gap-2 mt-2">
+            {handleFilterChange ? (
+              <button 
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleFilterChange('typeFilter', [organization.type]);
                 }}
-              />
-            ) : null}
-            <div className={`h-16 w-16 rounded-xl ${colorClasses.avatar} text-white flex items-center justify-center font-bold text-lg shadow-lg group-hover:shadow-xl transition-shadow duration-300 ${organization.logo_url ? 'hidden' : 'flex'}`}>
-              {getInitials(organization.name)}
-            </div>
-          </div>
-          <div className="flex-1">
-            <h3 className="text-xl font-bold text-slate-800 mb-2 group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r group-hover:from-blue-600 group-hover:to-purple-600 transition-all duration-300 line-clamp-1 h-7">{organization.name}</h3>
-            
-            {/* Organization type badge and engagement stats */}
-            <div className="flex flex-wrap items-center gap-2 mt-2">
-              {handleFilterChange ? (
-                <button 
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    handleFilterChange('typeFilter', [organization.type]);
-                  }}
-                  className={`text-xs font-semibold px-3 py-1.5 rounded-full inline-flex items-center gap-1.5 transition-all duration-300 transform hover:scale-105 active:scale-95 border ${colorClasses.bg} ${colorClasses.text} ${colorClasses.border}`}
-                  title={`Filter by type: ${typeConfig.label}`}
-                >
-                  {typeConfig.icon}
-                  {typeConfig.label}
-                </button>
-              ) : (
-                <span className={`text-xs font-semibold px-3 py-1.5 rounded-full inline-flex items-center gap-1.5 border ${colorClasses.bg} ${colorClasses.text} ${colorClasses.border}`}>
-                  {typeConfig.icon}
-                  {typeConfig.label}
-                </span>
-              )}
+                className={`text-xs font-semibold px-3 py-1.5 rounded-full inline-flex items-center gap-1.5 transition-all duration-300 transform hover:scale-105 active:scale-95 border ${colorClasses.bg} ${colorClasses.text} ${colorClasses.border}`}
+                title={`Filter by type: ${typeConfig.label}`}
+              >
+                {typeConfig.icon}
+                {typeConfig.label}
+              </button>
+            ) : (
+              <span className={`text-xs font-semibold px-3 py-1.5 rounded-full inline-flex items-center gap-1.5 border ${colorClasses.bg} ${colorClasses.text} ${colorClasses.border}`}>
+                {typeConfig.icon}
+                {typeConfig.label}
+              </span>
+            )}
 
-              {/* Followers count */}
-              {(organization.followers_count || organization.followersCount) && (
-                <span className="text-xs font-medium px-2 py-1 rounded-full bg-blue-50 text-blue-600 border border-blue-200 inline-flex items-center gap-1">
-                  <Eye size={12} />
-                  {organization.followers_count || organization.followersCount} followers
-                </span>
-              )}
+            {/* Followers count */}
+            {(organization.followers_count || organization.followersCount) && (
+              <span className="text-xs font-medium px-2 py-1 rounded-full bg-blue-50 text-blue-600 border border-blue-200 inline-flex items-center gap-1">
+                <Eye size={12} />
+                {organization.followers_count || organization.followersCount} followers
+              </span>
+            )}
 
-              {/* Likes count */}
-              {(organization.likes_count || organization.likesCount) && (
-                <span className="text-xs font-medium px-2 py-1 rounded-full bg-pink-50 text-pink-600 border border-pink-200 inline-flex items-center gap-1">
-                  <Heart size={12} />
-                  {organization.likes_count || organization.likesCount} likes
-                </span>
-              )}
-            </div>
+            {/* Likes count */}
+            {(organization.likes_count || organization.likesCount) && (
+              <span className="text-xs font-medium px-2 py-1 rounded-full bg-pink-50 text-pink-600 border border-pink-200 inline-flex items-center gap-1">
+                <Heart size={12} />
+                {organization.likes_count || organization.likesCount} likes
+              </span>
+            )}
           </div>
         </div>
 

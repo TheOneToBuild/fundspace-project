@@ -1,4 +1,4 @@
-// src/pages/OrganizationProfilePage.jsx - Updated to match template design
+// src/pages/OrganizationProfilePage.jsx - Updated to match template design with OrganizationGrants
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient.js';
@@ -15,6 +15,7 @@ import OrganizationTeam from '../components/organization-profile/OrganizationTea
 import OrganizationImpact from '../components/organization-profile/OrganizationImpact.jsx';
 import OrganizationNorthStar from '../components/organization-profile/OrganizationNorthStar.jsx';
 import OrganizationPhotos from '../components/organization-profile/OrganizationPhotos.jsx';
+import OrganizationGrants from '../components/organization-profile/OrganizationGrants.jsx';
 
 // Hooks
 import { useOrganizationSocial } from '../hooks/useOrganizationSocial.js';
@@ -145,7 +146,7 @@ const OrganizationProfilePage = () => {
       baseTabs.push({ id: 'photos', label: 'Photos', icon: 'Camera' });
     }
 
-    // Add standard tabs
+    // Add standard tabs (INCLUDING OVERVIEW)
     baseTabs.push(
       { id: 'overview', label: 'Overview', icon: 'Building' },
       { id: 'team', label: 'Team', icon: 'Users' }
@@ -375,14 +376,14 @@ const OrganizationProfilePage = () => {
         return <OrganizationPhotos {...props} userMembership={userMembership} session={session} />;
     }
 
-    // Type-specific tabs - use placeholders for now
+    // Type-specific tabs - use placeholders for now except grants
     switch (organization?.type) {
       case 'foundation':
         switch (activeTab) {
           case 'programs':
             return <PlaceholderContent contentType="Programs" organizationType="foundation" />;
           case 'grants':
-            return <PlaceholderContent contentType="Grants" organizationType="foundation" />;
+            return <OrganizationGrants organization={organization} userMembership={userMembership} session={session} />;
           case 'grantees':
             return <PlaceholderContent contentType="Grantees" organizationType="foundation" />;
         }
