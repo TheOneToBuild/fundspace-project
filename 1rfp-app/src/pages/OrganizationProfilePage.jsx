@@ -294,7 +294,7 @@ const OrganizationProfilePage = () => {
               .order('created_at', { ascending: false })
               .limit(10),
             
-            // Team Members - Query organization_memberships directly
+            // Team Members - Updated query with social profiles
             supabase
               .from('organization_memberships')
               .select(`
@@ -304,13 +304,18 @@ const OrganizationProfilePage = () => {
                   full_name,
                   avatar_url,
                   title,
-                  is_omega_admin
+                  bio,
+                  location,
+                  is_omega_admin,
+                  linkedin_url,
+                  twitter_url,
+                  website_url
                 )
               `)
               .eq('organization_id', orgData.id)
               .eq('is_public', true)
               .order('joined_at', { ascending: false }),
-            
+
             // Check user's membership if logged in
             session?.user?.id ? supabase
               .from('organization_memberships')
@@ -323,7 +328,7 @@ const OrganizationProfilePage = () => {
           ]);
 
           setOrganizationPosts(postsRes.data || []);
-          setTeamMembers(teamRes.data || []);
+          setTeamMembers(teamRes.data || []); // Updated to include social profiles
           setUserMembership(membershipRes?.data || null);
           
           // For now, just set empty type-specific data

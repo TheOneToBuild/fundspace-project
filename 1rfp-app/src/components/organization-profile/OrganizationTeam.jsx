@@ -2,8 +2,8 @@
 // Extract shared team display logic with full social functionality
 
 import React from 'react';
-import { Users, UserPlus } from 'lucide-react';
-import { Linkedin } from '../Icons.jsx';
+import { Users, UserPlus, ExternalLink } from 'lucide-react';
+import { Linkedin, Twitter, Globe } from '../Icons.jsx';
 import Avatar from '../Avatar.jsx';
 import { hasPermission, PERMISSIONS } from '../../utils/organizationPermissions.js';
 import { useTeamMemberSocial } from '../../hooks/useTeamMemberSocial.js';
@@ -65,6 +65,21 @@ const OrganizationTeam = ({ teamMembers = [], organization, userMembership, sess
     intern: 'Interns'
   };
 
+  // Social platform mapping
+  const socialPlatforms = [
+    { key: 'linkedin_url', icon: Linkedin, color: 'bg-blue-600' },
+    { key: 'twitter_url', icon: Twitter, color: 'bg-slate-900' },
+    { key: 'website_url', icon: Globe, color: 'bg-green-600' }
+  ];
+
+  // Get available social links for a member
+  const getSocialLinks = (profile) => {
+    return socialPlatforms.filter(platform => profile?.[platform.key]).map(platform => ({
+      ...platform,
+      url: profile[platform.key]
+    }));
+  };
+
   // Team Member Card Component with Social Functionality
   const TeamMemberCard = ({ member, organization, currentUserId }) => {
     const {
@@ -77,6 +92,7 @@ const OrganizationTeam = ({ teamMembers = [], organization, userMembership, sess
     } = useTeamMemberSocial(member.profile_id, currentUserId);
 
     const connectionButtonProps = getConnectionButtonProps();
+    const socialLinks = getSocialLinks(member.profiles);
 
     const getConnectionText = () => {
       if (mutualConnections > 0) {
@@ -140,17 +156,31 @@ const OrganizationTeam = ({ teamMembers = [], organization, userMembership, sess
             
             {/* Title/Role */}
             {(member.functional_role || member.profiles?.title) && (
-              <p className="text-blue-600 font-semibold text-sm mb-2">
+              <p className="text-blue-600 font-semibold text-sm mb-4">
                 {member.functional_role || member.profiles.title}
               </p>
             )}
             
-            {/* LinkedIn icon below title */}
-            <div className="mb-4">
-              <div className="w-8 h-8 mx-auto bg-blue-600 rounded-full flex items-center justify-center">
-                <Linkedin className="w-4 h-4 text-white" />
+            {/* Social Links - only show if user has social profiles */}
+            {socialLinks.length > 0 && (
+              <div className="flex justify-center gap-2 mb-4">
+                {socialLinks.map((social, index) => {
+                  const IconComponent = social.icon;
+                  return (
+                    <a
+                      key={index}
+                      href={social.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={`w-8 h-8 rounded-full flex items-center justify-center ${social.color} hover:opacity-80 transition-opacity`}
+                      title={`Visit ${social.key.replace('_url', '').replace('_', ' ')}`}
+                    >
+                      <IconComponent className="w-4 h-4 text-white" />
+                    </a>
+                  );
+                })}
               </div>
-            </div>
+            )}
             
             {/* Your Profile indicator */}
             <p className="text-slate-500 text-xs mb-5">
@@ -208,17 +238,31 @@ const OrganizationTeam = ({ teamMembers = [], organization, userMembership, sess
           
           {/* Title/Role */}
           {(member.functional_role || member.profiles?.title) && (
-            <p className="text-blue-600 font-semibold text-sm mb-2">
+            <p className="text-blue-600 font-semibold text-sm mb-4">
               {member.functional_role || member.profiles.title}
             </p>
           )}
           
-          {/* LinkedIn icon below title */}
-          <div className="mb-4">
-            <div className="w-8 h-8 mx-auto bg-blue-600 rounded-full flex items-center justify-center">
-              <Linkedin className="w-4 h-4 text-white" />
+          {/* Social Links - only show if user has social profiles */}
+          {socialLinks.length > 0 && (
+            <div className="flex justify-center gap-2 mb-4">
+              {socialLinks.map((social, index) => {
+                const IconComponent = social.icon;
+                return (
+                  <a
+                    key={index}
+                    href={social.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={`w-8 h-8 rounded-full flex items-center justify-center ${social.color} hover:opacity-80 transition-opacity`}
+                    title={`Visit ${social.key.replace('_url', '').replace('_', ' ')}`}
+                  >
+                    <IconComponent className="w-4 h-4 text-white" />
+                  </a>
+                );
+              })}
             </div>
-          </div>
+          )}
           
           {/* Connection info - mutual connections */}
           <p className="text-slate-500 text-xs mb-5">

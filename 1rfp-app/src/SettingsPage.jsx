@@ -10,6 +10,7 @@ import NotificationSettings from './components/settings/NotificationSettings';
 import PasswordSettings from './components/settings/PasswordSettings';
 import EmailSettings from './components/settings/EmailSettings';
 import AccountDeletionSettings from './components/settings/AccountDeletionSettings';
+import SocialProfilesSettings from './components/settings/SocialProfilesSettings';
 
 export default function SettingsPage() {
   const { profile: initialProfile, session, refreshProfile } = useOutletContext();
@@ -98,6 +99,24 @@ export default function SettingsPage() {
     if (error) showMessage(`Failed to save ${field}`, true);
     else if (typeof refreshProfile === 'function') await refreshProfile();
   };
+
+  const handleSocialProfilesSave = async (socialProfiles) => {
+    const { error } = await supabase
+      .from('profiles')
+      .update({ 
+        ...socialProfiles, 
+        updated_at: new Date() 
+      })
+      .eq('id', session.user.id);
+    
+    if (error) {
+      showMessage(error.message, true);
+      throw error;
+    } else {
+      showMessage('Social profiles updated successfully!');
+      if (typeof refreshProfile === 'function') await refreshProfile();
+    }
+  };
   
   const updateNotificationProfile = async (updatedFields) => {
     setLoading(true);
@@ -170,6 +189,12 @@ export default function SettingsPage() {
             {error && <div className="text-red-600 text-sm mt-4 font-medium">{error}</div>}
         </form>
       </div>
+
+      <SocialProfilesSettings
+        profile={profile}
+        onSave={handleSocialProfilesSave}
+        loading={loading}
+      />
 
       <PrivacySettings
         privacySetting={privacySetting}
