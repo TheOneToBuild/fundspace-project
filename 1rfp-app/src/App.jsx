@@ -23,8 +23,9 @@ import SettingsPage from './SettingsPage.jsx';
 import SavedGrantsPage from './SavedGrantsPage.jsx';
 import ExploreMembersPage from './ExploreMembersPage.jsx';
 import MemberProfilePage from './MemberProfilePage.jsx';
-import DashboardHomePage from './components/DashboardHomePage.jsx';
-import HelloCommunityRoute from './components/HelloCommunityRoute.jsx';
+import HomeDashboard from './components/HomeDashboard.jsx';                    // NEW: Main dashboard
+import HelloWorldChannel from './components/HelloWorldChannel.jsx';           // NEW: Renamed HelloWorld chat
+import HelloCommunityRoute from './components/HelloCommunityRoute.jsx';       // EXISTING
 import FollowersPage from './components/FollowersPage.jsx';
 import FollowingPage from './components/FollowingPage.jsx';
 import OmegaAdminDashboard from './components/OmegaAdminDashboard.jsx';
@@ -412,7 +413,8 @@ export default function App() {
             <Route path="profile/:profileId" element={<MemberProfilePage />} />
             <Route path="organizations/:slug" element={<OrganizationProfilePage />} />
             <Route path="profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>}>
-              <Route index element={<DashboardHomePage />} />
+              <Route index element={<HomeDashboard />} />                                  {/* FIXED: Use HomeDashboard */}
+              <Route path="hello-world" element={<HelloWorldChannel />} />               {/* FIXED: Add HelloWorld route */}
               <Route path="grants" element={<GrantsPageContent hideHero={true} isProfileView={true} />} />
               <Route path="organizations" element={<ExploreOrganizations isProfileView={true} />} />
               <Route path="members" element={<ExploreMembersPage />} />

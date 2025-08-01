@@ -117,8 +117,8 @@ const SubmitGrantPage = () => {
                 <ol className="text-sm text-emerald-700 space-y-1">
                   <li>1. Share the grant URL you discovered</li>
                   <li>2. Add any helpful details or context</li>
-                  <li>3. Our team reviews and verifies the submission</li>
-                  <li>4. Grant gets added to our database for all nonprofits to discover</li>
+                  <li>3. Our AI model reads the content and pulls relevant information</li>
+                  <li>4. Grant gets added to our database for all organizations to discover</li>
                 </ol>
               </div>
 
@@ -201,7 +201,7 @@ const SubmitGrantPage = () => {
               <div className="space-y-4 text-sm text-slate-600">
                 <div className="flex items-start gap-3">
                   <div className="w-2 h-2 bg-emerald-500 rounded-full mt-2 flex-shrink-0"></div>
-                  <p><strong>Saves Time:</strong> Every submission helps nonprofits discover funding faster</p>
+                  <p><strong>Saves Time:</strong> Every submission helps our communitites discover funding faster</p>
                 </div>
                 <div className="flex items-start gap-3">
                   <div className="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></div>
@@ -224,7 +224,7 @@ const SubmitGrantPage = () => {
               <div className="space-y-2 text-sm text-slate-600">
                 <p>✅ <strong>Bay Area focus:</strong> Must serve our 9-county region</p>
                 <p>✅ <strong>Active grants:</strong> Currently accepting applications</p>
-                <p>✅ <strong>Nonprofit eligible:</strong> Open to 501(c)(3) organizations</p>
+                <p>✅ <strong>Open to all:</strong> Open to all organization types and individuals</p>
                 <p>✅ <strong>Public access:</strong> Information publicly available</p>
               </div>
             </div>
@@ -239,7 +239,7 @@ const SubmitGrantPage = () => {
             Thank You for Building Community
           </h2>
           <p className="text-lg md:text-xl opacity-90 mb-6 max-w-2xl mx-auto">
-            Every grant submission brings us closer to our goal of connecting every Bay Area nonprofit with the perfect funding opportunity. Together, we're making social impact more accessible.
+            Every grant submission brings us one step closer to advancing our mission of making funding accessible to everyone. 
           </p>
         </div>
       </section>

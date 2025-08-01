@@ -5,7 +5,7 @@ import NotificationsPanel from './NotificationsPanel';
 import UserMenu from './UserMenu.jsx';
 import GlobalSearch from './GlobalSearch'; // Import the new search component
 import headerLogoImage from '../assets/1rfp-logo.png';
-import { Search, PlusCircle, Home, Building, FileText, ClipboardList, Bell, Menu, X, Users } from './Icons';
+import { Search, PlusCircle, Home, Building, ClipboardList, Bell, Menu, X, Users } from './Icons';
 
 const HeaderNavLink = ({ to, children, Icon, mobile = false, onClick }) => {
     const navLinkClass = ({ isActive }) => mobile 
@@ -98,7 +98,7 @@ export default function DashboardHeader({
 
                         {/* Desktop Navigation */}
                         <nav className="hidden md:flex items-center justify-center h-full">
-                            <HeaderNavLink to="/profile" Icon={Home}>Home</HeaderNavLink>
+                            <HeaderNavLink to="/profile" Icon={Home}>Dashboard</HeaderNavLink>
                             <HeaderNavLink to="/profile/grants" Icon={ClipboardList}>Grants</HeaderNavLink>
                             <HeaderNavLink to="/profile/organizations" Icon={Building}>Organizations</HeaderNavLink>
                             <HeaderNavLink to="/profile/members" Icon={Users}>Members</HeaderNavLink>
@@ -189,7 +189,7 @@ export default function DashboardHeader({
                         {/* Mobile Navigation Links */}
                         <nav className="py-4">
                             <HeaderNavLink to="/profile" Icon={Home} mobile onClick={closeMobileMenu}>
-                                Dashboard Home
+                                Dashboard
                             </HeaderNavLink>
                             <HeaderNavLink to="/profile/grants" Icon={ClipboardList} mobile onClick={closeMobileMenu}>
                                 My Grants
@@ -197,7 +197,7 @@ export default function DashboardHeader({
                             <HeaderNavLink to="/profile/organizations" Icon={Building} mobile onClick={closeMobileMenu}>
                                 Explore Organizations
                             </HeaderNavLink>
-                             <HeaderNavLink to="/profile/members" Icon={Users} mobile onClick={closeMobileMenu}>
+                            <HeaderNavLink to="/profile/members" Icon={Users} mobile onClick={closeMobileMenu}>
                                 Explore Members
                             </HeaderNavLink>
                         </nav>

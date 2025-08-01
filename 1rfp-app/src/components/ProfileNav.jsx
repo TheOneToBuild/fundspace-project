@@ -4,7 +4,7 @@ import { supabase } from '../supabaseClient';
 import { isPlatformAdmin } from '../utils/permissions.js';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-    Home, Users, LayoutDashboard, BarChart2, FileText, Building, Bookmark, Bell, Settings, Search, ChevronsRight, Crown, Briefcase, Handshake
+    Home, Users, LayoutDashboard, BarChart2, FileText, Building, Bookmark, Bell, Settings, Search, ChevronsRight, Crown, Briefcase, Handshake, Globe
 } from 'lucide-react';
 
 // Main Component
@@ -100,7 +100,8 @@ export default function ProfileNav() {
         {
             section: 'Community',
             links: [
-                { icon: <Home size={20} />, text: "Hello World", to: "/profile" },
+                { icon: <Home size={20} />, text: "Dashboard", to: "/profile" },                           // NEW: Main dashboard
+                { icon: <Globe size={20} />, text: "Hello World", to: "/profile/hello-world" },          // UPDATED: Moved HelloWorld
                 { icon: <Handshake size={20} />, text: "Hello Community", to: "/profile/hello-community" },
                 { icon: <Search size={20} />, text: "Discover People", to: "/profile/members" },
             ]
@@ -186,11 +187,7 @@ export default function ProfileNav() {
                         exit={{ scale: 0, opacity: 0 }}
                         className="p-4 flex justify-center"
                     >
-                        <button 
-                            onClick={() => setIsExpanded(true)} 
-                            className="hover:scale-105 transition-transform"
-                            title={`${profile?.full_name || 'Your Profile'} - Click to expand navigation`}
-                        >
+                        <button onClick={() => setIsExpanded(true)} className="hover:scale-105 transition-transform">
                             <Avatar profile={profile} />
                         </button>
                     </motion.div>

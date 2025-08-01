@@ -1,4 +1,4 @@
-// src/pages/OrganizationProfilePage.jsx - Updated to match template design with OrganizationGrants
+// src/pages/OrganizationProfilePage.jsx - Updated to match template design with dynamic grants tab
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient.js';
@@ -15,7 +15,7 @@ import OrganizationTeam from '../components/organization-profile/OrganizationTea
 import OrganizationImpact from '../components/organization-profile/OrganizationImpact.jsx';
 import OrganizationNorthStar from '../components/organization-profile/OrganizationNorthStar.jsx';
 import OrganizationPhotos from '../components/organization-profile/OrganizationPhotos.jsx';
-import OrganizationGrants from '../components/organization-profile/OrganizationGrants.jsx';
+import OrganizationGrantsFixed from '../components/organization-profile/OrganizationGrantsFixed.jsx';
 
 // Hooks
 import { useOrganizationSocial } from '../hooks/useOrganizationSocial.js';
@@ -75,6 +75,7 @@ const OrganizationProfilePage = () => {
   const [typeSpecificData, setTypeSpecificData] = useState({});
   const [userMembership, setUserMembership] = useState(null);
   const [photos, setPhotos] = useState([]);
+  const [hasGrants, setHasGrants] = useState(false); // Track if organization has grants
 
   // Get organization type configuration
   const orgConfig = ORG_TYPE_CONFIGS[organization?.type] || ORG_TYPE_CONFIGS.default;
@@ -131,24 +132,23 @@ const OrganizationProfilePage = () => {
       { id: 'home', label: 'Home', icon: 'Globe' }
     ];
 
+    // Add North Star for foundations first (right after home)
+    if (orgConfig.showNorthStar) {
+      baseTabs.push({ id: 'northstar', label: 'North Star', icon: 'Target' });
+    }
+
     // Add Impact tab for foundations and nonprofits
     if (orgConfig.showImpact) {
       baseTabs.push({ id: 'impact', label: 'Impact', icon: 'TrendingUp' });
     }
 
-    // Add North Star for foundations only
-    if (orgConfig.showNorthStar) {
-      baseTabs.push({ id: 'northstar', label: 'North Star', icon: 'Target' });
-    }
-
-    // Add Photos if enabled
+    // Add Action tab (formerly Photos) if enabled
     if (orgConfig.showPhotos) {
-      baseTabs.push({ id: 'photos', label: 'Photos', icon: 'Camera' });
+      baseTabs.push({ id: 'photos', label: 'Action', icon: 'Camera' });
     }
 
-    // Add standard tabs (INCLUDING OVERVIEW)
+    // Add standard tabs
     baseTabs.push(
-      { id: 'overview', label: 'Overview', icon: 'Building' },
       { id: 'team', label: 'Team', icon: 'Users' }
     );
 
@@ -158,43 +158,57 @@ const OrganizationProfilePage = () => {
   };
 
   const getTypeSpecificTabs = (orgType) => {
+    const tabs = [];
+    
     switch (orgType) {
       case 'foundation':
-        return [
+        tabs.push(
           { id: 'programs', label: 'Programs', icon: 'Rocket' },
-          { id: 'grants', label: 'Grants', icon: 'DollarSign' },
           { id: 'grantees', label: 'Grantees', icon: 'HandHeart' }
-        ];
+        );
+        break;
       
       case 'nonprofit':
-        return [
+        tabs.push(
           { id: 'programs', label: 'Programs', icon: 'Rocket' },
           { id: 'kudos', label: 'Community Kudos', icon: 'Star' }
-        ];
+        );
+        break;
       
       case 'healthcare':
-        return [
+        tabs.push(
           { id: 'services', label: 'Services', icon: 'Heart' },
           { id: 'specialties', label: 'Specialties', icon: 'Award' }
-        ];
+        );
+        break;
       
       case 'education':
-        return [
+        tabs.push(
           { id: 'programs', label: 'Academic Programs', icon: 'BookOpen' },
           { id: 'research', label: 'Research', icon: 'Microscope' }
-        ];
+        );
+        break;
       
       case 'government':
-        return [
+        tabs.push(
           { id: 'services', label: 'Public Services', icon: 'Building2' },
           { id: 'initiatives', label: 'Initiatives', icon: 'Flag' }
-        ];
+        );
+        break;
       
       default:
-        return [
+        tabs.push(
           { id: 'services', label: 'Services', icon: 'Briefcase' }
-        ];
+        );
+        break;
     }
+
+    // Add Grants tab for ANY organization type that has grants
+    if (hasGrants) {
+      tabs.push({ id: 'grants', label: 'Grants', icon: 'DollarSign' });
+    }
+
+    return tabs;
   };
 
   // Fetch organization data
@@ -224,27 +238,6 @@ const OrganizationProfilePage = () => {
           orgData.focusAreas = orgData.organization_categories?.map(oc => oc.categories.name) || [];
           orgData.fundingLocations = orgData.organization_funding_locations?.map(ol => ol.locations.name) || [];
           
-          // Mock North Star data for foundations
-          if (orgData.type === 'foundation') {
-            orgData.northStar = {
-              title: "Our North Star",
-              description: "Our strategic vision guides every decision, partnership, and grant we make.",
-              vision: {
-                title: "Vision 2030",
-                text: "Creating lasting impact through strategic philanthropy and community partnerships."
-              },
-              focus: {
-                title: "Strategic Focus", 
-                text: "Catalyzing systemic change through collaborative partnerships and innovative funding models."
-              },
-              priorities: [
-                { title: "Education Equity", text: "Closing opportunity gaps through innovative approaches" },
-                { title: "Housing Stability", text: "Creating pathways to affordable, stable housing" },
-                { title: "Climate Resilience", text: "Building community capacity for environmental challenges" }
-              ]
-            };
-          }
-
           // Mock impact data
           orgData.impactData = {
             spotlights: [
@@ -282,6 +275,28 @@ const OrganizationProfilePage = () => {
         }
         
         setOrganization(orgData);
+
+        // Check if organization has grants
+        if (orgData?.id) {
+          try {
+            const { data: grantsData, error: grantsError } = await supabase
+              .from('grants')
+              .select('id')
+              .eq('organization_id', orgData.id)
+              .limit(1);
+            
+            if (!grantsError && grantsData && grantsData.length > 0) {
+              console.log('OrganizationProfilePage: Found grants for organization:', orgData.name);
+              setHasGrants(true);
+            } else {
+              console.log('OrganizationProfilePage: No grants found for organization:', orgData.name);
+              setHasGrants(false);
+            }
+          } catch (error) {
+            console.log('OrganizationProfilePage: Error checking grants:', error);
+            setHasGrants(false);
+          }
+        }
 
         // Fetch related data in parallel
         if (orgData?.id) {
@@ -329,7 +344,7 @@ const OrganizationProfilePage = () => {
           ]);
 
           setOrganizationPosts(postsRes.data || []);
-          setTeamMembers(teamRes.data || []); // Updated to include social profiles
+          setTeamMembers(teamRes.data || []); 
           setUserMembership(membershipRes?.data || null);
           
           // For now, just set empty type-specific data
@@ -345,7 +360,7 @@ const OrganizationProfilePage = () => {
     };
 
     fetchOrganizationData();
-  }, [slug, session?.user?.id]); // Removed followersCount, bookmarksCount from dependencies
+  }, [slug, session?.user?.id]);
 
   // Render active tab content
   const renderActiveTab = () => {
@@ -364,14 +379,12 @@ const OrganizationProfilePage = () => {
     switch (activeTab) {
       case 'home':
         return <OrganizationHome {...props} />;
-      case 'overview':
-        return <OrganizationOverview {...props} />;
       case 'team':
         return <OrganizationTeam {...props} userMembership={userMembership} session={session} />;
       case 'impact':
         return <OrganizationImpact {...props} />;
       case 'northstar':
-        return <OrganizationNorthStar {...props} />;
+        return <OrganizationNorthStar {...props} userMembership={userMembership} session={session} />;
       case 'photos':
         return <OrganizationPhotos {...props} userMembership={userMembership} session={session} />;
     }
@@ -382,8 +395,6 @@ const OrganizationProfilePage = () => {
         switch (activeTab) {
           case 'programs':
             return <PlaceholderContent contentType="Programs" organizationType="foundation" />;
-          case 'grants':
-            return <OrganizationGrants organization={organization} userMembership={userMembership} session={session} />;
           case 'grantees':
             return <PlaceholderContent contentType="Grantees" organizationType="foundation" />;
         }
@@ -424,6 +435,11 @@ const OrganizationProfilePage = () => {
             return <PlaceholderContent contentType="Initiatives" organizationType="government" />;
         }
         break;
+    }
+
+    // Handle grants tab for ANY organization type that has grants
+    if (activeTab === 'grants' && hasGrants) {
+      return <OrganizationGrantsFixed organization={organization} userMembership={userMembership} session={session} />;
     }
 
     // Fallback

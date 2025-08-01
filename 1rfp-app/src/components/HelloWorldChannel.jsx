@@ -1,36 +1,70 @@
 // src/components/DashboardHomePage.jsx - Cleaned
 import React, { useState, useEffect, useRef, useCallback, memo } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { supabase } from '../supabaseClient';
+import { supabase } from '../supabaseClient.js';
 import { ChevronLeft, ChevronRight, Clock, ArrowRight, Users, MessageCircle, Globe } from 'lucide-react';
 import PostCard from './PostCard.jsx';
 import CreatePost from './CreatePost.jsx';
 import ProfileCompletionBanner from './ProfileCompletionBanner.jsx';
 import { rssNewsService as newsService } from '../services/rssNewsService.js';
-import { addOrganizationEventListener } from '../utils/organizationEvents';
+import { addOrganizationEventListener } from '../utils/organizationEvents.js';
 import PropTypes from 'prop-types';
 
-const NewsCard = memo(({ title, summary, timeAgo, image, url }) => {
+const NewsCard = memo(({ title, timeAgo, image, url, category }) => {
   return (
     <div
-      className="flex-shrink-0 w-80 bg-white rounded-xl border border-slate-200 overflow-hidden hover:shadow-lg transition-shadow cursor-pointer"
+      className="flex-shrink-0 w-80 h-64 bg-white rounded-xl overflow-hidden hover:shadow-lg transition-all duration-200 cursor-pointer group relative"
       onClick={() => url && window.open(url, '_blank')}
     >
-      <div className="h-40 bg-slate-100 flex items-center justify-center">
-        {image && <img src={image} alt={title} className="w-full h-full object-cover" />}
-      </div>
-      <div className="p-4">
-        <h3 className="font-semibold text-slate-800 text-sm line-clamp-2 mb-2">{title}</h3>
-        <p className="text-slate-600 text-xs line-clamp-3 mb-3">{summary}</p>
-        <div className="flex items-center justify-between text-xs text-slate-500">
-          <div className="flex items-center"><Clock size={12} className="mr-1" />{timeAgo}</div>
+      {/* Full Background Image */}
+      {image ? (
+        <img 
+          src={image} 
+          alt={title} 
+          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" 
+        />
+      ) : (
+        <div className="w-full h-full bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center">
+          <Globe size={32} className="text-slate-400" />
+        </div>
+      )}
+      
+      {/* Dark Gradient Overlay */}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
+      
+      {/* Source Tag - Top Left */}
+      <div className="absolute top-3 left-3">
+        <div className="flex items-center space-x-2">
+          <span className="bg-white/20 backdrop-blur-sm text-white text-xs font-medium px-2 py-1 rounded-full border border-white/30">
+            {category || 'News'}
+          </span>
+          <div className="flex items-center text-white/80 text-xs">
+            <span className="w-1 h-1 bg-white/60 rounded-full mr-1"></span>
+            <span>{timeAgo}</span>
+          </div>
         </div>
       </div>
+      
+      {/* Title Overlay - Bottom */}
+      <div className="absolute bottom-0 left-0 right-0 p-4">
+        <h3 className="font-bold text-white text-lg leading-tight line-clamp-3 group-hover:text-blue-200 transition-colors">
+          {title}
+        </h3>
+      </div>
+      
+      {/* Hover Overlay */}
+      <div className="absolute inset-0 bg-blue-600/0 group-hover:bg-blue-600/10 transition-colors duration-200"></div>
     </div>
   );
 });
 NewsCard.displayName = 'NewsCard';
-NewsCard.propTypes = { title: PropTypes.string, summary: PropTypes.string, timeAgo: PropTypes.string, image: PropTypes.string, url: PropTypes.string };
+NewsCard.propTypes = { 
+  title: PropTypes.string.isRequired, 
+  timeAgo: PropTypes.string.isRequired, 
+  image: PropTypes.string, 
+  url: PropTypes.string,
+  category: PropTypes.string
+};
 
 const TrendingNewsSection = () => {
   const [news, setNews] = useState([]);
