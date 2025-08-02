@@ -22,10 +22,10 @@ const STATIC_MEDIA = {
 
 const advisoryBoard = [
   {
-    name: 'Jeremy Nguyen',
-    title: 'Advisory Board, Chan Zuckerberg Initiative',
-    imageUrl: 'https://media.licdn.com/dms/image/v2/D5603AQET5tsjlPDvOA/profile-displayphoto-shrink_800_800/profile-displayphoto-shrink_800_800/0/1705692479717?e=1756339200&v=beta&t=pUrtqQOE_DKvBg_ZXfiIYqckGn5cNs54CvTGFc7Zwu4',
-    bio: 'Jeremy brings 10 years of experience advancing social impact through data-driven strategies and cross-sector collaboration. At the Chan Zuckerberg Initiative and CSBio Community Foundation, he led community-focused initiatives and educational programs that expanded access, built partnerships, and increased equity across the Bay Area. Previously at Stanford University, he supported research-practice partnerships to inform systems change in education, healthcare, and public services.'
+    name: 'Advisory Board Member',
+    title: 'To be announced',
+    imageUrl: 'https://encrypted-tbn1.gstatic.com/images?q=tbn:ANd9GcTljW8umHXU4FCVp6-HEuPasRa0jvvrTiCs_qtuiv0Y09LPSPhS',
+    bio: 'We are excited to announce the remaining members of our esteemed advisory board soon. Stay tuned for more experts from both sides of the funding table.'
   },
   {
     name: 'Advisory Board Member',
@@ -41,7 +41,7 @@ const advisoryBoard = [
   },
   {
     name: 'Yen Pang',
-    title: "Advisory Board, San Mateo County Manager's Office",
+    title: "Director of Procurement and Contracts, San Francisco International Airport",
     imageUrl: 'https://media.licdn.com/dms/image/v2/C5603AQFAMGYFJIyhzA/profile-displayphoto-shrink_200_200/profile-displayphoto-shrink_200_200/0/1600903357926?e=1756944000&v=beta&t=t_MdadgWSG5ei1r_su5CiUgwnUQ167iWvefbSAogAIY',
     bio: 'Yen brings over 20 years of expertise in government procurement and contract management, driving improvements across San Mateo County and the City and County of San Francisco. As Manager at the County of San Mateo, she led the redesign of Measure K, streamlining its process, implementation, and evaluation to maximize community impact. Previously, as Principal Contracts Analyst at San Francisco International Airport, she oversaw contracts up to $1B, directing complex solicitations and enhancing contract monitoring systems.'
   },
