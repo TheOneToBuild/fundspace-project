@@ -274,7 +274,7 @@ const TrendingPostsSection = ({ posts, onViewMore, onPostClick }) => {
         <div>
             <div className="flex items-center justify-between mb-6">
                 <div>
-                    <h2 className="text-xl font-bold text-slate-800">Trending from Hello World</h2>
+                    <h2 className="text-xl font-bold text-slate-800">Trending Platform-Wide</h2>
                     <p className="text-sm text-slate-600 mt-1">Popular posts from the global community</p>
                 </div>
                 <div className="flex items-center space-x-2">

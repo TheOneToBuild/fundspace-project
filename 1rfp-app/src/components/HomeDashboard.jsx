@@ -1,4 +1,4 @@
-// src/components/HomeDashboard.jsx - Refactored version
+// src/components/HomeDashboard.jsx - Complete version with all sections
 import React, { useState, useEffect } from 'react';
 import { useOutletContext, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
@@ -6,8 +6,10 @@ import { rssNewsService as newsService } from '../services/rssNewsService.js';
 
 // Import all the smaller components
 import WelcomeBanner from './dashboard/WelcomeBanner.jsx';
+import ConnectionsAvatars from './dashboard/ConnectionsAvatars.jsx';
 import TrendingPostsSection from './dashboard/TrendingPostsSection.jsx';
 import HelloCommunitySection from './dashboard/HelloCommunitySection.jsx';
+import TrendingGrantsSection from './dashboard/TrendingGrantsSection.jsx';
 import NewsCarousel from './dashboard/NewsCarousel.jsx';
 import PostDetailModal from './dashboard/PostDetailModal.jsx';
 import QuickActions from './dashboard/QuickActions.jsx';
@@ -270,6 +272,10 @@ export default function HomeDashboard() {
                 organizationInfo={organizationInfo} 
             />
             
+            <ConnectionsAvatars currentUserProfile={profile} />
+            
+            <NewsCarousel news={news} />
+            
             <TrendingPostsSection
                 posts={trendingPosts}
                 onViewMore={handleViewMorePosts}
@@ -283,7 +289,7 @@ export default function HomeDashboard() {
                 organizationInfo={organizationInfo}
             />
             
-            <NewsCarousel news={news} />
+            <TrendingGrantsSection currentUserProfile={profile} />
             
             <PostDetailModal 
                 post={selectedPost}
