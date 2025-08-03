@@ -76,7 +76,7 @@ export default function SavedGrantsPage() {
   const fetchSavedGrants = useCallback(async (userId) => {
     setLoading(true);
     try {
-      // FIXED: Updated query to match the actual database schema
+      // FIXED: Updated query to use organizations instead of funders
       const { data, error } = await supabase
         .from('saved_grants')
         .select(`

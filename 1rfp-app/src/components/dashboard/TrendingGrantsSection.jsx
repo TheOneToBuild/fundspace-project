@@ -1,14 +1,10 @@
 // src/components/dashboard/TrendingGrantsSection.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, Calendar, DollarSign, MapPin, Bookmark, TrendingUp } from 'lucide-react';
-import { supabase } from '../../supabaseClient';
 import PropTypes from 'prop-types';
 
-const TrendingGrantCard = ({ grant, onClick }) => {
-    const [isBookmarked, setIsBookmarked] = useState(false);
-    const [bookmarkCount, setBookmarkCount] = useState(grant.save_count || 0);
-
+const TrendingGrantCard = ({ grant, onClick, onSave, onUnsave, isSaved }) => {
     const formatDate = (dateString) => {
         if (!dateString) return 'No deadline';
         const date = new Date(dateString);
@@ -45,10 +41,39 @@ const TrendingGrantCard = ({ grant, onClick }) => {
         return 'bg-green-100 text-green-700';
     };
 
+    const getOrgTypeColor = (type) => {
+        const typeMap = {
+            'nonprofit': 'bg-rose-100 text-rose-700 border-rose-200',
+            '501(c)(3)': 'bg-rose-100 text-rose-700 border-rose-200',
+            'education': 'bg-indigo-100 text-indigo-700 border-indigo-200',
+            'healthcare': 'bg-emerald-100 text-emerald-700 border-emerald-200',
+            'government': 'bg-blue-100 text-blue-700 border-blue-200',
+            'foundation': 'bg-purple-100 text-purple-700 border-purple-200',
+            'for profit': 'bg-green-100 text-green-700 border-green-200',
+            'religious': 'bg-amber-100 text-amber-700 border-amber-200',
+            'international': 'bg-cyan-100 text-cyan-700 border-cyan-200',
+            'individual': 'bg-orange-100 text-orange-700 border-orange-200',
+            'local government': 'bg-sky-100 text-sky-700 border-sky-200'
+        };
+        
+        // Check for partial matches
+        for (const [key, value] of Object.entries(typeMap)) {
+            if (type.includes(key)) {
+                return value;
+            }
+        }
+        
+        return 'bg-slate-100 text-slate-700 border-slate-200';
+    };
+
     const handleBookmark = (e) => {
         e.stopPropagation();
-        setIsBookmarked(!isBookmarked);
-        setBookmarkCount(prev => isBookmarked ? prev - 1 : prev + 1);
+        
+        if (isSaved) {
+            onUnsave?.(grant.id);
+        } else {
+            onSave?.(grant.id);
+        }
     };
 
     // Extract organization data consistently
@@ -113,45 +138,41 @@ const TrendingGrantCard = ({ grant, onClick }) => {
                     </div>
                 </div>
 
-                {/* Status badges */}
+                {/* Status badges - positioned in top-right corner like main grant cards */}
                 <div className="absolute top-2 right-2 z-10 flex flex-col gap-1">
                     <div className={`text-xs font-medium px-2 py-1 rounded-full ${getUrgencyColor(grantData.dueDate)}`}>
                         {formatDate(grantData.dueDate)}
                     </div>
+                    {/* Bookmark count badge - always show total bookmarks from all users */}
                     <div className="bg-gradient-to-r from-indigo-500 to-purple-600 text-white text-xs font-bold px-2 py-1 rounded-full shadow-sm flex items-center gap-1">
                         <Bookmark size={8} fill="currentColor" />
-                        {bookmarkCount}
+                        {grant.save_count || 0}
                     </div>
                 </div>
             </div>
 
             {/* Main content */}
             <div className="px-4 pt-6 pb-4">
-                {/* Organization name & Grant type */}
-                <div className="mb-3 text-center">
+                {/* Organization name */}
+                <div className="mb-3">
                     <p className="font-semibold text-slate-800 text-sm truncate">
                         {organizationData.name}
                     </p>
-                    {grantData.grantType && (
-                        <span className="inline-block mt-1 text-xs bg-gradient-to-r from-purple-100 to-indigo-100 text-purple-700 px-2 py-1 rounded-full font-medium border border-purple-200">
-                            {grantData.grantType}
-                        </span>
-                    )}
                 </div>
 
                 {/* Grant title */}
-                <h4 className="font-bold text-slate-900 text-base mb-3 line-clamp-2 leading-tight text-center group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r group-hover:from-blue-600 group-hover:to-purple-600 transition-all duration-300">
+                <h4 className="font-bold text-slate-900 text-base mb-3 line-clamp-2 leading-tight group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r group-hover:from-blue-600 group-hover:to-purple-600 transition-all duration-300">
                     {grantData.title}
                 </h4>
 
                 {/* Description */}
-                <p className="text-slate-600 text-sm leading-relaxed line-clamp-3 mb-4 text-center">
+                <p className="text-slate-600 text-sm leading-relaxed line-clamp-3 mb-4">
                     {grantData.description}
                 </p>
 
                 {/* Location - only show if not "Location varies" */}
                 {grantData.location && grantData.location !== 'Location varies' && (
-                    <div className="flex items-center justify-center text-xs mb-4">
+                    <div className="flex items-center text-xs mb-4">
                         <MapPin size={12} className="mr-1 text-blue-500" />
                         <span className="text-slate-600 truncate">{grantData.location}</span>
                     </div>
@@ -159,7 +180,7 @@ const TrendingGrantCard = ({ grant, onClick }) => {
 
                 {/* Action footer with funding at bottom */}
                 <div className="space-y-3">
-                    {/* FUNDING AMOUNT - At the bottom */}
+                    {/* FUNDING AMOUNT - Centered */}
                     <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg p-2 border border-green-200 shadow-sm">
                         <div className="flex items-center justify-center gap-1">
                             <DollarSign size={14} className="text-green-600" />
@@ -169,16 +190,37 @@ const TrendingGrantCard = ({ grant, onClick }) => {
                         </div>
                     </div>
 
+                    {/* Eligible Organization Types - Colored Pills */}
+                    {grant.eligible_organization_types && grant.eligible_organization_types.length > 0 && (
+                        <div>
+                            <p className="text-xs text-slate-500 mb-2">Eligible Organizations</p>
+                            <div className="flex flex-wrap gap-1 items-center">
+                                {grant.eligible_organization_types.slice(0, 2).map((type, index) => {
+                                    const cleanType = type.replace(/^\d+\.\s*/, '').replace(/([A-Z])/g, ' $1').trim();
+                                    const colorClass = getOrgTypeColor(cleanType.toLowerCase());
+                                    return (
+                                        <span key={index} className={`text-xs px-2 py-1 rounded-full font-medium ${colorClass}`}>
+                                            {cleanType}
+                                        </span>
+                                    );
+                                })}
+                                {grant.eligible_organization_types.length > 2 && (
+                                    <span className="text-xs text-slate-500">+{grant.eligible_organization_types.length - 2} more</span>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
                     <div className="flex items-center justify-between">
                         <button
                             onClick={handleBookmark}
                             className={`p-2 rounded-lg transition-all duration-300 shadow-sm hover:shadow-md transform hover:scale-105 ${
-                                isBookmarked 
+                                isSaved 
                                     ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white' 
                                     : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-50'
                             }`}
                         >
-                            <Bookmark size={14} fill={isBookmarked ? 'currentColor' : 'none'} />
+                            <Bookmark size={14} fill={isSaved ? 'currentColor' : 'none'} />
                         </button>
                         <div className="text-blue-600 font-medium text-sm opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
                             View Details →
@@ -190,136 +232,12 @@ const TrendingGrantCard = ({ grant, onClick }) => {
     );
 };
 
-const TrendingGrantsSection = ({ currentUserProfile }) => {
+const TrendingGrantsSection = ({ currentUserProfile, onOpenGrantModal, trendingGrants = [], onSaveGrant, onUnsaveGrant, savedGrantIds = new Set() }) => {
     const navigate = useNavigate();
-    const [trendingGrants, setTrendingGrants] = useState([]);
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(false);
 
-    useEffect(() => {
-        const fetchTrendingGrants = async () => {
-            try {
-                setLoading(true);
-                console.log('Fetching trending grants...');
-                
-                // Updated query to properly join with organizations table
-                let grantsData, grantsError;
-                
-                // Try with proper organizations join using organization_id
-                const { data: grantsWithOrgs, error: orgsError } = await supabase
-                    .from('grants')
-                    .select(`
-                        *,
-                        organizations!inner (
-                            id,
-                            name,
-                            image_url,
-                            banner_image_url,
-                            slug
-                        )
-                    `)
-                    .limit(15);
-                
-                if (orgsError) {
-                    console.log('Organizations join failed, trying without join:', orgsError);
-                    // Fallback to grants only
-                    const { data: grantsOnly, error: grantsOnlyError } = await supabase
-                        .from('grants')
-                        .select('*')
-                        .limit(15);
-                    grantsData = grantsOnly;
-                    grantsError = grantsOnlyError;
-                } else {
-                    grantsData = grantsWithOrgs;
-                    grantsError = orgsError;
-                }
-
-                console.log('Grants query result:', { grantsData, grantsError });
-
-                if (grantsError) {
-                    console.error('Error fetching grants:', grantsError);
-                    setTrendingGrants([]);
-                    return;
-                }
-
-                if (!grantsData || grantsData.length === 0) {
-                    console.log('No grants found in database');
-                    setTrendingGrants([]);
-                    return;
-                }
-
-                // Process the grants data to match our expected format
-                const processedGrants = grantsData.map(grant => ({
-                    id: grant.id,
-                    title: grant.title || 'Untitled Grant',
-                    description: grant.description || 'No description available',
-                    // Try multiple field names for organization
-                    foundation_name: grant.organizations?.name || grant.foundation_name || grant.funder_name || grant.organization_name || 'Unknown Foundation',
-                    funder_name: grant.organizations?.name || grant.funder_name || grant.foundation_name || grant.organization_name || 'Unknown Foundation',
-                    funding_amount_text: grant.funding_amount_text || grant.amount || 'Amount varies',
-                    max_funding_amount: grant.max_funding_amount || grant.funding_amount || null,
-                    due_date: grant.due_date || grant.deadline || null,
-                    deadline: grant.deadline || grant.due_date || null,
-                    location: grant.location || grant.geographic_focus || 'Location varies',
-                    grant_type: grant.grant_type || grant.type || null,
-                    created_at: grant.created_at,
-                    save_count: 0, // Default to 0, we'll update this if we can get bookmark data
-                    // Add organization data
-                    organization: {
-                        name: grant.organizations?.name || grant.foundation_name || grant.funder_name || grant.organization_name || 'Unknown Foundation',
-                        image_url: grant.organizations?.image_url || grant.funder_logo_url || null,
-                        banner_image_url: grant.organizations?.banner_image_url || null
-                    },
-                    funder_logo_url: grant.funder_logo_url || grant.organizations?.image_url || null
-                }));
-
-                console.log('Processed grants:', processedGrants);
-
-                // Try to get bookmark counts (optional - won't fail if table doesn't exist)
-                try {
-                    const grantIds = processedGrants.map(grant => grant.id);
-                    const { data: bookmarksData } = await supabase
-                        .from('saved_grants')
-                        .select('grant_id')
-                        .in('grant_id', grantIds);
-
-                    if (bookmarksData) {
-                        const bookmarkCounts = {};
-                        bookmarksData.forEach(bookmark => {
-                            bookmarkCounts[bookmark.grant_id] = (bookmarkCounts[bookmark.grant_id] || 0) + 1;
-                        });
-
-                        // Update grants with bookmark counts
-                        processedGrants.forEach(grant => {
-                            grant.save_count = bookmarkCounts[grant.id] || 0;
-                        });
-
-                        // Sort by bookmark count, then by creation date
-                        processedGrants.sort((a, b) => {
-                            if (b.save_count !== a.save_count) {
-                                return b.save_count - a.save_count;
-                            }
-                            return new Date(b.created_at) - new Date(a.created_at);
-                        });
-                    }
-                } catch (bookmarkError) {
-                    console.log('Could not fetch bookmark counts, using grants without counts:', bookmarkError);
-                    // Just sort by creation date if bookmark counting fails
-                    processedGrants.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-                }
-
-                setTrendingGrants(processedGrants.slice(0, 10));
-                console.log('Successfully set trending grants:', processedGrants.slice(0, 10));
-
-            } catch (error) {
-                console.error('Unexpected error fetching trending grants:', error);
-                setTrendingGrants([]);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchTrendingGrants();
-    }, []);
+    // Debug log to see what grants are being passed
+    console.log('TrendingGrantsSection received grants:', trendingGrants.map(g => ({ id: g.id, save_count: g.save_count })));
 
     const scrollGrants = (direction) => {
         const container = document.getElementById('trending-grants-scroll');
@@ -333,10 +251,13 @@ const TrendingGrantsSection = ({ currentUserProfile }) => {
     };
 
     const handleGrantClick = (grant) => {
-        // Open grant detail modal instead of navigating
-        // You'll need to add this functionality to open a detail modal
-        // For now, navigate to grants page with specific grant highlighted
-        navigate(`/grants?open_grant=${grant.id}`);
+        // Use the modal callback to open the grant detail modal
+        if (onOpenGrantModal) {
+            onOpenGrantModal(grant);
+        } else {
+            // Fallback to navigation if no modal callback provided
+            navigate(`/grants?open_grant=${grant.id}`);
+        }
     };
 
     if (loading) {
@@ -397,6 +318,9 @@ const TrendingGrantsSection = ({ currentUserProfile }) => {
                             key={grant.id}
                             grant={grant}
                             onClick={() => handleGrantClick(grant)}
+                            onSave={onSaveGrant}
+                            onUnsave={onUnsaveGrant}
+                            isSaved={savedGrantIds.has(grant.id)}
                         />
                     ))}
                 </div>
@@ -418,12 +342,20 @@ const TrendingGrantsSection = ({ currentUserProfile }) => {
 };
 
 TrendingGrantsSection.propTypes = {
-    currentUserProfile: PropTypes.object
+    currentUserProfile: PropTypes.object,
+    onOpenGrantModal: PropTypes.func,
+    trendingGrants: PropTypes.array,
+    onSaveGrant: PropTypes.func,
+    onUnsaveGrant: PropTypes.func,
+    savedGrantIds: PropTypes.object
 };
 
 TrendingGrantCard.propTypes = {
     grant: PropTypes.object.isRequired,
-    onClick: PropTypes.func.isRequired
+    onClick: PropTypes.func.isRequired,
+    onSave: PropTypes.func,
+    onUnsave: PropTypes.func,
+    isSaved: PropTypes.bool
 };
 
 export default TrendingGrantsSection;

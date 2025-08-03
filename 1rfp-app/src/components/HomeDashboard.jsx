@@ -1,4 +1,4 @@
-// src/components/HomeDashboard.jsx - Complete version with all sections
+// src/components/HomeDashboard.jsx - Complete version with corrected grant bookmark counts
 import React, { useState, useEffect } from 'react';
 import { useOutletContext, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
@@ -12,6 +12,7 @@ import HelloCommunitySection from './dashboard/HelloCommunitySection.jsx';
 import TrendingGrantsSection from './dashboard/TrendingGrantsSection.jsx';
 import NewsCarousel from './dashboard/NewsCarousel.jsx';
 import PostDetailModal from './dashboard/PostDetailModal.jsx';
+import GrantDetailModal from '../GrantDetailModal.jsx';
 import QuickActions from './dashboard/QuickActions.jsx';
 import StatsCard from './dashboard/StatsCard.jsx';
 
@@ -170,6 +171,154 @@ const useTrendingPosts = () => {
     return trendingPosts;
 };
 
+// Updated useTrendingGrants hook with corrected bookmark counting
+const useTrendingGrants = () => {
+    const [trendingGrants, setTrendingGrants] = useState([]);
+
+    useEffect(() => {
+        const fetchTrendingGrants = async () => {
+            try {
+                console.log('Fetching trending grants...');
+                
+                // Updated query to properly join with organizations table
+                let grantsData, grantsError;
+                
+                // Try with proper organizations join using organization_id
+                const { data: grantsWithOrgs, error: orgsError } = await supabase
+                    .from('grants')
+                    .select(`
+                        *,
+                        organizations!inner (
+                            id,
+                            name,
+                            image_url,
+                            banner_image_url,
+                            slug
+                        )
+                    `)
+                    .limit(15);
+                
+                if (orgsError) {
+                    console.log('Organizations join failed, trying without join:', orgsError);
+                    // Fallback to grants only
+                    const { data: grantsOnly, error: grantsOnlyError } = await supabase
+                        .from('grants')
+                        .select('*')
+                        .limit(15);
+                    grantsData = grantsOnly;
+                    grantsError = grantsOnlyError;
+                } else {
+                    grantsData = grantsWithOrgs;
+                    grantsError = orgsError;
+                }
+
+                console.log('Grants query result:', { grantsData, grantsError });
+
+                if (grantsError) {
+                    console.error('Error fetching grants:', grantsError);
+                    setTrendingGrants([]);
+                    return;
+                }
+
+                if (!grantsData || grantsData.length === 0) {
+                    console.log('No grants found in database');
+                    setTrendingGrants([]);
+                    return;
+                }
+
+                // Process the grants data to match our expected format
+                const processedGrants = grantsData.map(grant => ({
+                    id: grant.id,
+                    title: grant.title || 'Untitled Grant',
+                    description: grant.description || 'No description available',
+                    // Try multiple field names for organization
+                    foundation_name: grant.organizations?.name || grant.foundation_name || grant.funder_name || grant.organization_name || 'Unknown Foundation',
+                    funder_name: grant.organizations?.name || grant.funder_name || grant.foundation_name || grant.organization_name || 'Unknown Foundation',
+                    funding_amount_text: grant.funding_amount_text || grant.amount || 'Amount varies',
+                    max_funding_amount: grant.max_funding_amount || grant.funding_amount || null,
+                    due_date: grant.due_date || grant.deadline || null,
+                    deadline: grant.deadline || grant.due_date || null,
+                    location: grant.location || grant.geographic_focus || 'Location varies',
+                    grant_type: grant.grant_type || grant.type || null,
+                    created_at: grant.created_at,
+                    save_count: 0, // Default to 0, we'll update this if we can get bookmark data
+                    // Add URL fields for the apply button
+                    application_url: grant.application_url || grant.url || grant.website_url || '#',
+                    url: grant.url || grant.application_url || grant.website_url || '#',
+                    // Add eligible organization types
+                    eligible_organization_types: grant.eligible_organization_types || grant.taxonomy_codes || [],
+                    // Add organization data
+                    organization: {
+                        name: grant.organizations?.name || grant.foundation_name || grant.funder_name || grant.organization_name || 'Unknown Foundation',
+                        image_url: grant.organizations?.image_url || grant.funder_logo_url || null,
+                        banner_image_url: grant.organizations?.banner_image_url || null
+                    },
+                    funder_logo_url: grant.funder_logo_url || grant.organizations?.image_url || null
+                }));
+
+                console.log('Processed grants:', processedGrants);
+
+                // CRITICAL FIX: Get bookmark counts from ALL users, not just current user
+                try {
+                    const grantIds = processedGrants.map(grant => grant.id);
+                    console.log('Grant IDs for bookmark lookup:', grantIds);
+                    
+                    // FIXED: Removed user_id filter to count ALL bookmarks from ALL users
+                    const { data: bookmarksData, error: bookmarksError } = await supabase
+                        .from('saved_grants')
+                        .select('grant_id')
+                        .in('grant_id', grantIds);
+
+                    console.log('Bookmarks data:', bookmarksData);
+                    console.log('Bookmarks error:', bookmarksError);
+
+                    if (bookmarksData) {
+                        const bookmarkCounts = {};
+                        bookmarksData.forEach(bookmark => {
+                            bookmarkCounts[bookmark.grant_id] = (bookmarkCounts[bookmark.grant_id] || 0) + 1;
+                        });
+
+                        console.log('Bookmark counts:', bookmarkCounts);
+
+                        // Update grants with bookmark counts
+                        processedGrants.forEach(grant => {
+                            const previousCount = grant.save_count;
+                            grant.save_count = bookmarkCounts[grant.id] || 0;
+                            console.log(`Grant ${grant.id}: ${previousCount} -> ${grant.save_count}`);
+                        });
+
+                        // Sort by bookmark count, then by creation date
+                        processedGrants.sort((a, b) => {
+                            if (b.save_count !== a.save_count) {
+                                return b.save_count - a.save_count;
+                            }
+                            return new Date(b.created_at) - new Date(a.created_at);
+                        });
+                    }
+                } catch (bookmarkError) {
+                    console.log('Could not fetch bookmark counts, using grants without counts:', bookmarkError);
+                    // Just sort by creation date if bookmark counting fails
+                    processedGrants.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+                }
+
+                const finalGrants = processedGrants.slice(0, 10);
+                console.log('Final grants to set:', finalGrants);
+                console.log('Final grants with save counts:', finalGrants.map(g => ({ id: g.id, save_count: g.save_count })));
+                setTrendingGrants(finalGrants);
+                console.log('Successfully set trending grants:', finalGrants);
+
+            } catch (error) {
+                console.error('Unexpected error fetching trending grants:', error);
+                setTrendingGrants([]);
+            }
+        };
+
+        fetchTrendingGrants();
+    }, []);
+
+    return { trendingGrants, setTrendingGrants };
+};
+
 const useUserData = (profile) => {
     const [organizationInfo, setOrganizationInfo] = useState(null);
     const [stats, setStats] = useState({
@@ -209,6 +358,11 @@ export default function HomeDashboard() {
     const navigate = useNavigate();
     const [selectedPost, setSelectedPost] = useState(null);
     const [isPostModalOpen, setIsPostModalOpen] = useState(false);
+    
+    // Add grant modal state
+    const [selectedGrant, setSelectedGrant] = useState(null);
+    const [isGrantModalOpen, setIsGrantModalOpen] = useState(false);
+    const [savedGrantIds, setSavedGrantIds] = useState(new Set());
 
     // First get user data including organization info
     const { organizationInfo, stats, loading } = useUserData(profile);
@@ -216,11 +370,155 @@ export default function HomeDashboard() {
     // Then use hooks that depend on organization info
     const news = useNews();
     const trendingPosts = useTrendingPosts();
+    const { trendingGrants, setTrendingGrants } = useTrendingGrants();
     const helloCommunityPosts = useHelloCommunityPosts(organizationInfo);
+
+    // Load saved grants when profile changes
+    useEffect(() => {
+        const fetchSavedGrants = async () => {
+            if (!profile?.id) return;
+            
+            try {
+                const { data: savedData, error } = await supabase
+                    .from('saved_grants')
+                    .select('grant_id')
+                    .eq('user_id', profile.id);
+                    
+                if (error) {
+                    console.error('Error fetching saved grants:', error);
+                } else {
+                    setSavedGrantIds(new Set(savedData.map(g => g.grant_id)));
+                }
+            } catch (error) {
+                console.error('Error loading saved grants:', error);
+            }
+        };
+        
+        fetchSavedGrants();
+    }, [profile?.id]);
 
     const handlePostClick = (post) => {
         setSelectedPost(post);
         setIsPostModalOpen(true);
+    };
+
+    // Add grant modal handlers
+    const handleGrantClick = (grant) => {
+        setSelectedGrant(grant);
+        setIsGrantModalOpen(true);
+    };
+
+    const handleCloseGrantModal = () => {
+        setIsGrantModalOpen(false);
+        setSelectedGrant(null);
+    };
+
+    // Grant save/unsave handlers
+    const handleSaveGrant = async (grantId) => {
+        if (!profile?.id) {
+            console.error('No profile ID available for saving grant');
+            return;
+        }
+        
+        try {
+            // Optimistically update the saved grants state
+            setSavedGrantIds(prev => new Set(prev).add(grantId));
+            
+            // Update the trending grants list to reflect the new save count
+            setTrendingGrants(prev => prev.map(grant => 
+                grant.id === grantId 
+                    ? { ...grant, save_count: (grant.save_count || 0) + 1 }
+                    : grant
+            ));
+            
+            const { error } = await supabase
+                .from('saved_grants')
+                .insert({ 
+                    user_id: profile.id, 
+                    grant_id: grantId 
+                });
+                
+            if (error) {
+                console.error('Error saving grant:', error);
+                // Revert the optimistic updates
+                setSavedGrantIds(prev => {
+                    const newSet = new Set(prev);
+                    newSet.delete(grantId);
+                    return newSet;
+                });
+                setTrendingGrants(prev => prev.map(grant => 
+                    grant.id === grantId 
+                        ? { ...grant, save_count: Math.max((grant.save_count || 1) - 1, 0) }
+                        : grant
+                ));
+            } else {
+                console.log('Grant saved successfully:', grantId);
+            }
+        } catch (error) {
+            console.error('Error saving grant:', error);
+            // Revert the optimistic updates
+            setSavedGrantIds(prev => {
+                const newSet = new Set(prev);
+                newSet.delete(grantId);
+                return newSet;
+            });
+            setTrendingGrants(prev => prev.map(grant => 
+                grant.id === grantId 
+                    ? { ...grant, save_count: Math.max((grant.save_count || 1) - 1, 0) }
+                    : grant
+            ));
+        }
+    };
+
+    const handleUnsaveGrant = async (grantId) => {
+        if (!profile?.id) {
+            console.error('No profile ID available for unsaving grant');
+            return;
+        }
+        
+        try {
+            // Optimistically update the saved grants state
+            setSavedGrantIds(prev => {
+                const newSet = new Set(prev);
+                newSet.delete(grantId);
+                return newSet;
+            });
+            
+            // Update the trending grants list to reflect the new save count
+            setTrendingGrants(prev => prev.map(grant => 
+                grant.id === grantId 
+                    ? { ...grant, save_count: Math.max((grant.save_count || 1) - 1, 0) }
+                    : grant
+            ));
+            
+            const { error } = await supabase
+                .from('saved_grants')
+                .delete()
+                .eq('user_id', profile.id)
+                .eq('grant_id', grantId);
+                
+            if (error) {
+                console.error('Error unsaving grant:', error);
+                // Revert the optimistic updates
+                setSavedGrantIds(prev => new Set(prev).add(grantId));
+                setTrendingGrants(prev => prev.map(grant => 
+                    grant.id === grantId 
+                        ? { ...grant, save_count: (grant.save_count || 0) + 1 }
+                        : grant
+                ));
+            } else {
+                console.log('Grant unsaved successfully:', grantId);
+            }
+        } catch (error) {
+            console.error('Error unsaving grant:', error);
+            // Revert the optimistic updates
+            setSavedGrantIds(prev => new Set(prev).add(grantId));
+            setTrendingGrants(prev => prev.map(grant => 
+                grant.id === grantId 
+                    ? { ...grant, save_count: (grant.save_count || 0) + 1 }
+                    : grant
+            ));
+        }
     };
 
     const handleViewMorePosts = () => {
@@ -289,7 +587,14 @@ export default function HomeDashboard() {
                 organizationInfo={organizationInfo}
             />
             
-            <TrendingGrantsSection currentUserProfile={profile} />
+            <TrendingGrantsSection 
+                currentUserProfile={profile} 
+                onOpenGrantModal={handleGrantClick}
+                trendingGrants={trendingGrants}
+                onSaveGrant={handleSaveGrant}
+                onUnsaveGrant={handleUnsaveGrant}
+                savedGrantIds={savedGrantIds}
+            />
             
             <PostDetailModal 
                 post={selectedPost}
@@ -299,6 +604,16 @@ export default function HomeDashboard() {
                     setSelectedPost(null);
                 }}
                 currentUserProfile={profile}
+            />
+
+            <GrantDetailModal
+                grant={selectedGrant}
+                isOpen={isGrantModalOpen}
+                onClose={handleCloseGrantModal}
+                session={{ user: profile }}
+                isSaved={selectedGrant ? savedGrantIds.has(selectedGrant.id) : false}
+                onSave={handleSaveGrant}
+                onUnsave={handleUnsaveGrant}
             />
         </div>
     );
