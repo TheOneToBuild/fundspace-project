@@ -97,9 +97,19 @@ const GrantDetailModal = ({ grant, isOpen, onClose, session, isSaved, onSave, on
     return `$${num.toLocaleString()}`;
   };
 
-  const handleBookmarkClick = () => {
+  const handleBookmarkClick = async () => {
     if (!session) return;
-    isSaved ? onUnsave(grant.id) : onSave(grant.id);
+    
+    try {
+      if (isSaved) {
+        await onUnsave(grant.id);
+      } else {
+        await onSave(grant.id);
+      }
+    } catch (error) {
+      console.error('Error handling bookmark:', error);
+      // Could add a toast notification here
+    }
   };
 
   const isEndingSoon = grantData.dueDate && new Date(grantData.dueDate) <= new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);

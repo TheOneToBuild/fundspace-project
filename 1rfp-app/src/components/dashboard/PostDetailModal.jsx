@@ -36,28 +36,37 @@ const PostDetailModal = ({ post, isOpen, onClose, currentUserProfile }) => {
         return `${Math.floor(diffInHours / 24)}d ago`;
     };
 
-    // Check user's reaction status
+    // Check user's reaction status - FIXED
     useEffect(() => {
         const checkReactionStatus = async () => {
             if (!currentUserProfile || !post?.id) return;
             try {
-                const { data } = await supabase
+                const { data, error } = await supabase
                     .from('post_likes')
                     .select('reaction_type')
                     .eq('post_id', post.id)
                     .eq('user_id', currentUserProfile.id)
-                    .single();
-                setSelectedReaction(data?.reaction_type || null);
+                    .limit(1);  // Use limit instead of single()
+                
+                if (error) {
+                    console.error('Error checking reaction status:', error);
+                    setSelectedReaction(null);
+                    return;
+                }
+                
+                setSelectedReaction(data && data.length > 0 ? data[0].reaction_type : null);
             } catch (error) {
+                console.error('Error in checkReactionStatus:', error);
                 setSelectedReaction(null);
             }
         };
+        
         if (isOpen && post) {
             checkReactionStatus();
         }
     }, [currentUserProfile, post?.id, isOpen]);
 
-    // Fetch reactors
+    // Fetch reactors - FIXED
     useEffect(() => {
         const fetchReactors = async () => {
             if (likeCount <= 0 || !post?.id) {
@@ -65,18 +74,30 @@ const PostDetailModal = ({ post, isOpen, onClose, currentUserProfile }) => {
                 return;
             }
             try {
-                const { data: likesData } = await supabase
+                const { data: likesData, error: likesError } = await supabase
                     .from('post_likes')
                     .select('user_id, reaction_type, created_at')
                     .eq('post_id', post.id)
                     .order('created_at', { ascending: false });
 
+                if (likesError) {
+                    console.error('Error fetching likes:', likesError);
+                    setReactors([]);
+                    return;
+                }
+
                 if (likesData && likesData.length > 0) {
                     const userIds = likesData.map(like => like.user_id);
-                    const { data: profilesData } = await supabase
+                    const { data: profilesData, error: profilesError } = await supabase
                         .from('profiles')
                         .select('id, full_name, avatar_url, title, organization_name, role')
                         .in('id', userIds);
+
+                    if (profilesError) {
+                        console.error('Error fetching profiles:', profilesError);
+                        setReactors([]);
+                        return;
+                    }
 
                     const transformedReactors = likesData.map(like => {
                         const profile = profilesData?.find(p => p.id === like.user_id);
@@ -101,6 +122,7 @@ const PostDetailModal = ({ post, isOpen, onClose, currentUserProfile }) => {
                 setReactors([]);
             }
         };
+        
         if (isOpen && post) {
             fetchReactors();
         }
@@ -112,23 +134,33 @@ const PostDetailModal = ({ post, isOpen, onClose, currentUserProfile }) => {
         try {
             if (selectedReaction === reactionType) {
                 // Remove reaction
-                await supabase
+                const { error } = await supabase
                     .from('post_likes')
                     .delete()
                     .eq('post_id', post.id)
                     .eq('user_id', currentUserProfile.id);
                 
+                if (error) {
+                    console.error('Error removing reaction:', error);
+                    return;
+                }
+                
                 setSelectedReaction(null);
                 setLikeCount(prev => Math.max(0, prev - 1));
             } else {
                 // Add or update reaction
-                await supabase
+                const { error } = await supabase
                     .from('post_likes')
                     .upsert({
                         post_id: post.id,
                         user_id: currentUserProfile.id,
                         reaction_type: reactionType
                     }, { onConflict: 'post_id,user_id' });
+                
+                if (error) {
+                    console.error('Error adding reaction:', error);
+                    return;
+                }
                 
                 setSelectedReaction(reactionType);
                 if (!selectedReaction) {

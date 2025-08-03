@@ -236,9 +236,6 @@ const TrendingGrantsSection = ({ currentUserProfile, onOpenGrantModal, trendingG
     const navigate = useNavigate();
     const [loading, setLoading] = useState(false);
 
-    // Debug log to see what grants are being passed
-    console.log('TrendingGrantsSection received grants:', trendingGrants.map(g => ({ id: g.id, save_count: g.save_count })));
-
     const scrollGrants = (direction) => {
         const container = document.getElementById('trending-grants-scroll');
         if (container) {

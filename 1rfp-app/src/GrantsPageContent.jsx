@@ -1,7 +1,8 @@
-// src/GrantsPageContent.jsx
+// src/GrantsPageContent.jsx - FIXED VERSION
 import React, { useState, useEffect, useMemo, useCallback, useContext } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from './supabaseClient.js';
+import { refreshGrantBookmarkCounts } from './utils/grantUtils';
 import { Search, Users, MapPin, Calendar, DollarSign, Info, ChevronDown, ExternalLink, Zap, Clock, Target, Briefcase as IconBriefcase, BarChart3, ClipboardList, TrendingUp, Loader, XCircle, Heart, Bot, Briefcase, LayoutGrid, List, SlidersHorizontal, Bookmark, ArrowRight, Sparkles, Star, TrendingUp as TrendingUpIcon } from './components/Icons.jsx';
 import GrantCard from './components/GrantCard.jsx';
 import GrantDetailModal from './GrantDetailModal.jsx';
@@ -178,7 +179,6 @@ const GrantListItem = ({ grant, onOpenDetailModal, isSaved, onSave, onUnsave, se
     );
 };
 
-
 const GrantsPageContent = ({ isProfileView = false }) => {
   const { setPageBgColor } = useContext(LayoutContext);
   const [searchParams, setSearchParams] = useSearchParams();
@@ -215,72 +215,87 @@ const GrantsPageContent = ({ isProfileView = false }) => {
 
   useEffect(() => {
     const fetchInitialData = async () => {
-        setLoading(true);
-        const { data: { session } } = await supabase.auth.getSession();
-        setSession(session);
+      setLoading(true);
+      const { data: { session } } = await supabase.auth.getSession();
+      setSession(session);
 
-        // Updated query to join with organizations table to get banner images
-        const { data: grantsData, error: grantsError } = await supabase
-            .from('grants_with_taxonomy')
-            .select(`
-                *,
-                organizations!inner(
-                    image_url,
-                    banner_image_url,
-                    slug
-                )
-            `)
-            .order('id', { ascending: false });
+      // FIXED: Use simple query from grants_with_taxonomy view without complex joins
+      const { data: grantsData, error: grantsError } = await supabase
+        .from('grants_with_taxonomy')
+        .select('*')
+        .order('id', { ascending: false });
 
-        if (grantsError) {
-            console.error('Error fetching grants:', grantsError);
-        } else {
-            const formattedData = grantsData.map(grant => ({
-                ...grant,
-                foundationName: grant.funder_name || 'Unknown Funder',
-                funderSlug: grant.funder_slug || grant.organizations?.slug || null,
-                fundingAmount: grant.max_funding_amount || grant.funding_amount_text || 'Not specified',
-                dueDate: grant.deadline,
-                grantType: grant.grant_type,
-                eligibility_criteria: grant.eligibility_criteria,
-                categories: grant.category_names ? grant.category_names.map((name, idx) => ({ id: idx, name })) : [],
-                locations: grant.location_names ? grant.location_names.map((name, idx) => ({ id: idx, name })) : [],
-                eligible_organization_types: grant.taxonomy_codes || [],
-                // Updated organization object to use joined data
-                organization: {
-                    image_url: grant.organizations?.image_url || grant.funder_logo_url || null,
-                    banner_image_url: grant.organizations?.banner_image_url || null
-                }
-            }));
-            setGrants(formattedData);
-        }
+      if (grantsError) {
+        console.error('Error fetching grants:', grantsError);
+      } else {
+        // Get organization IDs and fetch organizations separately
+        const orgIds = [...new Set(grantsData.map(g => g.organization_id).filter(Boolean))];
+        const { data: orgsData } = await supabase
+          .from('organizations')
+          .select('id, name, image_url, banner_image_url, slug')
+          .in('id', orgIds);
 
-        if (session) {
-            const { data: savedData, error: savedError } = await supabase
-                .from('saved_grants')
-                .select('grant_id')
-                .eq('user_id', session.user.id);
-            if (savedError) console.error('Error fetching saved grants:', savedError);
-            else setSavedGrantIds(new Set(savedData.map(g => g.grant_id)));
-        }
-        setLoading(false);
+        const formattedData = grantsData.map(grant => {
+          const orgData = orgsData?.find(o => o.id === grant.organization_id);
+          
+          return {
+            ...grant,
+            foundationName: grant.funder_name || 'Unknown Funder',
+            funderSlug: grant.funder_slug || orgData?.slug || null,
+            fundingAmount: grant.max_funding_amount || grant.funding_amount_text || 'Not specified',
+            dueDate: grant.deadline,
+            grantType: grant.grant_type,
+            eligibility_criteria: grant.eligibility_criteria,
+            categories: grant.category_names ? grant.category_names.map((name, idx) => ({ id: idx, name })) : [],
+            locations: grant.location_names ? grant.location_names.map((name, idx) => ({ id: idx, name })) : [],
+            eligible_organization_types: grant.taxonomy_codes || [],
+            // Updated organization object to use joined data
+            organization: {
+              image_url: orgData?.image_url || grant.funder_logo_url || null,
+              banner_image_url: orgData?.banner_image_url || null
+            },
+            save_count: 0 // Initialize to 0, will be updated below
+          };
+        });
+
+        // FIXED: Get fresh bookmark counts from database
+        const grantIds = formattedData.map(grant => grant.id);
+        const bookmarkCounts = await refreshGrantBookmarkCounts(grantIds);
+
+        // Update grants with accurate bookmark counts
+        formattedData.forEach(grant => {
+          grant.save_count = bookmarkCounts[grant.id] || 0;
+        });
+
+        setGrants(formattedData);
+      }
+
+      if (session) {
+        const { data: savedData, error: savedError } = await supabase
+          .from('saved_grants')
+          .select('grant_id')
+          .eq('user_id', session.user.id);
+        if (savedError) console.error('Error fetching saved grants:', savedError);
+        else setSavedGrantIds(new Set(savedData.map(g => g.grant_id)));
+      }
+      setLoading(false);
     };
     
     fetchInitialData();
     
     const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
-        setSession(session);
-        if (session) {
-            supabase
-                .from('saved_grants')
-                .select('grant_id')
-                .eq('user_id', session.user.id)
-                .then(({ data, error }) => { 
-                    if (!error) setSavedGrantIds(new Set(data.map(g => g.grant_id)));
-                });
-        } else { 
-            setSavedGrantIds(new Set()); 
-        }
+      setSession(session);
+      if (session) {
+        supabase
+          .from('saved_grants')
+          .select('grant_id')
+          .eq('user_id', session.user.id)
+          .then(({ data, error }) => { 
+            if (!error) setSavedGrantIds(new Set(data.map(g => g.grant_id)));
+          });
+      } else { 
+        setSavedGrantIds(new Set()); 
+      }
     });
     
     return () => { authListener.subscription.unsubscribe(); };
@@ -310,25 +325,90 @@ const GrantsPageContent = ({ isProfileView = false }) => {
 
   const handleSaveGrant = async (grantId) => {
     if (!session) return;
+    
+    // Optimistically update UI
     setSavedGrantIds(prev => new Set(prev).add(grantId));
-    setGrants(prevGrants => prevGrants.map(g => g.id === grantId ? { ...g, save_count: (g.save_count || 0) + 1 } : g));
-    const { error } = await supabase.from('saved_grants').insert({ user_id: session.user.id, grant_id: grantId });
-    if (error) {
+    setGrants(prevGrants => prevGrants.map(g => 
+      g.id === grantId ? { ...g, save_count: (g.save_count || 0) + 1 } : g
+    ));
+    
+    try {
+      const { error } = await supabase
+        .from('saved_grants')
+        .insert({ user_id: session.user.id, grant_id: grantId });
+        
+      if (error) {
+        console.error("Error saving grant:", error);
+        // Revert optimistic updates
+        setSavedGrantIds(prev => { 
+          const newSet = new Set(prev); 
+          newSet.delete(grantId); 
+          return newSet; 
+        });
+        setGrants(prevGrants => prevGrants.map(g => 
+          g.id === grantId ? { ...g, save_count: Math.max(0, (g.save_count || 1) - 1) } : g
+        ));
+      } else {
+        // SUCCESS: Get fresh count from database
+        const bookmarkCounts = await refreshGrantBookmarkCounts([grantId]);
+        setGrants(prevGrants => prevGrants.map(g => 
+          g.id === grantId ? { ...g, save_count: bookmarkCounts[grantId] || 0 } : g
+        ));
+      }
+    } catch (error) {
       console.error("Error saving grant:", error);
-      setSavedGrantIds(prev => { const newSet = new Set(prev); newSet.delete(grantId); return newSet; });
-      setGrants(prevGrants => prevGrants.map(g => g.id === grantId ? { ...g, save_count: g.save_count - 1 } : g));
+      // Revert optimistic updates
+      setSavedGrantIds(prev => { 
+        const newSet = new Set(prev); 
+        newSet.delete(grantId); 
+        return newSet; 
+      });
+      setGrants(prevGrants => prevGrants.map(g => 
+        g.id === grantId ? { ...g, save_count: Math.max(0, (g.save_count || 1) - 1) } : g
+      ));
     }
   };
 
   const handleUnsaveGrant = async (grantId) => {
     if (!session) return;
-    setSavedGrantIds(prev => { const newSet = new Set(prev); newSet.delete(grantId); return newSet; });
-    setGrants(prevGrants => prevGrants.map(g => g.id === grantId ? { ...g, save_count: Math.max(0, g.save_count - 1) } : g));
-    const { error } = await supabase.from('saved_grants').delete().match({ user_id: session.user.id, grant_id: grantId });
-    if (error) {
+    
+    // Optimistically update UI
+    setSavedGrantIds(prev => { 
+      const newSet = new Set(prev); 
+      newSet.delete(grantId); 
+      return newSet;
+    });
+    setGrants(prevGrants => prevGrants.map(g => 
+      g.id === grantId ? { ...g, save_count: Math.max(0, (g.save_count || 1) - 1) } : g
+    ));
+    
+    try {
+      const { error } = await supabase
+        .from('saved_grants')
+        .delete()
+        .match({ user_id: session.user.id, grant_id: grantId });
+        
+      if (error) {
+        console.error("Error unsaving grant:", error);
+        // Revert optimistic updates
+        setSavedGrantIds(prev => new Set(prev).add(grantId));
+        setGrants(prevGrants => prevGrants.map(g => 
+          g.id === grantId ? { ...g, save_count: (g.save_count || 0) + 1 } : g
+        ));
+      } else {
+        // SUCCESS: Get fresh count from database
+        const bookmarkCounts = await refreshGrantBookmarkCounts([grantId]);
+        setGrants(prevGrants => prevGrants.map(g => 
+          g.id === grantId ? { ...g, save_count: bookmarkCounts[grantId] || 0 } : g
+        ));
+      }
+    } catch (error) {
       console.error("Error unsaving grant:", error);
+      // Revert optimistic updates
       setSavedGrantIds(prev => new Set(prev).add(grantId));
-      setGrants(prevGrants => prevGrants.map(g => g.id === grantId ? { ...g, save_count: g.save_count + 1 } : g));
+      setGrants(prevGrants => prevGrants.map(g => 
+        g.id === grantId ? { ...g, save_count: (g.save_count || 0) + 1 } : g
+      ));
     }
   };
 
