@@ -9,6 +9,7 @@ import Pagination from './components/Pagination.jsx';
 import { sortGrants } from './sorting.js';
 import { BookmarkIcon, Search, XCircle } from './components/Icons.jsx';
 import { GRANT_STATUSES } from './constants.js';
+import { refreshGrantBookmarkCounts } from './utils/grantUtils.js';
 
 const filterSavedGrants = (grant, filters) => {
   const { searchTerm, locationFilter, categoryFilter, grantTypeFilter, grantStatusFilter } = filters;
@@ -71,9 +72,7 @@ export default function SavedGrantsPage() {
   const fetchSavedGrantsWorking = useCallback(async (userId) => {
     setLoading(true);
     try {
-      console.log('Fetching saved grants for user:', userId);
-      
-      // Step 1: Get saved grants (this works!)
+      // Step 1: Get saved grants
       const { data: savedGrantsData, error: savedError } = await supabase
         .from('saved_grants')
         .select('id, grant_id, created_at')
@@ -87,12 +86,9 @@ export default function SavedGrantsPage() {
       }
 
       if (!savedGrantsData || savedGrantsData.length === 0) {
-        console.log('No saved grants found');
         setAllSavedGrants([]);
         return;
       }
-
-      console.log('Found saved grants:', savedGrantsData.length);
       const grantIds = savedGrantsData.map(sg => sg.grant_id);
 
       // Step 2: Get basic grant data
@@ -113,7 +109,7 @@ export default function SavedGrantsPage() {
       if (orgIds.length > 0) {
         const { data: organizationsData } = await supabase
           .from('organizations')
-          .select('id, name, image_url, slug')
+          .select('id, name, image_url, banner_image_url, slug')
           .in('id', orgIds);
         orgsData = organizationsData || [];
       }
@@ -130,7 +126,10 @@ export default function SavedGrantsPage() {
         .select('grant_id, locations(id, name)')
         .in('grant_id', grantIds);
 
-      // Step 6: Combine everything
+      // Step 6: Get real-time bookmark counts using utility function
+      const bookmarkCounts = await refreshGrantBookmarkCounts(grantIds);
+
+      // Step 7: Combine everything
       const formattedData = savedGrantsData.map(savedGrant => {
         const grantData = grantsData.find(g => g.id === savedGrant.grant_id);
         if (!grantData) return null;
@@ -150,11 +149,16 @@ export default function SavedGrantsPage() {
           categories: grantCategories.map(gc => gc.categories).filter(Boolean),
           locations: grantLocations.map(gl => gl.locations).filter(Boolean),
           eligibility_criteria: grantData.eligibility_criteria,
-          save_count: grantData.save_count || 0
+          save_count: bookmarkCounts[savedGrant.grant_id] || 0,
+          // Add organization object for GrantCard compatibility
+          organization: {
+            image_url: orgData?.image_url || null,
+            banner_image_url: orgData?.banner_image_url || null,
+            name: orgData?.name || 'Unknown Organization'
+          }
         };
       }).filter(Boolean);
 
-      console.log('Final formatted data:', formattedData);
       setAllSavedGrants(formattedData);
 
     } catch (err) {
@@ -331,6 +335,9 @@ export default function SavedGrantsPage() {
                 grant={grant} 
                 onOpenDetailModal={openDetail}
                 onUnsave={() => handleUnsaveGrant(grant.id)}
+                onSave={() => {}} // Empty function since these are already saved
+                isSaved={true} // Always true for saved grants page
+                session={session}
                 showUnsaveButton={true}
               />
             ))}

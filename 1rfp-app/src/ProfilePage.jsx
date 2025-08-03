@@ -1,4 +1,4 @@
-// src/ProfilePage.jsx - Complete version combining current functionality with auth fix
+// src/ProfilePage.jsx - FIXED VERSION
 import React, { useState, useEffect, useCallback, useContext, useMemo } from 'react';
 import { supabase } from './supabaseClient';
 import { Outlet, useOutletContext } from 'react-router-dom';
@@ -95,8 +95,63 @@ export default function ProfilePage() {
                 return { data: postsWithReactions, error: null };
             };
 
+            // FIXED: Separate queries to avoid complex joins that cause 400 errors
+            const fetchSavedGrants = async () => {
+                try {
+                    // Step 1: Get saved grants IDs
+                    const { data: savedGrantsData, error: savedError } = await supabase
+                        .from('saved_grants')
+                        .select('id, grant_id, created_at')
+                        .eq('user_id', userId)
+                        .order('created_at', { ascending: false });
+
+                    if (savedError || !savedGrantsData) return [];
+
+                    const grantIds = savedGrantsData.map(sg => sg.grant_id);
+                    if (grantIds.length === 0) return [];
+
+                    // Step 2: Get grants data
+                    const { data: grantsData, error: grantsError } = await supabase
+                        .from('grants')
+                        .select('*')
+                        .in('id', grantIds);
+
+                    if (grantsError || !grantsData) return [];
+
+                    // Step 3: Get organizations data
+                    const orgIds = [...new Set(grantsData.map(g => g.organization_id).filter(Boolean))];
+                    let orgsData = [];
+                    if (orgIds.length > 0) {
+                        const { data: organizationsData } = await supabase
+                            .from('organizations')
+                            .select('id, name, image_url, slug')
+                            .in('id', orgIds);
+                        orgsData = organizationsData || [];
+                    }
+
+                    // Step 4: Combine data
+                    return savedGrantsData.map(savedGrant => {
+                        const grantData = grantsData.find(g => g.id === savedGrant.grant_id);
+                        if (!grantData) return null;
+
+                        const orgData = orgsData.find(o => o.id === grantData.organization_id);
+
+                        return {
+                            ...grantData,
+                            dueDate: grantData.deadline,
+                            save_id: savedGrant.id,
+                            foundationName: orgData?.name || 'Unknown Organization',
+                            funderLogoUrl: orgData?.image_url || null
+                        };
+                    }).filter(Boolean);
+                } catch (error) {
+                    console.error('Error fetching saved grants:', error);
+                    return [];
+                }
+            };
+
             const [
-                savedGrantsRes,
+                savedGrantsData,
                 trendingGrantsRes,
                 postsRes,
                 socialStatsRes,
@@ -104,11 +159,7 @@ export default function ProfilePage() {
                 followingRes,
                 communityMembersRes
             ] = await Promise.all([
-                supabase
-                    .from('saved_grants')
-                    .select(`id, grant_id, grants(*, funders(name, logo_url, slug))`)
-                    .eq('user_id', userId)
-                    .order('created_at', { ascending: false }),
+                fetchSavedGrants(),
                 supabase.rpc('get_trending_grants'),
                 fetchPostsWithReactions(),
                 supabase.from('profiles').select('id').eq('id', userId).single(),
@@ -130,11 +181,7 @@ export default function ProfilePage() {
             setAppState(prev => ({
                 ...prev,
                 dataLoading: false,
-                savedGrants: savedGrantsRes.data?.map(item => ({
-                    ...item.grants,
-                    dueDate: item.grants.deadline,
-                    save_id: item.id
-                })) || [],
+                savedGrants: savedGrantsData,
                 trendingGrants: trendingGrantsRes.data || [],
                 posts: postsRes.data || [],
                 totalPosts: postsRes.data?.length || 0,
@@ -245,16 +292,28 @@ export default function ProfilePage() {
     const handleTrendingGrantClick = useCallback(async grantId => {
         const { data } = await supabase
             .from('grants')
-            .select(`*, funders(*), grant_categories(categories(*)), grant_locations(locations(*))`)
+            .select(`*, grant_categories(categories(*)), grant_locations(locations(*))`)
             .eq('id', grantId)
             .single();
 
         if (data) {
+            // Get organization data separately
+            let orgData = null;
+            if (data.organization_id) {
+                const { data: organizationData } = await supabase
+                    .from('organizations')
+                    .select('name, image_url')
+                    .eq('id', data.organization_id)
+                    .single();
+                orgData = organizationData;
+            }
+
             openDetail({
                 ...data,
-                foundationName: data.funders?.name,
-                categories: data.grant_categories.map(gc => gc.categories),
-                locations: data.grant_locations.map(gl => gl.locations),
+                foundationName: orgData?.name || 'Unknown Organization',
+                funderLogoUrl: orgData?.image_url || null,
+                categories: data.grant_categories?.map(gc => gc.categories) || [],
+                locations: data.grant_locations?.map(gl => gl.locations) || [],
                 dueDate: data.deadline
             });
         }
