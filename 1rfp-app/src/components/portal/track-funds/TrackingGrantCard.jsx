@@ -1,0 +1,162 @@
+// src/components/portal/track-funds/TrackingGrantCard.jsx
+import React, { useState } from 'react';
+import { 
+  FileText, 
+  Trophy, 
+  Building2, 
+  DollarSign, 
+  Calendar, 
+  Sparkles 
+} from '../../Icons.jsx';
+import ApplicationConfirmModal from './ApplicationConfirmModal.jsx';
+import AwardConfirmModal from './AwardConfirmModal.jsx';
+
+const TrackingGrantCard = ({ 
+  grant, 
+  onOpenDetailModal, 
+  onMarkAsApplied, 
+  onMarkAsReceived,
+  activeSection 
+}) => {
+  const [showAppliedConfirm, setShowAppliedConfirm] = useState(false);
+  const [showReceivedConfirm, setShowReceivedConfirm] = useState(false);
+
+  const hasApplication = grant.application_id;
+  const hasAward = grant.award_id;
+
+  const handleAppliedConfirm = async (notes = '') => {
+    const success = await onMarkAsApplied(grant.id, notes);
+    if (success) {
+      setShowAppliedConfirm(false);
+    }
+    return success;
+  };
+
+  const handleReceivedConfirm = async (awardAmount = null, notes = '') => {
+    const success = await onMarkAsReceived(grant.id, awardAmount, notes);
+    if (success) {
+      setShowReceivedConfirm(false);
+    }
+    return success;
+  };
+
+  return (
+    <div className="relative group">
+      {/* Base Grant Card */}
+      <div className="bg-white rounded-xl border border-slate-200 hover:shadow-xl transition-all duration-300 ease-in-out flex flex-col justify-between transform hover:-translate-y-1 relative overflow-hidden h-full">
+        
+        {/* Status badges at top */}
+        <div className="absolute top-3 right-3 z-10 flex flex-col gap-1">
+          {hasApplication && (
+            <div className="bg-gradient-to-r from-orange-400 to-orange-500 text-white text-xs font-bold px-2 py-0.5 rounded-full shadow-sm flex items-center gap-1">
+              <FileText size={10} />
+              Applied
+            </div>
+          )}
+          {hasAward && (
+            <div className="bg-gradient-to-r from-green-400 to-green-500 text-white text-xs font-bold px-2 py-0.5 rounded-full shadow-sm flex items-center gap-1">
+              <Trophy size={10} />
+              Received
+            </div>
+          )}
+        </div>
+
+        {/* Grant content */}
+        <div onClick={() => onOpenDetailModal(grant)} className="cursor-pointer p-6 flex-grow">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-purple-400 rounded-full flex items-center justify-center">
+              <Building2 className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <p className="font-semibold text-slate-800 text-sm">{grant.foundationName}</p>
+              {grant.grantType && (
+                <p className="text-xs text-blue-600 font-medium">{grant.grantType}</p>
+              )}
+            </div>
+          </div>
+
+          <h3 className="text-lg font-bold text-slate-900 mb-2 group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r group-hover:from-blue-600 group-hover:to-purple-600 transition-all duration-300">
+            {grant.title}
+          </h3>
+          <p className="text-slate-600 text-sm mb-4 line-clamp-3">{grant.description}</p>
+
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2 text-sm text-slate-600">
+              <DollarSign className="w-4 h-4 text-green-500" />
+              <span className="font-semibold">{grant.fundingAmount || 'Not specified'}</span>
+            </div>
+            <div className="flex items-center gap-2 text-sm text-slate-600">
+              <Calendar className="w-4 h-4 text-red-500" />
+              <span>{grant.dueDate ? new Date(grant.dueDate).toLocaleDateString() : 'Rolling'}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Action buttons at bottom */}
+        <div className="px-6 pb-6 flex gap-2">
+          {activeSection === 'saved' && (
+            <>
+              {!hasApplication ? (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowAppliedConfirm(true);
+                  }}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-orange-500 to-amber-500 text-white font-semibold rounded-xl shadow-sm hover:shadow-lg transition-all duration-300 transform hover:scale-105"
+                >
+                  <FileText size={14} />
+                  Mark Applied
+                </button>
+              ) : !hasAward ? (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowReceivedConfirm(true);
+                  }}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-green-500 to-emerald-500 text-white font-semibold rounded-xl shadow-sm hover:shadow-lg transition-all duration-300 transform hover:scale-105"
+                >
+                  <Trophy size={14} />
+                  Mark Received
+                </button>
+              ) : (
+                <div className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-slate-400 to-slate-500 text-white font-semibold rounded-xl">
+                  <Trophy size={14} />
+                  Completed
+                </div>
+              )}
+            </>
+          )}
+          
+          {/* Details button - always present */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpenDetailModal(grant);
+            }}
+            className={`${activeSection === 'saved' ? 'px-4' : 'flex-1'} flex items-center justify-center gap-2 py-2.5 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold rounded-xl shadow-sm hover:shadow-lg transition-all duration-300 transform hover:scale-105`}
+          >
+            <Sparkles size={14} />
+            Details
+          </button>
+        </div>
+      </div>
+
+      {/* Confirmation Modals */}
+      <ApplicationConfirmModal
+        isOpen={showAppliedConfirm}
+        onClose={() => setShowAppliedConfirm(false)}
+        onConfirm={handleAppliedConfirm}
+        grantTitle={grant.title}
+      />
+
+      <AwardConfirmModal
+        isOpen={showReceivedConfirm}
+        onClose={() => setShowReceivedConfirm(false)}
+        onConfirm={handleReceivedConfirm}
+        grantTitle={grant.title}
+      />
+    </div>
+  );
+};
+
+export default TrackingGrantCard;

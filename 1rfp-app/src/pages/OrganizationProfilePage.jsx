@@ -215,12 +215,11 @@ const OrganizationProfilePage = () => {
   useEffect(() => {
     const fetchOrganizationData = async () => {
       if (!slug) return;
-      
+
       setLoading(true);
       setError(null);
 
       try {
-        // Get organization by slug
         const { data: orgData, error: orgError } = await supabase
           .from('organizations')
           .select(`
@@ -232,39 +231,18 @@ const OrganizationProfilePage = () => {
           .single();
 
         if (orgError) throw orgError;
-        
-        // Format organization data
+
         if (orgData) {
           orgData.focusAreas = orgData.organization_categories?.map(oc => oc.categories.name) || [];
           orgData.fundingLocations = orgData.organization_funding_locations?.map(ol => ol.locations.name) || [];
-          
-          // Mock impact data
-          orgData.impactData = {
-            spotlights: [
-              { 
-                title: "Community Impact", 
-                text: "Our focus on community development has created lasting change through strategic partnerships.",
-                image: "https://images.unsplash.com/photo-1552664730-d307ca884978?w=600&h=400&fit=crop" 
-              }
-            ],
-            testimonials: [
-              { 
-                quote: "Their support was transformational for our organization and the communities we serve.",
-                name: "Community Leader",
-                title: "Executive Director",
-                image: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&h=200&fit=crop" 
-              }
-            ]
-          };
 
-          // Fetch photos from database
           const { data: photosData } = await supabase
             .from('organization_photos')
             .select('*')
             .eq('organization_id', orgData.id)
             .order('display_order', { ascending: true })
             .order('created_at', { ascending: false });
-          
+
           setPhotos(photosData?.map(photo => ({
             id: photo.id,
             url: photo.image_url,
@@ -273,35 +251,19 @@ const OrganizationProfilePage = () => {
             is_featured: photo.is_featured
           })) || []);
         }
-        
+
         setOrganization(orgData);
 
-        // Check if organization has grants
         if (orgData?.id) {
-          try {
-            const { data: grantsData, error: grantsError } = await supabase
-              .from('grants')
-              .select('id')
-              .eq('organization_id', orgData.id)
-              .limit(1);
-            
-            if (!grantsError && grantsData && grantsData.length > 0) {
-              console.log('OrganizationProfilePage: Found grants for organization:', orgData.name);
-              setHasGrants(true);
-            } else {
-              console.log('OrganizationProfilePage: No grants found for organization:', orgData.name);
-              setHasGrants(false);
-            }
-          } catch (error) {
-            console.log('OrganizationProfilePage: Error checking grants:', error);
-            setHasGrants(false);
-          }
-        }
+          const { data: grantsData } = await supabase
+            .from('grants')
+            .select('id')
+            .eq('organization_id', orgData.id)
+            .limit(1);
 
-        // Fetch related data in parallel
-        if (orgData?.id) {
+          setHasGrants(grantsData && grantsData.length > 0);
+
           const [postsRes, teamRes, membershipRes] = await Promise.all([
-            // Organization Posts
             supabase
               .from('organization_posts')
               .select('*')
@@ -309,8 +271,6 @@ const OrganizationProfilePage = () => {
               .eq('organization_type', orgData.type)
               .order('created_at', { ascending: false })
               .limit(10),
-            
-            // Team Members - Updated query with social profiles
             supabase
               .from('organization_memberships')
               .select(`
@@ -331,26 +291,21 @@ const OrganizationProfilePage = () => {
               .eq('organization_id', orgData.id)
               .eq('is_public', true)
               .order('joined_at', { ascending: false }),
-
-            // Check user's membership if logged in
-            session?.user?.id ? supabase
-              .from('organization_memberships')
-              .select('*')
-              .eq('organization_id', orgData.id)
-              .eq('profile_id', session.user.id)
-              .single()
-              .then(res => res).catch(() => ({ data: null }))
-            : Promise.resolve({ data: null })
+            session?.user?.id
+              ? supabase
+                  .from('organization_memberships')
+                  .select('*')
+                  .eq('organization_id', orgData.id)
+                  .eq('profile_id', session.user.id)
+                  .single()
+              : Promise.resolve({ data: null })
           ]);
 
           setOrganizationPosts(postsRes.data || []);
-          setTeamMembers(teamRes.data || []); 
+          setTeamMembers(teamRes.data || []);
           setUserMembership(membershipRes?.data || null);
-          
-          // For now, just set empty type-specific data
           setTypeSpecificData({});
         }
-
       } catch (err) {
         console.error('Error fetching organization data:', err);
         setError('Could not load organization profile.');

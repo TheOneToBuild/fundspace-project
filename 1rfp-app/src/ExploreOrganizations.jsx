@@ -185,42 +185,25 @@ const ExploreOrganizations = ({ isProfileView = false }) => {
     const fetchOrganizations = async () => {
       setLoading(true);
       try {
-        // Start with the simplest query first - just organizations table
-        console.log('🔍 Fetching organizations...');
-        
         const { data, error } = await supabase
           .from('organizations')
           .select(`
             *,
             organization_categories(categories(name))
           `);
-        
+
         if (error) {
           console.error('❌ Database error:', error);
           throw error;
         }
 
         if (data) {
-          console.log('✅ Fetched organizations:', data.length);
-          console.log('🎯 First organization sample:', data[0]);
-          
-          const formattedData = data.map(org => {
-            console.log(`🏢 Processing ${org.name}:`, {
-              has_banner: !!org.banner_image_url,
-              banner_url: org.banner_image_url,
-              has_logo: !!org.image_url,
-              logo_url: org.image_url
-            });
-            
-            return {
-              ...org,
-              focus_areas: org.organization_categories?.map(oc => oc.categories?.name).filter(Boolean) || [],
-              followers_count: 0, // Default since we're not using engagement view
-              likes_count: 0      // Default since we're not using engagement view
-            };
-          });
-          
-          console.log('📊 Final formatted data sample:', formattedData[0]);
+          const formattedData = data.map(org => ({
+            ...org,
+            focus_areas: org.organization_categories?.map(oc => oc.categories?.name).filter(Boolean) || [],
+            followers_count: 0, // Default since we're not using engagement view
+            likes_count: 0      // Default since we're not using engagement view
+          }));
           setOrganizations(formattedData);
         }
       } catch (error) {
@@ -230,7 +213,7 @@ const ExploreOrganizations = ({ isProfileView = false }) => {
         setLoading(false);
       }
     };
-    
+
     fetchOrganizations();
   }, []);
 

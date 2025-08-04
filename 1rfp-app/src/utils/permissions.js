@@ -1,4 +1,4 @@
-// src/utils/permissions.js - Updated with enhanced Super Admin support
+// src/utils/permissions.js - Complete permissions system with all exports
 
 export const ROLES = {
   OMEGA_ADMIN: 'omega_admin',
@@ -17,18 +17,16 @@ export const PERMISSIONS = {
   EDIT_ORGANIZATION: 'edit_organization',
   MANAGE_ADMINS: 'manage_admins',
   MANAGE_MEMBERS: 'manage_members',
+  APPOINT_SUPER_ADMIN: 'appoint_super_admin',
+  DELETE_ORGANIZATION: 'delete_organization',
   VIEW_ORGANIZATION: 'view_organization'
 };
 
 /**
  * Check if a user role has a specific permission
- * @param {string} userRole - The user's role (omega_admin, super_admin, admin, or member)
- * @param {string} permission - The permission to check
- * @param {boolean} isOmegaAdmin - Whether the user is an omega admin (from profile.is_omega_admin)
- * @returns {boolean} - Whether the user has the permission
  */
 export function hasPermission(userRole, permission, isOmegaAdmin = false) {
-  // FIXED: Omega admins have all permissions - check this first
+  // Omega admins have all permissions
   if (isOmegaAdmin === true) {
     return true;
   }
@@ -38,6 +36,8 @@ export function hasPermission(userRole, permission, isOmegaAdmin = false) {
       PERMISSIONS.EDIT_ORGANIZATION,
       PERMISSIONS.MANAGE_ADMINS,
       PERMISSIONS.MANAGE_MEMBERS,
+      PERMISSIONS.APPOINT_SUPER_ADMIN,
+      PERMISSIONS.DELETE_ORGANIZATION,
       PERMISSIONS.VIEW_ORGANIZATION
     ],
     [ROLES.ADMIN]: [
@@ -53,11 +53,87 @@ export function hasPermission(userRole, permission, isOmegaAdmin = false) {
 }
 
 /**
+ * Check if user has platform-level admin privileges
+ */
+export function isPlatformAdmin(isOmegaAdmin) {
+  return isOmegaAdmin === true;
+}
+
+/**
+ * Check if user can edit any organization (not just their own)
+ */
+export function canEditAnyOrganization(isOmegaAdmin) {
+  return isOmegaAdmin === true;
+}
+
+/**
+ * Check if user can access organization claim management
+ */
+export function canManageOrganizationClaims(isOmegaAdmin) {
+  return isOmegaAdmin === true;
+}
+
+/**
+ * Check if user can appoint super admins
+ */
+export function canAppointSuperAdmin(currentUserRole, isOmegaAdmin = false) {
+  return hasPermission(currentUserRole, PERMISSIONS.APPOINT_SUPER_ADMIN, isOmegaAdmin);
+}
+
+/**
+ * Check if organization has existing super admins
+ */
+export async function checkExistingSuperAdmins(organizationId) {
+  const { supabase } = await import('../supabaseClient');
+  
+  const { data: existingSuperAdmins, error } = await supabase
+    .from('organization_memberships')
+    .select('id')
+    .eq('organization_id', organizationId)
+    .eq('role', 'super_admin');
+  
+  if (error) {
+    console.error('Error checking existing super admins:', error);
+    return true; // Default to assuming admins exist to be safe
+  }
+  
+  return existingSuperAdmins && existingSuperAdmins.length > 0;
+}
+
+/**
+ * Determine role for new member joining organization
+ */
+export async function determineJoinRole(organizationId) {
+  const hasExistingSuperAdmins = await checkExistingSuperAdmins(organizationId);
+  return hasExistingSuperAdmins ? ROLES.MEMBER : ROLES.SUPER_ADMIN;
+}
+
+/**
+ * Promote member to super admin
+ */
+export async function promoteMemberToSuperAdmin(profileId, organizationId) {
+  const { supabase } = await import('../supabaseClient');
+  
+  try {
+    const { error } = await supabase
+      .from('organization_memberships')
+      .update({ role: ROLES.SUPER_ADMIN })
+      .eq('profile_id', profileId)
+      .eq('organization_id', organizationId);
+
+    if (error) {
+      throw new Error(`Failed to promote to super admin: ${error.message}`);
+    }
+
+    return { success: true };
+  } catch (err) {
+    console.error('Error promoting to super admin:', err);
+    return { success: false, error: err.message };
+  }
+}
+
+/**
  * Check if current user can manage a target user based on roles
- * @param {string} currentUserRole - Current user's role
- * @param {string} targetUserRole - Target user's role
- * @param {boolean} isOmegaAdmin - Whether current user is omega admin
- * @returns {boolean} - Whether current user can manage target user
  */
 export function canManageUser(currentUserRole, targetUserRole, isOmegaAdmin = false) {
   // Omega admins can manage everyone
@@ -80,10 +156,6 @@ export function canManageUser(currentUserRole, targetUserRole, isOmegaAdmin = fa
 
 /**
  * Check if current user can promote target user to a specific role
- * @param {string} currentUserRole - Current user's role
- * @param {string} targetRole - Role to promote to
- * @param {boolean} isOmegaAdmin - Whether current user is omega admin
- * @returns {boolean} - Whether current user can promote to target role
  */
 export function canPromoteToRole(currentUserRole, targetRole, isOmegaAdmin = false) {
   // Omega admins can promote to any role except omega_admin
@@ -91,7 +163,7 @@ export function canPromoteToRole(currentUserRole, targetRole, isOmegaAdmin = fal
     return [ROLES.MEMBER, ROLES.ADMIN, ROLES.SUPER_ADMIN].includes(targetRole);
   }
 
-  // Super admins can promote to any role except omega_admin and super_admin
+  // Super admins can promote to any role including super_admin
   if (currentUserRole === ROLES.SUPER_ADMIN) {
     return [ROLES.MEMBER, ROLES.ADMIN, ROLES.SUPER_ADMIN].includes(targetRole);
   }
@@ -106,10 +178,6 @@ export function canPromoteToRole(currentUserRole, targetRole, isOmegaAdmin = fal
 
 /**
  * Check if current user can demote target user from a specific role
- * @param {string} currentUserRole - Current user's role
- * @param {string} currentTargetRole - Target user's current role
- * @param {boolean} isOmegaAdmin - Whether current user is omega admin
- * @returns {boolean} - Whether current user can demote target user
  */
 export function canDemoteFromRole(currentUserRole, currentTargetRole, isOmegaAdmin = false) {
   // Omega admins can demote anyone except other omega admins
@@ -132,9 +200,6 @@ export function canDemoteFromRole(currentUserRole, currentTargetRole, isOmegaAdm
 
 /**
  * Check if current user can manage members (view member management interface)
- * @param {string} currentUserRole - Current user's role
- * @param {boolean} isOmegaAdmin - Whether current user is omega admin
- * @returns {boolean} - Whether current user can access member management
  */
 export function canAccessMemberManagement(currentUserRole, isOmegaAdmin = false) {
   if (isOmegaAdmin === true) {
@@ -146,9 +211,6 @@ export function canAccessMemberManagement(currentUserRole, isOmegaAdmin = false)
 
 /**
  * Get display name for a role
- * @param {string} role - The role
- * @param {boolean} isOmegaAdmin - Whether the user is an omega admin
- * @returns {string} - Human readable role name
  */
 export function getRoleDisplayName(role, isOmegaAdmin = false) {
   if (isOmegaAdmin === true) {
@@ -166,9 +228,6 @@ export function getRoleDisplayName(role, isOmegaAdmin = false) {
 
 /**
  * Get Tailwind CSS classes for role badges
- * @param {string} role - The role
- * @param {boolean} isOmegaAdmin - Whether the user is an omega admin
- * @returns {string} - CSS classes for styling the role badge
  */
 export function getRoleBadgeColor(role, isOmegaAdmin = false) {
   if (isOmegaAdmin === true) {
@@ -186,9 +245,6 @@ export function getRoleBadgeColor(role, isOmegaAdmin = false) {
 
 /**
  * Get the appropriate icon name for a role (for use with lucide-react)
- * @param {string} role - The role
- * @param {boolean} isOmegaAdmin - Whether the user is an omega admin
- * @returns {string} - Icon name
  */
 export function getRoleIcon(role, isOmegaAdmin = false) {
   if (isOmegaAdmin === true) {
@@ -205,28 +261,32 @@ export function getRoleIcon(role, isOmegaAdmin = false) {
 }
 
 /**
- * Check if user has platform-level admin privileges
- * @param {boolean} isOmegaAdmin - Whether the user is an omega admin
- * @returns {boolean} - Whether the user can access platform admin features
+ * Organization type utilities
  */
-export function isPlatformAdmin(isOmegaAdmin) {
-  return isOmegaAdmin === true;
-}
+export const getOrgTypeIcon = (type) => {
+  const iconMap = {
+    'nonprofit': '🏛️',
+    'foundation': '💰',
+    'government': '🏛️',
+    'for-profit': '🏢',
+    'education': '🎓',
+    'healthcare': '🏥',
+    'religious': '⛪',
+    'international': '🌍'
+  };
+  return iconMap[type] || '🏢';
+};
 
-/**
- * Check if user can edit any organization (not just their own)
- * @param {boolean} isOmegaAdmin - Whether the user is an omega admin
- * @returns {boolean} - Whether the user can edit any organization
- */
-export function canEditAnyOrganization(isOmegaAdmin) {
-  return isOmegaAdmin === true;
-}
-
-/**
- * Check if user can access organization claim management
- * @param {boolean} isOmegaAdmin - Whether the user is an omega admin
- * @returns {boolean} - Whether the user can manage organization claims
- */
-export function canManageOrganizationClaims(isOmegaAdmin) {
-  return isOmegaAdmin === true;
-}
+export const getOrgTypeLabel = (type) => {
+  const labelMap = {
+    'nonprofit': 'Nonprofit Organization',
+    'foundation': 'Foundation',
+    'government': 'Government Agency',
+    'for-profit': 'For-Profit Company',
+    'education': 'Educational Institution',
+    'healthcare': 'Healthcare Organization',
+    'religious': 'Religious Organization',
+    'international': 'International Organization'
+  };
+  return labelMap[type] || 'Organization';
+};

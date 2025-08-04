@@ -15,26 +15,21 @@ const OrganizationGrantsFixed = ({ organization, userMembership, session }) => {
   useEffect(() => {
     const fetchGrants = async () => {
       if (!organization?.id) {
-        console.log('OrganizationGrantsFixed: No organization ID');
         setGrants([]);
         return;
       }
 
-      console.log('OrganizationGrantsFixed: Fetching for org ID:', organization.id);
       setLoading(true);
 
       try {
-        // CORRECT QUERY: Using organization_id, NOT foundation_name
         const { data, error } = await supabase
           .from('grants')
           .select('*')
           .eq('organization_id', organization.id)
           .order('deadline', { ascending: true });
 
-        console.log('OrganizationGrantsFixed: Result:', { data, error });
-
         if (error) {
-          console.error('OrganizationGrantsFixed: Error:', error);
+          console.error('Error fetching grants:', error);
           setGrants([]);
           return;
         }
@@ -47,7 +42,6 @@ const OrganizationGrantsFixed = ({ organization, userMembership, session }) => {
           dateAdded: grant.date_added,
           grantType: grant.grant_type,
           startDate: grant.start_date,
-          // Add organization data for GrantCard
           organization: {
             image_url: organization.image_url,
             banner_image_url: organization.banner_image_url
@@ -55,11 +49,9 @@ const OrganizationGrantsFixed = ({ organization, userMembership, session }) => {
           funderSlug: organization.slug
         }));
 
-        console.log('OrganizationGrantsFixed: Found', formatted.length, 'grants');
         setGrants(formatted);
-
       } catch (err) {
-        console.error('OrganizationGrantsFixed: Catch error:', err);
+        console.error('Error in fetchGrants:', err);
         setGrants([]);
       } finally {
         setLoading(false);

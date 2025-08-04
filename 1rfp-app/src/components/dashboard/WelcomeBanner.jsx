@@ -1,7 +1,7 @@
 // src/components/dashboard/WelcomeBanner.jsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Calendar, Bell, Plus, Zap, Target, Users, ChevronDown, Palette, Apple, X, Globe, Building } from 'lucide-react';
+import { Calendar, Bell, Plus, Zap, Target, Users, ChevronDown, Palette, Apple, X, Globe, Building, FileText } from 'lucide-react';
 import PropTypes from 'prop-types';
 
 const WelcomeBanner = ({ profile, organizationInfo }) => {
@@ -61,6 +61,15 @@ const WelcomeBanner = ({ profile, organizationInfo }) => {
                 : 'bg-blue-500 hover:bg-blue-600 text-white shadow-md hover:shadow-lg',
             action: () => setShowCreatePopup(true)
         },
+        // NEW: Add Grants Portal button - only show for admins or organization members
+        ...(profile?.is_omega_admin || organizationInfo ? [{
+            icon: FileText,
+            label: 'Grants Portal',
+            action: () => navigate('/profile/grants-portal'),
+            color: theme === 'gradient' 
+                ? 'bg-white/20 hover:bg-white/30 text-white' 
+                : 'bg-green-500 hover:bg-green-600 text-white shadow-md hover:shadow-lg'
+        }] : []),
         {
             icon: Calendar,
             label: 'Events',

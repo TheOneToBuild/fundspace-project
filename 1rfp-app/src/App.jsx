@@ -49,7 +49,7 @@ import NotificationsPage from './components/NotificationsPage.jsx';
 import ResetPasswordForm from './components/auth/ResetPasswordForm';
 import AuthLayout from './components/auth/AuthLayout';
 import ConnectionsPage from './components/ConnectionsPage.jsx';
-
+import GrantsPortalPage from './components/GrantsPortalPage.jsx';
 export const LayoutContext = createContext({ setPageBgColor: () => {} });
 
 const AuthRedirect = ({ children }) => {
@@ -398,7 +398,7 @@ export default function App() {
             <Route index element={<AuthRedirect><HomePage /></AuthRedirect>} />
             <Route path="grants" element={<GrantsPageContent />} />
             <Route path="organizations" element={<ExploreOrganizations />} />
-            {/* REMOVED: funders and nonprofits routes */}
+            {/* REMOVED: grants-portal from here - it belongs in profile routes */}
             <Route path="spotlight" element={<SpotlightLandingPage />} />
             <Route path="spotlight/:countySlug" element={<CountySpotlightPage />} />
             <Route path="spotlight/:countySlug/:citySlug" element={<CitySpotlightPage />} />
@@ -413,13 +413,13 @@ export default function App() {
             <Route path="profile/:profileId" element={<MemberProfilePage />} />
             <Route path="organizations/:slug" element={<OrganizationProfilePage />} />
             <Route path="profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>}>
-              <Route index element={<HomeDashboard />} />                                  {/* FIXED: Use HomeDashboard */}
-              <Route path="hello-world" element={<HelloWorldChannel />} />               {/* FIXED: Add HelloWorld route */}
+              <Route index element={<HomeDashboard />} />
+              <Route path="hello-world" element={<HelloWorldChannel />} />
               <Route path="grants" element={<GrantsPageContent hideHero={true} isProfileView={true} />} />
               <Route path="organizations" element={<ExploreOrganizations isProfileView={true} />} />
               <Route path="members" element={<ExploreMembersPage />} />
-              <Route path="members/:profileId" element={<MemberProfilePage />} />
               <Route path="saved-grants" element={<SavedGrantsPage />} />
+              <Route path="grants-portal" element={<GrantsPortalPage />} />  {/* MOVED HERE - BEFORE members/:profileId */}
               <Route path="hello-community" element={<HelloCommunityRoute />} />
               <Route path="settings" element={<SettingsPage />} />
               <Route path="followers" element={<FollowersPage />} />
@@ -434,6 +434,7 @@ export default function App() {
               <Route path="omega-admin/organizations/edit/:orgType/:orgId" element={<OmegaAdminEditOrg />} />
               <Route path="omega-admin/organizations/members/:orgType/:orgId" element={<OmegaAdminManageMembers />} />
               <Route path="notifications" element={<NotificationsPage />} />
+              <Route path="members/:profileId" element={<MemberProfilePage />} />  {/* MOVED TO THE END */}
             </Route>
             <Route path="/onboarding" element={<ProtectedRoute><OnboardingWizard /></ProtectedRoute>} />
           </Route>

@@ -255,7 +255,6 @@ export default function StreamlinedOrganizationSetupPage({ onJoinSuccess }) {
 
     // 🚀 ENHANCED: Join an existing organization with INSTANT EVENTS
     const handleJoinOrganization = async (organization) => {
-        console.log('🤝 INSTANT JOIN: Starting to join organization:', organization.name);
         setLoading(true);
         setError('');
         setMessage('');
@@ -266,11 +265,14 @@ export default function StreamlinedOrganizationSetupPage({ onJoinSuccess }) {
                 throw new Error('You must be logged in to join an organization');
             }
 
+            const hasExistingSuperAdmins = await checkExistingSuperAdmins(organization.id);
+            const role = hasExistingSuperAdmins ? 'member' : 'super_admin';
+            
             const membershipData = {
                 profile_id: session.user.id,
                 organization_id: organization.id,
                 organization_type: organization.type,
-                role: 'member',
+                role: role,
                 membership_type: 'staff',
                 is_public: true
             };
@@ -283,8 +285,6 @@ export default function StreamlinedOrganizationSetupPage({ onJoinSuccess }) {
                 throw new Error(`Failed to join organization: ${membershipError.message}`);
             }
 
-            console.log('✅ INSTANT JOIN: Successfully joined organization in database');
-
             const { error: profileError } = await supabase
                 .from('profiles')
                 .update({
@@ -296,27 +296,23 @@ export default function StreamlinedOrganizationSetupPage({ onJoinSuccess }) {
                 .eq('id', session.user.id);
 
             if (profileError) {
-                console.warn('⚠️ Profile update error (non-critical):', profileError);
+                setError('Profile update failed (non-critical)');
             }
 
-            // 🚀 INSTANT EVENT: Notify organization joined immediately
-            console.log('📡 INSTANT JOIN: Dispatching instant organization change event');
-            notifyOrganizationJoined(session.user.id, organization);
-
-            setMessage(`Successfully joined ${organization.name}!`);
-            clearPersistedData(); // Clear form data on success
+            const roleMessage = role === 'super_admin' 
+                ? `Successfully joined ${organization.name} as Super Admin! You're the first admin for this organization.`
+                : `Successfully joined ${organization.name} as Member!`;
+                
+            setMessage(roleMessage);
+            clearPersistedData();
             
-            console.log('🎉 INSTANT JOIN: Complete! ProfileNav should update instantly.');
-
-            // Short delay then trigger success callback
             setTimeout(() => {
                 if (onJoinSuccess) {
                     onJoinSuccess();
                 }
-            }, 1000); // Reduced from 1500ms to 1000ms
+            }, 1000);
 
         } catch (err) {
-            console.error('❌ Join organization error:', err);
             setError(err.message || 'Failed to join organization');
         } finally {
             setLoading(false);
@@ -447,8 +443,6 @@ export default function StreamlinedOrganizationSetupPage({ onJoinSuccess }) {
             setMessage(`Successfully created ${newOrg.name}! You are now the organization's administrator.`);
             clearPersistedData(); // Clear form data on success
             
-            console.log('🎉 INSTANT CREATE: Complete! ProfileNav should update instantly.');
-            
             // Short delay then trigger success callback
             setTimeout(() => {
                 if (onJoinSuccess) {
@@ -512,6 +506,20 @@ export default function StreamlinedOrganizationSetupPage({ onJoinSuccess }) {
         loc.toLowerCase().includes(locationSearch.toLowerCase()) &&
         !selectedLocations.includes(loc)
     );
+
+    const checkExistingSuperAdmins = async (organizationId) => {
+        const { data: existingSuperAdmins, error } = await supabase
+            .from('organization_memberships')
+            .select('id')
+            .eq('organization_id', organizationId)
+            .eq('role', 'super_admin');
+        
+        if (error) {
+            return false;
+        }
+        
+        return existingSuperAdmins && existingSuperAdmins.length > 0;
+    };
 
     return (
         <div className="max-w-4xl mx-auto space-y-6">
@@ -1041,3 +1049,21 @@ export default function StreamlinedOrganizationSetupPage({ onJoinSuccess }) {
         </div>
     );
 }
+
+export const promoteMemberToSuperAdmin = async (profileId, organizationId) => {
+    try {
+        const { error } = await supabase
+            .from('organization_memberships')
+            .update({ role: 'super_admin' })
+            .eq('profile_id', profileId)
+            .eq('organization_id', organizationId);
+
+        if (error) {
+            throw new Error(`Failed to promote to super admin: ${error.message}`);
+        }
+
+        return { success: true };
+    } catch (err) {
+        return { success: false, error: err.message };
+    }
+};

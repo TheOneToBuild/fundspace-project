@@ -173,7 +173,6 @@ function HomePage() {
   useEffect(() => {
     const fetchGrantsData = async () => {
       try {
-        console.log('Fetching grants data for homepage counter...');
         const { data, error } = await supabase
           .from('grants_with_taxonomy')
           .select('max_funding_amount, funding_amount_text, deadline, status')
@@ -184,50 +183,35 @@ function HomePage() {
           throw error;
         }
         
-        console.log('Raw grants data:', data?.length || 0, 'grants found');
-        
         if (data && data.length > 0) {
-          // Filter for active grants (same logic as GrantsPageContent)
           const activeGrants = data.filter(grant => {
-            // Include grants without deadline (rolling deadlines) or future deadlines
             if (!grant.deadline) return true;
             const today = new Date();
             today.setHours(0, 0, 0, 0);
             return new Date(grant.deadline) >= today;
           });
 
-          console.log('Active grants:', activeGrants.length, 'out of', data.length);
-
-          // Calculate total funding using same method as GrantsPageContent
           const activeFunding = activeGrants.reduce((sum, grant) => {
             let amount = 0;
-            
-            // Try max_funding_amount first, then fall back to parsing funding_amount_text
             if (grant.max_funding_amount) {
               amount = parseFloat(grant.max_funding_amount);
             } else if (grant.funding_amount_text) {
               amount = parseMaxFundingAmount(grant.funding_amount_text);
             }
-            
             if (amount && !isNaN(amount) && amount > 0) {
-              console.log('Adding grant funding:', amount, 'from grant:', grant.max_funding_amount || grant.funding_amount_text);
               return sum + amount;
             }
-            
             return sum;
           }, 0);
-          
-          console.log('Total calculated funding:', activeFunding);
+
           setTotalFunding(activeFunding);
           setGrants(data);
         } else {
-          console.log('No grants data found, using fallback');
           setTotalFunding(87500000); // Fallback
         }
       } catch (error) {
         console.error('Error fetching grants data:', error);
-        // Fallback to the previous static number
-        setTotalFunding(87500000);
+        setTotalFunding(87500000); // Fallback
       }
     };
 

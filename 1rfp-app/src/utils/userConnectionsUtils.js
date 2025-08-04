@@ -84,7 +84,6 @@ export const sendConnectionRequest = async (requesterId, recipientId) => {
 
     return { success: true };
   } catch (error) {
-    console.error('Error sending connection request:', error);
     return { success: false, error: error.message };
   }
 };
@@ -118,7 +117,6 @@ export const acceptConnectionRequest = async (currentUserId, requesterId) => {
 
     return { success: true };
   } catch (error) {
-    console.error('Error accepting connection request:', error);
     return { success: false, error: error.message };
   }
 };
@@ -147,7 +145,6 @@ export const declineConnectionRequest = async (currentUserId, requesterId) => {
 
     return { success: true };
   } catch (error) {
-    console.error('Error declining connection request:', error);
     return { success: false, error: error.message };
   }
 };
@@ -171,7 +168,6 @@ export const removeConnection = async (currentUserId, otherUserId) => {
 
     return { success: true };
   } catch (error) {
-    console.error('Error removing connection:', error);
     return { success: false, error: error.message };
   }
 };
@@ -207,7 +203,6 @@ export const getConnectionStatus = async (userId1, userId2) => {
       isRequester: data.requester_id === userId1
     };
   } catch (error) {
-    console.error('Error getting connection status:', error);
     return { status: 'none', isRequester: false, error: error.message };
   }
 };
@@ -244,13 +239,11 @@ export const withdrawConnectionRequest = async (requesterId, recipientId) => {
       .eq('type', 'connection_request');
 
     if (notificationError) {
-      console.warn('Error deleting connection notification:', notificationError);
       // Don't fail the whole operation for notification cleanup
     }
 
     return { success: true };
   } catch (error) {
-    console.error('Error withdrawing connection request:', error);
     return { success: false, error: error.message };
   }
 };
@@ -269,7 +262,6 @@ export const getMutualConnectionsCount = async (userId1, userId2) => {
 
     return { count: data || 0 };
   } catch (error) {
-    console.error('Error getting mutual connections count:', error);
     return { count: 0, error: error.message };
   }
 };
@@ -292,7 +284,6 @@ export const getUserConnections = async (userId, limit = 50) => {
       .limit(limit);
 
     if (connectionsError) {
-      console.error('Error fetching connections:', connectionsError);
       return { connections: [], error: connectionsError.message };
     }
 
@@ -312,7 +303,6 @@ export const getUserConnections = async (userId, limit = 50) => {
       .in('id', otherUserIds);
 
     if (profilesError) {
-      console.error('Error fetching profiles:', profilesError);
       return { connections: [], error: profilesError.message };
     }
 
@@ -341,10 +331,8 @@ export const getUserConnections = async (userId, limit = 50) => {
       };
     });
 
-    console.log(`✅ Successfully fetched ${formattedConnections.length} connections for user ${userId}`);
     return { connections: formattedConnections };
   } catch (error) {
-    console.error('Error getting user connections:', error);
     return { connections: [], error: error.message };
   }
 };
@@ -365,7 +353,6 @@ export const getPendingConnectionRequests = async (userId) => {
       .order('created_at', { ascending: false });
 
     if (requestsError) {
-      console.error('Error fetching pending requests:', requestsError);
       return { requests: [], error: requestsError.message };
     }
 
@@ -383,7 +370,6 @@ export const getPendingConnectionRequests = async (userId) => {
       .in('id', requesterIds);
 
     if (profilesError) {
-      console.error('Error fetching requester profiles:', profilesError);
       return { requests: [], error: profilesError.message };
     }
 
@@ -410,10 +396,8 @@ export const getPendingConnectionRequests = async (userId) => {
       };
     });
 
-    console.log(`✅ Successfully fetched ${formattedRequests.length} pending requests for user ${userId}`);
     return { requests: formattedRequests };
   } catch (error) {
-    console.error('Error getting pending connection requests:', error);
     return { requests: [], error: error.message };
   }
 };
@@ -442,14 +426,11 @@ const createConnectionNotification = async (actorId, recipientId, type, connecti
       });
 
     if (error) {
-      console.error('Error creating connection notification:', error);
       return { success: false, error: error.message };
     }
 
-    console.log(`✅ Connection notification created: ${type}`);
     return { success: true, notificationId: data };
   } catch (error) {
-    console.error('Error in createConnectionNotification:', error);
     return { success: false, error: error.message };
   }
 };

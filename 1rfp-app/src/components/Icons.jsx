@@ -100,4 +100,6 @@ export {
   Send,
   Lock,
   Settings,
+  Grid3X3,
+  Trophy,
 } from 'lucide-react';

@@ -29,15 +29,11 @@ export default function ConnectionsPage() {
 
     const fetchConnections = async () => {
         try {
-            console.log('🔍 Fetching connections for user:', currentUserProfile.id);
             const result = await getUserConnections(currentUserProfile.id, 100);
             
             if (!result.error) {
                 setConnections(result.connections || []);
-                console.log('✅ Successfully set connections:', result.connections?.length || 0);
-            } else {
-                console.error('❌ Error fetching connections:', result.error);
-            }
+            } 
         } catch (error) {
             console.error('❌ Error in fetchConnections:', error);
         }
@@ -46,17 +42,11 @@ export default function ConnectionsPage() {
     const fetchPendingRequests = async () => {
         try {
             setLoading(true);
-            console.log('🔍 Fetching pending requests for user:', currentUserProfile.id);
             const result = await getPendingConnectionRequests(currentUserProfile.id);
-            
-            console.log('📊 Pending requests result:', result);
             
             if (!result.error) {
                 setPendingRequests(result.requests || []);
-                console.log('✅ Successfully set pending requests:', result.requests?.length || 0);
-            } else {
-                console.error('❌ Error fetching pending requests:', result.error);
-            }
+            } 
         } catch (error) {
             console.error('❌ Error in fetchPendingRequests:', error);
         } finally {
@@ -79,9 +69,7 @@ export default function ConnectionsPage() {
             if (result.success) {
                 // Remove from local state
                 setConnections(prev => prev.filter(conn => conn.user.id !== userId));
-            } else {
-                console.error('Error disconnecting:', result.error);
-            }
+            } 
         } catch (error) {
             console.error('Error in handleDisconnect:', error);
         } finally {
@@ -106,9 +94,7 @@ export default function ConnectionsPage() {
                 setPendingRequests(prev => prev.filter(req => req.requester_profile.id !== userId));
                 // Refresh connections list
                 await fetchConnections();
-            } else {
-                console.error('Error accepting request:', result.error);
-            }
+            } 
         } catch (error) {
             console.error('Error in handleAcceptRequest:', error);
         } finally {
@@ -131,9 +117,7 @@ export default function ConnectionsPage() {
             if (result.success) {
                 // Remove from pending requests
                 setPendingRequests(prev => prev.filter(req => req.requester_profile.id !== userId));
-            } else {
-                console.error('Error declining request:', result.error);
-            }
+            } 
         } catch (error) {
             console.error('Error in handleDeclineRequest:', error);
         } finally {
