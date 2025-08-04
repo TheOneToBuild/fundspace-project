@@ -102,4 +102,5 @@ export {
   Settings,
   Grid3X3,
   Trophy,
+  RotateCcw,
 } from 'lucide-react';

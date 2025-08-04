@@ -80,17 +80,36 @@ const TrackFundsTab = ({ session, userMembership }) => {
   const [grantsPerPage, setGrantsPerPage] = useState(12);
 
   // Use custom hooks for data and actions
-  const { data, loading, loadSectionData, loadSavedGrants, loadApplications, loadReceivedGrants } = useTrackingData(session, userMembership);
+  const { 
+    data, 
+    loading, 
+    loadSectionData, 
+    loadSavedGrants, 
+    loadApplications, 
+    loadReceivedGrants
+  } = useTrackingData(session, userMembership);
+  
   const { markAsApplied, markAsReceived, removeApplication, removeAward } = useTrackingActions(
     session, 
     userMembership, 
-    { loadSavedGrants, loadApplications, loadReceivedGrants }
+    { 
+      loadSavedGrants, 
+      loadApplications, 
+      loadReceivedGrants
+    }
   );
 
-  // Load data when section changes
+  // Load data when section changes and ensure counts are updated
   useEffect(() => {
     loadSectionData(activeSection);
-  }, [activeSection, loadSectionData]);
+    // Also refresh all sections to ensure counts are accurate
+    if (activeSection === 'saved') {
+      setTimeout(() => {
+        loadApplications();
+        loadReceivedGrants();
+      }, 200);
+    }
+  }, [activeSection, loadSectionData, loadApplications, loadReceivedGrants]);
 
   // Filter and pagination logic
   const currentData = data[activeSection] || [];
@@ -327,6 +346,7 @@ const TrackFundsTab = ({ session, userMembership }) => {
                 onOpenDetailModal={openDetail}
                 onMarkAsApplied={markAsApplied}
                 onMarkAsReceived={markAsReceived}
+                onRemoveApplication={removeApplication}
                 activeSection={activeSection}
               />
             ))}

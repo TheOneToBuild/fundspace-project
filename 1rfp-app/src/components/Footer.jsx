@@ -39,7 +39,7 @@ export default function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
           <div>
             <img src={footerLogoImage} alt="1RFP Logo" className="h-14 mb-4 w-auto" />
-            <p className="text-slate-600">Streamlining grant discovery for a better Bay Area.</p>
+            <p className="text-slate-600">Democratizing access to funding for a better Bay Area.</p>
           </div>
           <div>
             <h4 className="text-sm font-bold text-slate-800 mb-3 tracking-wider uppercase">Product</h4>

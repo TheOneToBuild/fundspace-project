@@ -6,7 +6,8 @@ import {
   Building2, 
   DollarSign, 
   Calendar, 
-  Sparkles 
+  Sparkles,
+  RotateCcw
 } from '../../Icons.jsx';
 import ApplicationConfirmModal from './ApplicationConfirmModal.jsx';
 import AwardConfirmModal from './AwardConfirmModal.jsx';
@@ -16,10 +17,12 @@ const TrackingGrantCard = ({
   onOpenDetailModal, 
   onMarkAsApplied, 
   onMarkAsReceived,
+  onRemoveApplication,
   activeSection 
 }) => {
   const [showAppliedConfirm, setShowAppliedConfirm] = useState(false);
   const [showReceivedConfirm, setShowReceivedConfirm] = useState(false);
+  const [showUndoConfirm, setShowUndoConfirm] = useState(false);
 
   const hasApplication = grant.application_id;
   const hasAward = grant.award_id;
@@ -36,6 +39,16 @@ const TrackingGrantCard = ({
     const success = await onMarkAsReceived(grant.id, awardAmount, notes);
     if (success) {
       setShowReceivedConfirm(false);
+    }
+    return success;
+  };
+
+  const handleUndoApplication = async () => {
+    console.log('handleUndoApplication called for grant:', grant.id);
+    const success = await onRemoveApplication(grant.id);
+    console.log('Undo application result:', success);
+    if (success) {
+      setShowUndoConfirm(false);
     }
     return success;
   };
@@ -102,7 +115,7 @@ const TrackingGrantCard = ({
                     e.stopPropagation();
                     setShowAppliedConfirm(true);
                   }}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-orange-500 to-amber-500 text-white font-semibold rounded-xl shadow-sm hover:shadow-lg transition-all duration-300 transform hover:scale-105"
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-green-500 to-emerald-500 text-white font-semibold rounded-xl shadow-sm hover:shadow-lg transition-all duration-300 transform hover:scale-105"
                 >
                   <FileText size={14} />
                   Mark Applied
@@ -125,6 +138,20 @@ const TrackingGrantCard = ({
                 </div>
               )}
             </>
+          )}
+
+          {/* Show undo button for applications */}
+          {activeSection === 'applications' && hasApplication && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowUndoConfirm(true);
+              }}
+              className="px-4 py-2.5 bg-gradient-to-r from-red-500 to-red-600 text-white font-semibold rounded-xl shadow-sm hover:shadow-lg transition-all duration-300 transform hover:scale-105 flex items-center gap-2"
+            >
+              <RotateCcw size={14} />
+              Undo Applied
+            </button>
           )}
           
           {/* Details button - always present */}
@@ -155,6 +182,39 @@ const TrackingGrantCard = ({
         onConfirm={handleReceivedConfirm}
         grantTitle={grant.title}
       />
+
+      {/* Undo Confirmation Modal */}
+      {showUndoConfirm && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl">
+            <div className="text-center">
+              <div className="w-16 h-16 bg-gradient-to-r from-red-100 to-red-200 rounded-full flex items-center justify-center mx-auto mb-4">
+                <RotateCcw size={32} className="text-red-500" />
+              </div>
+              <h3 className="text-xl font-bold text-slate-800 mb-2">Undo Application? 🤔</h3>
+              <p className="text-slate-600 mb-6">
+                This will remove <strong>{grant.title}</strong> from your applications and move it back to saved grants. Are you sure?
+              </p>
+              
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowUndoConfirm(false)}
+                  className="flex-1 px-4 py-3 text-slate-600 hover:text-slate-800 font-semibold rounded-xl hover:bg-slate-100 transition-all"
+                >
+                  Keep Applied
+                </button>
+                <button
+                  onClick={handleUndoApplication}
+                  className="flex-1 px-4 py-3 bg-gradient-to-r from-red-500 to-red-600 text-white font-semibold rounded-xl hover:from-red-600 hover:to-red-700 transition-all flex items-center justify-center gap-2"
+                >
+                  <RotateCcw size={16} />
+                  Yes, Undo
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
