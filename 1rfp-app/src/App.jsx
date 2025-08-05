@@ -30,7 +30,6 @@ import FollowersPage from './components/FollowersPage.jsx';
 import FollowingPage from './components/FollowingPage.jsx';
 import OmegaAdminDashboard from './components/OmegaAdminDashboard.jsx';
 import OmegaAdminAnalytics from './components/OmegaAdminAnalytics.jsx';
-import AdminClaimsPage from './components/AdminClaimsPage.jsx';
 import OmegaAdminOrgSelector from './components/OmegaAdminOrgSelector.jsx';
 import OmegaAdminEditOrg from './components/OmegaAdminEditOrg.jsx';
 import OmegaAdminManageMembers from './components/OmegaAdminManageMembers.jsx';
@@ -427,7 +426,6 @@ export default function App() {
               <Route path="my-organization/edit" element={<EditOrganizationPage />} />
               <Route path="omega-admin" element={<OmegaAdminDashboard />} />
               <Route path="omega-admin/analytics" element={<OmegaAdminAnalytics />} />
-              <Route path="omega-admin/claims" element={<AdminClaimsPage />} />
               <Route path="omega-admin/organizations" element={<OmegaAdminOrgSelector />} />
               <Route path="omega-admin/organizations/edit/:orgType/:orgId" element={<OmegaAdminEditOrg />} />
               <Route path="omega-admin/organizations/members/:orgType/:orgId" element={<OmegaAdminManageMembers />} />

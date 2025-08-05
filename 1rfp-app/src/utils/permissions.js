@@ -6,7 +6,6 @@ export const ROLES = {
 };
 
 export const PERMISSIONS = {
-  APPROVE_ADMIN_CLAIMS: 'approve_admin_claims',
   PLATFORM_MANAGEMENT: 'platform_management',
   VIEW_ALL_ORGANIZATIONS: 'view_all_organizations',
   EDIT_ORGANIZATION: 'edit_organization',
@@ -48,10 +47,6 @@ export function isPlatformAdmin(isOmegaAdmin) {
 }
 
 export function canEditAnyOrganization(isOmegaAdmin) {
-  return isOmegaAdmin === true;
-}
-
-export function canManageOrganizationClaims(isOmegaAdmin) {
   return isOmegaAdmin === true;
 }
 

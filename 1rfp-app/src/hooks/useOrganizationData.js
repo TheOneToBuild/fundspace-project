@@ -203,14 +203,30 @@ export function useOrganizationData(profile, session) {
         setLoading(true);
         setError('');
         try {
+            // Check if organization has existing super admins
+            const { data: existingSuperAdmins, error: checkError } = await supabase
+                .from('organization_memberships')
+                .select('id')
+                .eq('organization_id', organizationData.id)
+                .eq('role', 'super_admin');
+        
+            if (checkError) {
+                console.error('Error checking existing super admins:', checkError);
+                throw checkError;
+            }
+        
+            // Determine role: super_admin if no existing super_admins, otherwise member
+            const role = (!existingSuperAdmins || existingSuperAdmins.length === 0) ? 'super_admin' : 'member';
+        
             const membershipData = {
                 profile_id: profile.id,
                 organization_id: organizationData.id,
                 organization_type: organizationData.type,
-                role: 'member',
+                role: role, // Will be 'super_admin' if no existing super admins, otherwise 'member'
                 membership_type: 'staff',
                 is_public: true
             };
+        
             const { error: membershipError } = await supabase
                 .from('organization_memberships')
                 .insert(membershipData);
@@ -220,9 +236,12 @@ export function useOrganizationData(profile, session) {
             setUserMembership({ ...membershipData, joined_at: new Date().toISOString() });
             notifyOrganizationJoined(profile.id, organizationData);
             await checkMembership();
+            
+            console.log(`✅ Successfully joined organization with role: ${role}`);
             return true;
         } catch (err) {
             setError('Failed to join organization');
+            console.error('Error joining organization:', err);
             return false;
         } finally {
             setLoading(false);

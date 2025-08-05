@@ -382,11 +382,26 @@ export default function SignUpWizard({ onSwitchToLogin }) {
     console.log('Creating organization membership:', { userId, selectedOrgData });
     
     try {
+      // Check if organization has existing super admins
+      const { data: existingSuperAdmins, error: checkError } = await supabase
+        .from('organization_memberships')
+        .select('id')
+        .eq('organization_id', selectedOrgData.id)
+        .eq('role', 'super_admin');
+    
+      if (checkError) {
+        console.error('Error checking existing super admins:', checkError);
+        throw checkError;
+      }
+    
+      // Determine role: super_admin if no existing super_admins, otherwise member
+      const role = (!existingSuperAdmins || existingSuperAdmins.length === 0) ? 'super_admin' : 'member';
+    
       const membershipData = {
         profile_id: userId,
         organization_id: selectedOrgData.id,
         organization_type: selectedOrgData.type,
-        role: 'member'
+        role: role // This will be 'super_admin' if no existing super admins, otherwise 'member'
       };
 
       const { error } = await supabase
@@ -395,7 +410,8 @@ export default function SignUpWizard({ onSwitchToLogin }) {
 
       if (error) throw error;
       
-      console.log('✅ Organization membership created successfully');
+      console.log(`✅ Organization membership created successfully with role: ${role}`);
+      return { success: true, role };
     } catch (error) {
       console.error('❌ Error creating organization membership:', error);
       throw error;
