@@ -11,9 +11,12 @@ import {
   ChevronDown,
   XCircle,
   Heart,
-  Building2
+  Building2,
+  BarChart3,
+  Grid3X3
 } from '../../Icons.jsx';
 import TrackingGrantCard from './TrackingGrantCard.jsx';
+import ApplicationDashboard from './ApplicationDashboard.jsx'; // New import
 import GrantDetailModal from '../../../GrantDetailModal.jsx';
 import FilterBar from '../../FilterBar.jsx';
 import Pagination from '../../Pagination.jsx';
@@ -301,93 +304,105 @@ const TrackFundsTab = ({ session, userMembership }) => {
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="mb-6">
-        <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-slate-800">
-              {sections.find(s => s.id === activeSection)?.label}
-            </h3>
-            <button
-              onClick={() => setShowFilters(!showFilters)}
-              className="flex items-center gap-2 px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 transition-colors text-sm"
-            >
-              <Filter className="w-4 h-4" />
-              {showFilters ? 'Hide Filters' : 'Show Filters'}
-              {activeGrantFilters.length > 0 && (
-                <span className="ml-1 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-blue-600 bg-blue-100 rounded-full">
-                  {activeGrantFilters.length}
-                </span>
-              )}
-            </button>
-          </div>
-
-          {showFilters && (
-            <FilterBar {...filterBarProps} />
-          )}
-        </div>
-      </div>
-
-      {/* Content */}
-      {loading ? (
-        <div className="flex items-center justify-center py-16">
-          <div className="text-center">
-            <Heart className="w-8 h-8 text-blue-500 animate-pulse mx-auto mb-4" />
-            <p className="text-slate-700 font-medium">Loading...</p>
-          </div>
-        </div>
-      ) : currentPageData.length > 0 ? (
+      {/* Content - Always show ApplicationDashboard for applications */}
+      {activeSection === 'applications' ? (
+        <ApplicationDashboard 
+          applications={currentData}
+          onOpenDetailModal={openDetail}
+          onMarkAsReceived={markAsReceived}
+          onRemoveApplication={removeApplication}
+        />
+      ) : (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-            {currentPageData.map((grant) => (
-              <TrackingGrantCard 
-                key={`${activeSection}-${grant.id}`}
-                grant={grant} 
-                onOpenDetailModal={openDetail}
-                onMarkAsApplied={markAsApplied}
-                onMarkAsReceived={markAsReceived}
-                onRemoveApplication={removeApplication}
-                activeSection={activeSection}
-              />
-            ))}
+          {/* Filters */}
+          <div className="mb-6">
+            <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-semibold text-slate-800">
+                  {sections.find(s => s.id === activeSection)?.label}
+                </h3>
+                <button
+                  onClick={() => setShowFilters(!showFilters)}
+                  className="flex items-center gap-2 px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 transition-colors text-sm"
+                >
+                  <Filter className="w-4 h-4" />
+                  {showFilters ? 'Hide Filters' : 'Show Filters'}
+                  {activeGrantFilters.length > 0 && (
+                    <span className="ml-1 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-blue-600 bg-blue-100 rounded-full">
+                      {activeGrantFilters.length}
+                    </span>
+                  )}
+                </button>
+              </div>
+
+              {showFilters && (
+                <FilterBar {...filterBarProps} />
+              )}
+            </div>
           </div>
 
-          {totalPages > 0 && (
-            <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={paginate} />
+          {/* Content */}
+          {loading ? (
+            <div className="flex items-center justify-center py-16">
+              <div className="text-center">
+                <Heart className="w-8 h-8 text-blue-500 animate-pulse mx-auto mb-4" />
+                <p className="text-slate-700 font-medium">Loading...</p>
+              </div>
+            </div>
+          ) : currentPageData.length > 0 ? (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+                {currentPageData.map((grant) => (
+                  <TrackingGrantCard 
+                    key={`${activeSection}-${grant.id}`}
+                    grant={grant} 
+                    onOpenDetailModal={openDetail}
+                    onMarkAsApplied={markAsApplied}
+                    onMarkAsReceived={markAsReceived}
+                    onRemoveApplication={removeApplication}
+                    activeSection={activeSection}
+                  />
+                ))}
+              </div>
+
+              {totalPages > 0 && (
+                <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={paginate} />
+              )}
+            </>
+          ) : (
+            <div className="text-center py-16">
+              <div className="bg-white/80 backdrop-blur-sm p-12 rounded-3xl border border-white/60 shadow-xl max-w-md mx-auto">
+                <div className="w-20 h-20 bg-gradient-to-r from-slate-100 to-slate-200 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                  <Search size={40} className="text-slate-400" />
+                </div>
+                <h3 className="text-2xl font-bold text-slate-800 mb-3">
+                  No {sections.find(s => s.id === activeSection)?.label.toLowerCase()} found
+                </h3>
+                <p className="text-slate-600 mb-6">
+                  {activeGrantFilters.length > 0 
+                    ? "Try adjusting your filters to see more results."
+                    : `You haven't ${activeSection === 'saved' ? 'saved any grants' : activeSection === 'applications' ? 'applied to any grants' : 'received any grants'} yet.`
+                  }
+                </p>
+                {activeGrantFilters.length > 0 ? (
+                  <button 
+                    onClick={handleClearFilters}
+                    className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
+                  >
+                    <XCircle size={16} className="mr-2" /> 
+                    Clear All Filters
+                  </button>
+                ) : (
+                  <p className="text-sm text-slate-500">
+                    {activeSection === 'saved' && "Start exploring grants and bookmark the ones you're interested in."}
+                    {activeSection === 'applications' && "Grant applications will appear here once you start applying."}
+                    {activeSection === 'received' && "Successful grant awards will be tracked here."}
+                  </p>
+                )}
+              </div>
+            </div>
           )}
         </>
-      ) : (
-        <div className="text-center py-16">
-          <div className="bg-white/80 backdrop-blur-sm p-12 rounded-3xl border border-white/60 shadow-xl max-w-md mx-auto">
-            <div className="w-20 h-20 bg-gradient-to-r from-slate-100 to-slate-200 rounded-2xl flex items-center justify-center mx-auto mb-6">
-              <Search size={40} className="text-slate-400" />
-            </div>
-            <h3 className="text-2xl font-bold text-slate-800 mb-3">
-              No {sections.find(s => s.id === activeSection)?.label.toLowerCase()} found
-            </h3>
-            <p className="text-slate-600 mb-6">
-              {activeGrantFilters.length > 0 
-                ? "Try adjusting your filters to see more results."
-                : `You haven't ${activeSection === 'saved' ? 'saved any grants' : activeSection === 'applications' ? 'applied to any grants' : 'received any grants'} yet.`
-              }
-            </p>
-            {activeGrantFilters.length > 0 ? (
-              <button 
-                onClick={handleClearFilters}
-                className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
-              >
-                <XCircle size={16} className="mr-2" /> 
-                Clear All Filters
-              </button>
-            ) : (
-              <p className="text-sm text-slate-500">
-                {activeSection === 'saved' && "Start exploring grants and bookmark the ones you're interested in."}
-                {activeSection === 'applications' && "Grant applications will appear here once you start applying."}
-                {activeSection === 'received' && "Successful grant awards will be tracked here."}
-              </p>
-            )}
-          </div>
-        </div>
       )}
 
       {/* Grant Detail Modal */}

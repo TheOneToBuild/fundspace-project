@@ -1,4 +1,3 @@
-// Add this to your existing src/components/Icons.jsx exports:
 export {
   Search,
   Users,
@@ -25,7 +24,7 @@ export {
   Briefcase as IconBriefcase,
   Briefcase,
   BarChart3,
-  X, // <- Add this line if it's not already there
+  X, 
   Tag,
   Heart,
   ArrowRight,
@@ -103,4 +102,13 @@ export {
   Grid3X3,
   Trophy,
   RotateCcw,
+  MoreHorizontal,
+  BookOpen,
+  CheckSquare,
+  Download,
+  Folder,
+  Paperclip,
+  AtSign,
+  Reply,
+  Smile,
 } from 'lucide-react';

@@ -1,9 +1,6 @@
-// src/utils/notificationCleanup.js
+
 import { supabase } from '../supabaseClient';
 
-/**
- * Clear all notifications for the current user
- */
 export const clearAllNotifications = async (userId) => {
   try {
     console.log('🗑️ Clearing all notifications for user:', userId);
@@ -26,9 +23,6 @@ export const clearAllNotifications = async (userId) => {
   }
 };
 
-/**
- * Clear only read notifications for the current user
- */
 export const clearReadNotifications = async (userId) => {
   try {
     console.log('🗑️ Clearing read notifications for user:', userId);
@@ -52,9 +46,6 @@ export const clearReadNotifications = async (userId) => {
   }
 };
 
-/**
- * Mark all notifications as read for the current user
- */
 export const markAllAsRead = async (userId) => {
   try {
     console.log('📖 Marking all notifications as read for user:', userId);
@@ -78,10 +69,6 @@ export const markAllAsRead = async (userId) => {
   }
 };
 
-/**
- * Auto-cleanup old notifications (run periodically)
- * Deletes notifications older than specified days
- */
 export const autoCleanupOldNotifications = async (daysOld = 30) => {
   try {
     console.log(`🧹 Auto-cleaning notifications older than ${daysOld} days`);
@@ -104,9 +91,6 @@ export const autoCleanupOldNotifications = async (daysOld = 30) => {
   }
 };
 
-/**
- * Get notification statistics for a user
- */
 export const getNotificationStats = async (userId) => {
   try {
     const { data, error } = await supabase
@@ -120,7 +104,6 @@ export const getNotificationStats = async (userId) => {
     const unread = data.filter(n => !n.is_read).length;
     const read = total - unread;
     
-    // Group by last 7 days
     const recent = data.filter(n => 
       new Date(n.created_at) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
     ).length;

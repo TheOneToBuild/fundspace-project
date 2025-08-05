@@ -1,12 +1,5 @@
-// src/utils/notificationUtils.js
-
 import { supabase } from '../supabaseClient';
 
-/**
- * Extracts user and organization mentions from HTML content.
- * @param {string} htmlContent - The HTML content of the post.
- * @returns {Array<Object>} An array of mention objects, each with id, displayName, and type.
- */
 const extractMentionsFromHTML = (htmlContent) => {
   if (!htmlContent) {
     return [];
@@ -24,14 +17,6 @@ const extractMentionsFromHTML = (htmlContent) => {
   }));
 };
 
-/**
- * Creates notification records in the database for mentioned users.
- * @param {string} postId - The ID of the post containing the mentions.
- * @param {Array<Object>} mentions - An array of mention objects from extractMentionsFromHTML.
- * @param {string} actorId - The ID of the user who created the post.
- * @param {boolean} isOrganizationPost - Whether this is an organization post or regular post.
- * @returns {Promise<{success: boolean, count: number, error?: string}>} An object indicating success and the number of notifications created.
- */
 export const createMentionNotifications = async (postId, mentions, actorId, isOrganizationPost = false) => {
   if (!mentions?.length) {
     return { success: true, count: 0 };
@@ -41,13 +26,11 @@ export const createMentionNotifications = async (postId, mentions, actorId, isOr
     const processedUserIds = new Set([actorId]);
     const notificationPromises = [];
 
-    // Process user mentions first to populate processedUserIds
     const userMentions = mentions.filter(m => m.type === 'user');
     for (const mention of userMentions) {
       if (!processedUserIds.has(mention.id)) {
         processedUserIds.add(mention.id);
-        
-        // Create notification object with correct post reference
+
         const notificationData = {
           user_id: mention.id,
           actor_id: actorId,
@@ -55,7 +38,6 @@ export const createMentionNotifications = async (postId, mentions, actorId, isOr
           is_read: false,
         };
 
-        // Set the appropriate post ID field based on post type
         if (isOrganizationPost) {
           notificationData.organization_post_id = postId;
         } else {
@@ -66,7 +48,6 @@ export const createMentionNotifications = async (postId, mentions, actorId, isOr
       }
     }
 
-    // Process organization mentions
     const organizationMentions = mentions.filter(m => m.type === 'organization');
     if (organizationMentions.length > 0) {
       const orgMemberQueries = organizationMentions.map(mention => {
@@ -85,8 +66,7 @@ export const createMentionNotifications = async (postId, mentions, actorId, isOr
           result.data.forEach(member => {
             if (!processedUserIds.has(member.profile_id)) {
               processedUserIds.add(member.profile_id);
-              
-              // Create notification object with correct post reference
+
               const notificationData = {
                 user_id: member.profile_id,
                 actor_id: actorId,
@@ -94,7 +74,6 @@ export const createMentionNotifications = async (postId, mentions, actorId, isOr
                 is_read: false,
               };
 
-              // Set the appropriate post ID field based on post type
               if (isOrganizationPost) {
                 notificationData.organization_post_id = postId;
               } else {
@@ -121,14 +100,6 @@ export const createMentionNotifications = async (postId, mentions, actorId, isOr
   }
 };
 
-/**
- * Processes a post's content to find mentions and create notifications.
- * @param {string} postId - The ID of the post.
- * @param {string} content - The HTML content of the post.
- * @param {string} actorId - The ID of the user who created the post.
- * @param {boolean} isOrganizationPost - Whether this is an organization post or regular post.
- * @returns {Promise<{success: boolean, count: number, error?: string}>} An object indicating success and count of created notifications.
- */
 export const processMentionsForNotifications = async (postId, content, actorId, isOrganizationPost = false) => {
   try {
     const mentions = extractMentionsFromHTML(content);

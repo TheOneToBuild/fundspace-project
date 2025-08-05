@@ -1,8 +1,6 @@
-// src/utils/organizationAPI.js - Clean Single Table API
 import { supabase } from '../supabaseClient';
 
 class OrganizationAPI {
-  // Get organization by ID
   static async getOrganization(orgId) {
     const { data, error } = await supabase
       .from('organizations')
@@ -13,7 +11,6 @@ class OrganizationAPI {
     return { data, error };
   }
   
-  // Search organizations
   static async searchOrganizations(query, filters = {}) {
     let queryBuilder = supabase
       .from('organizations')
@@ -39,7 +36,6 @@ class OrganizationAPI {
     return queryBuilder;
   }
   
-  // Create organization
   static async createOrganization(orgData) {
     return supabase
       .from('organizations')
@@ -48,7 +44,6 @@ class OrganizationAPI {
       .single();
   }
   
-  // Update organization
   static async updateOrganization(orgId, updates) {
     return supabase
       .from('organizations')
@@ -58,7 +53,6 @@ class OrganizationAPI {
       .single();
   }
   
-  // Get organizations by type
   static async getOrganizationsByType(type, limit = 10) {
     return supabase
       .from('organizations')
@@ -67,7 +61,6 @@ class OrganizationAPI {
       .limit(limit);
   }
   
-  // Get organizations by taxonomy
   static async getOrganizationsByTaxonomy(taxonomyPattern, limit = 10) {
     return supabase
       .from('organizations')
@@ -76,7 +69,6 @@ class OrganizationAPI {
       .limit(limit);
   }
   
-  // Get organizations with specific capabilities
   static async getOrganizationsByCapability(capability, limit = 10) {
     return supabase
       .from('organizations')

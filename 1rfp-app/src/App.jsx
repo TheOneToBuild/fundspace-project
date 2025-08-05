@@ -5,7 +5,7 @@ import { supabase } from './supabaseClient';
 import { clearAllNotifications, markAllAsRead } from './utils/notificationCleanup';
 import HomePage from './HomePage.jsx';
 import GrantsPageContent from './GrantsPageContent.jsx';
-import ExploreOrganizations from './ExploreOrganizations.jsx'; // ONLY UNIFIED COMPONENT
+import ExploreOrganizations from './ExploreOrganizations.jsx';
 import SpotlightLandingPage from './SpotlightLandingPage.jsx';
 import CountySpotlightPage from './CountySpotlightPage.jsx';
 import CitySpotlightPage from './CitySpotlightPage.jsx';
@@ -23,9 +23,9 @@ import SettingsPage from './SettingsPage.jsx';
 import SavedGrantsPage from './SavedGrantsPage.jsx';
 import ExploreMembersPage from './ExploreMembersPage.jsx';
 import MemberProfilePage from './MemberProfilePage.jsx';
-import HomeDashboard from './components/HomeDashboard.jsx';                    // NEW: Main dashboard
-import HelloWorldChannel from './components/HelloWorldChannel.jsx';           // NEW: Renamed HelloWorld chat
-import HelloCommunityRoute from './components/HelloCommunityRoute.jsx';       // EXISTING
+import HomeDashboard from './components/HomeDashboard.jsx';
+import HelloWorldChannel from './components/HelloWorldChannel.jsx';
+import HelloCommunityRoute from './components/HelloCommunityRoute.jsx';
 import FollowersPage from './components/FollowersPage.jsx';
 import FollowingPage from './components/FollowingPage.jsx';
 import OmegaAdminDashboard from './components/OmegaAdminDashboard.jsx';
@@ -103,7 +103,6 @@ const PublicHeader = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const mobileMenuRef = useRef(null);
 
-  // UPDATED: Clean navigation with only unified Organizations
   const mainNavLinks = [
     { to: "/grants", text: "Find Grants", active: "text-blue-600 font-semibold" },
     { to: "/organizations", text: "Explore Organizations", active: "text-blue-600 font-semibold" },
@@ -398,7 +397,6 @@ export default function App() {
             <Route index element={<AuthRedirect><HomePage /></AuthRedirect>} />
             <Route path="grants" element={<GrantsPageContent />} />
             <Route path="organizations" element={<ExploreOrganizations />} />
-            {/* REMOVED: grants-portal from here - it belongs in profile routes */}
             <Route path="spotlight" element={<SpotlightLandingPage />} />
             <Route path="spotlight/:countySlug" element={<CountySpotlightPage />} />
             <Route path="spotlight/:countySlug/:citySlug" element={<CitySpotlightPage />} />
@@ -419,7 +417,7 @@ export default function App() {
               <Route path="organizations" element={<ExploreOrganizations isProfileView={true} />} />
               <Route path="members" element={<ExploreMembersPage />} />
               <Route path="saved-grants" element={<SavedGrantsPage />} />
-              <Route path="grants-portal" element={<GrantsPortalPage />} />  {/* MOVED HERE - BEFORE members/:profileId */}
+              <Route path="grants-portal" element={<GrantsPortalPage />} />
               <Route path="hello-community" element={<HelloCommunityRoute />} />
               <Route path="settings" element={<SettingsPage />} />
               <Route path="followers" element={<FollowersPage />} />
@@ -434,7 +432,7 @@ export default function App() {
               <Route path="omega-admin/organizations/edit/:orgType/:orgId" element={<OmegaAdminEditOrg />} />
               <Route path="omega-admin/organizations/members/:orgType/:orgId" element={<OmegaAdminManageMembers />} />
               <Route path="notifications" element={<NotificationsPage />} />
-              <Route path="members/:profileId" element={<MemberProfilePage />} />  {/* MOVED TO THE END */}
+              <Route path="members/:profileId" element={<MemberProfilePage />} />
             </Route>
             <Route path="/onboarding" element={<ProtectedRoute><OnboardingWizard /></ProtectedRoute>} />
           </Route>

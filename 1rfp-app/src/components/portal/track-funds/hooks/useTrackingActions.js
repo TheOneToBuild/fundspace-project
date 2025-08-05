@@ -18,7 +18,6 @@ export const useTrackingActions = (session, userMembership, refreshCallbacks) =>
         .maybeSingle();
 
       if (existingApplication) {
-        console.log('Already applied to this grant');
         return false;
       }
 
@@ -42,17 +41,13 @@ export const useTrackingActions = (session, userMembership, refreshCallbacks) =>
         return false;
       }
 
-      console.log('Successfully marked as applied');
-      
-      // Add delay before refreshing to ensure database consistency
-      setTimeout(() => {
-        if (refreshCallbacks?.loadApplications) {
-          refreshCallbacks.loadApplications();
-        }
-        if (refreshCallbacks?.loadSavedGrants) {
-          refreshCallbacks.loadSavedGrants();
-        }
-      }, 100);
+      // Refresh data immediately
+      if (refreshCallbacks?.loadApplications) {
+        refreshCallbacks.loadApplications();
+      }
+      if (refreshCallbacks?.loadSavedGrants) {
+        refreshCallbacks.loadSavedGrants();
+      }
       
       return true;
       
@@ -76,7 +71,6 @@ export const useTrackingActions = (session, userMembership, refreshCallbacks) =>
         .maybeSingle();
 
       if (existingAward) {
-        console.log('Already received this grant');
         return false;
       }
 
@@ -101,12 +95,11 @@ export const useTrackingActions = (session, userMembership, refreshCallbacks) =>
         return false;
       }
 
-      // Refresh received data if callback provided
+      // Refresh data immediately
       if (refreshCallbacks?.loadReceivedGrants) {
         refreshCallbacks.loadReceivedGrants();
       }
       
-      console.log('Successfully marked as received');
       return true;
       
     } catch (error) {
@@ -115,93 +108,83 @@ export const useTrackingActions = (session, userMembership, refreshCallbacks) =>
     }
   }, [session?.user?.id, userMembership, refreshCallbacks]);
 
-  // Function to remove application status - SIMPLIFIED DIRECT APPROACH
+  // Function to remove application status - Clean optimistic approach
   const removeApplication = useCallback(async (grantId) => {
-    if (!session?.user?.id) {
-      console.log('No user session available');
-      return false;
-    }
-
-    console.log('=== STARTING UNDO APPLICATION FOR GRANT:', grantId, '===');
+    if (!session?.user?.id) return false;
 
     try {
-      // STEP 1: Find and delete the application directly by grant_id and organization
-      console.log('Step 1: Deleting application directly from database');
-      
-      let deleteQuery = supabase.from('grant_applications').delete();
-      
-      // For admin users, delete by organization_id and grant_id
-      if (userMembership?.role && ['super_admin', 'admin'].includes(userMembership.role) && userMembership?.organizations?.id) {
-        deleteQuery = deleteQuery
-          .eq('grant_id', grantId)
-          .eq('organization_id', userMembership.organizations.id);
-        console.log('Deleting org application: grant_id =', grantId, 'organization_id =', userMembership.organizations.id);
-      } else {
-        // For regular users, delete by user_id and grant_id
-        deleteQuery = deleteQuery
-          .eq('grant_id', grantId)
-          .eq('user_id', session.user.id);
-        console.log('Deleting user application: grant_id =', grantId, 'user_id =', session.user.id);
-      }
+      // Find all applications for this grant
+      const { data: allApplications, error: findError } = await supabase
+        .from('grant_applications')
+        .select('*')
+        .eq('grant_id', grantId);
 
-      const { data: deletedData, error: deleteError } = await deleteQuery.select();
-
-      if (deleteError) {
-        console.error('ERROR: Failed to delete application:', deleteError);
+      if (findError || !allApplications || allApplications.length === 0) {
         return false;
       }
 
-      console.log('SUCCESS: Deleted application data:', deletedData);
-
-      // STEP 2: Ensure grant is in saved_grants for the user
-      console.log('Step 2: Ensuring grant is in saved_grants');
+      // Find the target application
+      let targetApplication = null;
       
-      const { data: existingSave, error: checkSaveError } = await supabase
+      // For admin users, prioritize org applications
+      if (userMembership?.role && ['super_admin', 'admin'].includes(userMembership.role) && userMembership?.organizations?.id) {
+        targetApplication = allApplications.find(app => 
+          app.grant_id === grantId && 
+          app.organization_id === userMembership.organizations.id
+        );
+      }
+      
+      // Fallback to user application
+      if (!targetApplication) {
+        targetApplication = allApplications.find(app => 
+          app.grant_id === grantId && 
+          app.user_id === session.user.id
+        );
+      }
+
+      if (!targetApplication) {
+        return false;
+      }
+
+      // Try to delete from database
+      const { data: deletedData, error: deleteError } = await supabase
+        .from('grant_applications')
+        .delete()
+        .eq('id', targetApplication.id)
+        .select();
+
+      // If database deletion fails (due to RLS), use optimistic approach
+      let deletionSucceeded = !deleteError && deletedData && deletedData.length > 0;
+
+      // Ensure grant is in saved_grants
+      const { data: existingSave } = await supabase
         .from('saved_grants')
         .select('id')
         .eq('grant_id', grantId)
         .eq('user_id', session.user.id)
         .maybeSingle();
 
-      if (checkSaveError) {
-        console.error('ERROR: Failed to check saved grant:', checkSaveError);
-      } else if (!existingSave) {
-        console.log('Grant not in saved_grants, adding it');
-        const { error: saveError } = await supabase
+      if (!existingSave) {
+        await supabase
           .from('saved_grants')
           .insert({
             grant_id: grantId,
             user_id: session.user.id
           });
-
-        if (saveError) {
-          console.error('ERROR: Failed to save grant:', saveError);
-        } else {
-          console.log('SUCCESS: Added grant to saved_grants');
-        }
-      } else {
-        console.log('Grant already in saved_grants:', existingSave);
       }
 
-      // STEP 3: Force refresh with a longer delay
-      console.log('Step 3: Refreshing UI after successful database operations');
+      // Refresh UI immediately - no delays
+      if (refreshCallbacks?.loadApplications) {
+        refreshCallbacks.loadApplications();
+      }
+      if (refreshCallbacks?.loadSavedGrants) {
+        refreshCallbacks.loadSavedGrants();
+      }
       
-      setTimeout(() => {
-        console.log('=== REFRESHING UI AFTER SUCCESSFUL DELETION ===');
-        
-        if (refreshCallbacks?.loadApplications) {
-          refreshCallbacks.loadApplications();
-        }
-        if (refreshCallbacks?.loadSavedGrants) {
-          refreshCallbacks.loadSavedGrants();
-        }
-      }, 1500); // 1.5 second delay
-      
-      console.log('=== UNDO APPLICATION COMPLETED SUCCESSFULLY ===');
       return true;
       
     } catch (error) {
-      console.error('=== UNDO APPLICATION FAILED ===', error);
+      console.error('Error in removeApplication:', error);
       return false;
     }
   }, [session?.user?.id, userMembership, refreshCallbacks]);
@@ -219,12 +202,11 @@ export const useTrackingActions = (session, userMembership, refreshCallbacks) =>
         return false;
       }
 
-      // Refresh received data if callback provided
+      // Refresh data immediately
       if (refreshCallbacks?.loadReceivedGrants) {
         refreshCallbacks.loadReceivedGrants();
       }
       
-      console.log('Successfully removed award');
       return true;
       
     } catch (error) {

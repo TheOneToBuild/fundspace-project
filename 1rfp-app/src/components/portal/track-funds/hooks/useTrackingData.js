@@ -63,7 +63,7 @@ export const useTrackingData = (session, userMembership) => {
 
         return {
           ...grantData,
-          ...item, // Include additional fields like save_id, application_id, etc.
+          ...item,
           foundationName: orgData?.name || 'Unknown Organization',
           funderLogoUrl: orgData?.image_url || null,
           fundingAmount: grantData.max_funding_amount || grantData.funding_amount_text || 'Not specified',
@@ -90,8 +90,6 @@ export const useTrackingData = (session, userMembership) => {
   const loadSavedGrants = useCallback(async () => {
     if (!session?.user?.id) return;
 
-    console.log('Loading saved grants for user:', session.user.id);
-
     try {
       const { data: savedGrantsData, error } = await supabase
         .from('saved_grants')
@@ -105,49 +103,30 @@ export const useTrackingData = (session, userMembership) => {
         return;
       }
 
-      console.log('Raw saved grants data:', savedGrantsData?.length || 0, 'entries');
-
       if (!savedGrantsData || savedGrantsData.length === 0) {
-        console.log('No saved grants found');
         setData(prev => ({ ...prev, saved: [] }));
         return;
       }
 
       // Get existing applications to filter out grants that have already been applied to
-      // Add longer delay to ensure we get fresh data after any recent deletions
-      await new Promise(resolve => setTimeout(resolve, 200));
-      
-      // Use the same query logic as loadApplications to ensure consistency
       let applicationsQuery = supabase
         .from('grant_applications')
         .select('grant_id');
 
       // Match the same query logic as loadApplications
       if (userMembership?.role && ['super_admin', 'admin'].includes(userMembership.role) && userMembership?.organizations?.id) {
-        applicationsQuery = applicationsQuery
-          .eq('organization_id', userMembership.organizations.id)
-          .limit(1000); // Force fresh query
-        console.log('Filtering applications by organization for saved grants:', userMembership.organizations.id);
+        applicationsQuery = applicationsQuery.eq('organization_id', userMembership.organizations.id);
       } else {
-        applicationsQuery = applicationsQuery
-          .eq('user_id', session.user.id)
-          .limit(1000); // Force fresh query
-        console.log('Filtering applications by user for saved grants:', session.user.id);
+        applicationsQuery = applicationsQuery.eq('user_id', session.user.id);
       }
 
       const { data: existingApplications } = await applicationsQuery;
-
-      console.log('Existing applications for filtering:', existingApplications?.length || 0);
-
       const appliedGrantIds = new Set(existingApplications?.map(app => app.grant_id) || []);
-      console.log('Applied grant IDs:', Array.from(appliedGrantIds));
 
       // Filter out grants that have already been applied to
       const availableSavedGrants = savedGrantsData.filter(sg => !appliedGrantIds.has(sg.grant_id));
-      console.log('Available saved grants after filtering:', availableSavedGrants.length);
 
       if (availableSavedGrants.length === 0) {
-        console.log('No available saved grants after filtering out applied ones');
         setData(prev => ({ ...prev, saved: [] }));
         return;
       }
@@ -160,55 +139,33 @@ export const useTrackingData = (session, userMembership) => {
       }));
 
       const formattedData = await buildGrantData(baseData, grantIds);
-      console.log('✅ Final saved grants data:', formattedData.length, 'grants');
-      
       setData(prev => ({ ...prev, saved: formattedData }));
     } catch (error) {
       console.error('Error in loadSavedGrants:', error);
       setData(prev => ({ ...prev, saved: [] }));
     }
-  }, [session?.user?.id, userMembership]); // Added userMembership dependency
+  }, [session?.user?.id, userMembership]);
 
   // Load applications (organization level if admin, individual if not)
   const loadApplications = useCallback(async () => {
     if (!session?.user?.id) return;
 
-    console.log('Loading applications for user:', session.user.id);
-
     try {
-      // Create a completely fresh query with timestamp to bypass all caching
-      const timestamp = Date.now();
       let query = supabase
         .from('grant_applications')
-        .select('id, grant_id, status, applied_date, notes, user_id, organization_id'); // Added user_id and organization_id for debugging
+        .select('id, grant_id, status, applied_date, notes, user_id, organization_id');
 
       // If user has admin access, show organization-wide applications
       if (userMembership?.role && ['super_admin', 'admin'].includes(userMembership.role) && userMembership?.organizations?.id) {
         query = query.eq('organization_id', userMembership.organizations.id);
-        console.log('Loading organization applications for org:', userMembership.organizations.id);
       } else {
-        // Otherwise, show only user's applications
         query = query.eq('user_id', session.user.id);
-        console.log('Loading individual applications for user:', session.user.id);
       }
 
-      // Force completely fresh query with multiple cache-busting techniques
-      const { data: applicationsData, error } = await query
-        .order('applied_date', { ascending: false })
-        .limit(1000)
-        .range(0, 999); // Additional cache buster
-
-      console.log('Applications query result:', { data: applicationsData, error });
-      console.log('Raw applications data:', applicationsData?.map(app => ({ 
-        id: app.id, 
-        grant_id: app.grant_id, 
-        user_id: app.user_id,
-        organization_id: app.organization_id 
-      })));
+      const { data: applicationsData, error } = await query.order('applied_date', { ascending: false });
 
       if (error) {
         console.error('Error fetching applications:', error);
-        // If the table doesn't exist yet, just set empty array
         if (error.code === '42P01' || error.message.includes('does not exist')) {
           setData(prev => ({ ...prev, applications: [] }));
           return;
@@ -218,12 +175,9 @@ export const useTrackingData = (session, userMembership) => {
       }
 
       if (!applicationsData || applicationsData.length === 0) {
-        console.log('No applications found, setting empty array');
         setData(prev => ({ ...prev, applications: [] }));
         return;
       }
-
-      console.log('Found', applicationsData.length, 'applications');
 
       const grantIds = applicationsData.map(app => app.grant_id);
       const baseData = applicationsData.map(app => ({
@@ -235,13 +189,7 @@ export const useTrackingData = (session, userMembership) => {
       }));
 
       const formattedData = await buildGrantData(baseData, grantIds);
-      console.log('Formatted applications data:', formattedData.length, 'grants');
-      
-      // Filter out manually removed applications for immediate UI feedback
-      const filteredApplications = formattedData.filter(grant => !manualRemovedApplications.has(grant.id));
-      console.log('After manual filtering, applications data:', filteredApplications.length, 'grants');
-      
-      setData(prev => ({ ...prev, applications: filteredApplications }));
+      setData(prev => ({ ...prev, applications: formattedData }));
     } catch (error) {
       console.error('Error in loadApplications:', error);
       setData(prev => ({ ...prev, applications: [] }));
@@ -267,7 +215,6 @@ export const useTrackingData = (session, userMembership) => {
 
       if (error) {
         console.error('Error fetching received grants:', error);
-        // If the table doesn't exist yet, just set empty array
         if (error.code === '42P01' || error.message.includes('does not exist')) {
           setData(prev => ({ ...prev, received: [] }));
           return;

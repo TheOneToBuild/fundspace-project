@@ -1,4 +1,3 @@
-// src/utils/organizationEvents.js - Cleaned
 export const dispatchOrganizationChange = (profileId, organization) => {
     try {
         const event = new CustomEvent('organizationChanged', {

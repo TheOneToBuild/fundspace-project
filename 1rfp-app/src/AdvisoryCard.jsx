@@ -3,7 +3,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 const AdvisoryCard = ({ member, isExpanded, onToggle }) => {
   return (
-    // The `layout` prop from framer-motion will automatically animate size changes
     <motion.div
       layout
       onClick={onToggle}
@@ -20,8 +19,6 @@ const AdvisoryCard = ({ member, isExpanded, onToggle }) => {
         />
         <motion.h3 layout="position" className="text-lg font-bold text-slate-900">{member.name}</motion.h3>
         <motion.p layout="position" className="font-sans font-semibold text-blue-600 mb-3 text-sm">{member.title}</motion.p>
-        
-        {/* AnimatePresence will handle the smooth appearance and disappearance of the bio */}
         <AnimatePresence>
           {isExpanded && (
             <motion.div

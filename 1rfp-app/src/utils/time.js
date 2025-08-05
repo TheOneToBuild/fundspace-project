@@ -1,4 +1,3 @@
-// src/utils/time.js
 export const timeAgo = (date) => {
     const seconds = Math.floor((new Date() - new Date(date)) / 1000);
     let interval = seconds / 31536000;
