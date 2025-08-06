@@ -1,12 +1,10 @@
+// hooks/useOrganizationData.js
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
-import { 
-    notifyOrganizationJoined, 
-    notifyOrganizationLeft, 
-    notifyOrganizationUpdated 
-} from '../utils/organizationEvents';
 
 export function useOrganizationData(profile, session) {
+    const navigate = useNavigate();
     const [organization, setOrganization] = useState(null);
     const [members, setMembers] = useState([]);
     const [userMembership, setUserMembership] = useState(null);
@@ -35,7 +33,11 @@ export function useOrganizationData(profile, session) {
                 .order('joined_at', { ascending: false })
                 .limit(1);
 
-            if (membershipError) throw membershipError;
+            if (membershipError) {
+                setError('Error checking membership');
+                setLoading(false);
+                return;
+            }
 
             if (memberships && memberships.length > 0) {
                 setUserMembership(memberships[0]);
@@ -46,15 +48,16 @@ export function useOrganizationData(profile, session) {
             }
         } catch (err) {
             setError('Error checking membership');
+            setUserMembership(null);
+            setOrganization(null);
+            setMembers([]);
         } finally {
             setLoading(false);
         }
     }, [profile, session?.user?.id]);
 
     const fetchOrganizationData = useCallback(async () => {
-        if (!userMembership) {
-            return;
-        }
+        if (!userMembership) return;
 
         try {
             setLoading(true);
@@ -65,9 +68,13 @@ export function useOrganizationData(profile, session) {
                 .eq('id', userMembership.organization_id)
                 .single();
 
-            if (orgError || !orgData) throw (orgError || new Error('Organization not found'));
+            if (orgError || !orgData) {
+                setError('Organization not found');
+                setLoading(false);
+                return;
+            }
 
-            const enrichedOrgData = { 
+            setOrganization({ 
                 ...orgData, 
                 type: userMembership.organization_type,
                 logo_url: orgData.image_url,
@@ -76,19 +83,28 @@ export function useOrganizationData(profile, session) {
                 location: orgData.location || '', 
                 website: orgData.website || '', 
                 contact_email: orgData.contact_email || '',
-            };
-            
-            setOrganization(enrichedOrgData);
+            });
 
+            // FIXED: Added organizational_role to the query
             const { data: memberData, error: memberError } = await supabase
                 .from('organization_memberships')
-                .select(`*, profiles (id, full_name, avatar_url, title, is_omega_admin)`)
+                .select(`
+                    *,
+                    profiles (
+                        id,
+                        full_name,
+                        avatar_url,
+                        title,
+                        is_omega_admin,
+                        organizational_role
+                    )
+                `)
                 .eq('organization_id', userMembership.organization_id)
-                .order('joined_at', { ascending: false });
+                .eq('organization_type', userMembership.organization_type)
+                .order('role', { ascending: false })
+                .order('joined_at', { ascending: true });
 
-            if (memberError) {
-                setError('Error loading organization members');
-            } else {
+            if (!memberError) {
                 setMembers(memberData || []);
             }
         } catch (err) {
@@ -98,214 +114,149 @@ export function useOrganizationData(profile, session) {
         }
     }, [userMembership]);
 
-    const executeLeave = useCallback(async () => {
-        if (!userMembership || !profile?.id) return false;
+    const executeLeave = async () => {
+        if (!userMembership) return;
 
-        setLoading(true);
-        setError('');
         try {
+            setLoading(true);
+            setError('');
+
             const { error: deleteError } = await supabase
                 .from('organization_memberships')
                 .delete()
-                .eq('profile_id', profile.id)
+                .eq('profile_id', session.user.id)
                 .eq('organization_id', userMembership.organization_id);
 
-            if (deleteError) throw deleteError;
-            
-            notifyOrganizationLeft(profile.id, userMembership.organization_id);
+            if (deleteError) {
+                setError('Error leaving organization: ' + deleteError.message);
+                return;
+            }
+
+            await supabase
+                .from('profiles')
+                .update({
+                    organization_choice: null,
+                    selected_organization_id: null,
+                    selected_organization_type: null,
+                    updated_at: new Date()
+                })
+                .eq('id', session.user.id);
 
             setUserMembership(null);
             setOrganization(null);
             setMembers([]);
-            return true;
+            
+            await new Promise(resolve => setTimeout(resolve, 500));
+            await checkMembership();
         } catch (err) {
-            setError('Failed to leave organization');
-            return false;
+            setError('An unexpected error occurred while leaving the organization.');
         } finally {
             setLoading(false);
         }
-    }, [userMembership, profile?.id]);
+    };
 
-    const executeDeleteOrganization = useCallback(async () => {
-        if (!organization || !userMembership || !profile?.id) return false;
+    const executeDeleteOrganization = async (confirmText) => {
+        if (!organization || confirmText !== organization.name) {
+            setError('Please enter the organization name exactly to confirm deletion.');
+            return false;
+        }
 
-        setLoading(true);
-        setError('');
         try {
-            const { error: membershipsError } = await supabase
+            setLoading(true);
+            setError('');
+
+            // Step 1: Delete all organization memberships
+            const { error: membershipError } = await supabase
                 .from('organization_memberships')
                 .delete()
                 .eq('organization_id', organization.id);
 
-            if (membershipsError) throw membershipsError;
+            if (membershipError) {
+                throw new Error('Failed to remove organization members: ' + membershipError.message);
+            }
 
+            // Step 2: Delete organization posts (if any)
+            await supabase
+                .from('organization_posts')
+                .delete()
+                .eq('organization_id', organization.id);
+
+            // Step 3: Delete the organization itself
             const { error: orgError } = await supabase
                 .from('organizations')
                 .delete()
                 .eq('id', organization.id);
 
-            if (orgError) throw orgError;
-            
-            notifyOrganizationLeft(profile.id, organization.id);
-
-            setUserMembership(null);
-            setOrganization(null);
-            setMembers([]);
-            return true;
-        } catch (err) {
-            setError('Failed to delete organization');
-            return false;
-        } finally {
-            setLoading(false);
-        }
-    }, [organization, userMembership, profile?.id]);
-
-    const updateOrganization = useCallback(async (updateData) => {
-        if (!organization || !userMembership || !profile?.id) return false;
-
-        setLoading(true);
-        setError('');
-        try {
-            const { data: updatedOrg, error: updateError } = await supabase
-                .from('organizations')
-                .update(updateData)
-                .eq('id', organization.id)
-                .select()
-                .single();
-
-            if (updateError) throw updateError;
-            
-            const enrichedOrgData = { 
-                ...updatedOrg, 
-                type: userMembership.organization_type,
-                logo_url: updatedOrg.image_url,
-                tagline: updatedOrg.tagline || '', 
-                description: updatedOrg.description || '', 
-                location: updatedOrg.location || '', 
-                website: updatedOrg.website || '', 
-                contact_email: updatedOrg.contact_email || '',
-            };
-            
-            setOrganization(enrichedOrgData);
-            notifyOrganizationUpdated(profile.id, enrichedOrgData);
-            return true;
-        } catch (err) {
-            setError('Failed to update organization');
-            return false;
-        } finally {
-            setLoading(false);
-        }
-    }, [organization, userMembership, profile?.id]);
-
-    const joinOrganization = useCallback(async (organizationData) => {
-        if (!profile?.id || !session?.user?.id) return false;
-
-        setLoading(true);
-        setError('');
-        try {
-            // Check if organization has existing super admins
-            const { data: existingSuperAdmins, error: checkError } = await supabase
-                .from('organization_memberships')
-                .select('id')
-                .eq('organization_id', organizationData.id)
-                .eq('role', 'super_admin');
-        
-            if (checkError) {
-                console.error('Error checking existing super admins:', checkError);
-                throw checkError;
+            if (orgError) {
+                throw new Error('Failed to delete organization: ' + orgError.message);
             }
-        
-            // Determine role: super_admin if no existing super_admins, otherwise member
-            const role = (!existingSuperAdmins || existingSuperAdmins.length === 0) ? 'super_admin' : 'member';
-        
-            const membershipData = {
-                profile_id: profile.id,
-                organization_id: organizationData.id,
-                organization_type: organizationData.type,
-                role: role, // Will be 'super_admin' if no existing super admins, otherwise 'member'
-                membership_type: 'staff',
-                is_public: true
-            };
-        
-            const { error: membershipError } = await supabase
-                .from('organization_memberships')
-                .insert(membershipData);
 
-            if (membershipError) throw membershipError;
-            
-            setUserMembership({ ...membershipData, joined_at: new Date().toISOString() });
-            notifyOrganizationJoined(profile.id, organizationData);
-            await checkMembership();
-            
-            console.log(`✅ Successfully joined organization with role: ${role}`);
+            // Step 4: Update user profile to clear organization references
+            await supabase
+                .from('profiles')
+                .update({
+                    organization_choice: null,
+                    selected_organization_id: null,
+                    selected_organization_type: null,
+                    updated_at: new Date()
+                })
+                .eq('id', session.user.id);
+
+            // Success - navigate away
+            alert('Organization deleted successfully.');
+            navigate('/profile');
             return true;
         } catch (err) {
-            setError('Failed to join organization');
-            console.error('Error joining organization:', err);
+            console.error('Delete organization error:', err);
+            setError(err.message || 'An unexpected error occurred while deleting the organization.');
             return false;
         } finally {
             setLoading(false);
         }
-    }, [profile?.id, session?.user?.id, checkMembership]);
+    };
 
-    const createOrganization = useCallback(async (orgData, focusAreas, supportedLocations) => {
-        if (!profile?.id || !session?.user?.id) return false;
+    const updateOrganization = async (updateData) => {
+        if (!organization) return false;
 
-        setLoading(true);
-        setError('');
         try {
-            const createData = {
-                ...orgData,
-                admin_profile_id: profile.id,
-                is_verified: false,
-                extended_data: {
-                    focus_areas: focusAreas || [],
-                    supported_locations: supportedLocations || []
-                }
-            };
-            const { data: newOrg, error: orgError } = await supabase
+            setLoading(true);
+            setError('');
+
+            const { error: updateError } = await supabase
                 .from('organizations')
-                .insert(createData)
-                .select()
-                .single();
+                .update({
+                    ...updateData,
+                    updated_at: new Date()
+                })
+                .eq('id', organization.id);
 
-            if (orgError) throw orgError;
-
-            const membershipData = {
-                profile_id: profile.id,
-                organization_id: newOrg.id,
-                organization_type: newOrg.type,
-                role: 'super_admin',
-                membership_type: 'staff',
-                is_public: true
-            };
-            const { error: membershipError } = await supabase
-                .from('organization_memberships')
-                .insert(membershipData);
-
-            if (membershipError) {
-                setError('Organization created but failed to set up membership');
+            if (updateError) {
+                setError('Failed to save changes. Please try again.');
                 return false;
             }
 
-            setUserMembership({ ...membershipData, joined_at: new Date().toISOString() });
-            notifyOrganizationJoined(profile.id, newOrg);
-            await checkMembership();
-            return newOrg;
+            setOrganization(prev => ({
+                ...prev,
+                ...updateData
+            }));
+
+            return true;
         } catch (err) {
-            setError('Failed to create organization');
+            setError('An unexpected error occurred. Please try again.');
             return false;
         } finally {
             setLoading(false);
         }
-    }, [profile?.id, session?.user?.id, checkMembership]);
+    };
 
     useEffect(() => {
         checkMembership();
     }, [checkMembership]);
 
     useEffect(() => {
-        fetchOrganizationData();
+        if (userMembership) {
+            fetchOrganizationData();
+        }
     }, [fetchOrganizationData]);
 
     return {
@@ -319,8 +270,6 @@ export function useOrganizationData(profile, session) {
         fetchOrganizationData,
         executeLeave,
         executeDeleteOrganization,
-        updateOrganization,
-        joinOrganization,
-        createOrganization
+        updateOrganization
     };
 }

@@ -1,4 +1,4 @@
-// components/organization/TeamManagement.jsx - Updated to pass organization prop
+// components/organization/TeamManagement.jsx - Updated to use organizational_role field
 import React, { useState, useMemo } from 'react';
 import { Search, Users } from 'lucide-react';
 import { ROLES } from '../../utils/organizationPermissions.js';
@@ -10,7 +10,7 @@ export default function TeamManagement({
     profile, 
     onMemberAction, 
     setError,
-    organization  // Add organization prop
+    organization
 }) {
     const [searchQuery, setSearchQuery] = useState('');
     const [roleFilter, setRoleFilter] = useState('all');
@@ -28,27 +28,54 @@ export default function TeamManagement({
         });
     }, [members, searchQuery, roleFilter]);
 
-    // Organize members by role and title
+    // Organize members by organizational_role field with fallbacks
     const organizedMembers = useMemo(() => {
         const filtered = filteredMembers;
 
-        const leadership = filtered.filter(m => 
-            ['super_admin', 'admin'].includes(m.role) || 
-            m.profiles?.title?.toLowerCase().includes('director') ||
-            m.profiles?.title?.toLowerCase().includes('ceo') ||
-            m.profiles?.title?.toLowerCase().includes('president') ||
-            m.profiles?.title?.toLowerCase().includes('executive')
-        );
+        // Use organizational_role field first, with fallbacks only if not set
+        const leadership = filtered.filter(m => {
+            // First check organizational_role field - if set, use it
+            if (m.profiles?.organizational_role) {
+                return m.profiles.organizational_role === 'leadership';
+            }
+            
+            // Only use fallback logic if organizational_role is not set
+            // Fallback to role-based detection
+            if (['super_admin', 'admin'].includes(m.role)) return true;
+            
+            // Fallback to title-based detection
+            const title = m.profiles?.title?.toLowerCase() || '';
+            return title.includes('director') ||
+                   title.includes('ceo') ||
+                   title.includes('president') ||
+                   title.includes('executive') ||
+                   title.includes('chief');
+        });
 
-        const boardMembers = filtered.filter(m => 
-            m.profiles?.title?.toLowerCase().includes('board') ||
-            m.profiles?.title?.toLowerCase().includes('trustee') ||
-            m.profiles?.title?.toLowerCase().includes('chair')
-        );
+        const boardMembers = filtered.filter(m => {
+            // First check organizational_role field - if set, use it
+            if (m.profiles?.organizational_role) {
+                return m.profiles.organizational_role === 'board';
+            }
+            
+            // Only use fallback if organizational_role is not set
+            const title = m.profiles?.title?.toLowerCase() || '';
+            return title.includes('board') ||
+                   title.includes('trustee') ||
+                   title.includes('chair') ||
+                   title.includes('advisor');
+        });
 
-        const staff = filtered.filter(m => 
-            !leadership.includes(m) && !boardMembers.includes(m)
-        );
+        const staff = filtered.filter(m => {
+            // First check organizational_role field - if set, use it
+            if (m.profiles?.organizational_role) {
+                return m.profiles.organizational_role === 'staff';
+            }
+            
+            // Only use fallback if organizational_role is not set
+            // Include members not in leadership or board (fallback logic)
+            return !leadership.includes(m) && !boardMembers.includes(m);
+        });
 
         return { leadership, staff, boardMembers };
     }, [filteredMembers]);
@@ -95,7 +122,7 @@ export default function TeamManagement({
                     profile={profile}
                     onMemberAction={onMemberAction}
                     setError={setError}
-                    organization={organization}  // Pass organization prop
+                    organization={organization}
                 />
                 
                 <TeamSection
@@ -105,7 +132,7 @@ export default function TeamManagement({
                     profile={profile}
                     onMemberAction={onMemberAction}
                     setError={setError}
-                    organization={organization}  // Pass organization prop
+                    organization={organization}
                 />
                 
                 <TeamSection
@@ -115,7 +142,7 @@ export default function TeamManagement({
                     profile={profile}
                     onMemberAction={onMemberAction}
                     setError={setError}
-                    organization={organization}  // Pass organization prop
+                    organization={organization}
                 />
             </div>
 
