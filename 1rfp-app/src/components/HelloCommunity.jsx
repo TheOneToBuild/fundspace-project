@@ -499,7 +499,12 @@ function HelloCommunity() {
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'posts', filter: `channel=eq.${dbChannel}` }, handlePostDelete)
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    return () => { 
+      if (channel) {
+        channel.unsubscribe();
+        supabase.removeChannel(channel); 
+      }
+    };
   }, [dbChannel]);
 
   if (!organizationInfo || !userOrgType) {

@@ -8,14 +8,29 @@ export const sendConnectionRequest = async (requesterId, recipientId) => {
     if (requesterId === recipientId) {
       return { success: false, error: 'Cannot connect to yourself' };
     }
-    const { data: existingConnection, error: checkError } = await supabase
-      .from('user_connections')
-      .select('id, status, requester_id, recipient_id')
-      .or(`and(requester_id.eq.${requesterId},recipient_id.eq.${recipientId}),and(requester_id.eq.${recipientId},recipient_id.eq.${requesterId})`)
-      .single();
-    if (checkError && checkError.code !== 'PGRST116') {
-      return { success: false, error: checkError.message };
+
+    // FIXED: Use two separate queries instead of complex OR with AND
+    const [query1, query2] = await Promise.all([
+      supabase
+        .from('user_connections')
+        .select('id, status, requester_id, recipient_id')
+        .eq('requester_id', requesterId)
+        .eq('recipient_id', recipientId)
+        .maybeSingle(),
+      supabase
+        .from('user_connections')
+        .select('id, status, requester_id, recipient_id')
+        .eq('requester_id', recipientId)
+        .eq('recipient_id', requesterId)
+        .maybeSingle()
+    ]);
+
+    if (query1.error || query2.error) {
+      return { success: false, error: query1.error?.message || query2.error?.message };
     }
+
+    const existingConnection = query1.data || query2.data;
+
     if (existingConnection) {
       switch (existingConnection.status) {
         case 'accepted':
@@ -28,8 +43,10 @@ export const sendConnectionRequest = async (requesterId, recipientId) => {
           return { success: false, error: 'Unable to send connection request' };
       }
     }
+
     let result;
     let connectionId;
+
     if (existingConnection && existingConnection.status === 'declined') {
       result = await supabase
         .from('user_connections')
@@ -53,9 +70,11 @@ export const sendConnectionRequest = async (requesterId, recipientId) => {
         .single();
       connectionId = result.data?.id;
     }
+
     if (result.error) {
       return { success: false, error: result.error.message };
     }
+
     await createConnectionNotification(requesterId, recipientId, 'connection_request', connectionId);
     return { success: true };
   } catch (error) {
@@ -76,9 +95,11 @@ export const acceptConnectionRequest = async (currentUserId, requesterId) => {
       .eq('status', 'pending')
       .select('id')
       .single();
+
     if (error) {
       return { success: false, error: error.message };
     }
+
     await createConnectionNotification(currentUserId, requesterId, 'connection_accepted', data.id);
     return { success: true };
   } catch (error) {
@@ -97,6 +118,7 @@ export const declineConnectionRequest = async (currentUserId, requesterId) => {
       .eq('requester_id', requesterId)
       .eq('recipient_id', currentUserId)
       .eq('status', 'pending');
+
     if (error) {
       return { success: false, error: error.message };
     }
@@ -108,13 +130,24 @@ export const declineConnectionRequest = async (currentUserId, requesterId) => {
 
 export const removeConnection = async (currentUserId, otherUserId) => {
   try {
-    const { error } = await supabase
-      .from('user_connections')
-      .delete()
-      .or(`and(requester_id.eq.${currentUserId},recipient_id.eq.${otherUserId}),and(requester_id.eq.${otherUserId},recipient_id.eq.${currentUserId})`);
-    if (error) {
-      return { success: false, error: error.message };
+    // FIXED: Use two separate delete operations
+    const [delete1, delete2] = await Promise.all([
+      supabase
+        .from('user_connections')
+        .delete()
+        .eq('requester_id', currentUserId)
+        .eq('recipient_id', otherUserId),
+      supabase
+        .from('user_connections')
+        .delete()
+        .eq('requester_id', otherUserId)
+        .eq('recipient_id', currentUserId)
+    ]);
+
+    if (delete1.error && delete2.error) {
+      return { success: false, error: delete1.error.message };
     }
+
     return { success: true };
   } catch (error) {
     return { success: false, error: error.message };
@@ -126,17 +159,33 @@ export const getConnectionStatus = async (userId1, userId2) => {
     if (!userId1 || !userId2) {
       return { status: 'none', isRequester: false };
     }
-    const { data, error } = await supabase
-      .from('user_connections')
-      .select('status, requester_id, recipient_id')
-      .or(`and(requester_id.eq.${userId1},recipient_id.eq.${userId2}),and(requester_id.eq.${userId2},recipient_id.eq.${userId1})`)
-      .single();
-    if (error && error.code !== 'PGRST116') {
-      return { status: 'none', isRequester: false, error: error.message };
+
+    // FIXED: Use two separate queries instead of complex OR with AND
+    const [query1, query2] = await Promise.all([
+      supabase
+        .from('user_connections')
+        .select('status, requester_id, recipient_id')
+        .eq('requester_id', userId1)
+        .eq('recipient_id', userId2)
+        .maybeSingle(),
+      supabase
+        .from('user_connections')
+        .select('status, requester_id, recipient_id')
+        .eq('requester_id', userId2)
+        .eq('recipient_id', userId1)
+        .maybeSingle()
+    ]);
+
+    if (query1.error || query2.error) {
+      return { status: 'none', isRequester: false, error: query1.error?.message || query2.error?.message };
     }
+
+    const data = query1.data || query2.data;
+
     if (!data) {
       return { status: 'none', isRequester: false };
     }
+
     return {
       status: data.status,
       isRequester: data.requester_id === userId1
@@ -151,21 +200,26 @@ export const withdrawConnectionRequest = async (requesterId, recipientId) => {
     if (!requesterId || !recipientId) {
       return { success: false, error: 'Both requester and recipient IDs are required' };
     }
+
     const { error } = await supabase
       .from('user_connections')
       .delete()
       .eq('requester_id', requesterId)
       .eq('recipient_id', recipientId)
       .eq('status', 'pending');
+
     if (error) {
       return { success: false, error: error.message };
     }
+
+    // Clean up notification
     const { error: notificationError } = await supabase
       .from('notifications')
       .delete()
       .eq('actor_id', requesterId)
       .eq('user_id', recipientId)
       .eq('type', 'connection_request');
+
     return { success: true };
   } catch (error) {
     return { success: false, error: error.message };
@@ -179,6 +233,7 @@ export const getMutualConnectionsCount = async (userId1, userId2) => {
         user1_id: userId1,
         user2_id: userId2
       });
+
     if (error) {
       return { count: 0, error: error.message };
     }
@@ -197,30 +252,38 @@ export const getUserConnections = async (userId, limit = 50) => {
       .eq('status', 'accepted')
       .order('created_at', { ascending: false })
       .limit(limit);
+
     if (connectionsError) {
       return { connections: [], error: connectionsError.message };
     }
+
     if (!connectionsData || connectionsData.length === 0) {
       return { connections: [] };
     }
+
     const otherUserIds = connectionsData.map(conn => {
       return conn.requester_id === userId ? conn.recipient_id : conn.requester_id;
     });
+
     const { data: profilesData, error: profilesError } = await supabase
       .from('profiles')
       .select('id, full_name, avatar_url, title, organization_name')
       .in('id', otherUserIds);
+
     if (profilesError) {
       return { connections: [], error: profilesError.message };
     }
+
     const profilesMap = {};
     profilesData.forEach(profile => {
       profilesMap[profile.id] = profile;
     });
+
     const formattedConnections = connectionsData.map(conn => {
       const isRequester = conn.requester_id === userId;
       const otherUserId = isRequester ? conn.recipient_id : conn.requester_id;
       const otherUser = profilesMap[otherUserId];
+      
       return {
         id: conn.id,
         user: otherUser || {
@@ -233,6 +296,7 @@ export const getUserConnections = async (userId, limit = 50) => {
         connected_at: conn.created_at
       };
     });
+
     return { connections: formattedConnections };
   } catch (error) {
     return { connections: [], error: error.message };
@@ -247,24 +311,31 @@ export const getPendingConnectionRequests = async (userId) => {
       .eq('recipient_id', userId)
       .eq('status', 'pending')
       .order('created_at', { ascending: false });
+
     if (requestsError) {
       return { requests: [], error: requestsError.message };
     }
+
     if (!requestsData || requestsData.length === 0) {
       return { requests: [] };
     }
+
     const requesterIds = requestsData.map(req => req.requester_id);
+
     const { data: profilesData, error: profilesError } = await supabase
       .from('profiles')
       .select('id, full_name, avatar_url, title, organization_name')
       .in('id', requesterIds);
+
     if (profilesError) {
       return { requests: [], error: profilesError.message };
     }
+
     const profilesMap = {};
     profilesData.forEach(profile => {
       profilesMap[profile.id] = profile;
     });
+
     const formattedRequests = requestsData.map(req => {
       const requesterProfile = profilesMap[req.requester_id];
       return {
@@ -279,6 +350,7 @@ export const getPendingConnectionRequests = async (userId) => {
         }
       };
     });
+
     return { requests: formattedRequests };
   } catch (error) {
     return { requests: [], error: error.message };
@@ -290,6 +362,7 @@ const createConnectionNotification = async (actorId, recipientId, type, connecti
     if (actorId === recipientId) {
       return { success: true };
     }
+
     const { data, error } = await supabase
       .rpc('create_connection_notification', {
         p_recipient_id: recipientId,
@@ -297,9 +370,11 @@ const createConnectionNotification = async (actorId, recipientId, type, connecti
         p_notification_type: type,
         p_connection_id: connectionId
       });
+
     if (error) {
       return { success: false, error: error.message };
     }
+
     return { success: true, notificationId: data };
   } catch (error) {
     return { success: false, error: error.message };

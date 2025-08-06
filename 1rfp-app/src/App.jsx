@@ -49,15 +49,20 @@ import ResetPasswordForm from './components/auth/ResetPasswordForm';
 import AuthLayout from './components/auth/AuthLayout';
 import ConnectionsPage from './components/ConnectionsPage.jsx';
 import GrantsPortalPage from './components/GrantsPortalPage.jsx';
+
 export const LayoutContext = createContext({ setPageBgColor: () => {} });
 
 const AuthRedirect = ({ children }) => {
   const { session, profile, loading } = useOutletContext();
   const location = useLocation();
+  
   if (loading) return children;
-  if (session && profile && location.pathname === '/') {
+  
+  // Only redirect logged-in users who are specifically on the homepage with no query parameters
+  if (session && profile && location.pathname === '/' && location.search === '') {
     return <Navigate to="/profile" replace />;
   }
+  
   return children;
 };
 
@@ -363,13 +368,26 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, []);
 
+  // FIXED: Proper real-time subscription cleanup for notifications
   useEffect(() => {
-    if (!session) return;
+    if (!session?.user?.id) return;
+    
     const channel = supabase.channel(`profile-notifications:${session.user.id}`);
+    
     channel
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${session.user.id}` }, async (payload) => {
+      .on('postgres_changes', { 
+        event: 'INSERT', 
+        schema: 'public', 
+        table: 'notifications', 
+        filter: `user_id=eq.${session.user.id}` 
+      }, async (payload) => {
         try {
-          const { data: actor } = await supabase.from('profiles').select('*').eq('id', payload.new.actor_id).single();
+          const { data: actor } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', payload.new.actor_id)
+            .single();
+            
           if (actor) {
             setNotifications(current => [{ ...payload.new, actor_id: actor }, ...current]);
             setUnreadCount(current => current + 1);
@@ -378,9 +396,21 @@ export default function App() {
           console.error('Error processing notification:', error);
         }
       })
-      .subscribe();
-    return () => supabase.removeChannel(channel);
-  }, [session]);
+      .subscribe((status) => {
+        // Only log errors, not successful connections
+        if (status === 'CHANNEL_ERROR') {
+          console.error('Notifications subscription error');
+        }
+      });
+    
+    return () => {
+      // FIXED: Properly unsubscribe and remove channel
+      if (channel) {
+        channel.unsubscribe();
+        supabase.removeChannel(channel);
+      }
+    };
+  }, [session?.user?.id]);
 
   const outletContext = { session, profile, loading, notifications, unreadCount, markNotificationsAsRead, handleClearAllNotifications, handleViewPost, refreshProfile };
 

@@ -27,9 +27,11 @@ export default function SettingsPage() {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   
-  // Add collapsible state
+  // Add collapsible state for notifications and social profiles
   const [showPasswordSettings, setShowPasswordSettings] = useState(false);
   const [showEmailSettings, setShowEmailSettings] = useState(false);
+  const [showNotificationSettings, setShowNotificationSettings] = useState(false);
+  const [showSocialSettings, setShowSocialSettings] = useState(false);
 
   useEffect(() => {
     const loadProfileData = async () => {
@@ -338,9 +340,12 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      {/* Enhanced Social Profiles Section */}
+      {/* Collapsible Social Profiles Section */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="bg-gradient-to-r from-purple-50 to-pink-50 px-6 py-4 border-b border-slate-200">
+        <div 
+          className="flex items-center justify-between cursor-pointer p-6 hover:bg-slate-50 transition-colors"
+          onClick={() => setShowSocialSettings(!showSocialSettings)}
+        >
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
               <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -349,22 +354,56 @@ export default function SettingsPage() {
             </div>
             <div>
               <h2 className="text-xl font-semibold text-slate-800">Social Profiles</h2>
-              <p className="text-sm text-slate-600">Connect your social media and professional profiles</p>
+              <p className="text-sm text-slate-500 mt-0.5">Connect your social media and professional profiles</p>
             </div>
           </div>
+          <div className="flex items-center gap-2">
+            {showSocialSettings && (
+              <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded-full font-medium">
+                Expanded
+              </span>
+            )}
+            <button className="p-2 hover:bg-slate-200 rounded-lg transition-colors">
+              <svg 
+                className={`w-5 h-5 text-slate-600 transform transition-transform duration-200 ${showSocialSettings ? 'rotate-180' : ''}`}
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+          </div>
         </div>
-        <div className="p-6">
-          <SocialProfilesSettings
-            profile={profile}
-            onSave={handleSocialProfilesSave}
-            loading={loading}
-          />
-        </div>
+        
+        {showSocialSettings && (
+          <div className="px-6 pb-6 border-t border-slate-100 bg-slate-50/50">
+            <div className="pt-6">
+              <SocialProfilesSettings
+                profile={profile}
+                onSave={handleSocialProfilesSave}
+                loading={loading}
+              />
+              <div className="mt-4">
+                <button 
+                  type="button"
+                  onClick={() => setShowSocialSettings(false)}
+                  className="px-6 py-2.5 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 font-medium transition-colors"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Enhanced Notification Settings */}
+      {/* Collapsible Notification Settings */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="bg-gradient-to-r from-amber-50 to-orange-50 px-6 py-4 border-b border-slate-200">
+        <div 
+          className="flex items-center justify-between cursor-pointer p-6 hover:bg-slate-50 transition-colors"
+          onClick={() => setShowNotificationSettings(!showNotificationSettings)}
+        >
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center">
               <svg className="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -373,17 +412,48 @@ export default function SettingsPage() {
             </div>
             <div>
               <h2 className="text-xl font-semibold text-slate-800">Notifications</h2>
-              <p className="text-sm text-slate-600">Manage how and when you receive notifications</p>
+              <p className="text-sm text-slate-500 mt-0.5">Manage how and when you receive notifications</p>
             </div>
           </div>
+          <div className="flex items-center gap-2">
+            {showNotificationSettings && (
+              <span className="text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded-full font-medium">
+                Expanded
+              </span>
+            )}
+            <button className="p-2 hover:bg-slate-200 rounded-lg transition-colors">
+              <svg 
+                className={`w-5 h-5 text-slate-600 transform transition-transform duration-200 ${showNotificationSettings ? 'rotate-180' : ''}`}
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+          </div>
         </div>
-        <div className="p-6">
-          <NotificationSettings
-            profile={profile}
-            updateNotificationProfile={updateNotificationProfile}
-            loading={loading}
-          />
-        </div>
+        
+        {showNotificationSettings && (
+          <div className="px-6 pb-6 border-t border-slate-100 bg-slate-50/50">
+            <div className="pt-6">
+              <NotificationSettings
+                profile={profile}
+                updateNotificationProfile={updateNotificationProfile}
+                loading={loading}
+              />
+              <div className="mt-4">
+                <button 
+                  type="button"
+                  onClick={() => setShowNotificationSettings(false)}
+                  className="px-6 py-2.5 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 font-medium transition-colors"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
       
       {/* Collapsible Password Settings */}
@@ -425,41 +495,16 @@ export default function SettingsPage() {
         {showPasswordSettings && (
           <div className="px-6 pb-6 border-t border-slate-100 bg-slate-50/50">
             <div className="pt-6">
-              <form className="space-y-5">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">New Password</label>
-                    <input
-                      type="password"
-                      className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                      placeholder="Enter new password"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">Confirm Password</label>
-                    <input
-                      type="password"
-                      className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                      placeholder="Confirm new password"
-                    />
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 pt-2">
-                  <button 
-                    type="submit" 
-                    className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 py-2.5 rounded-lg hover:from-blue-700 hover:to-blue-800 font-semibold shadow-sm transition-all transform hover:scale-105"
-                  >
-                    Update Password
-                  </button>
-                  <button 
-                    type="button"
-                    onClick={() => setShowPasswordSettings(false)}
-                    className="px-6 py-2.5 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 font-medium transition-colors"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </form>
+              <PasswordSettings />
+              <div className="mt-4">
+                <button 
+                  type="button"
+                  onClick={() => setShowPasswordSettings(false)}
+                  className="px-6 py-2.5 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 font-medium transition-colors"
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -474,7 +519,7 @@ export default function SettingsPage() {
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center">
               <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 7.89a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 7.89a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-1 1v3M4 7h16" />
               </svg>
             </div>
             <div>
@@ -504,44 +549,16 @@ export default function SettingsPage() {
         {showEmailSettings && (
           <div className="px-6 pb-6 border-t border-slate-100 bg-slate-50/50">
             <div className="pt-6">
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-5">
-                <div className="flex items-start gap-3">
-                  <svg className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  <div>
-                    <p className="text-sm font-medium text-blue-800">Email Change Process</p>
-                    <p className="text-sm text-blue-700 mt-1">
-                      A confirmation link will be sent to your new email address. You'll need to click it to complete the change.
-                    </p>
-                  </div>
-                </div>
+              <EmailSettings />
+              <div className="mt-4">
+                <button 
+                  type="button"
+                  onClick={() => setShowEmailSettings(false)}
+                  className="px-6 py-2.5 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 font-medium transition-colors"
+                >
+                  Close
+                </button>
               </div>
-              <form className="space-y-5">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">New Email Address</label>
-                  <input
-                    type="email"
-                    className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
-                    placeholder="Enter your new email address"
-                  />
-                </div>
-                <div className="flex items-center gap-3 pt-2">
-                  <button 
-                    type="submit" 
-                    className="bg-gradient-to-r from-emerald-600 to-emerald-700 text-white px-6 py-2.5 rounded-lg hover:from-emerald-700 hover:to-emerald-800 font-semibold shadow-sm transition-all transform hover:scale-105"
-                  >
-                    Update Email
-                  </button>
-                  <button 
-                    type="button"
-                    onClick={() => setShowEmailSettings(false)}
-                    className="px-6 py-2.5 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 font-medium transition-colors"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </form>
             </div>
           </div>
         )}

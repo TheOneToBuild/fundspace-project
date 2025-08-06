@@ -1,3 +1,4 @@
+// src/components/ProfileNav.jsx - FIXED VERSION
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { NavLink, useOutletContext, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
@@ -70,38 +71,24 @@ export default function ProfileNav() {
     }, [profile?.id]);
 
     useEffect(() => {
-        fetchProfileStats();
-        
-        // Fetch organization data
         if (profile?.id) {
-            fetchOrganizationData(profile.id).then(({ name, slug }) => {
-                setOrganizationName(name);
-                setOrganizationSlug(slug);
+            Promise.all([
+                fetchOrganizationData(profile.id),
+                fetchProfileStats()
+            ]).then(([orgData]) => {
+                setOrganizationName(orgData.name);
+                setOrganizationSlug(orgData.slug);
             });
         }
-        
-        const channel = supabase.channel(`profile-stats-changes:${profile?.id}`)
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'followers', filter: `or(follower_id.eq.${profile?.id},following_id.eq.${profile?.id})` }, fetchProfileStats)
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'user_connections', filter: `or(requester_id.eq.${profile?.id},recipient_id.eq.${profile?.id})` }, fetchProfileStats)
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'organization_memberships', filter: `profile_id.eq.${profile?.id}` }, () => {
-                if (profile?.id) {
-                    fetchOrganizationData(profile.id).then(({ name, slug }) => {
-                        setOrganizationName(name);
-                        setOrganizationSlug(slug);
-                    });
-                }
-            })
-            .subscribe();
-        return () => { supabase.removeChannel(channel); };
-    }, [profile?.id, fetchProfileStats, fetchOrganizationData]);
+    }, [profile?.id, fetchOrganizationData, fetchProfileStats]);
 
-    // --- NAVIGATION STRUCTURE ---
+    // Navigation configuration
     const navItems = [
         {
             section: 'Community',
             links: [
-                { icon: <Home size={20} />, text: "Dashboard", to: "/profile" },                           // NEW: Main dashboard
-                { icon: <Globe size={20} />, text: "Hello World", to: "/profile/hello-world" },          // UPDATED: Moved HelloWorld
+                { icon: <Home size={20} />, text: "Home", to: "/profile" },
+                { icon: <Globe size={20} />, text: "Hello World", to: "/profile/hello-world" },
                 { icon: <Handshake size={20} />, text: "Hello Community", to: "/profile/hello-community" },
                 { icon: <Search size={20} />, text: "Discover People", to: "/profile/members" },
             ]
@@ -236,7 +223,9 @@ function NavItem({ to, icon, text, badge, isExpanded }) {
         <NavLink 
             to={to} 
             className={navLinkClass} 
-            end={to === "/profile/omega-admin" || to === "/profile"} 
+            // FIXED: Removed the problematic end prop that was causing routing issues
+            // Only use end for specific admin routes that truly need exact matching
+            end={to === "/profile/omega-admin"}
             title={!isExpanded ? text : ''}
         >
             <div className="flex items-center justify-center w-5 h-5 flex-shrink-0">
@@ -314,7 +303,7 @@ function ProfileCard({ profile, stats, organizationName, organizationSlug, navig
                     value={stats.followingCount} 
                     onClick={() => navigate('/profile/following')}
                     color="blue"
-                    icon="🌟"
+                    icon="👤"
                 />
             </div>
         </div>
@@ -322,43 +311,53 @@ function ProfileCard({ profile, stats, organizationName, organizationSlug, navig
 }
 
 function StatButton({ label, value, onClick, color, icon }) {
+    const colorClasses = {
+        emerald: "bg-gradient-to-br from-emerald-50 to-emerald-100 text-emerald-700 hover:from-emerald-100 hover:to-emerald-200 border-emerald-200",
+        purple: "bg-gradient-to-br from-purple-50 to-purple-100 text-purple-700 hover:from-purple-100 hover:to-purple-200 border-purple-200",
+        blue: "bg-gradient-to-br from-blue-50 to-blue-100 text-blue-700 hover:from-blue-100 hover:to-blue-200 border-blue-200"
+    };
+
     return (
-        <motion.button 
-            onClick={onClick} 
-            className="flex flex-col items-center text-center rounded-xl p-3 transition-all duration-200 w-20 hover:bg-slate-50 hover:scale-105"
-            whileHover={{ y: -2 }}
+        <motion.button
+            onClick={onClick}
+            whileHover={{ scale: 1.05, y: -2 }}
             whileTap={{ scale: 0.95 }}
+            className={`flex flex-col items-center p-2 rounded-lg border transition-all duration-200 cursor-pointer group ${colorClasses[color]}`}
         >
             <div className="text-lg mb-1">{icon}</div>
-            <motion.p 
-                className="text-xl font-bold text-slate-800"
-                key={value}
-                initial={{ scale: 1.2, color: '#3b82f6' }}
-                animate={{ scale: 1, color: '#1e293b' }}
-                transition={{ duration: 0.3 }}
-            >
-                {value}
-            </motion.p>
-            <p className="text-[10px] font-medium text-slate-500 uppercase tracking-normal leading-tight">{label}</p>
+            <span className="text-sm font-bold">{value || 0}</span>
+            <span className="text-xs opacity-80 group-hover:opacity-100 transition-opacity">{label}</span>
         </motion.button>
     );
 }
 
-function Avatar({ profile, size = 'medium' }) {
+function Avatar({ profile, size = "medium" }) {
     const sizeClasses = {
-        medium: 'w-10 h-10 text-base',
-        large: 'w-16 h-16 text-2xl',
+        small: "w-8 h-8 text-sm",
+        medium: "w-10 h-10 text-sm", 
+        large: "w-16 h-16 text-lg"
     };
+    
+    const initials = profile?.full_name
+        ?.split(' ')
+        .map(name => name[0])
+        .join('')
+        .toUpperCase()
+        .slice(0, 2) || '??';
+
+    if (profile?.avatar_url) {
+        return (
+            <img
+                src={profile.avatar_url}
+                alt={profile.full_name || 'Profile'}
+                className={`${sizeClasses[size]} rounded-full object-cover border-2 border-white shadow-lg`}
+            />
+        );
+    }
+
     return (
-        <div className={`relative ${sizeClasses[size]}`}>
-            <div className="w-full h-full bg-slate-200 rounded-full flex items-center justify-center overflow-hidden ring-2 ring-white shadow-sm">
-                {profile?.avatar_url ? (
-                    <img src={profile.avatar_url} alt="Profile" className="w-full h-full object-cover" />
-                ) : (
-                    <span className="font-bold text-slate-600">{profile?.full_name?.charAt(0)?.toUpperCase() || '?'}</span>
-                )}
-            </div>
-            <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-green-500 rounded-full ring-2 ring-white"></div>
+        <div className={`${sizeClasses[size]} rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-semibold shadow-lg`}>
+            {initials}
         </div>
     );
 }

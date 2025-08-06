@@ -3,6 +3,10 @@ import { useOutletContext, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import { rssNewsService as newsService } from '../services/rssNewsService.js';
 
+// ADD THESE IMPORTS
+import { realtimeManager } from '../utils/realtimeManager.js';
+import { getChannelInfo } from '../utils/channelUtils.js';
+
 // Import all the smaller components
 import WelcomeBanner from './dashboard/WelcomeBanner.jsx';
 import ConnectionsAvatars from './dashboard/ConnectionsAvatars.jsx';
@@ -37,8 +41,10 @@ const useNews = () => {
     return news;
 };
 
+// UPDATED: useTrendingPosts hook with new channel manager
 const useTrendingPosts = () => {
     const [trendingPosts, setTrendingPosts] = useState([]);
+    const { profile } = useOutletContext() || {};
 
     useEffect(() => {
         const fetchTrendingPosts = async () => {
@@ -109,60 +115,61 @@ const useTrendingPosts = () => {
 
         fetchTrendingPosts();
 
-        // Set up real-time subscription for post reactions
-        const channel = supabase.channel('trending-posts-reactions');
-        
-        channel
-            .on('postgres_changes', { 
-                event: '*', 
-                schema: 'public', 
-                table: 'post_likes' 
-            }, async (payload) => {
-                const { new: newRecord, old: oldRecord } = payload;
-                const affectedPostId = newRecord?.post_id || oldRecord?.post_id;
-                
-                if (!affectedPostId) return;
-                
-                const affectedPost = trendingPosts.find(post => post.id === affectedPostId);
-                if (!affectedPost) return;
-                
-                try {
-                    const { data: reactionsData } = await supabase
-                        .from('post_likes')
-                        .select('reaction_type')
-                        .eq('post_id', affectedPostId);
-                    
-                    const reactionSummary = (reactionsData || []).reduce((acc, r) => {
-                        const type = r.reaction_type || 'like';
-                        acc[type] = (acc[type] || 0) + 1;
-                        return acc;
-                    }, {});
-                    
-                    const totalLikes = Object.values(reactionSummary).reduce((sum, count) => sum + count, 0);
-                    
-                    setTrendingPosts(currentPosts => 
-                        currentPosts.map(post => 
-                            post.id === affectedPostId 
-                                ? {
-                                    ...post,
-                                    likes_count: totalLikes,
-                                    reactions: {
-                                        summary: Object.entries(reactionSummary).map(([type, count]) => ({ type, count }))
-                                    }
-                                }
-                                : post
-                        )
-                    );
-                } catch (error) {
-                    // Handle error silently
+        // UPDATED: Use the new realtime manager with your channel system
+        if (profile) {
+            const subscription = realtimeManager.createSubscription(
+                'hello-world', 
+                supabase, 
+                profile,
+                {
+                    onLikeChange: async (payload) => {
+                        const { new: newRecord, old: oldRecord } = payload;
+                        const affectedPostId = newRecord?.post_id || oldRecord?.post_id;
+                        
+                        if (!affectedPostId) return;
+                        
+                        try {
+                            const { data: reactionsData } = await supabase
+                                .from('post_likes')
+                                .select('reaction_type')
+                                .eq('post_id', affectedPostId);
+                            
+                            const reactionSummary = (reactionsData || []).reduce((acc, r) => {
+                                const type = r.reaction_type || 'like';
+                                acc[type] = (acc[type] || 0) + 1;
+                                return acc;
+                            }, {});
+                            
+                            const totalLikes = Object.values(reactionSummary).reduce((sum, count) => sum + count, 0);
+                            
+                            setTrendingPosts(currentPosts => 
+                                currentPosts.map(post => 
+                                    post.id === affectedPostId 
+                                        ? {
+                                            ...post,
+                                            likes_count: totalLikes,
+                                            reactions: {
+                                                summary: Object.entries(reactionSummary).map(([type, count]) => ({ type, count }))
+                                            }
+                                        }
+                                        : post
+                                )
+                            );
+                        } catch (error) {
+                            console.warn('Error updating post reactions:', error);
+                        }
+                    }
                 }
-            })
-            .subscribe();
+            );
+        }
 
+        // UPDATED: Clean removal using the manager
         return () => {
-            supabase.removeChannel(channel);
+            if (profile) {
+                realtimeManager.removeSubscription('hello-world', supabase);
+            }
         };
-    }, []);
+    }, [profile?.id]);
 
     return trendingPosts;
 };
