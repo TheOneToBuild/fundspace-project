@@ -1,4 +1,4 @@
-// components/organization/TeamManagement.jsx
+// components/organization/TeamManagement.jsx - Updated to pass organization prop
 import React, { useState, useMemo } from 'react';
 import { Search, Users } from 'lucide-react';
 import { ROLES } from '../../utils/organizationPermissions.js';
@@ -9,7 +9,8 @@ export default function TeamManagement({
     userMembership, 
     profile, 
     onMemberAction, 
-    setError 
+    setError,
+    organization  // Add organization prop
 }) {
     const [searchQuery, setSearchQuery] = useState('');
     const [roleFilter, setRoleFilter] = useState('all');
@@ -94,6 +95,7 @@ export default function TeamManagement({
                     profile={profile}
                     onMemberAction={onMemberAction}
                     setError={setError}
+                    organization={organization}  // Pass organization prop
                 />
                 
                 <TeamSection
@@ -103,6 +105,7 @@ export default function TeamManagement({
                     profile={profile}
                     onMemberAction={onMemberAction}
                     setError={setError}
+                    organization={organization}  // Pass organization prop
                 />
                 
                 <TeamSection
@@ -112,6 +115,7 @@ export default function TeamManagement({
                     profile={profile}
                     onMemberAction={onMemberAction}
                     setError={setError}
+                    organization={organization}  // Pass organization prop
                 />
             </div>
 

@@ -81,7 +81,7 @@ const MemberProfileHeader = ({
                     });
                 }
             } catch (error) {
-                console.error('Error fetching stats:', error);
+                // Handle error silently or with user-friendly message
             } finally {
                 setStatsLoading(false);
             }
@@ -163,10 +163,10 @@ const MemberProfileHeader = ({
             }
             
             if (!result.success) {
-                console.error(`Error with ${action}:`, result.error);
+                // Handle error silently or with user-friendly message
             }
         } catch (error) {
-            console.error(`Error in ${action}:`, error);
+            // Handle error silently or with user-friendly message
         } finally {
             setConnectionLoading(false);
         }
@@ -406,8 +406,6 @@ export default function MemberProfilePage() {
     // Use whichever parameter is available
     const memberIdToUse = memberId || profileId;
     
-    console.log('🔍 MemberProfilePage params:', { memberId, profileId, memberIdToUse });
-    
     const [member, setMember] = useState(null);
     const [posts, setPosts] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -426,8 +424,6 @@ export default function MemberProfilePage() {
             setLoading(true);
             setError(null);
             
-            console.log('🔍 Fetching member data for ID:', memberIdToUse);
-
             // Fetch member profile
             const { data: memberData, error: memberError } = await supabase
                 .from('profiles')
@@ -436,7 +432,6 @@ export default function MemberProfilePage() {
                 .single();
 
             if (memberError) {
-                console.error('❌ Error fetching member:', memberError);
                 throw new Error(memberError.message);
             }
 
@@ -444,7 +439,6 @@ export default function MemberProfilePage() {
                 throw new Error('Member not found');
             }
 
-            console.log('✅ Member data fetched:', memberData.full_name);
             setMember(memberData);
 
             // Fetch member's posts
@@ -464,14 +458,12 @@ export default function MemberProfilePage() {
                 .order('created_at', { ascending: false });
 
             if (postsError) {
-                console.error('⚠️ Error fetching posts:', postsError);
+                // Handle error silently
             } else {
-                console.log('✅ Posts fetched:', postsData?.length || 0);
                 setPosts(postsData || []);
             }
 
         } catch (err) {
-            console.error('💥 Error in fetchMemberData:', err);
             setError(err.message);
         } finally {
             setLoading(false);
@@ -485,14 +477,12 @@ export default function MemberProfilePage() {
         }
 
         try {
-            console.log('🔍 Checking follow status between:', currentUserProfile.id, 'and', memberIdToUse);
             const result = await checkFollowStatus(currentUserProfile.id, memberIdToUse);
             if (!result.error) {
-                console.log('✅ Follow status:', result.isFollowing);
                 setIsFollowing(result.isFollowing);
             }
         } catch (error) {
-            console.error('❌ Error checking follow status:', error);
+            // Handle error silently
         }
     }, [currentUserProfile?.id, memberIdToUse]);
 
@@ -515,12 +505,10 @@ export default function MemberProfilePage() {
             const result = await followUser(currentUserProfile.id, profileIdToFollow);
             
             if (!result.success) {
-                console.error('Error following user:', result.error);
                 // Revert optimistic update
                 setIsFollowing(false);
             }
         } catch (error) {
-            console.error('Error in handleFollow:', error);
             // Revert optimistic update
             setIsFollowing(false);
         } finally {
@@ -539,12 +527,10 @@ export default function MemberProfilePage() {
             const result = await unfollowUser(currentUserProfile.id, profileIdToUnfollow);
             
             if (!result.success) {
-                console.error('Error unfollowing user:', result.error);
                 // Revert optimistic update
                 setIsFollowing(true);
             }
         } catch (error) {
-            console.error('Error in handleUnfollow:', error);
             // Revert optimistic update
             setIsFollowing(true);
         } finally {

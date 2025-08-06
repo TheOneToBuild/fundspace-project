@@ -1,8 +1,7 @@
 // components/organization/OrganizationTabContent.jsx
 import React from 'react';
 import { 
-    MessageSquare, Plus, Users, BarChart3, TrendingUp, 
-    ClipboardList, Star 
+    MessageSquare, Plus, Users, ClipboardList, Star 
 } from 'lucide-react';
 import TeamManagement from './TeamManagement.jsx';
 
@@ -31,49 +30,6 @@ export default function OrganizationTabContent({
         </div>
     );
 
-    const renderAnalyticsTab = () => (
-        <div className="p-6">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <p className="text-sm font-medium text-slate-600">Total Members</p>
-                            <p className="text-2xl font-bold text-slate-900">{members.length}</p>
-                        </div>
-                        <Users className="w-8 h-8 text-blue-500" />
-                    </div>
-                </div>
-                
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <p className="text-sm font-medium text-slate-600">Profile Views</p>
-                            <p className="text-2xl font-bold text-slate-900">1,234</p>
-                        </div>
-                        <BarChart3 className="w-8 h-8 text-green-500" />
-                    </div>
-                </div>
-                
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <p className="text-sm font-medium text-slate-600">Engagement</p>
-                            <p className="text-2xl font-bold text-slate-900">+12%</p>
-                        </div>
-                        <TrendingUp className="w-8 h-8 text-purple-500" />
-                    </div>
-                </div>
-            </div>
-            
-            <div className="bg-slate-50 border border-slate-200 rounded-lg p-6">
-                <p className="text-sm text-slate-600">
-                    More analytics features will be available soon, including engagement metrics, 
-                    post statistics, and member activity tracking.
-                </p>
-            </div>
-        </div>
-    );
-
     const renderTeamTab = () => (
         <TeamManagement 
             members={members}
@@ -81,6 +37,7 @@ export default function OrganizationTabContent({
             profile={profile}
             onMemberAction={onMemberAction}
             setError={setError}
+            organization={organization}
         />
     );
 
@@ -99,9 +56,6 @@ export default function OrganizationTabContent({
         case 'overview':
             return renderOverviewTab();
             
-        case 'analytics':
-            return renderAnalyticsTab();
-            
         case 'team':
             return renderTeamTab();
             
@@ -110,15 +64,6 @@ export default function OrganizationTabContent({
                 'Programs & Services',
                 'Manage your organization\'s programs and services.',
                 <ClipboardList className="w-12 h-12 text-slate-400 mx-auto mb-4" />
-            );
-            
-        case 'impact':
-            return renderPlaceholderTab(
-                'Impact Stories',
-                userMembership?.organization_type === 'foundation' 
-                    ? 'Showcase the impact of your funding.'
-                    : 'Share and manage your organization\'s impact stories.',
-                <TrendingUp className="w-12 h-12 text-slate-400 mx-auto mb-4" />
             );
             
         case 'supporters':

@@ -3,7 +3,6 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { Eye, Heart, TrendingUp, Users, Calendar, ChevronDown } from 'lucide-react';
 import { hasPermission, PERMISSIONS } from '../utils/permissions.js';
-import { useProfileViewStats, useRecentProfileViewers } from '../utils/profileViewsHooks.js';
 
 const SocialMetricsCard = ({ organization, organizationType, userRole, isOmegaAdmin }) => {
   const [metrics, setMetrics] = useState({
@@ -14,18 +13,6 @@ const SocialMetricsCard = ({ organization, organizationType, userRole, isOmegaAd
   const [loading, setLoading] = useState(true);
   const [timeRange, setTimeRange] = useState('30'); // days
   const [isCollapsed, setIsCollapsed] = useState(false);
-
-  // Use profile views data
-  const { 
-    totalViews: profileViews, 
-    uniqueViewers,
-    loading: viewsLoading 
-  } = useProfileViewStats(organization?.id, parseInt(timeRange));
-
-  const { 
-    viewers: recentViewers, 
-    loading: viewersLoading 
-  } = useRecentProfileViewers(organization?.id, 5);
 
   // Check if user can view social metrics
   const canViewSocialMetrics = organizationType === 'funder' && 
@@ -84,7 +71,7 @@ const SocialMetricsCard = ({ organization, organizationType, userRole, isOmegaAd
             console.warn('Could not fetch recent bookmarks:', recentBookmarkError.message);
           }
 
-          // Combine all activity sources (simplified without profile details)
+          // Combine activity sources (simplified without profile details)
           const combinedActivity = [
             ...(recentFollowIds || []).map(item => ({
               type: 'follow',
@@ -103,16 +90,6 @@ const SocialMetricsCard = ({ organization, organizationType, userRole, isOmegaAd
                 avatar_url: null
               },
               timestamp: item.created_at
-            })),
-            ...(recentViewers || []).map(item => ({
-              type: 'view',
-              user: {
-                full_name: item.viewer_name,
-                organization_name: item.viewer_organization,
-                avatar_url: item.viewer_avatar
-              },
-              timestamp: item.view_timestamp,
-              is_authenticated: item.is_authenticated
             }))
           ].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
@@ -130,7 +107,7 @@ const SocialMetricsCard = ({ organization, organizationType, userRole, isOmegaAd
     };
 
     fetchSocialMetrics();
-  }, [organization?.id, organizationType, timeRange, canViewSocialMetrics, recentViewers]);
+  }, [organization?.id, organizationType, timeRange, canViewSocialMetrics]);
 
   // Don't show for nonprofits or users without permission
   if (!canViewSocialMetrics) {
@@ -154,8 +131,6 @@ const SocialMetricsCard = ({ organization, organizationType, userRole, isOmegaAd
         return <Eye size={16} className="text-blue-500" />;
       case 'bookmark':
         return <Heart size={16} className="text-red-500" />;
-      case 'view':
-        return <TrendingUp size={16} className="text-green-500" />;
       default:
         return <TrendingUp size={16} className="text-green-500" />;
     }
@@ -171,12 +146,6 @@ const SocialMetricsCard = ({ organization, organizationType, userRole, isOmegaAd
         return `${userName}${orgText} started following your organization`;
       case 'bookmark':
         return `${userName}${orgText} bookmarked your organization`;
-      case 'view':
-        if (activity.is_authenticated) {
-          return `${userName}${orgText} viewed your profile`;
-        } else {
-          return 'Someone viewed your profile';
-        }
       default:
         return `${userName} interacted with your profile`;
     }
@@ -215,10 +184,10 @@ const SocialMetricsCard = ({ organization, organizationType, userRole, isOmegaAd
 
       {!isCollapsed && (
         <>
-          {(loading || viewsLoading || viewersLoading) ? (
+          {loading ? (
             <div className="animate-pulse">
-              <div className="grid grid-cols-3 gap-4 mb-6">
-                {[1, 2, 3].map(i => (
+              <div className="grid grid-cols-2 gap-4 mb-6">
+                {[1, 2].map(i => (
                   <div key={i} className="h-20 bg-slate-200 rounded-lg"></div>
                 ))}
               </div>
@@ -230,8 +199,8 @@ const SocialMetricsCard = ({ organization, organizationType, userRole, isOmegaAd
             </div>
           ) : (
             <>
-              {/* Metrics Overview */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+              {/* Metrics Overview - Removed Profile Views */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                 <div className="bg-blue-50 rounded-lg p-4 border border-blue-100">
                   <div className="flex items-center justify-between">
                     <div>
@@ -255,21 +224,6 @@ const SocialMetricsCard = ({ organization, organizationType, userRole, isOmegaAd
                   </div>
                   <p className="text-xs text-red-600 mt-1">
                     Users who bookmarked you
-                  </p>
-                </div>
-
-                <div className="bg-green-50 rounded-lg p-4 border border-green-100">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-green-600">Profile Views</p>
-                      <p className="text-2xl font-bold text-green-700">
-                        {viewsLoading ? '...' : profileViews}
-                      </p>
-                    </div>
-                    <TrendingUp className="text-green-500" size={24} />
-                  </div>
-                  <p className="text-xs text-green-600 mt-1">
-                    Total views ({uniqueViewers} unique)
                   </p>
                 </div>
               </div>
@@ -304,7 +258,7 @@ const SocialMetricsCard = ({ organization, organizationType, userRole, isOmegaAd
                     <Users className="w-12 h-12 mx-auto text-slate-300 mb-2" />
                     <p className="text-sm">No recent activity in the last {timeRange} days</p>
                     <p className="text-xs text-slate-400 mt-1">
-                      Activity will appear here when people follow, bookmark, or view your profile
+                      Activity will appear here when people follow or bookmark your profile
                     </p>
                   </div>
                 )}
@@ -319,11 +273,6 @@ const SocialMetricsCard = ({ organization, organizationType, userRole, isOmegaAd
                   <li>• Keep your grant opportunities current and well-detailed</li>
                   <li>• Engage with the nonprofit community through kudos and comments</li>
                 </ul>
-                <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                  <p className="text-xs text-blue-800">
-                    <strong>View Analytics:</strong> View counts update as users visit your profile based on their privacy preferences.
-                  </p>
-                </div>
               </div>
             </>
           )}

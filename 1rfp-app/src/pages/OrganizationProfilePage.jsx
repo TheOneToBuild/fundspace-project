@@ -19,7 +19,6 @@ import OrganizationGrantsFixed from '../components/organization-profile/Organiza
 
 // Hooks
 import { useOrganizationSocial } from '../hooks/useOrganizationSocial.js';
-import { useProfileViewTracking } from '../hooks/useProfileViewTracking.js';
 
 // Organization type configurations for different layouts
 const ORG_TYPE_CONFIGS = {

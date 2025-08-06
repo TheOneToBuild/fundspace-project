@@ -1,13 +1,13 @@
-// components/organization/TeamMemberCard.jsx
-import React from 'react';
-import { Crown, Shield, Users, UserPlus, UserMinus } from 'lucide-react';
+// components/organization/TeamMemberCard.jsx - LinkedIn-sized card with proper organization banner and clickable
+import React, { useState } from 'react';
+import { Crown, Shield, Users, UserPlus, UserMinus, MoreVertical } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../supabaseClient';
 import Avatar from '../Avatar.jsx';
 import { 
     ROLES, 
     getRoleDisplayName, 
     getRoleBadgeColor, 
-    canManageUser,
     hasPermission,
     PERMISSIONS
 } from '../../utils/organizationPermissions.js';
@@ -17,34 +17,22 @@ export default function TeamMemberCard({
     userMembership, 
     profile, 
     onMemberAction, 
-    setError 
+    setError,
+    organization
 }) {
+    const [showDropdown, setShowDropdown] = useState(false);
+    const navigate = useNavigate();
     const isOmegaAdmin = profile?.is_omega_admin === true;
     const userRole = userMembership?.role;
     
     const canManageMembers = hasPermission(userRole, PERMISSIONS.MANAGE_MEMBERS, isOmegaAdmin);
     const canManageAdmins = hasPermission(userRole, PERMISSIONS.MANAGE_ADMINS, isOmegaAdmin);
 
-    const getRoleIcon = (role) => {
-        switch (role) {
-            case 'super_admin': 
-                return <Crown className="text-yellow-500" size={16} />;
-            case 'admin': 
-                return <Shield className="text-blue-500" size={16} />;
-            case 'member': 
-                return <Users className="text-green-500" size={16} />;
-            default: 
-                return <Users className="text-slate-400" size={16} />;
-        }
-    };
-
     const handleMemberAction = async (action) => {
         if (!userMembership) return;
+        setShowDropdown(false);
 
-        const currentUserRole = userMembership.role;
-        const targetRole = member.role;
-        
-        if (!canManageUser(currentUserRole, targetRole, isOmegaAdmin)) {
+        if (!userMembership || member.profile_id === profile.id) {
             setError('You do not have permission to manage this user.');
             return;
         }
@@ -85,71 +73,139 @@ export default function TeamMemberCard({
         }
     };
 
+    const canShowActions = canManageMembers && member.profile_id !== profile.id;
+
+    // Handle click to profile  
+    const handleCardClick = () => {
+        const profileId = member.profile_id;
+        
+        if (profileId) {
+            navigate(`/profile/members/${profileId}`);
+        }
+    };
+
+
+
     return (
-        <div className="flex items-center justify-between p-4 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors">
-            {/* Member Info */}
-            <div className="flex items-center space-x-3">
-                <Avatar 
-                    src={member.profiles?.avatar_url} 
-                    fullName={member.profiles?.full_name} 
-                    size="md" 
-                />
-                <div>
-                    <div className="flex items-center space-x-2">
-                        <h3 className="font-medium text-slate-800">
-                            {member.profiles?.full_name || 'Unknown User'}
-                        </h3>
-                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getRoleBadgeColor(member.role, member.profiles?.is_omega_admin)}`}>
-                            {getRoleIcon(member.role)}
-                            <span className="ml-1">
-                                {getRoleDisplayName(member.role, member.profiles?.is_omega_admin)}
-                            </span>
-                        </span>
+        <div 
+            className="bg-white border border-slate-200 rounded-2xl overflow-hidden hover:shadow-lg transition-all duration-200 cursor-pointer relative w-80 mx-auto"
+            onClick={handleCardClick}
+        >
+            {/* Organization Banner Background - LinkedIn sized */}
+            <div className="h-24 bg-gradient-to-br from-blue-400 via-purple-500 to-pink-500 relative">
+                {organization?.banner_image_url ? (
+                    <img 
+                        src={organization.banner_image_url} 
+                        alt="Organization banner" 
+                        className="w-full h-full object-cover"
+                    />
+                ) : (
+                    <div className="w-full h-full bg-gradient-to-br from-blue-400 via-purple-500 to-pink-500" />
+                )}
+                
+                {/* Action Menu - positioned on banner */}
+                {canShowActions && (
+                    <div className="absolute top-3 right-3">
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setShowDropdown(!showDropdown);
+                            }}
+                            className="p-2 text-white/80 hover:text-white hover:bg-white/20 rounded-lg transition-colors"
+                        >
+                            <MoreVertical className="w-4 h-4" />
+                        </button>
+
+                        {showDropdown && (
+                            <>
+                                {/* Backdrop */}
+                                <div 
+                                    className="fixed inset-0 z-10" 
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setShowDropdown(false);
+                                    }}
+                                />
+                                
+                                {/* Dropdown Menu */}
+                                <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-slate-200 py-1 z-20">
+                                    {/* Promote to Admin */}
+                                    {member.role === ROLES.MEMBER && canManageAdmins && (
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleMemberAction('promote');
+                                            }}
+                                            className="flex items-center w-full px-4 py-2 text-sm text-green-600 hover:bg-green-50 transition-colors"
+                                        >
+                                            <UserPlus className="w-4 h-4 mr-3" />
+                                            Promote to Admin
+                                        </button>
+                                    )}
+                                    
+                                    {/* Demote to Member */}
+                                    {(member.role === ROLES.ADMIN || member.role === ROLES.SUPER_ADMIN) && canManageAdmins && (
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleMemberAction('demote');
+                                            }}
+                                            className="flex items-center w-full px-4 py-2 text-sm text-orange-600 hover:bg-orange-50 transition-colors"
+                                        >
+                                            <UserMinus className="w-4 h-4 mr-3" />
+                                            Demote to Member
+                                        </button>
+                                    )}
+                                    
+                                    {/* Remove from Organization */}
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleMemberAction('remove');
+                                        }}
+                                        className="flex items-center w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                                    >
+                                        <UserMinus className="w-4 h-4 mr-3" />
+                                        Remove from Organization
+                                    </button>
+                                </div>
+                            </>
+                        )}
                     </div>
-                    {member.profiles?.title && (
-                        <p className="text-sm text-slate-500">{member.profiles.title}</p>
-                    )}
-                    <p className="text-xs text-slate-400">
-                        Joined {new Date(member.joined_at).toLocaleDateString()}
-                    </p>
-                </div>
+                )}
             </div>
 
-            {/* Action Buttons */}
-            {canManageMembers && member.profile_id !== profile.id && (
-                <div className="flex items-center space-x-2">
-                    {/* Promote to Admin */}
-                    {member.role === ROLES.MEMBER && canManageAdmins && (
-                        <button
-                            onClick={() => handleMemberAction('promote')}
-                            className="p-2 text-green-600 hover:text-green-800 hover:bg-green-50 rounded-lg transition-colors"
-                            title="Promote to Admin"
-                        >
-                            <UserPlus className="w-4 h-4" />
-                        </button>
-                    )}
-                    
-                    {/* Demote to Member */}
-                    {(member.role === ROLES.ADMIN || member.role === ROLES.SUPER_ADMIN) && canManageAdmins && (
-                        <button
-                            onClick={() => handleMemberAction('demote')}
-                            className="p-2 text-orange-600 hover:text-orange-800 hover:bg-orange-50 rounded-lg transition-colors"
-                            title="Demote to Member"
-                        >
-                            <UserMinus className="w-4 h-4" />
-                        </button>
-                    )}
-                    
-                    {/* Remove from Organization */}
-                    <button
-                        onClick={() => handleMemberAction('remove')}
-                        className="p-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-colors"
-                        title="Remove from Organization"
-                    >
-                        <UserMinus className="w-4 h-4" />
-                    </button>
+            {/* Profile Content */}
+            <div className="px-6 pb-6 text-center">
+                {/* Avatar - overlapping banner, LinkedIn-sized */}
+                <div className="flex justify-center -mt-12 mb-4">
+                    <div className="w-24 h-24 rounded-full overflow-hidden ring-4 ring-white shadow-lg bg-slate-100">
+                        <Avatar 
+                            src={member.profiles?.avatar_url} 
+                            fullName={member.profiles?.full_name} 
+                            size="xl"
+                            className="w-full h-full object-cover"
+                        />
+                    </div>
                 </div>
-            )}
+
+                {/* Member Info */}
+                <h3 className="font-semibold text-slate-900 text-lg mb-1 leading-tight">
+                    {member.profiles?.full_name || 'Unknown User'}
+                </h3>
+                
+                {member.profiles?.title && (
+                    <p className="text-slate-600 mb-4 text-sm">{member.profiles.title}</p>
+                )}
+
+                {/* Role Badge */}
+                <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getRoleBadgeColor(member.role, member.profiles?.is_omega_admin)}`}>
+                    {member.role === 'super_admin' && <Crown className="w-4 h-4 mr-2" />}
+                    {member.role === 'admin' && <Shield className="w-4 h-4 mr-2" />}
+                    {member.role === 'member' && <Users className="w-4 h-4 mr-2" />}
+                    {getRoleDisplayName(member.role, member.profiles?.is_omega_admin)}
+                </span>
+            </div>
         </div>
     );
 }
