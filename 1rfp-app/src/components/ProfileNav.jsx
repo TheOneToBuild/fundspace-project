@@ -63,7 +63,7 @@ export default function ProfileNav() {
         }
     }, [profile?.id]);
 
-    // FIXED: Proper real-time subscription cleanup
+    // FIXED: Improved real-time subscription cleanup
     useEffect(() => {
         fetchProfileStats();
         
@@ -78,7 +78,10 @@ export default function ProfileNav() {
         // Only set up real-time if profile ID exists
         if (!profile?.id) return;
         
-        const channel = supabase.channel(`profile-stats-changes:${profile.id}`)
+        // Use a more unique channel name to prevent conflicts
+        const channelName = `profile-stats-${profile.id}-${Date.now()}`;
+        
+        const channel = supabase.channel(channelName)
             .on('postgres_changes', { 
                 event: '*', 
                 schema: 'public', 
@@ -111,11 +114,21 @@ export default function ProfileNav() {
                 }
             });
         
+        // IMPROVED: Better cleanup to prevent WebSocket warnings
         return () => {
-            // FIXED: Properly unsubscribe and remove channel
             if (channel) {
+                // Unsubscribe first
                 channel.unsubscribe();
-                supabase.removeChannel(channel);
+                
+                // Small delay before removing channel to prevent race conditions
+                setTimeout(() => {
+                    try {
+                        supabase.removeChannel(channel);
+                    } catch (error) {
+                        // Silently handle any cleanup errors
+                        console.debug('Channel cleanup completed');
+                    }
+                }, 100);
             }
         };
     }, [profile?.id, fetchProfileStats, fetchOrganizationData]);

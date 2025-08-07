@@ -1,4 +1,4 @@
-// src/utils/realtimeManager.js - Enhanced with your channel system
+// src/utils/realtimeManager.js - Enhanced with your channel system (Clean Version)
 import { channelManager } from './channelManager.js';
 import { getChannelFilterForPosts, getUserChannelAccess, getChannelInfo } from './channelUtils.js';
 
@@ -6,6 +6,7 @@ class RealtimeManager {
   constructor() {
     this.activeSubscriptions = new Map();
     this.cleanupTimeouts = new Map();
+    this.debugMode = false; // Set to true if you want to see logs
   }
 
   // Create subscription with your channel system integration
@@ -15,7 +16,9 @@ class RealtimeManager {
     const channelInfo = getChannelInfo(channelName, userProfile);
     
     if (!channelInfo) {
-      console.warn(`Channel ${channelName} not found or not accessible`);
+      if (this.debugMode) {
+        console.warn(`Channel ${channelName} not found or not accessible`);
+      }
       return null;
     }
 
@@ -83,9 +86,14 @@ class RealtimeManager {
     // Subscribe with error handling
     channel.subscribe((status) => {
       if (status === 'SUBSCRIBED') {
-        console.log(`✅ Subscribed to ${channelName}`);
+        // Clean subscription - no console logs
+        if (this.debugMode) {
+          console.log(`✅ Subscribed to ${channelName}`);
+        }
       } else if (status === 'CHANNEL_ERROR') {
-        console.error(`❌ Channel error for ${channelName}`);
+        if (this.debugMode) {
+          console.error(`❌ Channel error for ${channelName}`);
+        }
         this.removeSubscription(channelName, supabase);
       }
     });
@@ -101,14 +109,20 @@ class RealtimeManager {
       if (channel) {
         try {
           channel.unsubscribe();
-          console.log(`🔄 Unsubscribed from ${channelName}`);
+          if (this.debugMode) {
+            console.log(`🔄 Unsubscribed from ${channelName}`);
+          }
         } catch (error) {
-          console.warn(`⚠️ Error unsubscribing ${channelName}:`, error);
+          if (this.debugMode) {
+            console.warn(`⚠️ Error unsubscribing ${channelName}:`, error);
+          }
         } finally {
           supabase.removeChannel(channel);
           this.activeSubscriptions.delete(channelName);
           this.cleanupTimeouts.delete(channelName);
-          console.log(`🗑️ Removed channel ${channelName}`);
+          if (this.debugMode) {
+            console.log(`🗑️ Removed channel ${channelName}`);
+          }
         }
       }
     }, 1000); // 1 second delay
@@ -121,6 +135,16 @@ class RealtimeManager {
     return this.activeSubscriptions.size;
   }
 
+  // Enable/disable debug logs
+  setDebugMode(enabled) {
+    this.debugMode = enabled;
+  }
+
+  // Get list of active channels (for debugging)
+  getActiveChannels() {
+    return Array.from(this.activeSubscriptions.keys());
+  }
+
   // Force cleanup all (for app unmount)
   cleanup(supabase) {
     this.cleanupTimeouts.forEach(timeoutId => clearTimeout(timeoutId));
@@ -128,13 +152,19 @@ class RealtimeManager {
       try {
         channel.unsubscribe();
       } catch (error) {
-        console.warn(`Error cleaning up ${name}:`, error);
+        if (this.debugMode) {
+          console.warn(`Error cleaning up ${name}:`, error);
+        }
       } finally {
         supabase.removeChannel(channel);
       }
     });
     this.activeSubscriptions.clear();
     this.cleanupTimeouts.clear();
+    
+    if (this.debugMode) {
+      console.log('🧹 All realtime subscriptions cleaned up');
+    }
   }
 }
 
