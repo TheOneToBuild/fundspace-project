@@ -1,4 +1,4 @@
-// src/components/HelloWorldChannel.jsx - Updated with Channel Managers
+// src/components/HelloWorldChannel.jsx - Fixed version with RLS issue resolved
 import React, { useState, useEffect, useRef, useCallback, memo } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { supabase } from '../supabaseClient.js';
@@ -8,6 +8,7 @@ import CreatePost from './CreatePost.jsx';
 import ProfileCompletionBanner from './ProfileCompletionBanner.jsx';
 import { rssNewsService as newsService } from '../services/rssNewsService.js';
 import { addOrganizationEventListener } from '../utils/organizationEvents.js';
+import { getOrganizationInfoForDashboard } from '../utils/membershipQueries.js';
 
 // ADD THESE IMPORTS
 import { realtimeManager } from '../utils/realtimeManager.js';
@@ -242,26 +243,20 @@ export default function HelloWorldChannel() {
     };
   }, [profile?.id]);
 
-  // Fetch organization info
+  // FIXED: Fetch organization info using safe query
   useEffect(() => {
     const fetchOrganizationInfo = async () => {
       if (!profile?.id) return;
+      
       try {
-        const { data: orgMembership } = await supabase
-          .from('organization_memberships')
-          .select('*, organizations!inner(id, name, type, tagline, image_url)')
-          .eq('profile_id', profile.id)
-          .order('joined_at', { ascending: false })
-          .limit(1);
-
-        if (orgMembership && orgMembership.length > 0) {
-          setOrganizationInfo(orgMembership[0].organizations);
-        }
+        const orgData = await getOrganizationInfoForDashboard(profile.id);
+        setOrganizationInfo(orgData);
       } catch (err) {
-        console.error('Error fetching organization info:', err);
+        console.error('❌ HelloWorldChannel: Error fetching organization info:', err);
         setOrganizationInfo(null);
       }
     };
+    
     fetchOrganizationInfo();
   }, [profile?.id]);
 

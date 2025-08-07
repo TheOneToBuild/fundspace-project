@@ -1,4 +1,4 @@
-// PostCard.jsx - Cleaned
+// PostCard.jsx - Fixed to avoid RLS infinite recursion
 import React, { useState, useEffect, useMemo, memo, lazy, Suspense } from 'react';
 import { supabase } from '../supabaseClient';
 import { useOutletContext } from 'react-router-dom';
@@ -30,43 +30,91 @@ function PostCard({ post, onDelete, disabled = false, showOrganizationAsAuthor =
     const [showReactorsPreview, setShowReactorsPreview] = useState(false);
     const reactorsTimeoutRef = React.useRef(null);
     const [authorOrganizationInfo, setAuthorOrganizationInfo] = useState(null);
+    const [fetchingOrgInfo, setFetchingOrgInfo] = useState(false);
 
     const { content, created_at, profiles: individualAuthor, image_url, image_urls, tags } = post;
     const isAuthor = currentUserProfile?.id === individualAuthor?.id;
     const displayImages = image_urls && image_urls.length > 0 ? image_urls : (image_url ? [image_url] : []);
 
+    // FIXED: Replace problematic query with safe approach
     useEffect(() => {
         const fetchAuthorOrganizationInfo = async () => {
-            if (!individualAuthor?.id) return;
+            if (!individualAuthor?.id || fetchingOrgInfo) return;
+            
+            setFetchingOrgInfo(true);
             try {
-                const { data: memberships, error } = await supabase
-                    .from('organization_memberships')
-                    .select(`*, organizations!inner(id, name, tagline, type, image_url)`)
-                    .eq('profile_id', individualAuthor.id)
-                    .order('joined_at', { ascending: false }).limit(1);
+                // Method 1: Try the stored procedure first (if it exists)
+                const { data: membershipData, error: funcError } = await supabase
+                    .rpc('get_user_organization_membership', { 
+                        user_id: individualAuthor.id 
+                    });
 
-                if (error) {
-                    console.error('❌ PostCard: Error fetching author organization:', error);
+                if (!funcError && membershipData && membershipData.length > 0) {
+                    const membership = membershipData[0];
+                    setAuthorOrganizationInfo({
+                        id: membership.organization_id,
+                        name: membership.organization_name,
+                        tagline: membership.organization_tagline,
+                        type: membership.organization_type,
+                        image_url: membership.organization_image_url,
+                        role: membership.role
+                    });
+                    setFetchingOrgInfo(false);
                     return;
                 }
+
+                // Method 2: Fallback to separate queries (no joins)
+                const { data: memberships, error } = await supabase
+                    .from('organization_memberships')
+                    .select('organization_id, organization_type, role, is_public')
+                    .eq('profile_id', individualAuthor.id)
+                    .eq('is_public', true) // Only fetch public memberships to avoid RLS issues
+                    .order('joined_at', { ascending: false })
+                    .limit(1);
+
+                if (error) {
+                    console.error('❌ PostCard: Error fetching author organization membership:', error);
+                    setAuthorOrganizationInfo(null);
+                    setFetchingOrgInfo(false);
+                    return;
+                }
+
                 if (memberships && memberships.length > 0) {
                     const membership = memberships[0];
-                    const org = membership.organizations;
-                    const orgInfo = {
-                        id: org.id, name: org.name, tagline: org.tagline,
-                        type: org.type, image_url: org.image_url, role: membership.role
-                    };
-                    setAuthorOrganizationInfo(orgInfo);
+                    
+                    // Separate query for organization details
+                    const { data: orgData, error: orgError } = await supabase
+                        .from('organizations')
+                        .select('id, name, tagline, type, image_url')
+                        .eq('id', membership.organization_id)
+                        .single();
+
+                    if (!orgError && orgData) {
+                        setAuthorOrganizationInfo({
+                            id: orgData.id,
+                            name: orgData.name,
+                            tagline: orgData.tagline,
+                            type: orgData.type,
+                            image_url: orgData.image_url,
+                            role: membership.role
+                        });
+                    } else {
+                        console.warn('Could not fetch organization details:', orgError);
+                        setAuthorOrganizationInfo(null);
+                    }
                 } else {
                     setAuthorOrganizationInfo(null);
                 }
             } catch (err) {
                 console.error('❌ PostCard: Error fetching author organization info:', err);
                 setAuthorOrganizationInfo(null);
+            } finally {
+                setFetchingOrgInfo(false);
             }
         };
+
         fetchAuthorOrganizationInfo();
-    }, [individualAuthor?.id]);
+    }, [individualAuthor?.id, fetchingOrgInfo]);
 
     useEffect(() => {
         if (!isAuthor || !currentUserProfile?.id) return;

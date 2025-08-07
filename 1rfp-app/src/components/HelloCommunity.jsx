@@ -7,6 +7,7 @@ import CreatePost from './CreatePost.jsx';
 import PostCard from './PostCard.jsx';
 import { rssNewsService as newsService } from '../services/rssNewsService.js';
 import { addOrganizationEventListener } from '../utils/organizationEvents';
+import { getOrganizationInfoForCommunity } from '../utils/membershipQueries.js';
 
 // Organization channel configuration - now maps to actual database channels
 const ORGANIZATION_CHANNELS = {
@@ -340,35 +341,20 @@ function HelloCommunity() {
     };
   }, [profile?.id]);
 
+  // FIXED: Replace problematic query with safe function
   useEffect(() => {
     const fetchOrganizationInfo = async () => {
       if (!profile?.id) return;
+      
       try {
-        const { data: memberships, error } = await supabase.from('organization_memberships')
-          .select(`*, organizations!inner(id, name, tagline, type, image_url)`)
-          .eq('profile_id', profile.id).order('joined_at', { ascending: false }).limit(1);
-
-        if (error) {
-          console.error('❌ HelloCommunity: Error fetching organization memberships:', error);
-          return;
-        }
-
-        if (memberships && memberships.length > 0) {
-          const membership = memberships[0];
-          const org = membership.organizations;
-          const orgData = {
-            id: org.id, name: org.name, tagline: org.tagline,
-            type: org.type, image_url: org.image_url, role: membership.role
-          };
-          setOrganizationInfo(orgData);
-        } else {
-          setOrganizationInfo(null);
-        }
+        const orgData = await getOrganizationInfoForCommunity(profile.id);
+        setOrganizationInfo(orgData);
       } catch (err) {
         console.error('❌ HelloCommunity: Error fetching organization info:', err);
         setOrganizationInfo(null);
       }
     };
+    
     fetchOrganizationInfo();
   }, [profile?.id]);
 

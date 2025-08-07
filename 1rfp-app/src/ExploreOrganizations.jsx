@@ -1,4 +1,5 @@
-// src/ExploreOrganizations.jsx
+// src/ExploreOrganizations.jsx - OPTIMIZED VERSION
+// Batches category queries to avoid hundreds of individual requests
 import React, { useState, useMemo, useEffect, useCallback, useContext } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { supabase } from './supabaseClient.js';
@@ -159,6 +160,7 @@ const ExploreOrganizations = ({ isProfileView = false }) => {
 
   const [organizations, setOrganizations] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [filterConfig, setFilterConfig] = useState({ 
     searchTerm: '', 
     locationFilter: [],
@@ -181,34 +183,75 @@ const ExploreOrganizations = ({ isProfileView = false }) => {
     }
   }, [location.state]);
 
+  // OPTIMIZED: Batch all category queries instead of individual requests
   useEffect(() => {
     const fetchOrganizations = async () => {
       setLoading(true);
+      setError('');
       try {
-        const { data, error } = await supabase
+        // Step 1: Get basic organizations data
+        const { data: orgsData, error: orgsError } = await supabase
           .from('organizations')
-          .select(`
-            *,
-            organization_categories(categories(name))
-          `);
+          .select('*');
 
-        if (error) {
-          console.error('❌ Database error:', error);
-          throw error;
+        if (orgsError) {
+          console.error('❌ Database error:', orgsError);
+          throw orgsError;
         }
 
-        if (data) {
-          const formattedData = data.map(org => ({
-            ...org,
-            focus_areas: org.organization_categories?.map(oc => oc.categories?.name).filter(Boolean) || [],
-            followers_count: 0, // Default since we're not using engagement view
-            likes_count: 0      // Default since we're not using engagement view
-          }));
-          setOrganizations(formattedData);
+        if (!orgsData || orgsData.length === 0) {
+          setOrganizations([]);
+          return;
         }
+
+        // Step 2: Get ALL organization categories in one batch query
+        const orgIds = orgsData.map(org => org.id);
+        const { data: allCategoryData } = await supabase
+          .from('organization_categories')
+          .select('organization_id, category_id')
+          .in('organization_id', orgIds);
+
+        // Step 3: Get all unique category IDs and fetch their names in one query
+        let categoryMap = {};
+        if (allCategoryData && allCategoryData.length > 0) {
+          const uniqueCategoryIds = [...new Set(allCategoryData.map(c => c.category_id))];
+          
+          const { data: categoryNames } = await supabase
+            .from('categories')
+            .select('id, name')
+            .in('id', uniqueCategoryIds);
+
+          // Create a map of category ID to name
+          const categoryIdToName = {};
+          categoryNames?.forEach(cat => {
+            categoryIdToName[cat.id] = cat.name;
+          });
+
+          // Create a map of organization ID to category names
+          allCategoryData.forEach(item => {
+            if (!categoryMap[item.organization_id]) {
+              categoryMap[item.organization_id] = [];
+            }
+            const categoryName = categoryIdToName[item.category_id];
+            if (categoryName) {
+              categoryMap[item.organization_id].push(categoryName);
+            }
+          });
+        }
+
+        // Step 4: Combine organizations with their categories
+        const orgsWithCategories = orgsData.map(org => ({
+          ...org,
+          focus_areas: categoryMap[org.id] || [],
+          followers_count: 0, // Default since we're not using engagement view
+          likes_count: 0      // Default since we're not using engagement view
+        }));
+
+        setOrganizations(orgsWithCategories);
+        
       } catch (error) {
         console.error('💥 Error fetching organizations:', error);
-        setError('Failed to load organizations');
+        setError('Failed to load organizations. Please try again.');
       } finally {
         setLoading(false);
       }
@@ -317,6 +360,24 @@ const ExploreOrganizations = ({ isProfileView = false }) => {
     activeFilters: activeFilters, 
     onRemoveFilter: handleRemoveFilter,
   };
+
+  if (error) {
+    return (
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="text-center py-16">
+          <div className="bg-red-50 border border-red-200 rounded-xl p-8 max-w-md mx-auto">
+            <div className="text-red-600 mb-4">{error}</div>
+            <button 
+              onClick={() => window.location.reload()}
+              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={isProfileView ? "" : "container mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12"}>

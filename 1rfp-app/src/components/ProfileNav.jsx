@@ -1,8 +1,8 @@
-// src/components/ProfileNav.jsx - FIXED VERSION
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { NavLink, useOutletContext, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import { isPlatformAdmin } from '../utils/permissions.js';
+import { getOrganizationForProfileNav } from '../utils/membershipQueries.js';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     Home, Users, LayoutDashboard, BarChart2, FileText, Building, Bookmark, Bell, Settings, Search, ChevronsRight, Crown, Briefcase, Handshake, Globe
@@ -32,20 +32,12 @@ export default function ProfileNav() {
     }, [isExpanded]);
 
     // --- DATA FETCHING & LOGIC ---
+    // FIXED: Replace problematic query with safe function
     const fetchOrganizationData = useCallback(async (profileId) => {
         if (!profileId) return { name: '', slug: '' };
+        
         try {
-            const { data } = await supabase
-                .from('organization_memberships')
-                .select('organizations!inner(name, slug)')
-                .eq('profile_id', profileId)
-                .order('joined_at', { ascending: false })
-                .limit(1)
-                .single();
-            return {
-                name: data?.organizations?.name || '',
-                slug: data?.organizations?.slug || ''
-            };
+            return await getOrganizationForProfileNav(profileId);
         } catch (error) {
             console.error('Error fetching organization data:', error);
             return { name: '', slug: '' };
@@ -58,7 +50,8 @@ export default function ProfileNav() {
             const [followersResult, followingResult, connectionsResult] = await Promise.all([
                 supabase.from('followers').select('*', { count: 'exact', head: true }).eq('following_id', profile.id),
                 supabase.from('followers').select('*', { count: 'exact', head: true }).eq('follower_id', profile.id),
-                supabase.from('user_connections').select('*', { count: 'exact', head: true }).or(`and(requester_id.eq.${profile.id},status.eq.accepted),and(recipient_id.eq.${profile.id},status.eq.accepted)`)
+                supabase.from('user_connections').select('*', { count: 'exact', head: true })
+                    .or(`and(requester_id.eq.${profile.id},status.eq.accepted),and(recipient_id.eq.${profile.id},status.eq.accepted)`)
             ]);
             setStats({
                 followersCount: followersResult.count || 0,
@@ -70,25 +63,70 @@ export default function ProfileNav() {
         }
     }, [profile?.id]);
 
+    // FIXED: Proper real-time subscription cleanup
     useEffect(() => {
+        fetchProfileStats();
+        
+        // Fetch organization data
         if (profile?.id) {
-            Promise.all([
-                fetchOrganizationData(profile.id),
-                fetchProfileStats()
-            ]).then(([orgData]) => {
-                setOrganizationName(orgData.name);
-                setOrganizationSlug(orgData.slug);
+            fetchOrganizationData(profile.id).then(({ name, slug }) => {
+                setOrganizationName(name);
+                setOrganizationSlug(slug);
             });
         }
-    }, [profile?.id, fetchOrganizationData, fetchProfileStats]);
+        
+        // Only set up real-time if profile ID exists
+        if (!profile?.id) return;
+        
+        const channel = supabase.channel(`profile-stats-changes:${profile.id}`)
+            .on('postgres_changes', { 
+                event: '*', 
+                schema: 'public', 
+                table: 'followers', 
+                filter: `or(follower_id.eq.${profile.id},following_id.eq.${profile.id})` 
+            }, fetchProfileStats)
+            .on('postgres_changes', { 
+                event: '*', 
+                schema: 'public', 
+                table: 'user_connections', 
+                filter: `or(requester_id.eq.${profile.id},recipient_id.eq.${profile.id})` 
+            }, fetchProfileStats)
+            .on('postgres_changes', { 
+                event: '*', 
+                schema: 'public', 
+                table: 'organization_memberships', 
+                filter: `profile_id.eq.${profile.id}` 
+            }, () => {
+                if (profile?.id) {
+                    fetchOrganizationData(profile.id).then(({ name, slug }) => {
+                        setOrganizationName(name);
+                        setOrganizationSlug(slug);
+                    });
+                }
+            })
+            .subscribe((status) => {
+                // Only log errors, not successful connections
+                if (status === 'CHANNEL_ERROR') {
+                    console.error('Profile stats subscription error');
+                }
+            });
+        
+        return () => {
+            // FIXED: Properly unsubscribe and remove channel
+            if (channel) {
+                channel.unsubscribe();
+                supabase.removeChannel(channel);
+            }
+        };
+    }, [profile?.id, fetchProfileStats, fetchOrganizationData]);
 
-    // Navigation configuration
+    // --- NAVIGATION STRUCTURE ---
     const navItems = [
         {
             section: 'Community',
             links: [
-                { icon: <Home size={20} />, text: "Home", to: "/profile" },
-                { icon: <Globe size={20} />, text: "Hello World", to: "/profile/hello-world" },
+                { icon: <Home size={20} />, text: "Dashboard", to: "/profile" },                           // NEW: Main dashboard
+                { icon: <Globe size={20} />, text: "Hello World", to: "/profile/hello-world" },          // UPDATED: Moved HelloWorld
                 { icon: <Handshake size={20} />, text: "Hello Community", to: "/profile/hello-community" },
                 { icon: <Search size={20} />, text: "Discover People", to: "/profile/members" },
             ]
@@ -223,9 +261,7 @@ function NavItem({ to, icon, text, badge, isExpanded }) {
         <NavLink 
             to={to} 
             className={navLinkClass} 
-            // FIXED: Removed the problematic end prop that was causing routing issues
-            // Only use end for specific admin routes that truly need exact matching
-            end={to === "/profile/omega-admin"}
+            end={to === "/profile/omega-admin" || to === "/profile"} 
             title={!isExpanded ? text : ''}
         >
             <div className="flex items-center justify-center w-5 h-5 flex-shrink-0">
@@ -303,7 +339,7 @@ function ProfileCard({ profile, stats, organizationName, organizationSlug, navig
                     value={stats.followingCount} 
                     onClick={() => navigate('/profile/following')}
                     color="blue"
-                    icon="👤"
+                    icon="🌟"
                 />
             </div>
         </div>
@@ -311,53 +347,43 @@ function ProfileCard({ profile, stats, organizationName, organizationSlug, navig
 }
 
 function StatButton({ label, value, onClick, color, icon }) {
-    const colorClasses = {
-        emerald: "bg-gradient-to-br from-emerald-50 to-emerald-100 text-emerald-700 hover:from-emerald-100 hover:to-emerald-200 border-emerald-200",
-        purple: "bg-gradient-to-br from-purple-50 to-purple-100 text-purple-700 hover:from-purple-100 hover:to-purple-200 border-purple-200",
-        blue: "bg-gradient-to-br from-blue-50 to-blue-100 text-blue-700 hover:from-blue-100 hover:to-blue-200 border-blue-200"
-    };
-
     return (
-        <motion.button
-            onClick={onClick}
-            whileHover={{ scale: 1.05, y: -2 }}
+        <motion.button 
+            onClick={onClick} 
+            className="flex flex-col items-center text-center rounded-xl p-3 transition-all duration-200 w-20 hover:bg-slate-50 hover:scale-105"
+            whileHover={{ y: -2 }}
             whileTap={{ scale: 0.95 }}
-            className={`flex flex-col items-center p-2 rounded-lg border transition-all duration-200 cursor-pointer group ${colorClasses[color]}`}
         >
             <div className="text-lg mb-1">{icon}</div>
-            <span className="text-sm font-bold">{value || 0}</span>
-            <span className="text-xs opacity-80 group-hover:opacity-100 transition-opacity">{label}</span>
+            <motion.p 
+                className="text-xl font-bold text-slate-800"
+                key={value}
+                initial={{ scale: 1.2, color: '#3b82f6' }}
+                animate={{ scale: 1, color: '#1e293b' }}
+                transition={{ duration: 0.3 }}
+            >
+                {value}
+            </motion.p>
+            <p className="text-[10px] font-medium text-slate-500 uppercase tracking-normal leading-tight">{label}</p>
         </motion.button>
     );
 }
 
-function Avatar({ profile, size = "medium" }) {
+function Avatar({ profile, size = 'medium' }) {
     const sizeClasses = {
-        small: "w-8 h-8 text-sm",
-        medium: "w-10 h-10 text-sm", 
-        large: "w-16 h-16 text-lg"
+        medium: 'w-10 h-10 text-base',
+        large: 'w-16 h-16 text-2xl',
     };
-    
-    const initials = profile?.full_name
-        ?.split(' ')
-        .map(name => name[0])
-        .join('')
-        .toUpperCase()
-        .slice(0, 2) || '??';
-
-    if (profile?.avatar_url) {
-        return (
-            <img
-                src={profile.avatar_url}
-                alt={profile.full_name || 'Profile'}
-                className={`${sizeClasses[size]} rounded-full object-cover border-2 border-white shadow-lg`}
-            />
-        );
-    }
-
     return (
-        <div className={`${sizeClasses[size]} rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-semibold shadow-lg`}>
-            {initials}
+        <div className={`relative ${sizeClasses[size]}`}>
+            <div className="w-full h-full bg-slate-200 rounded-full flex items-center justify-center overflow-hidden ring-2 ring-white shadow-sm">
+                {profile?.avatar_url ? (
+                    <img src={profile.avatar_url} alt="Profile" className="w-full h-full object-cover" />
+                ) : (
+                    <span className="font-bold text-slate-600">{profile?.full_name?.charAt(0)?.toUpperCase() || '?'}</span>
+                )}
+            </div>
+            <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-green-500 rounded-full ring-2 ring-white"></div>
         </div>
     );
 }

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useOutletContext, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import { rssNewsService as newsService } from '../services/rssNewsService.js';
+import { getOrganizationInfoForDashboard, getBulkOrganizationMemberships } from '../utils/membershipQueries.js';
 
 // ADD THESE IMPORTS
 import { realtimeManager } from '../utils/realtimeManager.js';
@@ -41,7 +42,7 @@ const useNews = () => {
     return news;
 };
 
-// UPDATED: useTrendingPosts hook with new channel manager
+// UPDATED: useTrendingPosts hook with safe queries
 const useTrendingPosts = () => {
     const [trendingPosts, setTrendingPosts] = useState([]);
     const { profile } = useOutletContext() || {};
@@ -65,18 +66,8 @@ const useTrendingPosts = () => {
                         .select('id, full_name, avatar_url')
                         .in('id', profileIds);
 
-                    const { data: membershipsData } = await supabase
-                        .from('organization_memberships')
-                        .select('profile_id, organizations!inner(name)')
-                        .in('profile_id', profileIds)
-                        .order('joined_at', { ascending: false });
-
-                    const orgMap = {};
-                    membershipsData?.forEach(membership => {
-                        if (!orgMap[membership.profile_id]) {
-                            orgMap[membership.profile_id] = membership.organizations.name;
-                        }
-                    });
+                    // FIXED: Use safe bulk membership query instead of problematic join
+                    const membershipMap = await getBulkOrganizationMemberships(profileIds);
 
                     const postIds = postsData.map(post => post.id);
                     const { data: reactionsData } = await supabase
@@ -86,18 +77,19 @@ const useTrendingPosts = () => {
 
                     const enrichedPosts = postsData.map(post => {
                         const profile = profilesData?.find(p => p.id === post.profile_id);
-                        const currentOrgName = orgMap[post.profile_id];
+                        const membership = membershipMap[post.profile_id];
                         const postReactions = reactionsData?.filter(r => r.post_id === post.id) || [];
                         const reactionSummary = postReactions.reduce((acc, r) => {
                             const type = r.reaction_type || 'like';
                             acc[type] = (acc[type] || 0) + 1;
                             return acc;
                         }, {});
+                        
                         return {
                             ...post,
                             profiles: {
                                 ...profile,
-                                organization_name: currentOrgName
+                                organization_name: membership?.organization_name || null
                             },
                             reactions: {
                                 summary: Object.entries(reactionSummary).map(([type, count]) => ({ type, count }))
@@ -278,6 +270,7 @@ const useTrendingGrants = () => {
     return { trendingGrants, setTrendingGrants };
 };
 
+// FIXED: useUserData hook with safe query
 const useUserData = (profile) => {
     const [organizationInfo, setOrganizationInfo] = useState(null);
     const [stats, setStats] = useState({
@@ -293,15 +286,12 @@ const useUserData = (profile) => {
             if (!profile?.id) return;
             setLoading(true);
             try {
-                const { data: orgMembership } = await supabase
-                    .from('organization_memberships')
-                    .select('*, organizations!inner(id, name, type, tagline, image_url)')
-                    .eq('profile_id', profile.id)
-                    .order('joined_at', { ascending: false })
-                    .limit(1);
-                if (orgMembership && orgMembership.length > 0) {
-                    setOrganizationInfo(orgMembership[0].organizations);
-                }
+                // FIXED: Use safe query function instead of problematic join
+                const orgData = await getOrganizationInfoForDashboard(profile.id);
+                setOrganizationInfo(orgData);
+            } catch (err) {
+                console.error('Error fetching user organization data:', err);
+                setOrganizationInfo(null);
             } finally {
                 setLoading(false);
             }
