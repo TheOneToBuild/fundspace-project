@@ -1,4 +1,4 @@
-// src/pages/OrganizationProfilePage.jsx - Complete version with inline editing capability
+// src/pages/OrganizationProfilePage.jsx - Complete version with global edit mode
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../supabaseClient.js';
@@ -11,9 +11,15 @@ import PublicPageLayout from '../components/PublicPageLayout.jsx';
 import EditableOrganizationHeader from '../components/organization-profile/EditableOrganizationHeader.jsx';
 import OrganizationHeader from '../components/organization-profile/OrganizationHeader.jsx';
 import OrganizationTabs from '../components/organization-profile/OrganizationTabs.jsx';
+
+// Regular Components
 import OrganizationHome from '../components/organization-profile/OrganizationHome.jsx';
 import OrganizationOverview from '../components/organization-profile/OrganizationOverview.jsx';
 import OrganizationTeam from '../components/organization-profile/OrganizationTeam.jsx';
+
+// Editable Components
+import EditableOrganizationHome from '../components/organization-profile/EditableOrganizationHome.jsx';
+import EditableOrganizationPhotos from '../components/organization-profile/EditableOrganizationPhotos.jsx';
 
 // New Components for Template Design
 import OrganizationImpact from '../components/organization-profile/OrganizationImpact.jsx';
@@ -497,13 +503,16 @@ const OrganizationProfilePage = () => {
       session,
       userMembership,
       onPostDelete: handleDeletePost,
-      photos
+      photos,
+      onUpdate: refreshOrganizationData // Add this for editable components
     };
 
-    // Shared tabs
+    // Shared tabs - Use editable versions when in edit mode
     switch (activeTab) {
       case 'home':
-        return <OrganizationHome {...props} />;
+        return isEditMode ? 
+          <EditableOrganizationHome {...props} /> : 
+          <OrganizationHome {...props} />;
       case 'team':
         return <OrganizationTeam {...props} userMembership={userMembership} session={session} />;
       case 'impact':
@@ -511,7 +520,9 @@ const OrganizationProfilePage = () => {
       case 'northstar':
         return <OrganizationNorthStar {...props} userMembership={userMembership} session={session} />;
       case 'photos':
-        return <OrganizationPhotos {...props} userMembership={userMembership} session={session} />;
+        return isEditMode ? 
+          <EditableOrganizationPhotos {...props} userMembership={userMembership} session={session} /> :
+          <OrganizationPhotos {...props} userMembership={userMembership} session={session} />;
     }
 
     // Type-specific tabs - use placeholders for now except grants
@@ -568,7 +579,9 @@ const OrganizationProfilePage = () => {
     }
 
     // Fallback
-    return <OrganizationHome {...props} />;
+    return isEditMode ? 
+      <EditableOrganizationHome {...props} /> : 
+      <OrganizationHome {...props} />;
   };
 
   const handleDeletePost = async (postId) => {
