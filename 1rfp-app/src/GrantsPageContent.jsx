@@ -619,7 +619,6 @@ const GrantsPageContent = ({ isProfileView = false }) => {
                             <AnimatedCounter 
                                 targetValue={totalFilteredFunding} 
                                 duration={1000} 
-                                prefix="$" 
                                 formatValue={formatCurrency}
                             /> Available
                         </span>

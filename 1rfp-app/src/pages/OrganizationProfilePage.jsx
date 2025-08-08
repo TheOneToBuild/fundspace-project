@@ -1,6 +1,6 @@
-// src/pages/OrganizationProfilePage.jsx - FIXED VERSION - Remove problematic joins
+// src/pages/OrganizationProfilePage.jsx - Complete version with inline editing capability
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../supabaseClient.js';
 
 // Import safe membership queries
@@ -8,6 +8,7 @@ import { getUserMembershipSafe } from '../utils/membershipQueries.js';
 
 // Shared Components
 import PublicPageLayout from '../components/PublicPageLayout.jsx';
+import EditableOrganizationHeader from '../components/organization-profile/EditableOrganizationHeader.jsx';
 import OrganizationHeader from '../components/organization-profile/OrganizationHeader.jsx';
 import OrganizationTabs from '../components/organization-profile/OrganizationTabs.jsx';
 import OrganizationHome from '../components/organization-profile/OrganizationHome.jsx';
@@ -22,11 +23,12 @@ import OrganizationGrantsFixed from '../components/organization-profile/Organiza
 
 // Hooks
 import { useOrganizationSocial } from '../hooks/useOrganizationSocial.js';
+import { hasPermission, PERMISSIONS } from '../utils/organizationPermissions.js';
 
 // Organization type configurations for different layouts
 const ORG_TYPE_CONFIGS = {
   foundation: {
-    headerStyle: 'foundation', // Special header styling for foundations
+    headerStyle: 'foundation',
     showNorthStar: true,
     showImpact: true,
     showPhotos: true,
@@ -39,7 +41,6 @@ const ORG_TYPE_CONFIGS = {
     showPhotos: true,
     primaryGradient: 'from-green-500 to-emerald-600'
   },
-  // Add other org types as needed
   default: {
     headerStyle: 'default',
     showNorthStar: false,
@@ -63,6 +64,10 @@ const PlaceholderContent = ({ contentType, organizationType }) => (
 const OrganizationProfilePage = () => {
   const { slug } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  
+  // Check if we're in edit mode
+  const isEditMode = searchParams.get('edit') === 'true';
   
   // Core States
   const [organization, setOrganization] = useState(null);
@@ -77,7 +82,7 @@ const OrganizationProfilePage = () => {
   const [typeSpecificData, setTypeSpecificData] = useState({});
   const [userMembership, setUserMembership] = useState(null);
   const [photos, setPhotos] = useState([]);
-  const [hasGrants, setHasGrants] = useState(false); // Track if organization has grants
+  const [hasGrants, setHasGrants] = useState(false);
 
   // Get organization type configuration
   const orgConfig = ORG_TYPE_CONFIGS[organization?.type] || ORG_TYPE_CONFIGS.default;
@@ -104,7 +109,6 @@ const OrganizationProfilePage = () => {
   useEffect(() => {
     if (organization?.id && !hasTrackedView.current) {
       hasTrackedView.current = true;
-      // Track view without using the hook that might cause re-renders
       const trackView = async () => {
         try {
           const sessionId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -130,7 +134,7 @@ const OrganizationProfilePage = () => {
       // Track after a delay
       setTimeout(trackView, 2000);
     }
-  }, [organization?.id]); // Only depend on org ID, not session
+  }, [organization?.id]);
 
   // Get tab configuration based on organization type
   const getTabConfiguration = (orgType) => {
@@ -217,171 +221,215 @@ const OrganizationProfilePage = () => {
     return tabs;
   };
 
+  // Function to refresh organization data
+  const refreshOrganizationData = async (updatedOrg = null) => {
+    if (updatedOrg) {
+      setOrganization(updatedOrg);
+    } else {
+      // Re-fetch from database
+      await fetchOrganizationData();
+    }
+  };
+
   // FIXED: Fetch organization data with separate queries to avoid joins
-  useEffect(() => {
-    const fetchOrganizationData = async () => {
-      if (!slug) return;
+  const fetchOrganizationData = useCallback(async () => {
+    if (!slug) return;
 
-      setLoading(true);
-      setError(null);
+    setLoading(true);
+    setError(null);
 
-      try {
-        // STEP 1: Get basic organization data (no joins)
-        const { data: orgData, error: orgError } = await supabase
-          .from('organizations')
-          .select('*')
-          .eq('slug', slug)
-          .single();
+    try {
+      // STEP 1: Get basic organization data (no joins)
+      const { data: orgData, error: orgError } = await supabase
+        .from('organizations')
+        .select('*')
+        .eq('slug', slug)
+        .single();
 
-        if (orgError) throw orgError;
+      if (orgError) throw orgError;
 
-        // STEP 2: Get organization categories separately (safe approach)
-        let focusAreas = [];
-        if (orgData?.id) {
-          try {
-            // Try the join approach first
-            const { data: categoryData, error: categoryError } = await supabase
+      // STEP 2: Get organization categories separately (safe approach)
+      let focusAreas = [];
+      if (orgData?.id) {
+        try {
+          // Try the join approach first
+          const { data: categoryData, error: categoryError } = await supabase
+            .from('organization_categories')
+            .select('category_id, categories(name)')
+            .eq('organization_id', orgData.id);
+
+          if (categoryError) {
+            console.warn('Categories join failed, trying fallback:', categoryError);
+            // Fallback: get category IDs then lookup names
+            const { data: categoryIds } = await supabase
               .from('organization_categories')
-              .select('category_id, categories(name)')
+              .select('category_id')
               .eq('organization_id', orgData.id);
 
-            if (categoryError) {
-              console.warn('Categories join failed, trying fallback:', categoryError);
-              // Fallback: get category IDs then lookup names
-              const { data: categoryIds } = await supabase
-                .from('organization_categories')
-                .select('category_id')
-                .eq('organization_id', orgData.id);
+            if (categoryIds && categoryIds.length > 0) {
+              const { data: categoryNames } = await supabase
+                .from('categories')
+                .select('name')
+                .in('id', categoryIds.map(c => c.category_id));
 
-              if (categoryIds && categoryIds.length > 0) {
-                const { data: categoryNames } = await supabase
-                  .from('categories')
-                  .select('name')
-                  .in('id', categoryIds.map(c => c.category_id));
-
-                focusAreas = categoryNames?.map(c => c.name) || [];
-              }
-            } else {
-              focusAreas = categoryData?.map(item => item.categories?.name).filter(Boolean) || [];
+              focusAreas = categoryNames?.map(c => c.name) || [];
             }
-          } catch (categoryError) {
-            console.warn('Error fetching categories (all approaches failed):', categoryError);
-            focusAreas = [];
+          } else {
+            focusAreas = categoryData?.map(item => item.categories?.name).filter(Boolean) || [];
           }
+        } catch (categoryError) {
+          console.warn('Error fetching categories (all approaches failed):', categoryError);
+          focusAreas = [];
         }
+      }
 
-        // STEP 3: Get organization funding locations separately (safe approach)
-        let fundingLocations = [];
-        if (orgData?.id) {
-          try {
-            // Try the join approach first
-            const { data: locationData, error: locationError } = await supabase
+      // STEP 3: Get organization funding locations separately (safe approach)
+      let fundingLocations = [];
+      if (orgData?.id) {
+        try {
+          // Try the join approach first
+          const { data: locationData, error: locationError } = await supabase
+            .from('organization_funding_locations')
+            .select('location_id, locations(name)')
+            .eq('organization_id', orgData.id);
+
+          if (locationError) {
+            console.warn('Locations join failed, trying fallback:', locationError);
+            // Fallback: get location IDs then lookup names
+            const { data: locationIds } = await supabase
               .from('organization_funding_locations')
-              .select('location_id, locations(name)')
+              .select('location_id')
               .eq('organization_id', orgData.id);
 
-            if (locationError) {
-              console.warn('Locations join failed, trying fallback:', locationError);
-              // Fallback: get location IDs then lookup names
-              const { data: locationIds } = await supabase
-                .from('organization_funding_locations')
-                .select('location_id')
-                .eq('organization_id', orgData.id);
+            if (locationIds && locationIds.length > 0) {
+              const { data: locationNames } = await supabase
+                .from('locations')
+                .select('name')
+                .in('id', locationIds.map(l => l.location_id));
 
-              if (locationIds && locationIds.length > 0) {
-                const { data: locationNames } = await supabase
-                  .from('locations')
-                  .select('name')
-                  .in('id', locationIds.map(l => l.location_id));
-
-                fundingLocations = locationNames?.map(l => l.name) || [];
-              }
-            } else {
-              fundingLocations = locationData?.map(item => item.locations?.name).filter(Boolean) || [];
+              fundingLocations = locationNames?.map(l => l.name) || [];
             }
-          } catch (locationError) {
-            console.warn('Error fetching locations (all approaches failed):', locationError);
-            fundingLocations = [];
+          } else {
+            fundingLocations = locationData?.map(item => item.locations?.name).filter(Boolean) || [];
           }
+        } catch (locationError) {
+          console.warn('Error fetching locations (all approaches failed):', locationError);
+          fundingLocations = [];
+        }
+      }
+
+      // STEP 4: Get organization photos
+      let photosData = [];
+      if (orgData?.id) {
+        try {
+          const { data: photoResults } = await supabase
+            .from('organization_photos')
+            .select('*')
+            .eq('organization_id', orgData.id)
+            .order('display_order', { ascending: true })
+            .order('created_at', { ascending: false });
+
+          photosData = photoResults?.map(photo => ({
+            id: photo.id,
+            url: photo.image_url,
+            caption: photo.caption,
+            alt_text: photo.alt_text,
+            is_featured: photo.is_featured
+          })) || [];
+        } catch (photoError) {
+          console.warn('Error fetching photos:', photoError);
+        }
+      }
+
+      // Combine all data
+      const completeOrgData = {
+        ...orgData,
+        focusAreas,
+        fundingLocations
+      };
+
+      setOrganization(completeOrgData);
+      setPhotos(photosData);
+
+      // STEP 5: Get additional data if org exists
+      if (orgData?.id) {
+        // Check for grants
+        try {
+          const { data: grantsData } = await supabase
+            .from('grants')
+            .select('id')
+            .eq('organization_id', orgData.id)
+            .limit(1);
+
+          setHasGrants(grantsData && grantsData.length > 0);
+        } catch (grantsError) {
+          console.warn('Error checking grants:', grantsError);
         }
 
-        // STEP 4: Get organization photos
-        let photosData = [];
-        if (orgData?.id) {
-          try {
-            const { data: photoResults } = await supabase
-              .from('organization_photos')
-              .select('*')
-              .eq('organization_id', orgData.id)
-              .order('display_order', { ascending: true })
-              .order('created_at', { ascending: false });
+        // Get organization posts
+        try {
+          const { data: postsData } = await supabase
+            .from('organization_posts')
+            .select('*')
+            .eq('organization_id', orgData.id)
+            .eq('organization_type', orgData.type)
+            .order('created_at', { ascending: false })
+            .limit(10);
 
-            photosData = photoResults?.map(photo => ({
-              id: photo.id,
-              url: photo.image_url,
-              caption: photo.caption,
-              alt_text: photo.alt_text,
-              is_featured: photo.is_featured
-            })) || [];
-          } catch (photoError) {
-            console.warn('Error fetching photos:', photoError);
-          }
+          setOrganizationPosts(postsData || []);
+        } catch (postsError) {
+          console.warn('Error fetching posts:', postsError);
         }
 
-        // Combine all data
-        const completeOrgData = {
-          ...orgData,
-          focusAreas,
-          fundingLocations
-        };
+        // FIXED: Get team members using safe cache approach
+        try {
+          const { data: membershipData } = await supabase
+            .from('organization_membership_cache')
+            .select('profile_id')
+            .eq('organization_id', orgData.id)
+            .eq('is_public', true);
 
-        setOrganization(completeOrgData);
-        setPhotos(photosData);
+          if (membershipData && membershipData.length > 0) {
+            const profileIds = membershipData.map(m => m.profile_id);
+            
+            const { data: profilesData } = await supabase
+              .from('profiles')
+              .select(`
+                id,
+                full_name,
+                avatar_url,
+                title,
+                bio,
+                location,
+                is_omega_admin,
+                linkedin_url,
+                twitter_url,
+                website_url
+              `)
+              .in('id', profileIds);
 
-        // STEP 5: Get additional data if org exists
-        if (orgData?.id) {
-          // Check for grants
-          try {
-            const { data: grantsData } = await supabase
-              .from('grants')
-              .select('id')
-              .eq('organization_id', orgData.id)
-              .limit(1);
+            // Combine membership and profile data
+            const teamData = membershipData.map(membership => {
+              const profile = profilesData?.find(p => p.id === membership.profile_id);
+              return profile ? {
+                profile_id: membership.profile_id,
+                organization_id: orgData.id,
+                is_public: true,
+                profiles: profile
+              } : null;
+            }).filter(Boolean);
 
-            setHasGrants(grantsData && grantsData.length > 0);
-          } catch (grantsError) {
-            console.warn('Error checking grants:', grantsError);
+            setTeamMembers(teamData);
           }
-
-          // Get organization posts
+        } catch (teamError) {
+          console.warn('Error fetching team members:', teamError);
+          // Fallback: try to get memberships without cache
           try {
-            const { data: postsData } = await supabase
-              .from('organization_posts')
-              .select('*')
-              .eq('organization_id', orgData.id)
-              .eq('organization_type', orgData.type)
-              .order('created_at', { ascending: false })
-              .limit(10);
-
-            setOrganizationPosts(postsData || []);
-          } catch (postsError) {
-            console.warn('Error fetching posts:', postsError);
-          }
-
-          // FIXED: Get team members using safe cache approach
-          try {
-            const { data: membershipData } = await supabase
-              .from('organization_membership_cache')
-              .select('profile_id')
-              .eq('organization_id', orgData.id)
-              .eq('is_public', true);
-
-            if (membershipData && membershipData.length > 0) {
-              const profileIds = membershipData.map(m => m.profile_id);
-              
-              const { data: profilesData } = await supabase
-                .from('profiles')
-                .select(`
+            const { data: fallbackMemberships } = await supabase
+              .from('organization_memberships')
+              .select(`
+                *,
+                profiles (
                   id,
                   full_name,
                   avatar_url,
@@ -392,86 +440,52 @@ const OrganizationProfilePage = () => {
                   linkedin_url,
                   twitter_url,
                   website_url
-                `)
-                .in('id', profileIds);
+                )
+              `)
+              .eq('organization_id', orgData.id)
+              .eq('is_public', true)
+              .order('joined_at', { ascending: false });
 
-              // Combine membership and profile data
-              const teamData = membershipData.map(membership => {
-                const profile = profilesData?.find(p => p.id === membership.profile_id);
-                return profile ? {
-                  profile_id: membership.profile_id,
-                  organization_id: orgData.id,
-                  is_public: true,
-                  profiles: profile
-                } : null;
-              }).filter(Boolean);
-
-              setTeamMembers(teamData);
-            }
-          } catch (teamError) {
-            console.warn('Error fetching team members:', teamError);
-            // Fallback: try to get memberships without cache
-            try {
-              const { data: fallbackMemberships } = await supabase
-                .from('organization_memberships')
-                .select(`
-                  *,
-                  profiles (
-                    id,
-                    full_name,
-                    avatar_url,
-                    title,
-                    bio,
-                    location,
-                    is_omega_admin,
-                    linkedin_url,
-                    twitter_url,
-                    website_url
-                  )
-                `)
-                .eq('organization_id', orgData.id)
-                .eq('is_public', true)
-                .order('joined_at', { ascending: false });
-
-              setTeamMembers(fallbackMemberships || []);
-            } catch (fallbackError) {
-              console.warn('Fallback team fetch also failed:', fallbackError);
-              setTeamMembers([]);
-            }
+            setTeamMembers(fallbackMemberships || []);
+          } catch (fallbackError) {
+            console.warn('Fallback team fetch also failed:', fallbackError);
+            setTeamMembers([]);
           }
+        }
 
-          // FIXED: Get user membership using safe approach
-          if (session?.user?.id) {
-            try {
-              const membershipData = await getUserMembershipSafe(session.user.id);
-              if (membershipData && membershipData.organization_id === orgData.id) {
-                setUserMembership({
-                  organization_id: orgData.id,
-                  profile_id: session.user.id,
-                  role: membershipData.role,
-                  is_public: membershipData.is_public
-                });
-              } else {
-                setUserMembership(null);
-              }
-            } catch (membershipError) {
-              console.warn('Error fetching user membership:', membershipError);
+        // FIXED: Get user membership using safe approach
+        if (session?.user?.id) {
+          try {
+            const membershipData = await getUserMembershipSafe(session.user.id);
+            if (membershipData && membershipData.organization_id === orgData.id) {
+              setUserMembership({
+                organization_id: orgData.id,
+                profile_id: session.user.id,
+                role: membershipData.role,
+                is_public: membershipData.is_public
+              });
+            } else {
               setUserMembership(null);
             }
+          } catch (membershipError) {
+            console.warn('Error fetching user membership:', membershipError);
+            setUserMembership(null);
           }
-
-          setTypeSpecificData({});
         }
-      } catch (err) {
-        console.error('Error fetching organization data:', err);
-        setError('Could not load organization profile.');
-      } finally {
-        setLoading(false);
-      }
-    };
 
-    fetchOrganizationData();
+        setTypeSpecificData({});
+      }
+    } catch (err) {
+      console.error('Error fetching organization data:', err);
+      setError('Could not load organization profile.');
+    } finally {
+      setLoading(false);
+    }
   }, [slug, session?.user?.id]);
+
+  useEffect(() => {
+    fetchOrganizationData();
+  }, [fetchOrganizationData]);
 
   // Render active tab content
   const renderActiveTab = () => {
@@ -612,33 +626,42 @@ const OrganizationProfilePage = () => {
 
   return (
     <PublicPageLayout bgColor="bg-slate-50">
-      {/* Banner Image - New for template design */}
-      <div className="relative h-80 bg-slate-200 overflow-hidden">
-        {organization.banner_image_url ? (
-          <img 
-            src={organization.banner_image_url} 
-            alt="Organization banner" 
-            className="w-full h-full object-cover" 
-          />
-        ) : (
-          <div className="w-full h-full bg-gradient-to-br from-white via-stone-50 to-stone-100"></div>
-        )}
-      </div>
-
-      {/* Header with integrated tabs */}
-      <OrganizationHeader 
-        organization={organization}
-        isFollowing={isFollowing}
-        followersCount={followersCount}
-        isBookmarked={isBookmarked}
-        bookmarksCount={bookmarksCount}
-        onFollow={handleFollow}
-        onBookmark={handleBookmark}
-        config={orgConfig}
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
-        tabs={tabConfig}
-      />
+      {/* Header - Use EditableOrganizationHeader if in edit mode, regular OrganizationHeader otherwise */}
+      {isEditMode ? (
+        <EditableOrganizationHeader 
+          organization={organization}
+          isFollowing={isFollowing}
+          followersCount={followersCount}
+          isBookmarked={isBookmarked}
+          bookmarksCount={bookmarksCount}
+          onFollow={handleFollow}
+          onBookmark={handleBookmark}
+          config={orgConfig}
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          tabs={tabConfig}
+          userMembership={userMembership}
+          session={session}
+          onUpdate={refreshOrganizationData}
+        />
+      ) : (
+        <OrganizationHeader 
+          organization={organization}
+          isFollowing={isFollowing}
+          followersCount={followersCount}
+          isBookmarked={isBookmarked}
+          bookmarksCount={bookmarksCount}
+          onFollow={handleFollow}
+          onBookmark={handleBookmark}
+          config={orgConfig}
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          tabs={tabConfig}
+          userMembership={userMembership}
+          session={session}
+          showBanner={true}
+        />
+      )}
       
       {/* Main Content */}
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
