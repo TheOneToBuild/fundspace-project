@@ -1,11 +1,16 @@
-// src/components/organization-profile/EditableOrganizationHome.jsx - Single edit modal approach
+// src/components/organization-profile/EditableOrganizationHome.jsx - Refactored Version
 import React, { useState } from 'react';
-import { MessageSquare, Plus, Edit3, Save, X, Image, Trash2, Upload } from 'lucide-react';
+import { MessageSquare, Plus, Edit3, X } from 'lucide-react';
 import { supabase } from '../../supabaseClient.js';
 import OrganizationPostCard from '../OrganizationPostCard.jsx';
 import OrganizationPostDetailModal from '../OrganizationPostDetailModal.jsx';
 import CreatePost from '../CreatePost.jsx';
 import { hasPermission, PERMISSIONS } from '../../utils/organizationPermissions.js';
+
+// Refactored components
+import MissionEditModal from './MissionEditModal.jsx';
+import PhotoPreviewSection from './PhotoPreviewSection.jsx';
+import { FocusAreaPill } from './FocusAreasManager.jsx';
 
 const EditableOrganizationHome = ({ 
   organization, 
@@ -14,8 +19,11 @@ const EditableOrganizationHome = ({
   onPostDelete,
   userMembership,
   photos = [],
-  onUpdate // Callback to refresh organization data
+  onUpdate,
+  activeTab,
+  setActiveTab
 }) => {
+  // State management - simplified
   const [selectedPost, setSelectedPost] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditingMission, setIsEditingMission] = useState(false);
@@ -23,24 +31,15 @@ const EditableOrganizationHome = ({
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
 
-  // Combined edit state for mission section
-  const [editData, setEditData] = useState({
-    description: organization?.description || '',
-    mission_image_url: organization?.mission_image_url || '',
-    focusAreas: organization?.focusAreas || []
-  });
-  const [newFocusArea, setNewFocusArea] = useState('');
-
-  // Check if user can create posts (must be a member with edit permissions)
+  // Check permissions
   const canCreatePosts = userMembership && hasPermission(
     userMembership.role, 
     PERMISSIONS.EDIT_ORGANIZATION, 
     session?.user?.is_omega_admin
   );
-
-  // Check if user can edit/delete posts
   const canEditPosts = canCreatePosts;
 
+  // Event handlers
   const handleOpenDetail = (post) => {
     setSelectedPost(post);
     setIsModalOpen(true);
@@ -53,6 +52,15 @@ const EditableOrganizationHome = ({
 
   const handleNewPost = (newPost) => {
     console.log('New post created:', newPost);
+  };
+
+  const handleViewAllPhotos = () => {
+    if (setActiveTab) {
+      setActiveTab('photos');
+      setTimeout(() => {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }, 100);
+    }
   };
 
   // Handle mission image upload
@@ -87,8 +95,7 @@ const EditableOrganizationHome = ({
         .from('avatars')
         .getPublicUrl(filePath);
 
-      setEditData({ ...editData, mission_image_url: publicUrl });
-      return true;
+      return publicUrl;
     } catch (err) {
       console.error('Error uploading image:', err);
       setError('Failed to upload image: ' + err.message);
@@ -99,7 +106,7 @@ const EditableOrganizationHome = ({
   };
 
   // Handle comprehensive save (mission + focus areas)
-  const handleSaveAll = async () => {
+  const handleMissionSave = async (editData) => {
     try {
       setSaving(true);
       setError('');
@@ -184,11 +191,7 @@ const EditableOrganizationHome = ({
 
       // Call the onUpdate callback to refresh organization data
       if (onUpdate) {
-        await onUpdate({ 
-          ...organization, 
-          ...orgUpdateData, 
-          focusAreas: editData.focusAreas 
-        });
+        await onUpdate();
       }
 
       setIsEditingMission(false);
@@ -201,108 +204,6 @@ const EditableOrganizationHome = ({
       setSaving(false);
     }
   };
-
-  // Add new focus area
-  const addFocusArea = () => {
-    if (newFocusArea.trim() && !editData.focusAreas.includes(newFocusArea.trim())) {
-      setEditData({
-        ...editData,
-        focusAreas: [...editData.focusAreas, newFocusArea.trim()]
-      });
-      setNewFocusArea('');
-    }
-  };
-
-  // Remove focus area
-  const removeFocusArea = (areaToRemove) => {
-    setEditData({
-      ...editData,
-      focusAreas: editData.focusAreas.filter(area => area !== areaToRemove)
-    });
-  };
-
-  // Start editing - reset all edit data
-  const startEditing = () => {
-    setEditData({
-      description: organization?.description || '',
-      mission_image_url: organization?.mission_image_url || '',
-      focusAreas: organization?.focusAreas || []
-    });
-    setNewFocusArea('');
-    setError('');
-    setIsEditingMission(true);
-  };
-
-  const FocusAreaPill = ({ area, onRemove = null, editable = false }) => {
-    const gradients = [
-      'from-amber-100 to-orange-100 text-amber-700 border-orange-200', 
-      'from-emerald-100 to-teal-100 text-emerald-700 border-teal-200', 
-      'from-rose-100 to-pink-100 text-rose-700 border-rose-200', 
-      'from-blue-100 to-indigo-100 text-blue-700 border-indigo-200'
-    ];
-    const gradient = gradients[area.length % gradients.length];
-    
-    return (
-      <span className={`inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium border bg-gradient-to-r ${gradient} ${editable ? 'pr-1' : ''}`}>
-        {area}
-        {editable && onRemove && (
-          <button
-            onClick={() => onRemove(area)}
-            className="ml-2 p-0.5 hover:bg-black hover:bg-opacity-10 rounded-full transition-colors"
-          >
-            <X className="w-3 h-3" />
-          </button>
-        )}
-      </span>
-    );
-  };
-
-  const PhotoGallery = ({ photos, title }) => (
-    <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm">
-      <div className="flex justify-between items-center mb-4">
-        <h3 className="text-lg font-bold text-slate-900">{title}</h3>
-        <div className="flex items-center gap-2">
-          {canCreatePosts && (
-            <button className="text-sm text-purple-600 hover:text-purple-700 font-medium">
-              Edit Photos
-            </button>
-          )}
-          <button className="text-sm text-purple-600 hover:text-purple-700 font-medium">View All</button>
-        </div>
-      </div>
-      <div className="flex overflow-x-auto space-x-4 pb-4 -mb-4">
-        {photos.slice(0, 9).map((photo, index) => (
-          <div 
-            key={photo.id || index} 
-            className="flex-shrink-0 w-72 h-52 rounded-lg overflow-hidden bg-slate-100 hover:scale-105 transition-transform cursor-pointer shadow-md group"
-          >
-            <img 
-              src={photo.url || photo} 
-              alt={photo.alt_text || `Photo ${index + 1}`} 
-              className="w-full h-full object-cover" 
-            />
-            {photo.caption && (
-              <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-50 text-white p-2 text-sm opacity-0 group-hover:opacity-100 transition-opacity">
-                {photo.caption}
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
-      
-      {photos.length === 0 && (
-        <div className="text-center py-8 text-slate-500">
-          <div className="text-4xl mb-2">📷</div>
-          <p>No photos uploaded yet</p>
-          {canCreatePosts && (
-            <button className="mt-3 text-sm text-purple-600 hover:text-purple-700 font-medium">
-              Add Photos
-            </button>
-          )}
-        </div>
-      )}
-    </div>
-  );
 
   return (
     <div className="space-y-10">
@@ -323,12 +224,12 @@ const EditableOrganizationHome = ({
         </div>
       )}
 
-      {/* Mission Section - Single Edit Button */}
+      {/* Mission Section */}
       <div className="bg-white rounded-3xl p-10 border border-slate-200 shadow-sm grid md:grid-cols-2 gap-10 items-center relative">
-        {/* Single Edit Button */}
-        {canEditPosts && (
+        {/* Edit Button */}
+        {canCreatePosts && (
           <button
-            onClick={startEditing}
+            onClick={() => setIsEditingMission(true)}
             className="absolute top-4 right-4 flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
           >
             <Edit3 className="w-4 h-4" />
@@ -344,21 +245,16 @@ const EditableOrganizationHome = ({
           </p>
           
           {/* Focus Areas */}
-          <div className="mt-8 pt-6 border-t border-slate-200">
-            <h4 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-3">Focus Areas</h4>
-            
-            {organization.focusAreas && organization.focusAreas.length > 0 ? (
+          {organization.focusAreas && organization.focusAreas.length > 0 && (
+            <div className="mt-8 pt-6 border-t border-slate-200">
+              <h4 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-3">Focus Areas</h4>
               <div className="flex flex-wrap gap-3">
                 {organization.focusAreas.map((area) => (
                   <FocusAreaPill key={area} area={area} />
                 ))}
               </div>
-            ) : (
-              <div className="text-slate-500 text-sm">
-                {canEditPosts ? "Click 'Edit Section' to add focus areas" : "No focus areas specified"}
-              </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
         
         {/* Mission Image */}
@@ -371,33 +267,9 @@ const EditableOrganizationHome = ({
         </div>
       </div>
 
-      {/* Photo Gallery */}
-      {photos.length > 0 ? (
-        <PhotoGallery photos={photos} title="Community in Action" />
-      ) : (
-        <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-bold text-slate-900">Community in Action</h3>
-            {canCreatePosts && (
-              <button className="text-sm text-purple-600 hover:text-purple-700 font-medium">
-                Add Photos
-              </button>
-            )}
-          </div>
-          <div className="text-center py-12 text-slate-500">
-            <div className="text-6xl mb-4">📷</div>
-            <h4 className="text-lg font-medium text-slate-700 mb-2">No Photos Yet</h4>
-            <p className="text-slate-600">
-              {canCreatePosts 
-                ? "Share photos of your work and community impact to bring your mission to life."
-                : `${organization.name} hasn't shared any photos yet.`
-              }
-            </p>
-          </div>
-        </div>
-      )}
+      {/* Photo Gallery section removed - photos now only shown in dedicated Photos tab */}
 
-      {/* Create Post Section - Only show if user can post */}
+      {/* Create Post Section */}
       {canCreatePosts && (
         <CreatePost 
           profile={session?.user} 
@@ -423,7 +295,6 @@ const EditableOrganizationHome = ({
             )}
           </div>
           
-          {/* Recent posts preview or full feed */}
           <div className="space-y-6">
             {organizationPosts.slice(0, 3).map((post) => (
               <OrganizationPostCard 
@@ -469,205 +340,17 @@ const EditableOrganizationHome = ({
         />
       )}
 
-      {/* Comprehensive Mission Edit Modal */}
-      {isEditingMission && (
-        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl max-w-4xl w-full shadow-2xl transform transition-all overflow-hidden max-h-[90vh] overflow-y-auto">
-            {/* Header */}
-            <div className="relative p-6 overflow-hidden">
-              <div className="absolute inset-0">
-                <div className="absolute top-0 left-0 w-32 h-32 bg-gradient-to-br from-purple-300 to-pink-300 rounded-full blur-2xl opacity-60 -translate-x-8 -translate-y-8"></div>
-                <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-blue-300 to-indigo-300 rounded-full blur-xl opacity-50 translate-x-4 -translate-y-4"></div>
-              </div>
-              
-              <div className="relative z-10 flex items-center justify-between">
-                <div>
-                  <h3 className="text-2xl font-bold text-slate-800">Edit Mission Section</h3>
-                  <p className="text-slate-600 text-sm mt-1">Update your mission statement, image, and focus areas</p>
-                </div>
-                <button
-                  onClick={() => setIsEditingMission(false)}
-                  className="text-slate-600 hover:text-slate-800 transition-colors p-1 bg-white bg-opacity-50 rounded-lg backdrop-blur-sm"
-                >
-                  <X className="w-6 h-6" />
-                </button>
-              </div>
-            </div>
-
-            {/* Content */}
-            <div className="p-6 space-y-8">
-              <div className="grid md:grid-cols-2 gap-8">
-                {/* Left Column - Text Content */}
-                <div className="space-y-6">
-                  {/* Mission Description */}
-                  <div className="group">
-                    <label className="block text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-gradient-to-r from-purple-400 to-pink-400"></div>
-                      Mission Statement
-                    </label>
-                    <textarea
-                      value={editData.description}
-                      onChange={(e) => setEditData({ ...editData, description: e.target.value })}
-                      className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-transparent focus:ring-2 focus:ring-purple-300 transition-all duration-200 group-hover:border-slate-300 bg-white resize-none"
-                      placeholder="Describe your organization's mission and goals..."
-                      rows={6}
-                    />
-                  </div>
-
-                  {/* Focus Areas */}
-                  <div className="group">
-                    <label className="block text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-gradient-to-r from-emerald-400 to-teal-400"></div>
-                      Focus Areas
-                    </label>
-                    
-                    {/* Current Focus Areas */}
-                    {editData.focusAreas.length > 0 && (
-                      <div className="flex flex-wrap gap-2 mb-4">
-                        {editData.focusAreas.map((area) => (
-                          <FocusAreaPill 
-                            key={area} 
-                            area={area} 
-                            onRemove={removeFocusArea}
-                            editable={true}
-                          />
-                        ))}
-                      </div>
-                    )}
-
-                    {/* Add New Focus Area */}
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={newFocusArea}
-                        onChange={(e) => setNewFocusArea(e.target.value)}
-                        onKeyPress={(e) => e.key === 'Enter' && addFocusArea()}
-                        className="flex-1 px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-transparent focus:ring-2 focus:ring-purple-300 transition-all duration-200 group-hover:border-slate-300 bg-white"
-                        placeholder="e.g., Education, Healthcare, Environment"
-                      />
-                      <button
-                        onClick={addFocusArea}
-                        disabled={!newFocusArea.trim()}
-                        className="px-4 py-3 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        <Plus className="w-5 h-5" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Right Column - Image */}
-                <div className="space-y-6">
-                  {/* Mission Image */}
-                  <div className="group">
-                    <label className="block text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-gradient-to-r from-blue-400 to-indigo-400"></div>
-                      Mission Image
-                    </label>
-                    
-                    {/* Current Image Preview */}
-                    <div className="mb-4 relative">
-                      <img 
-                        src={editData.mission_image_url || 'https://images.unsplash.com/photo-1582213782179-e0d53f98f2ca?w=800&h=600&fit=crop'} 
-                        alt="Mission" 
-                        className="w-full h-64 object-cover rounded-xl border-2 border-slate-200" 
-                      />
-                      {editData.mission_image_url && editData.mission_image_url !== 'https://images.unsplash.com/photo-1582213782179-e0d53f98f2ca?w=800&h=600&fit=crop' && (
-                        <button
-                          onClick={() => setEditData({ ...editData, mission_image_url: '' })}
-                          className="absolute top-2 right-2 bg-red-500 text-white p-2 rounded-lg hover:bg-red-600 transition-colors"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      )}
-                    </div>
-
-                    {/* Upload Options */}
-                    <div className="space-y-3">
-                      <div className="flex items-center gap-3">
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={(e) => e.target.files[0] && handleMissionImageUpload(e.target.files[0])}
-                          className="hidden"
-                          id="mission-image-upload"
-                        />
-                        <label
-                          htmlFor="mission-image-upload"
-                          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors cursor-pointer"
-                        >
-                          {uploading ? (
-                            <>
-                              <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
-                              Uploading...
-                            </>
-                          ) : (
-                            <>
-                              <Upload className="w-4 h-4" />
-                              Upload Image
-                            </>
-                          )}
-                        </label>
-                        <span className="text-sm text-slate-500">or paste URL below</span>
-                      </div>
-
-                      <input
-                        type="url"
-                        value={editData.mission_image_url}
-                        onChange={(e) => setEditData({ ...editData, mission_image_url: e.target.value })}
-                        className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-transparent focus:ring-2 focus:ring-purple-300 transition-all duration-200 group-hover:border-slate-300 bg-white"
-                        placeholder="https://example.com/image.jpg"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Loading State */}
-              {saving && (
-                <div className="relative overflow-hidden bg-white border-2 border-purple-100 rounded-xl p-4">
-                  <div className="absolute inset-0">
-                    <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-purple-200 to-pink-200 rounded-full blur-xl opacity-30"></div>
-                  </div>
-                  <div className="relative flex items-center gap-3">
-                    <div className="animate-spin rounded-full h-5 w-5 border-2 border-purple-400 border-t-transparent"></div>
-                    <span className="text-sm font-medium text-purple-700">
-                      Saving your changes...
-                    </span>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Footer */}
-            <div className="bg-slate-50 px-6 py-4 flex gap-3">
-              <button
-                onClick={() => setIsEditingMission(false)}
-                disabled={saving}
-                className="flex-1 px-6 py-3 text-slate-600 font-medium text-sm border-2 border-slate-200 rounded-xl hover:bg-slate-100 hover:border-slate-300 transition-all duration-200 disabled:opacity-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSaveAll}
-                disabled={saving}
-                className="flex-1 px-6 py-3 relative overflow-hidden text-white font-semibold text-sm rounded-xl transition-all duration-200 disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg hover:shadow-xl group"
-              >
-                <div className="absolute inset-0">
-                  <div className="absolute inset-0 bg-gradient-to-r from-purple-400 to-pink-400"></div>
-                  <div className="absolute top-0 left-0 w-8 h-8 bg-gradient-to-br from-blue-300 to-indigo-300 rounded-full blur-lg opacity-60 group-hover:scale-150 transition-transform duration-500"></div>
-                  <div className="absolute bottom-0 right-0 w-6 h-6 bg-gradient-to-br from-pink-300 to-purple-300 rounded-full blur-md opacity-40 group-hover:scale-125 transition-transform duration-700"></div>
-                </div>
-                
-                <div className="relative z-10 flex items-center gap-2">
-                  <Save className="w-4 h-4" />
-                  {saving ? 'Saving...' : 'Save All Changes'}
-                </div>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Mission Edit Modal */}
+      <MissionEditModal
+        isOpen={isEditingMission}
+        onClose={() => setIsEditingMission(false)}
+        organization={organization}
+        onSave={handleMissionSave}
+        saving={saving}
+        uploading={uploading}
+        error={error}
+        onImageUpload={handleMissionImageUpload}
+      />
     </div>
   );
 };

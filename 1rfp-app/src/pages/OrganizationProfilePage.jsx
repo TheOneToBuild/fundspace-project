@@ -504,7 +504,9 @@ const OrganizationProfilePage = () => {
       userMembership,
       onPostDelete: handleDeletePost,
       photos,
-      onUpdate: refreshOrganizationData // Add this for editable components
+      onUpdate: refreshOrganizationData, // Add this for editable components
+      activeTab, // Add these for navigation
+      setActiveTab
     };
 
     // Shared tabs - Use editable versions when in edit mode

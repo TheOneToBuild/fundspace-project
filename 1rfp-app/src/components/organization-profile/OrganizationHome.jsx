@@ -1,11 +1,10 @@
-// src/components/organization-profile/OrganizationHome.jsx - Updated for template design
+// src/components/organization-profile/OrganizationHome.jsx - Updated from latest version (Photos Removed)
 import React, { useState } from 'react';
 import { MessageSquare, Plus } from 'lucide-react';
 import OrganizationPostCard from '../OrganizationPostCard.jsx';
 import OrganizationPostDetailModal from '../OrganizationPostDetailModal.jsx';
 import CreatePost from '../CreatePost.jsx';
 import { hasPermission, PERMISSIONS } from '../../utils/organizationPermissions.js';
-import { getPillClasses } from '../../utils.js';
 
 const OrganizationHome = ({ 
   organization, 
@@ -13,21 +12,22 @@ const OrganizationHome = ({
   session, 
   onPostDelete,
   userMembership,
-  photos = []
+  photos = [], // Keep for compatibility but don't display
+  activeTab,
+  setActiveTab
 }) => {
   const [selectedPost, setSelectedPost] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // Check if user can create posts (must be a member with edit permissions)
+  // Check permissions
   const canCreatePosts = userMembership && hasPermission(
     userMembership.role, 
     PERMISSIONS.EDIT_ORGANIZATION, 
     session?.user?.is_omega_admin
   );
-
-  // Check if user can edit/delete posts
   const canEditPosts = canCreatePosts;
 
+  // Event handlers
   const handleOpenDetail = (post) => {
     setSelectedPost(post);
     setIsModalOpen(true);
@@ -57,44 +57,9 @@ const OrganizationHome = ({
     );
   };
 
-  const PhotoGallery = ({ photos, title }) => (
-    <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm">
-      <div className="flex justify-between items-center mb-4">
-        <h3 className="text-lg font-bold text-slate-900">{title}</h3>
-        <button className="text-sm text-purple-600 hover:text-purple-700 font-medium">View All</button>
-      </div>
-      <div className="flex overflow-x-auto space-x-4 pb-4 -mb-4">
-        {photos.slice(0, 9).map((photo, index) => (
-          <div 
-            key={photo.id || index} 
-            className="flex-shrink-0 w-72 h-52 rounded-lg overflow-hidden bg-slate-100 hover:scale-105 transition-transform cursor-pointer shadow-md group"
-          >
-            <img 
-              src={photo.url || photo} 
-              alt={photo.alt_text || `Photo ${index + 1}`} 
-              className="w-full h-full object-cover" 
-            />
-            {photo.caption && (
-              <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-50 text-white p-2 text-sm opacity-0 group-hover:opacity-100 transition-opacity">
-                {photo.caption}
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
-      
-      {photos.length === 0 && (
-        <div className="text-center py-8 text-slate-500">
-          <div className="text-4xl mb-2">📷</div>
-          <p>No photos uploaded yet</p>
-        </div>
-      )}
-    </div>
-  );
-
   return (
     <div className="space-y-10">
-      {/* Mission Section - Enhanced design */}
+      {/* Mission Section */}
       <div className="bg-white rounded-3xl p-10 border border-slate-200 shadow-sm grid md:grid-cols-2 gap-10 items-center">
         <div className="flex flex-col h-full">
           <h2 className="text-3xl font-black text-slate-900 mb-4">Our Mission ✨</h2>
@@ -115,7 +80,7 @@ const OrganizationHome = ({
           )}
         </div>
         
-        {/* Featured Image */}
+        {/* Mission Image */}
         <img 
           src={organization.mission_image_url || 'https://images.unsplash.com/photo-1582213782179-e0d53f98f2ca?w=800&h=600&fit=crop'} 
           alt="Our Mission" 
@@ -123,33 +88,9 @@ const OrganizationHome = ({
         />
       </div>
 
-      {/* Photo Gallery */}
-      {photos.length > 0 ? (
-        <PhotoGallery photos={photos} title="Community in Action" />
-      ) : (
-        <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-bold text-slate-900">Community in Action</h3>
-            {canCreatePosts && (
-              <button className="text-sm text-purple-600 hover:text-purple-700 font-medium">
-                Add Photos
-              </button>
-            )}
-          </div>
-          <div className="text-center py-12 text-slate-500">
-            <div className="text-6xl mb-4">📷</div>
-            <h4 className="text-lg font-medium text-slate-700 mb-2">No Photos Yet</h4>
-            <p className="text-slate-600">
-              {canCreatePosts 
-                ? "Share photos of your work and community impact to bring your mission to life."
-                : `${organization.name} hasn't shared any photos yet.`
-              }
-            </p>
-          </div>
-        </div>
-      )}
+      {/* Photo Gallery section removed - Photos now only shown in dedicated Photos tab */}
 
-      {/* Create Post Section - Only show if user can post */}
+      {/* Create Post Section */}
       {canCreatePosts && (
         <CreatePost 
           profile={session?.user} 
@@ -175,7 +116,6 @@ const OrganizationHome = ({
             )}
           </div>
           
-          {/* Recent posts preview or full feed */}
           <div className="space-y-6">
             {organizationPosts.slice(0, 3).map((post) => (
               <OrganizationPostCard 
