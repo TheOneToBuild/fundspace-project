@@ -1,10 +1,9 @@
 // src/AboutUsPage.jsx
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useEffect, useContext } from 'react';
 import { motion } from 'framer-motion';
-import { Users, BarChart3, Briefcase, Heart, Home, AlertTriangle, Coffee, Building, Sparkles, TrendingUp, Star, Clock, Target, Zap, Bot, Shield, Search, ArrowRight, ChevronDown } from './components/Icons.jsx';
+import { Users, BarChart3, Briefcase, Heart, Home, AlertTriangle, Coffee, Building, Sparkles, TrendingUp, Star, Clock, Target, Zap, Bot, Shield, Search, ArrowRight, ChevronDown, ExternalLink } from './components/Icons.jsx';
 import AnimatedCounter from './components/AnimatedCounter.jsx';
 import ScrollArrow from './components/ScrollArrow.jsx';
-import AdvisoryCard from './AdvisoryCard.jsx';
 import { LayoutContext } from './App.jsx';
 import PublicPageLayout from './components/PublicPageLayout.jsx';
 
@@ -25,37 +24,37 @@ const advisoryBoard = [
     name: 'Advisory Board Member',
     title: 'To be announced',
     imageUrl: 'https://encrypted-tbn1.gstatic.com/images?q=tbn:ANd9GcTljW8umHXU4FCVp6-HEuPasRa0jvvrTiCs_qtuiv0Y09LPSPhS',
-    bio: 'We are excited to announce the remaining members of our esteemed advisory board soon. Stay tuned for more experts from both sides of the funding table.'
+    linkedinUrl: null
   },
   {
-    name: 'Advisory Board Member',
-    title: 'To be announced',
-    imageUrl: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQqqinZ4zpaXzMpNsJ6Y4KWdXy6ZG_t-LCqlg&s',
-    bio: 'We are excited to announce the remaining members of our esteemed advisory board soon. Stay tuned for more experts from both sides of the funding table.'
+    name: 'Hana Ma',
+    title: 'Senior Program Officer, Sobrato Philanthropies',
+    imageUrl: 'https://media.licdn.com/dms/image/v2/D4E03AQFLpGmrPIPhJw/profile-displayphoto-shrink_800_800/profile-displayphoto-shrink_800_800/0/1698185669765?e=1757548800&v=beta&t=E0SzY2HFu542nR4AWlTFDkl5X8fkCBI5P-arsHwhcYM',
+    linkedinUrl: 'https://www.linkedin.com/in/hanahsiao/'
   },
   {
     name: 'Advisory Board Member',
     title: 'To be announced',
     imageUrl: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRZ4BvrhXf_ybRp8LzBO--xU8JcvJPGghLWe3OWeDIbG0FpCqFyWtxPxhdN0r8XQzBI4W0&usqp=CAU',
-    bio: 'We are excited to announce the remaining members of our esteemed advisory board soon. Stay tuned for more experts from both sides of the funding table.'
+    linkedinUrl: null
   },
   {
     name: 'Yen Pang',
-    title: "County of San Mateo",
+    title: "Director of Contracts Administration and Compliance, SFO",
     imageUrl: 'https://media.licdn.com/dms/image/v2/C5603AQFAMGYFJIyhzA/profile-displayphoto-shrink_200_200/profile-displayphoto-shrink_200_200/0/1600903357926?e=1756944000&v=beta&t=t_MdadgWSG5ei1r_su5CiUgwnUQ167iWvefbSAogAIY',
-    bio: 'Yen brings over 20 years of expertise in government procurement and contract management, driving improvements across San Mateo County and the City and County of San Francisco. As Manager at the County of San Mateo, she led the redesign of Measure K, streamlining its process, implementation, and evaluation to maximize community impact. Previously, as Principal Contracts Analyst at San Francisco International Airport, she oversaw contracts up to $1B, directing complex solicitations and enhancing contract monitoring systems.'
+    linkedinUrl: 'https://www.linkedin.com/in/yenpang/'
   },
   {
     name: 'Advisory Board Member',
     title: 'To be announced',
     imageUrl: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcREOLCZbSXQ6XO8DDxUsATFbrGsLXOH8oOIhYwCDPui3tZ9pRniUEcOMjHNfr3f-mJ3mBE&usqp=CAU',
-    bio: 'We are excited to announce the remaining members of our esteemed advisory board soon. Stay tuned for more experts from both sides of the funding table.'
+    linkedinUrl: null
   },
   {
     name: 'Advisory Board Member',
     title: 'To be announced',
     imageUrl: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSTIlcun59hjzIIjphLcoczCdFuaSyOpwDpFyHtp1R9WTq-MfqlfCtP4jTjJf94buMJfHw&usqp=CAU',
-    bio: 'We are excited to announce the remaining members of our esteemed advisory board soon. Stay tuned for more experts from both sides of the funding table.'
+    linkedinUrl: null
   }
 ];
 
@@ -89,7 +88,6 @@ const AnimatedGradientShape = ({ className, initial, animate, gradient }) => (
 
 const AboutUsPage = () => {
   const { setPageBgColor } = useContext(LayoutContext);
-  const [expandedIndex, setExpandedIndex] = useState(null);
 
   useEffect(() => {
     setPageBgColor('bg-gradient-to-br from-slate-50 via-blue-50 to-purple-50');
@@ -98,131 +96,48 @@ const AboutUsPage = () => {
     };
   }, [setPageBgColor]);
 
-  const formatCurrency = (amount) => `$${(amount / 1000000).toFixed(0)}M+`;
-  const formatNumber = (num) => num.toLocaleString() + '+';
-  const formatPercentage = (num) => `${num}%`;
-
   return (
     <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
-      {/* HERO SECTION */}
-      <section className="text-center mb-16 relative">
-        {/* Magical background elements */}
+      {/* HERO SECTION - Community-Focused */}
+      <section className="text-center mb-20 relative">
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute top-10 left-10 w-32 h-32 bg-gradient-to-r from-blue-400 to-purple-600 rounded-full opacity-10 animate-pulse"></div>
-          <div className="absolute top-32 right-20 w-24 h-24 bg-gradient-to-r from-pink-400 to-rose-600 rounded-full opacity-10 animate-pulse delay-1000"></div>
-          <div className="absolute bottom-10 left-1/3 w-20 h-20 bg-gradient-to-r from-emerald-400 to-teal-600 rounded-full opacity-10 animate-pulse delay-2000"></div>
+          <div className="absolute top-10 left-10 w-20 h-20 bg-gradient-to-r from-amber-300 to-orange-400 rounded-full opacity-20 animate-bounce" style={{animationDelay: '0s', animationDuration: '3s'}}></div>
+          <div className="absolute top-32 right-20 w-16 h-16 bg-gradient-to-r from-rose-300 to-pink-400 rounded-full opacity-20 animate-bounce" style={{animationDelay: '1s', animationDuration: '3s'}}></div>
+          <div className="absolute bottom-10 left-1/3 w-12 h-12 bg-gradient-to-r from-emerald-300 to-teal-400 rounded-full opacity-20 animate-bounce" style={{animationDelay: '2s', animationDuration: '3s'}}></div>
         </div>
         
-        <div className="relative bg-white/80 backdrop-blur-sm p-8 md:p-12 rounded-3xl border border-white/60 shadow-2xl">
-          <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight mb-4">
-            <span className="text-slate-900">Built by Community. </span>
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600">
+        <div className="relative bg-white/90 backdrop-blur-sm p-8 md:p-12 rounded-3xl border border-blue-200 shadow-xl">
+          <div className="mb-6">
+            <span className="inline-block bg-gradient-to-r from-blue-100 to-indigo-100 text-blue-800 px-4 py-2 rounded-full text-sm font-medium border border-blue-200">
+              👋 Hey there, changemaker!
+            </span>
+          </div>
+          
+          <h1 className="text-4xl md:text-6xl font-bold tracking-tight mb-6">
+            <span className="text-slate-800">Built by Community. </span>
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">
               For Community.
             </span>
           </h1>
           
-          <p className="text-lg md:text-xl text-slate-600 mb-8 max-w-4xl mx-auto leading-relaxed">
-            1RFP is the Bay Area's intelligent grant discovery platform. We believe that connecting purpose with progress shouldn't be this hard.
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-pink-600 font-semibold"> Technology should empower, not burden.</span>
+          <p className="text-lg md:text-xl text-slate-700 mb-8 max-w-4xl mx-auto leading-relaxed">
+            We've been in your shoes—staying up late scrolling through endless grant databases, 
+            bookmarking opportunities that disappear, and wondering if there's a better way to connect with funders and fellow change-makers. 
+            <span className="font-semibold text-blue-700"> Spoiler alert: there is! ✨</span>
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <a href="/grants" className="inline-flex items-center justify-center px-8 py-3.5 font-semibold rounded-full text-white bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 w-full sm:w-auto">
-              Explore Grants <Search className="ml-2" size={20} />
+            <a href="/grants" className="inline-flex items-center justify-center px-8 py-3.5 font-semibold rounded-full text-white bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 w-full sm:w-auto">
+              🔍 Discover Funding & Connect
             </a>
-            <a href="/signup" className="inline-flex items-center justify-center px-8 py-3.5 font-semibold rounded-full text-purple-700 bg-purple-100 hover:bg-purple-200/70 transition-colors duration-300 w-full sm:w-auto">
-              Join Our Network <ArrowRight className="ml-2" size={20} />
+            <a href="/signup" className="inline-flex items-center justify-center px-8 py-3.5 font-semibold rounded-full text-blue-700 bg-blue-100 hover:bg-blue-200/70 transition-colors duration-300 w-full sm:w-auto">
+              🤝 Join Our Community
             </a>
           </div>
         </div>
       </section>
 
-      {/* IMPACT STATS SECTION */}
-      <StorySection>
-        <div className="text-center mb-12 relative">
-          <motion.h2 variants={fadeIn} className="text-4xl md:text-5xl font-bold mb-6 leading-tight">
-            <span className="text-slate-800">A Region of Unmatched </span>
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-500 to-teal-600">Potential</span>
-            <span className="text-slate-800">.<br />A Community with </span>
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-red-500">Unmet Needs</span>
-            <span className="text-slate-800">.</span>
-          </motion.h2>
-          <motion.p variants={{...fadeIn, transition: {...fadeIn.transition, delay: 0.2}}} className="text-lg md:text-xl text-slate-600 mt-6 max-w-4xl mx-auto leading-relaxed">
-            The Bay Area is a global innovation hub with incredible wealth and human capital. Yet prosperity exists alongside deep-seated community challenges. Our platform begins by understanding both the resources and the need.
-          </motion.p>
-        </div>
-
-        <motion.div 
-          variants={{ hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.1, delayChildren: 0.5 } } }}
-          className="grid grid-cols-2 md:grid-cols-4 gap-x-4 sm:gap-x-8 gap-y-10 sm:gap-y-12 w-full max-w-6xl"
-        >
-          <motion.div variants={fadeIn} className="text-center">
-            <div className="w-16 h-16 mx-auto mb-4 bg-gradient-to-br from-sky-100 to-blue-100 rounded-2xl flex items-center justify-center border border-sky-200">
-              <Users className="h-8 w-8 text-sky-600" />
-            </div>
-            <AnimatedCounter targetValue={7700000} formatValue={formatNumber} className="text-3xl sm:text-4xl font-bold text-sky-600" />
-            <p className="text-xs sm:text-sm font-medium text-slate-500 mt-2">Bay Area Residents</p>
-          </motion.div>
-
-          <motion.div variants={fadeIn} className="text-center">
-            <div className="w-16 h-16 mx-auto mb-4 bg-gradient-to-br from-rose-100 to-pink-100 rounded-2xl flex items-center justify-center border border-rose-200">
-              <Heart className="h-8 w-8 text-rose-600" />
-            </div>
-            <AnimatedCounter targetValue={25000} formatValue={formatNumber} className="text-3xl sm:text-4xl font-bold text-rose-600" />
-            <p className="text-xs sm:text-sm font-medium text-slate-500 mt-2">Nonprofits</p>
-          </motion.div>
-
-          <motion.div variants={fadeIn} className="text-center">
-            <div className="w-16 h-16 mx-auto mb-4 bg-gradient-to-br from-amber-100 to-yellow-100 rounded-2xl flex items-center justify-center border border-amber-200">
-              <Shield className="h-8 w-8 text-amber-600" />
-            </div>
-            <AnimatedCounter targetValue={8000} formatValue={formatNumber} className="text-3xl sm:text-4xl font-bold text-amber-600" />
-            <p className="text-xs sm:text-sm font-medium text-slate-500 mt-2">Foundations</p>
-          </motion.div>
-
-          <motion.div variants={fadeIn} className="text-center">
-            <div className="w-16 h-16 mx-auto mb-4 bg-gradient-to-br from-emerald-100 to-teal-100 rounded-2xl flex items-center justify-center border border-emerald-200">
-              <TrendingUp className="h-8 w-8 text-emerald-600" />
-            </div>
-            <AnimatedCounter targetValue={87500000} duration={3000} formatValue={formatCurrency} className="text-3xl sm:text-4xl font-bold text-emerald-600" />
-            <p className="text-xs sm:text-sm font-medium text-slate-500 mt-2">Available Annually</p>
-          </motion.div>
-
-          <motion.div variants={fadeIn} className="text-center">
-            <div className="w-16 h-16 mx-auto mb-4 bg-gradient-to-br from-red-100 to-rose-100 rounded-2xl flex items-center justify-center border border-red-200">
-              <Home className="h-8 w-8 text-red-600" />
-            </div>
-            <AnimatedCounter targetValue={38000} formatValue={formatNumber} className="text-3xl sm:text-4xl font-bold text-red-600" />
-            <p className="text-xs sm:text-sm font-medium text-slate-500 mt-2">People Experiencing Homelessness</p>
-          </motion.div>
-
-          <motion.div variants={fadeIn} className="text-center">
-            <div className="w-16 h-16 mx-auto mb-4 bg-gradient-to-br from-orange-100 to-red-100 rounded-2xl flex items-center justify-center border border-orange-200">
-              <AlertTriangle className="h-8 w-8 text-orange-600" />
-            </div>
-            <AnimatedCounter targetValue={20} formatValue={formatPercentage} className="text-3xl sm:text-4xl font-bold text-orange-600" />
-            <p className="text-xs sm:text-sm font-medium text-slate-500 mt-2">Residents Living in Poverty</p>
-          </motion.div>
-
-          <motion.div variants={fadeIn} className="text-center">
-            <div className="w-16 h-16 mx-auto mb-4 bg-gradient-to-br from-indigo-100 to-purple-100 rounded-2xl flex items-center justify-center border border-indigo-200">
-              <Building className="h-8 w-8 text-indigo-600" />
-            </div>
-            <AnimatedCounter targetValue={45} formatValue={formatPercentage} className="text-3xl sm:text-4xl font-bold text-indigo-600" />
-            <p className="text-xs sm:text-sm font-medium text-slate-500 mt-2">Renters Who Are Rent-Burdened</p>
-          </motion.div>
-
-          <motion.div variants={fadeIn} className="text-center">
-            <div className="w-16 h-16 mx-auto mb-4 bg-gradient-to-br from-blue-100 to-cyan-100 rounded-2xl flex items-center justify-center border border-blue-200">
-              <Coffee className="h-8 w-8 text-blue-600" />
-            </div>
-            <AnimatedCounter targetValue={25} formatValue={formatPercentage} className="text-3xl sm:text-4xl font-bold text-blue-600" />
-            <p className="text-xs sm:text-sm font-medium text-slate-500 mt-2">Households Facing Food Insecurity</p>
-          </motion.div>
-        </motion.div>
-      </StorySection>
-      
-      {/* MISSION SECTION */}
+      {/* MISSION SECTION - Keep images but update messaging */}
       <StorySection>
         <div className="grid lg:grid-cols-2 gap-16 items-center max-w-7xl">
           <motion.div variants={fadeIn} className="text-left">
@@ -232,7 +147,7 @@ const AboutUsPage = () => {
             
             <h2 className="text-4xl font-bold text-slate-800 leading-tight mb-8">Our Mission</h2>
             
-            {/* Hero Mission Statement */}
+            {/* Updated mission statement */}
             <div className="bg-gradient-to-r from-purple-100 via-blue-100 to-teal-100 p-8 rounded-3xl mb-8 text-slate-900 shadow-xl border border-slate-200">
               <h3 className="text-2xl md:text-3xl font-bold leading-tight">
                 To democratize access to funding — so dreamers can dream bigger 💭, builders can build faster 🏗️, and momentum is never lost to bureaucracy 🏃‍♂️💨.
@@ -240,41 +155,42 @@ const AboutUsPage = () => {
             </div>
             
             <div className="text-lg text-slate-600 space-y-6 leading-relaxed">
-              <p>The numbers tell a story of disconnected resources. Critical funding information is scattered across thousands of foundation websites, outdated databases, and word-of-mouth networks. Nonprofits lose countless hours prospecting instead of focusing on their missions. Funders struggle to discover emerging organizations and innovative solutions.</p>
+              <p>Critical funding information is scattered across thousands of foundation websites, outdated databases, and word-of-mouth networks. Nonprofits lose countless hours prospecting in isolation instead of building relationships. Funders struggle to discover emerging organizations and connect with passionate changemakers.</p>
               
               <div className="bg-gradient-to-r from-red-50 to-rose-50 p-6 rounded-2xl border border-red-100">
                 <p className="text-slate-700 font-semibold text-xl mb-2">This inefficiency is a tax on progress.</p>
                 <p className="text-slate-600">It slows the very work that aims to uplift our communities.</p>
               </div>
               
-              <p>1RFP was created to solve this problem. We use AI not as a replacement for human connection, but as a tool to foster deeper relationships, stronger partnerships, and faster resource flows to where they're needed most.</p>
+              <p>1RFP was created to solve this problem by building community first. We use AI not to replace human connection, but to spark the conversations that lead to deeper relationships, stronger partnerships, and faster resource flows to where they're needed most.</p>
               
-              {/* Mission Pillars */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-8">
                 <div className="text-center p-4 bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl border border-purple-200">
                   <Sparkles className="h-8 w-8 text-purple-600 mx-auto mb-2" />
-                  <h4 className="font-bold text-slate-800 mb-1">Dream Bigger</h4>
-                  <p className="text-sm text-slate-600">Discover opportunities you never knew existed</p>
+                  <h4 className="font-bold text-slate-800 mb-1">Connect & Discover</h4>
+                  <p className="text-sm text-slate-600">Find opportunities and the people behind them</p>
                 </div>
                 <div className="text-center p-4 bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl border border-blue-200">
                   <Zap className="h-8 w-8 text-blue-600 mx-auto mb-2" />
-                  <h4 className="font-bold text-slate-800 mb-1">Build Faster</h4>
-                  <p className="text-sm text-slate-600">Spend time on mission, not grant hunting</p>
+                  <h4 className="font-bold text-slate-800 mb-1">Collaborate & Build</h4>
+                  <p className="text-sm text-slate-600">Spend time creating impact, not hunting alone</p>
                 </div>
                 <div className="text-center p-4 bg-gradient-to-br from-teal-50 to-teal-100 rounded-xl border border-teal-200">
                   <Target className="h-8 w-8 text-teal-600 mx-auto mb-2" />
-                  <h4 className="font-bold text-slate-800 mb-1">Never Lose Momentum</h4>
-                  <p className="text-sm text-slate-600">Cut through red tape with intelligent matching</p>
+                  <h4 className="font-bold text-slate-800 mb-1">Celebrate & Amplify</h4>
+                  <p className="text-sm text-slate-600">Share wins and learn from each other's journeys</p>
                 </div>
               </div>
             </div>
           </motion.div>
 
+          {/* Expanded image grid to fill the entire mission section */}
           <motion.div 
             variants={{ hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.1, delayChildren: 0.2 } } }}
-            className="grid grid-cols-3 grid-rows-3 gap-3 aspect-[4/3]"
+            className="grid grid-cols-4 grid-rows-8 gap-3 h-full min-h-[800px]"
           >
-            <motion.div variants={fadeIn} className="col-span-2 row-span-2 rounded-xl bg-cover bg-center shadow-lg border-2 border-white overflow-hidden">
+            {/* Large hero video - spans 2x3 in top left */}
+            <motion.div variants={fadeIn} className="col-span-2 row-span-3 rounded-xl bg-cover bg-center shadow-lg border-2 border-white overflow-hidden">
               <video
                 src={STATIC_MEDIA.hero}
                 autoPlay
@@ -285,42 +201,110 @@ const AboutUsPage = () => {
                 style={{ minHeight: 0, minWidth: 0 }}
               />
             </motion.div>
-            <motion.div variants={fadeIn} className="col-span-1 row-span-1 rounded-xl bg-cover bg-center shadow-lg border-2 border-white" style={{backgroundImage: `url(${STATIC_MEDIA.collage[1]})`}}></motion.div>
-            <motion.div variants={fadeIn} className="col-span-1 row-span-2 rounded-xl bg-cover bg-center shadow-lg border-2 border-white" style={{backgroundImage: `url(${STATIC_MEDIA.collage[2]})`}}></motion.div>
+            
+            {/* Top right section */}
+            <motion.div variants={fadeIn} className="col-span-1 row-span-2 rounded-xl bg-cover bg-center shadow-lg border-2 border-white" style={{backgroundImage: `url(${STATIC_MEDIA.collage[1]})`}}></motion.div>
+            <motion.div variants={fadeIn} className="col-span-1 row-span-1 rounded-xl bg-cover bg-center shadow-lg border-2 border-white" style={{backgroundImage: `url(${STATIC_MEDIA.collage[2]})`}}></motion.div>
+            
+            {/* Second row right */}
             <motion.div variants={fadeIn} className="col-span-1 row-span-1 rounded-xl bg-cover bg-center shadow-lg border-2 border-white" style={{backgroundImage: `url(${STATIC_MEDIA.collage[3]})`}}></motion.div>
             <motion.div variants={fadeIn} className="col-span-1 row-span-1 rounded-xl bg-cover bg-center shadow-lg border-2 border-white" style={{backgroundImage: `url(${STATIC_MEDIA.collage[4]})`}}></motion.div>
+            
+            {/* Third row - below hero video */}
+            <motion.div variants={fadeIn} className="col-span-1 row-span-1 rounded-xl bg-cover bg-center shadow-lg border-2 border-white" style={{backgroundImage: `url(${STATIC_MEDIA.collage[0]})`}}></motion.div>
+            <motion.div variants={fadeIn} className="col-span-1 row-span-1 rounded-xl bg-cover bg-center shadow-lg border-2 border-white" style={{backgroundImage: `url('https://images.unsplash.com/photo-1559027615-cd4628902d4a?q=80&w=1740&auto=format&fit=crop')`}}></motion.div>
+            <motion.div variants={fadeIn} className="col-span-2 row-span-1 rounded-xl bg-cover bg-center shadow-lg border-2 border-white" style={{backgroundImage: `url('https://images.unsplash.com/photo-1573164713714-d95e436ab8d6?q=80&w=1740&auto=format&fit=crop')`}}></motion.div>
+            
+            {/* Fourth row */}
+            <motion.div variants={fadeIn} className="col-span-1 row-span-2 rounded-xl bg-cover bg-center shadow-lg border-2 border-white" style={{backgroundImage: `url('https://images.unsplash.com/photo-1582213782179-e0d53f98f2ca?q=80&w=1740&auto=format&fit=crop')`}}></motion.div>
+            <motion.div variants={fadeIn} className="col-span-1 row-span-1 rounded-xl bg-cover bg-center shadow-lg border-2 border-white" style={{backgroundImage: `url('https://images.unsplash.com/photo-1517486808906-6ca8b3f04846?q=80&w=1740&auto=format&fit=crop')`}}></motion.div>
+            <motion.div variants={fadeIn} className="col-span-2 row-span-1 rounded-xl bg-cover bg-center shadow-lg border-2 border-white" style={{backgroundImage: `url('https://images.unsplash.com/photo-1559136555-9303baea8ebd?q=80&w=1740&auto=format&fit=crop')`}}></motion.div>
+            
+            {/* Fifth row */}
+            <motion.div variants={fadeIn} className="col-span-1 row-span-1 rounded-xl bg-cover bg-center shadow-lg border-2 border-white" style={{backgroundImage: `url('https://images.unsplash.com/photo-1544928147-79a2dbc1f389?q=80&w=687&auto=format&fit=crop')`}}></motion.div>
+            <motion.div variants={fadeIn} className="col-span-2 row-span-1 rounded-xl bg-cover bg-center shadow-lg border-2 border-white" style={{backgroundImage: `url('https://images.unsplash.com/photo-1527484912758-6e8bf56b18c3?q=80&w=1740&auto=format&fit=crop')`}}></motion.div>
+            
+            {/* Sixth row */}
+            <motion.div variants={fadeIn} className="col-span-2 row-span-1 rounded-xl bg-cover bg-center shadow-lg border-2 border-white" style={{backgroundImage: `url('https://plus.unsplash.com/premium_photo-1661544605271-d7da82ccaeb2?q=80&w=1740&auto=format&fit=crop')`}}></motion.div>
+            <motion.div variants={fadeIn} className="col-span-1 row-span-2 rounded-xl bg-cover bg-center shadow-lg border-2 border-white" style={{backgroundImage: `url('https://images.unsplash.com/photo-1615856210162-9ae33390b1a2?q=80&w=1742&auto=format&fit=crop')`}}></motion.div>
+            <motion.div variants={fadeIn} className="col-span-1 row-span-1 rounded-xl bg-cover bg-center shadow-lg border-2 border-white" style={{backgroundImage: `url('https://plus.unsplash.com/premium_photo-1705882849674-e8ecc5e53f6e?q=80&w=687&auto=format&fit=crop')`}}></motion.div>
+            
+            {/* Seventh row - Added missing image */}
+            <motion.div variants={fadeIn} className="col-span-1 row-span-1 rounded-xl bg-cover bg-center shadow-lg border-2 border-white" style={{backgroundImage: `url('https://images.unsplash.com/photo-1544928147-79a2dbc1f389?q=80&w=687&auto=format&fit=crop')`}}></motion.div>
+            <motion.div variants={fadeIn} className="col-span-1 row-span-1 rounded-xl bg-cover bg-center shadow-lg border-2 border-white" style={{backgroundImage: `url('https://images.unsplash.com/photo-1573164713714-d95e436ab8d6?q=80&w=1740&auto=format&fit=crop')`}}></motion.div>
+            <motion.div variants={fadeIn} className="col-span-1 row-span-1 rounded-xl bg-cover bg-center shadow-lg border-2 border-white" style={{backgroundImage: `url('https://images.unsplash.com/photo-1582213782179-e0d53f98f2ca?q=80&w=1740&auto=format&fit=crop')`}}></motion.div>
+            <motion.div variants={fadeIn} className="col-span-1 row-span-1 rounded-xl bg-cover bg-center shadow-lg border-2 border-white" style={{backgroundImage: `url('https://images.unsplash.com/photo-1559136555-9303baea8ebd?q=80&w=1740&auto=format&fit=crop')`}}></motion.div>
+            
+            {/* Eighth row */}
+            <motion.div variants={fadeIn} className="col-span-4 row-span-1 rounded-xl bg-cover bg-center shadow-lg border-2 border-white" style={{backgroundImage: `url('https://images.unsplash.com/photo-1517486808906-6ca8b3f04846?q=80&w=1740&auto=format&fit=crop')`}}></motion.div>
           </motion.div>
         </div>
       </StorySection>
-    
-      {/* ADVISORY BOARD SECTION */}
+
+      {/* TEAM SECTION - More Personal */}
       <StorySection>
         <div className="text-center mb-16">
           <motion.h2 variants={fadeIn} className="text-4xl md:text-5xl font-bold mb-6">
-            <span className="text-slate-800">Guided by </span>
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-500 to-teal-600">Experience</span>
+            <span className="text-slate-800">Meet the </span>
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-500 to-teal-600">Dreamers</span>
+            <span className="text-slate-800"> Behind the </span>
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-indigo-500">Magic</span>
           </motion.h2>
-          <motion.p variants={{...fadeIn, transition: {...fadeIn.transition, delay:0.2}}} className="text-lg text-slate-600 max-w-2xl mx-auto">
-            Our advisory board brings deep experience from both sides of the funding table—from nonprofit leadership to foundation program management.
+          <motion.p variants={{...fadeIn, transition: {...fadeIn.transition, delay:0.2}}} className="text-lg text-slate-600 max-w-3xl mx-auto">
+            Our advisory board comes from nonprofits, government, and foundations who believe the Bay Area deserves funding infrastructure that brings people together.
           </motion.p>
         </div>
         
         <motion.div 
           variants={{ hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.1, delayChildren: 0.4 } } }}
-          className="grid grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl"
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-7xl w-full"
         >
           {advisoryBoard.map((member, index) => (
-            <AdvisoryCard 
+            <motion.div
               key={index}
-              member={member}
-              isExpanded={index === expandedIndex}
-              onToggle={() => setExpandedIndex(expandedIndex === index ? null : index)}
-            />
+              variants={fadeIn}
+              className="bg-white rounded-3xl shadow-lg border border-slate-200 p-8 hover:shadow-xl transition-all duration-300 transform hover:scale-105 relative overflow-hidden"
+            >
+              {/* Fun background decoration */}
+              <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-amber-100 to-orange-100 rounded-full opacity-50 -translate-y-10 translate-x-10"></div>
+              
+              <div className="text-center relative">
+                <div className="relative w-32 h-32 mx-auto mb-6">
+                  <img
+                    src={member.imageUrl}
+                    alt={member.name}
+                    className="w-full h-full rounded-full object-cover border-4 border-amber-100 shadow-lg"
+                  />
+                  {member.linkedinUrl && (
+                    <div className="absolute -bottom-2 -right-2 w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center border-2 border-white">
+                      <span className="text-white text-xs font-bold">in</span>
+                    </div>
+                  )}
+                </div>
+                <h3 className="text-2xl font-bold text-slate-800 mb-2">{member.name}</h3>
+                <p className="text-blue-600 font-medium text-lg mb-4">{member.title}</p>
+                
+                {member.linkedinUrl ? (
+                  <a
+                    href={member.linkedinUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center text-blue-600 hover:text-blue-700 text-sm font-medium transition-colors bg-blue-50 px-4 py-2 rounded-full hover:bg-blue-100"
+                  >
+                    👋 Say hello on LinkedIn
+                  </a>
+                ) : (
+                  <p className="text-slate-500 text-sm bg-slate-50 px-4 py-2 rounded-full inline-block">
+                    🎉 Joining the party soon!
+                  </p>
+                )}
+              </div>
+            </motion.div>
           ))}
         </motion.div>
       </StorySection>
 
-      {/* BAY AREA COMMITMENT SECTION */}
+      {/* BAY AREA SECTION - Keep as is */}
       <StorySection>
         <div className="grid md:grid-cols-2 gap-12 lg:gap-20 items-center max-w-6xl">
           <motion.div variants={fadeIn}>
@@ -330,7 +314,7 @@ const AboutUsPage = () => {
               loop
               muted
               playsInline
-              className="w-full h-96 md:h-[480px] object-cover rounded-2xl shadow-2xl border-4 border-white"
+              className="w-full h-96 md:h-[480px] object-cover rounded-3xl shadow-2xl border-4 border-white"
               alt="San Francisco Bay Area"
             />
           </motion.div>
@@ -338,36 +322,53 @@ const AboutUsPage = () => {
             <div className="inline-block bg-gradient-to-br from-rose-100 to-pink-100 p-4 rounded-2xl mb-6 border border-rose-200">
               <Heart className="h-10 w-10 text-rose-600" />
             </div>
-            <h2 className="text-4xl font-bold text-slate-800 mb-6">Committed to Home</h2>
-            <div className="text-lg text-slate-600 space-y-6 leading-relaxed">
+            <h2 className="text-4xl font-bold text-slate-800 mb-6">
+              <span className="text-red-500">❤️</span> Bay Area Born & Raised
+            </h2>
+            <div className="text-lg text-slate-700 space-y-6 leading-relaxed">
               <p>
-                1RFP is exclusively for and about the 9-county San Francisco Bay Area. This local focus is our greatest strength. It allows us to build deeper relationships, provide more relevant data, and truly understand the nuanced challenges and opportunities our communities face.
+                We're not some Silicon Valley tech company that happened to stumble into the nonprofit space. 
+                We <strong>live here</strong>, <strong>work here</strong>, and <strong>care deeply</strong> about our communities.
               </p>
               
-              <div className="bg-gradient-to-r from-blue-50 to-teal-50 p-6 rounded-2xl border border-blue-100">
-                <p className="font-semibold text-slate-700 mb-4 text-lg">Serving all Bay Area counties:</p>
-                <div className="grid grid-cols-2 gap-3 text-slate-600">
-                  {['Alameda', 'Contra Costa', 'Marin', 'Napa', 'San Francisco', 'San Mateo', 'Santa Clara', 'Solano', 'Sonoma'].map(county => (
-                    <div key={county} className="flex items-center gap-2">
-                      <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-2xl border border-blue-100">
+                <p className="font-semibold text-slate-800 mb-4 text-xl flex items-center">
+                  <span className="text-2xl mr-2">🌉</span>
+                  All 9 counties, one community:
+                </p>
+                <div className="grid grid-cols-2 gap-3 text-slate-700">
+                  {[
+                    '🌊 Alameda', '🏔️ Contra Costa', '🌲 Marin', '🍇 Napa', 
+                    '🏙️ San Francisco', '✈️ San Mateo', '💻 Santa Clara', '🌾 Solano', '🍷 Sonoma'
+                  ].map(county => (
+                    <div key={county} className="flex items-center gap-2 bg-white px-3 py-2 rounded-lg">
                       <span className="font-medium">{county}</span>
                     </div>
                   ))}
                 </div>
               </div>
+              
+              <p className="text-blue-700 font-semibold">
+                Because when Bay Area nonprofits succeed, our entire region thrives. 🌟
+              </p>
             </div>
           </motion.div>
         </div>
       </StorySection>
 
-      {/* CALL TO ACTION SECTION */}
-      <StorySection className="bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 text-white rounded-3xl shadow-2xl">
+      {/* CALL TO ACTION - Community focused */}
+      <StorySection className="bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 text-white rounded-3xl shadow-2xl">
         <div className="text-center max-w-4xl px-8">
+          <motion.div variants={fadeIn} className="mb-6">
+            <span className="text-6xl">🚀</span>
+          </motion.div>
           <motion.h2 variants={fadeIn} className="text-4xl md:text-5xl font-bold mb-6">
-            Ready to Transform Your Funding Search?
+            Ready to Join Our Community?
           </motion.h2>
-          <motion.p variants={{...fadeIn, transition: {...fadeIn.transition, delay: 0.2}}} className="text-xl mb-8 opacity-90">
-            Join Bay Area organizations already using 1RFP to find funding faster and focus on what matters most: their mission.
+          <motion.p variants={{...fadeIn, transition: {...fadeIn.transition, delay: 0.2}}} className="text-xl mb-8 opacity-95 leading-relaxed">
+            Join Bay Area changemakers, funders, and nonprofit leaders who've discovered that 
+            finding funding is so much better when you're not doing it alone. 
+            <strong> Come for the grants, stay for the community! 🤝</strong>
           </motion.p>
           
           <motion.div 
@@ -376,19 +377,24 @@ const AboutUsPage = () => {
           >
             <a 
               href="/grants" 
-              className="inline-flex items-center justify-center px-8 py-4 font-semibold rounded-full text-purple-700 bg-white hover:bg-gray-50 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 w-full sm:w-auto"
+              className="inline-flex items-center justify-center px-8 py-4 font-semibold rounded-full text-blue-700 bg-white hover:bg-blue-50 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 w-full sm:w-auto"
             >
-              <Search className="mr-2" size={20} />
-              Start Exploring Grants
+              🔍 Start Connecting Today
             </a>
             <a 
               href="/signup" 
               className="inline-flex items-center justify-center px-8 py-4 font-semibold rounded-full text-white bg-black/20 hover:bg-black/30 backdrop-blur-sm border border-white/20 transition-all duration-300 w-full sm:w-auto"
             >
-              <Sparkles className="mr-2" size={20} />
-              Create Free Account
+              🎯 Join Free Today
             </a>
           </motion.div>
+          
+          <motion.p 
+            variants={{...fadeIn, transition: {...fadeIn.transition, delay: 0.6}}}
+            className="text-sm opacity-80 mt-6"
+          >
+            No credit card required. No spam. Just connections, collaboration, and lots of funding opportunities. 📧✨
+          </motion.p>
         </div>
       </StorySection>
     </div>

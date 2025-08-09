@@ -1,4 +1,4 @@
-// src/components/CommentSection.jsx - Refactored with modular components
+// src/components/CommentSection.jsx - Fixed to show current organization context
 import React, { useState, useEffect, useCallback, Suspense, lazy } from 'react';
 import { supabase } from '../supabaseClient';
 import CommentCard from './comment/CommentCard';
@@ -13,7 +13,8 @@ export default function CommentSection({
     onCommentAdded, 
     onCommentDeleted,
     showCommentForm = true,
-    compact = false 
+    compact = false,
+    organization = null // Pass the current organization context
 }) {
     const [comments, setComments] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -26,6 +27,53 @@ export default function CommentSection({
     const isOrganizationPost = post._isOrganizationPost;
     const commentsTable = isOrganizationPost ? 'organization_post_comments' : 'post_comments';
     const postIdField = isOrganizationPost ? 'organization_post_id' : 'post_id';
+
+    // Fetch comments from the appropriate table
+    const fetchComments = useCallback(async () => {
+        if (!post?.id) return;
+        
+        setLoading(true);
+        try {
+            // For organization posts, include all profile fields but we'll override organization_name in display
+            const profileFields = 'id, full_name, avatar_url, organization_name';
+
+            const { data, error } = await supabase
+                .from(commentsTable)
+                .select(`
+                    *,
+                    profiles:profile_id (${profileFields})
+                `)
+                .eq(postIdField, post.id)
+                .order('created_at', { ascending: true });
+
+            if (error) {
+                console.error("Error fetching comments:", error);
+                return;
+            }
+
+            // For organization posts, override the organization_name with current organization
+            let processedComments = data || [];
+            if (isOrganizationPost && organization) {
+                processedComments = processedComments.map(comment => ({
+                    ...comment,
+                    profiles: {
+                        ...comment.profiles,
+                        organization_name: organization.name // Override with current organization
+                    }
+                }));
+            }
+
+            setComments(processedComments);
+        } catch (error) {
+            console.error("Unexpected error fetching comments:", error);
+        } finally {
+            setLoading(false);
+        }
+    }, [post?.id, commentsTable, postIdField, isOrganizationPost, organization]);
+
+    useEffect(() => {
+        fetchComments();
+    }, [fetchComments]);
 
     // Handle opening reactions modal
     const handleOpenReactionsModal = async (comment) => {
@@ -66,58 +114,41 @@ export default function CommentSection({
                         const type = like.reaction_type || 'like';
                         counts[type] = (counts[type] || 0) + 1;
                     });
+
                     const summary = Object.entries(counts).map(([type, count]) => ({ type, count }));
                     
                     setModalReactors(combinedData);
                     setModalReactionSummary(summary);
                     setModalLikeCount(reactionData.length);
-                    setActiveReactionsModal(comment.id);
+                    setActiveReactionsModal(comment);
                 }
             }
         } catch (error) {
-            console.error('Error loading modal reactors:', error);
+            console.error('Error loading comment reactions:', error);
         }
     };
 
-    // Fetches comments when the component mounts
-    const fetchComments = useCallback(async () => {
-        setLoading(true);
-        const { data, error } = await supabase
-            .from(commentsTable)
-            .select(`
-                *, 
-                profiles(
-                    id, 
-                    full_name, 
-                    role, 
-                    avatar_url,
-                    organization_name
-                )
-            `)
-            .eq(postIdField, post.id)
-            .order('created_at', { ascending: true });
-        
-        if (error) {
-            console.error("Error fetching comments:", error);
-        } else {
-            setComments(data || []);
+    // Handle comment submission
+    const handleCommentAdded = useCallback((newComment) => {
+        // For organization posts, override the organization_name with current organization
+        if (isOrganizationPost && organization && newComment.profiles) {
+            newComment.profiles.organization_name = organization.name;
         }
-        setLoading(false);
-    }, [post.id, commentsTable, postIdField]);
-
-    useEffect(() => {
-        fetchComments();
-    }, [fetchComments]);
-
-    // Handle new comment added
-    const handleCommentAdded = (newComment) => {
+        
         setComments(currentComments => [...currentComments, newComment]);
+        
+        // Update the post's comment count for organization posts
+        if (isOrganizationPost) {
+            supabase.rpc('update_organization_post_comments_count', { 
+                post_id: post.id 
+            }).catch(err => console.warn('Failed to update comment count:', err));
+        }
         
         // Notify parent component
         if (onCommentAdded) {
             onCommentAdded();
         }
-    };
+    }, [isOrganizationPost, post.id, onCommentAdded, organization]);
 
     // Handle comment deletion
     const handleDeleteComment = async (commentId) => {
@@ -167,6 +198,7 @@ export default function CommentSection({
                     post={post}
                     currentUserProfile={currentUserProfile}
                     onCommentAdded={handleCommentAdded}
+                    organization={organization} // Pass organization context to form
                 />
             )}
 
@@ -191,21 +223,23 @@ export default function CommentSection({
                 
                 {!loading && comments.length === 0 && (
                     <p className="text-sm text-slate-500 text-center py-4">
-                        No comments yet. Be the first to comment!
+                        No comments yet. Be the first to leave a comment!
                     </p>
                 )}
             </div>
-            
+
             {/* Reactions Modal */}
-            <Suspense fallback={null}>
-                <ReactionsModal
-                    isOpen={!!activeReactionsModal}
-                    onClose={() => setActiveReactionsModal(null)}
-                    reactors={modalReactors}
-                    likeCount={modalLikeCount}
-                    reactionSummary={modalReactionSummary}
-                />
-            </Suspense>
+            {activeReactionsModal && (
+                <Suspense fallback={<div>Loading reactions...</div>}>
+                    <ReactionsModal
+                        isOpen={!!activeReactionsModal}
+                        onClose={() => setActiveReactionsModal(null)}
+                        reactions={modalReactors}
+                        summary={modalReactionSummary}
+                        likeCount={modalLikeCount}
+                    />
+                </Suspense>
+            )}
         </div>
     );
 }

@@ -1,4 +1,4 @@
-// src/components/OrganizationPostCard.jsx - Updated with highlighting support
+// src/components/OrganizationPostCard.jsx - Fixed handleEditPost function
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
@@ -12,7 +12,7 @@ import ReactorsText from './post/ReactorsText';
 import ReactionsPreview from './post/ReactionsPreview';
 import CommentSection from './CommentSection';
 import EditPost from './post/EditPost';
-import PostBody from './post/PostBody';  // ADD THIS IMPORT
+import PostBody from './post/PostBody';
 import { reactions } from './post/constants';
 
 export default function OrganizationPostCard({ 
@@ -61,7 +61,7 @@ export default function OrganizationPostCard({
             .select('reaction_type')
             .eq('organization_post_id', post.id)
             .eq('user_id', currentUserId)
-            .single();
+            .maybeSingle();
           
           setSelectedReaction(userReaction?.reaction_type || null);
         }
@@ -182,18 +182,77 @@ export default function OrganizationPostCard({
   };
 
   const handleDelete = () => {
-      onDelete(post.id);
-  setShowMenu(false);
-};
+    onDelete(post.id);
+    setShowMenu(false);
+  };
 
-  // Add edit functionality for organization posts
+  // FIXED: Add edit functionality for organization posts with proper data handling
   const handleEditPost = async (editData) => {
     try {
+      console.log('📝 Edit data received:', editData);
+      
+      // FIXED: Handle different data formats from EditPost component
+      let images = [];
+      let tags = [];
+      let content = '';
+
+      // Handle content
+      if (typeof editData === 'object') {
+        content = editData.content || editData.editedContent || '';
+        
+        // Handle images - could be in different formats
+        if (editData.images) {
+          images = Array.isArray(editData.images) ? editData.images : [];
+        } else if (editData.editedImages) {
+          images = Array.isArray(editData.editedImages) ? editData.editedImages : [];
+        } else if (editData.image_urls) {
+          images = Array.isArray(editData.image_urls) ? editData.image_urls : [];
+        }
+        
+        // Handle tags
+        if (editData.tags) {
+          tags = Array.isArray(editData.tags) ? editData.tags : [];
+        } else if (editData.editedTags) {
+          tags = Array.isArray(editData.editedTags) ? editData.editedTags : [];
+        }
+      } else {
+        // If editData is not an object, try to handle legacy format
+        content = String(editData || '');
+      }
+
+      // Validate and clean the data
+      content = String(content).trim();
+      images = images.filter(img => img && typeof img === 'string' && img.trim().length > 0);
+      tags = tags.filter(tag => tag && typeof tag === 'string' && tag.trim().length > 0);
+
+      console.log('📝 Processed data:', { 
+        content, 
+        images, 
+        tags,
+        imagesLength: images.length,
+        tagsLength: tags.length 
+      });
+
+      // Prepare update data with proper validation
       const updateData = {
-        content: editData.content.trim(),
-        tags: editData.tags.length > 0 ? JSON.stringify(editData.tags) : null,
-        image_urls: editData.images.length > 0 ? editData.images : null,
+        content: content || ''
       };
+
+      // Only update tags if they exist
+      if (tags.length > 0) {
+        updateData.tags = JSON.stringify(tags);
+      } else {
+        updateData.tags = null;
+      }
+
+      // Only update images if they exist and are valid URLs
+      if (images.length > 0) {
+        updateData.image_urls = images;
+      } else {
+        updateData.image_urls = null;
+      }
+
+      console.log('📝 Final update data for database:', updateData);
 
       const { data: updatedPost, error } = await supabase
         .from('organization_posts')
@@ -203,19 +262,26 @@ export default function OrganizationPostCard({
         .single();
       
       if (error) {
-        alert('Failed to update post. Please try again.');
-        console.error("Post update error:", error);
-      } else {
-        // Update the local post data
+        console.error("❌ Post update error:", error);
+        alert(`Failed to update post: ${error.message}`);
+        return;
+      }
+
+      console.log('✅ Post updated successfully:', updatedPost);
+
+      // Update the local post data
+      if (updatedPost) {
         post.content = updatedPost.content;
         post.tags = updatedPost.tags;
         post.image_urls = updatedPost.image_urls;
-        
-        setIsEditing(false);
+        // Don't update updated_at since it doesn't exist in the table
       }
+      
+      setIsEditing(false);
+      
     } catch (error) {
-      console.error('Error updating organization post:', error);
-      alert('Failed to update post. Please try again.');
+      console.error('❌ Unexpected error updating organization post:', error);
+      alert(`Failed to update post: ${error.message}`);
     }
   };
 
@@ -241,8 +307,8 @@ export default function OrganizationPostCard({
   return (
     <div 
       className="organization-post-card bg-white p-6 rounded-xl shadow-sm border border-slate-200 transition-all duration-300"
-      data-organization-post-id={post?.id} // CRITICAL: Add this for notification highlighting
-      data-post-id={post?.id} // Also add regular data-post-id as fallback
+      data-organization-post-id={post?.id}
+      data-post-id={post?.id}
     >
       {/* Header - Organization info and timestamp */}
       <div className="flex items-start space-x-3 mb-4">
@@ -268,6 +334,9 @@ export default function OrganizationPostCard({
               </h3>
               <p className="text-sm text-slate-500">
                 {post?.created_at ? formatDistanceToNow(new Date(post.created_at), { addSuffix: true }) : ''}
+                {post.updated_at && post.updated_at !== post.created_at && (
+                  <span className="ml-1">(edited)</span>
+                )}
               </p>
             </div>
             
@@ -312,14 +381,17 @@ export default function OrganizationPostCard({
         <EditPost 
           post={post} 
           onSave={handleEditPost} 
-          onCancel={() => setIsEditing(false)} 
+          onCancel={() => setIsEditing(false)}
+          // Pass current data to EditPost
+          initialContent={post.content}
+          initialImages={images}
+          initialTags={parsedTags}
         />
       ) : (
         <div 
           className="cursor-pointer"
           onClick={() => onOpenDetail && onOpenDetail(post)}
         >
-          {/* REPLACE THE OLD CONTENT RENDERING WITH PostBody COMPONENT */}
           <PostBody 
             content={post?.content || ''}
             images={images}
@@ -329,7 +401,7 @@ export default function OrganizationPostCard({
         </div>
       )}
 
-      {/* Reaction Summary and Comment Count - KEEP ORIGINAL WORKING DISPLAY */}
+      {/* Reaction Summary and Comment Count - SIMPLIFIED */}
       <div className="flex items-center justify-between text-sm text-slate-500 my-2 min-h-[20px]">
         <div 
           className="relative" 
@@ -349,22 +421,32 @@ export default function OrganizationPostCard({
                   );
                 })}
               </div>
-              <ReactorsText 
-                likeCount={totalLikes} 
-                reactors={reactors} 
-                onViewReactions={() => {/* TODO: Add reactions modal */}} 
-              />
+              <span className="ml-2 text-sm text-slate-600">
+                {totalLikes} {totalLikes === 1 ? 'like' : 'likes'}
+              </span>
             </div>
           )}
-          {showReactorsPreview && totalLikes > 0 && (
-            <ReactionsPreview 
-              reactors={reactors} 
-              likeCount={totalLikes} 
-              onViewAll={() => { 
-                setShowReactorsPreview(false); 
-                // TODO: setShowReactionsModal(true); 
-              }} 
-            />
+          {/* SIMPLIFIED REACTORS PREVIEW */}
+          {showReactorsPreview && totalLikes > 0 && reactors.length > 0 && (
+            <div className="absolute left-0 bottom-full mb-2 bg-white border border-slate-200 rounded-lg shadow-lg p-3 z-20 min-w-[200px]">
+              <div className="space-y-2">
+                {reactors.slice(0, 5).map((reactor, index) => (
+                  <div key={index} className="flex items-center space-x-2">
+                    <div className="w-6 h-6 rounded-full bg-slate-300 flex-shrink-0">
+                      {reactor.avatar_url ? (
+                        <img src={reactor.avatar_url} alt="" className="w-6 h-6 rounded-full object-cover" />
+                      ) : (
+                        <span className="text-xs text-white">{reactor.full_name?.charAt(0)}</span>
+                      )}
+                    </div>
+                    <span className="text-sm text-slate-700 truncate">{reactor.full_name}</span>
+                  </div>
+                ))}
+                {reactors.length > 5 && (
+                  <div className="text-xs text-slate-500">and {reactors.length - 5} others</div>
+                )}
+              </div>
+            </div>
           )}
         </div>
         {commentsCount > 0 && (
@@ -388,19 +470,19 @@ export default function OrganizationPostCard({
         />
       )}
 
-      {/* Comments Section - Using the same CommentSection component as PostCard - ONLY show when not editing */}
+      {/* Comments Section - FIXED: Pass organization context to CommentSection */}
       {showComments && !isEditing && (
         <div className="mt-4 border-t pt-4 max-h-96 overflow-y-auto">
           <CommentSection 
             post={{
               ...post,
-              // Transform to use organization_post_comments table
               id: post.id,
-              _isOrganizationPost: true // Flag to identify organization posts
+              _isOrganizationPost: true
             }}
-            currentUserProfile={finalUserProfile}  // Use the final resolved profile
+            currentUserProfile={finalUserProfile}
             onCommentAdded={() => setCommentsCount(prev => prev + 1)}
             onCommentDeleted={() => setCommentsCount(prev => Math.max(0, prev - 1))}
+            organization={organization} // FIXED: Pass organization context for comments
           />
         </div>
       )}
