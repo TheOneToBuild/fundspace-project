@@ -520,7 +520,7 @@ const OrganizationProfilePage = () => {
       case 'impact':
         return <OrganizationImpact {...props} />;
       case 'northstar':
-        return <OrganizationNorthStar {...props} userMembership={userMembership} session={session} />;
+        return <OrganizationNorthStar {...props} userMembership={userMembership} session={session} isEditMode={isEditMode} />;
       case 'photos':
         return isEditMode ? 
           <EditableOrganizationPhotos {...props} userMembership={userMembership} session={session} /> :

@@ -1,24 +1,18 @@
-// src/components/organization-profile/north-star/constants.js - Configuration & Templates
-import { 
-  Target, Eye, Zap, Star, Compass, Lightbulb, Rocket, Crown, Gift,
-  Heart, Shield, Handshake, Award, Globe, TrendingUp, MapPin,
-  GraduationCap, Home, Leaf, Users, Building, Palette, Music, 
-  Camera, Book, Coffee, Map
+// src/components/organization-profile/north-star/constants.js
+import {
+  Star, Target, Eye, Heart, TrendingUp, Users, Book, MapPin, Focus, Compass,
+  Award, Globe, Lightbulb, Shield, Zap, Crown, Rocket, Diamond, Flame, 
+  Mountain, TreePine, Building, Calendar, Clock, Home, Move
 } from 'lucide-react';
 
-// Comprehensive icon library for maximum flexibility
+// Icon library for blocks
 export const ICON_LIBRARY = {
-  // Strategy & Vision
-  Target, Eye, Zap, Star, Compass, Lightbulb, Rocket, Crown,
-  // Values & Impact  
-  Heart, Shield, Handshake, Award, Gift, Globe, TrendingUp,
-  // Focus Areas & Location
-  MapPin, GraduationCap, Home, Leaf, Users, Building,
-  // Creative & Culture
-  Palette, Music, Camera, Book, Coffee, Map
+  Star, Target, Eye, Heart, TrendingUp, Users, Book, MapPin, Focus, Compass,
+  Award, Globe, Lightbulb, Shield, Zap, Crown, Rocket, Diamond, Flame,
+  Mountain, TreePine, Building, Calendar, Clock, Home, Move
 };
 
-// Rich color palette with gradients and themes
+// Color themes for blocks
 export const COLOR_THEMES = {
   ocean: { 
     bg: 'from-blue-50 via-cyan-50 to-blue-50', 
@@ -29,7 +23,7 @@ export const COLOR_THEMES = {
     name: 'Ocean'
   },
   forest: { 
-    bg: 'from-green-50 via-emerald-50 to-teal-50', 
+    bg: 'from-green-50 via-emerald-50 to-green-50', 
     border: 'border-green-200', 
     text: 'text-green-900', 
     icon: 'from-green-500 to-emerald-500',
@@ -37,7 +31,7 @@ export const COLOR_THEMES = {
     name: 'Forest'
   },
   sunset: { 
-    bg: 'from-orange-50 via-red-50 to-pink-50', 
+    bg: 'from-orange-50 via-red-50 to-orange-50', 
     border: 'border-orange-200', 
     text: 'text-orange-900', 
     icon: 'from-orange-500 to-red-500',
@@ -45,7 +39,7 @@ export const COLOR_THEMES = {
     name: 'Sunset'
   },
   royal: { 
-    bg: 'from-purple-50 via-violet-50 to-indigo-50', 
+    bg: 'from-purple-50 via-indigo-50 to-purple-50', 
     border: 'border-purple-200', 
     text: 'text-purple-900', 
     icon: 'from-purple-500 to-indigo-500',
@@ -86,167 +80,180 @@ export const COLOR_THEMES = {
   }
 };
 
-// Updated block templates (removed mission and team, added strategic elements and location)
+// Hero background themes
+export const HERO_BACKGROUNDS = {
+  ocean: {
+    bg: 'from-blue-600 via-cyan-600 to-blue-700',
+    name: 'Ocean'
+  },
+  forest: {
+    bg: 'from-green-600 via-emerald-600 to-green-700',
+    name: 'Forest'
+  },
+  sunset: {
+    bg: 'from-orange-500 via-red-500 to-pink-600',
+    name: 'Sunset'
+  },
+  royal: {
+    bg: 'from-purple-600 via-indigo-600 to-purple-700',
+    name: 'Royal'
+  },
+  earth: {
+    bg: 'from-amber-600 via-orange-600 to-red-600',
+    name: 'Earth'
+  },
+  midnight: {
+    bg: 'from-slate-700 via-gray-800 to-slate-900',
+    name: 'Midnight'
+  }
+};
+
+// Updated block templates (added mission, long-term/short-term goals)
 export const BLOCK_TEMPLATES = {
+  mission: {
+    type: 'text',
+    title: 'Our Mission',
+    content: 'We are dedicated to creating lasting positive change in our community by addressing systemic inequities and empowering individuals and families to thrive. Through strategic partnerships, innovative programs, and community-led solutions, we work to build a more just and equitable society where everyone has the opportunity to reach their full potential.',
+    icon: 'Target',
+    color: 'ocean',
+    size: 'large'
+  },
   vision: {
     type: 'text',
     title: 'Our Vision',
-    content: 'We envision a world where every community has access to opportunities that foster growth, equity, and sustainable prosperity for all.',
+    content: 'We envision a world where every community has access to opportunities that enable individuals and families to thrive. Through collaborative partnerships and innovative programs, we work toward sustainable change that addresses root causes and creates lasting impact.',
     icon: 'Eye',
     color: 'royal',
     size: 'large'
   },
-  
-  strategic_priorities: {
-    type: 'priorities',
-    title: 'Strategic Priorities',
-    content: [
-      {
-        title: 'Community Engagement',
-        description: 'Building lasting partnerships with local communities to ensure sustainable impact.',
-        icon: 'Users',
-        color: 'ocean'
-      },
-      {
-        title: 'Innovation & Growth',
-        description: 'Developing cutting-edge solutions that address emerging challenges.',
-        icon: 'Lightbulb',
-        color: 'earth'
-      },
-      {
-        title: 'Equity & Inclusion',
-        description: 'Ensuring equal access and opportunities for all community members.',
-        icon: 'Heart',
-        color: 'rose'
-      }
-    ],
-    icon: 'Target',
-    color: 'emerald',
-    size: 'full'
-  },
-  
-  strategic_focus: {
-    type: 'text',
-    title: 'Strategic Focus',
-    content: 'We concentrate our efforts on high-impact initiatives that create lasting change, focusing on education, economic empowerment, and community development through evidence-based approaches.',
-    icon: 'Compass',
-    color: 'forest',
-    size: 'large'
-  },
-  
-  focus_areas: {
-    type: 'locations',
-    title: 'Focus Areas',
-    content: [
-      {
-        location: 'San Francisco Bay Area',
-        description: 'Serving 15+ communities with education and workforce development programs.',
-        impact: '50,000+ residents reached'
-      },
-      {
-        location: 'Central Valley',
-        description: 'Supporting agricultural communities with sustainability initiatives.',
-        impact: '200+ farms assisted'
-      },
-      {
-        location: 'Los Angeles County',
-        description: 'Youth development and mentorship programs in underserved neighborhoods.',
-        impact: '5,000+ youth served'
-      }
-    ],
-    icon: 'MapPin',
-    color: 'sunset',
-    size: 'full'
-  },
-  
   values: {
     type: 'list',
     title: 'Our Core Values',
     content: [
-      'Integrity - We act with honesty and transparency in all our endeavors',
+      'Equity & Justice - We believe everyone deserves equal opportunities to succeed',
+      'Community Partnership - We work with communities, not for them', 
       'Innovation - We embrace creative solutions to complex challenges',
-      'Impact - We measure success by the positive change we create',
-      'Inclusion - We ensure everyone has a voice and a place at the table',
-      'Sustainability - We build for the long-term health of our communities'
+      'Transparency - We operate with openness and accountability',
+      'Collaboration - We achieve more when we work together'
     ],
     icon: 'Heart',
     color: 'rose',
     size: 'medium'
   },
-  
+  long_term_goals: {
+    type: 'list',
+    title: 'Long-Term Goals (5-10 Years)',
+    content: [
+      'Achieve measurable reduction in regional inequality gaps',
+      'Establish sustainable funding models for community programs',
+      'Build a network of 500+ community partners',
+      'Create generational wealth-building programs',
+      'Develop replicable models for other regions'
+    ],
+    icon: 'Mountain',
+    color: 'forest',
+    size: 'medium'
+  },
+  short_term_goals: {
+    type: 'list',
+    title: 'Short-Term Goals (1-2 Years)',
+    content: [
+      'Launch three new community health initiatives',
+      'Increase annual grant distribution by 25%',
+      'Expand digital literacy programs to 10 new locations',
+      'Complete strategic partnership with local government',
+      'Achieve 90% participant satisfaction in all programs'
+    ],
+    icon: 'Calendar',
+    color: 'sunset',
+    size: 'medium'
+  },
+  strategic_priorities: {
+    type: 'list',
+    title: 'Strategic Priorities',
+    content: [
+      'Education Equity - Ensuring all children have access to quality education',
+      'Economic Mobility - Creating pathways to financial stability and wealth building',
+      'Community Health - Addressing health disparities and promoting wellness',
+      'Civic Engagement - Strengthening democracy through increased participation',
+      'Environmental Justice - Protecting communities from environmental harm'
+    ],
+    icon: 'Target',
+    color: 'forest',
+    size: 'large'
+  },
+  strategic_focus: {
+    type: 'text',
+    title: 'Strategic Focus Areas',
+    content: 'Our work is concentrated in three key areas that create the greatest impact for our community. We focus on systemic change through education reform, economic development initiatives, and community health programs. Each area is designed to address root causes while building long-term capacity for sustainable change.',
+    icon: 'Focus',
+    color: 'ocean',
+    size: 'medium'
+  },
+  focus_areas_location: {
+    type: 'list',
+    title: 'Geographic Focus Areas',
+    content: [
+      'East Bay Region - Oakland, Berkeley, Richmond, and surrounding communities',
+      'Rural Northern California - Supporting underserved agricultural communities',
+      'Central Valley - Addressing urban and rural disparities',
+      'Bay Area Partnerships - Collaborative initiatives across the greater Bay Area'
+    ],
+    icon: 'MapPin',
+    color: 'earth',
+    size: 'medium'
+  },
   impact: {
     type: 'stats',
-    title: 'Our Impact',
+    title: 'Our Impact (2024)',
     content: [
-      { label: 'Lives Transformed', value: '25,000+' },
-      { label: 'Programs Active', value: '42' },
-      { label: 'Community Partners', value: '150+' },
-      { label: 'Years of Service', value: '18' }
+      { label: 'Lives Impacted', value: '50,000+' },
+      { label: 'Partner Organizations', value: '200+' },
+      { label: 'Grants Awarded', value: '$15M' },
+      { label: 'Programs Supported', value: '85' }
     ],
     icon: 'TrendingUp',
     color: 'forest',
     size: 'medium'
   },
-  
   story: {
     type: 'text',
     title: 'Our Story',
-    content: 'Founded in 2006 with a vision to bridge opportunity gaps in underserved communities, we began as a grassroots initiative led by local educators and community leaders. Today, we\'ve grown into a comprehensive organization that continues to honor our roots while expanding our reach.',
+    content: 'Founded in 1953, the East Bay Community Foundation emerged from a simple belief that communities thrive when neighbors invest in each other. What started as a small group of local philanthropists has grown into one of the largest community foundations in Northern California, managing over $500 million in assets and distributing more than $80 million annually to support community-led solutions.',
     icon: 'Book',
     color: 'earth',
     size: 'large'
   },
-
   approach: {
     type: 'text',
     title: 'Our Approach',
-    content: 'We believe in collaborative, community-driven solutions that address root causes rather than symptoms. Our methodology combines data-driven insights with grassroots wisdom to create programs that are both effective and culturally responsive.',
-    icon: 'Handshake',
-    color: 'midnight',
+    content: 'We believe lasting change happens when communities lead the way. Our approach is rooted in trust-based philanthropy, centering the voices and leadership of those most impacted by the issues we aim to address. We provide flexible funding, capacity-building support, and advocacy to amplify community-driven solutions.',
+    icon: 'Compass',
+    color: 'royal',
+    size: 'medium'
+  },
+  partnerships: {
+    type: 'text',
+    title: 'Community Partnerships',
+    content: 'Strong partnerships are the foundation of our work. We collaborate with grassroots organizations, established nonprofits, government agencies, businesses, and individual donors to create a network of support that strengthens our entire community. Together, we leverage resources, share knowledge, and amplify impact.',
+    icon: 'Users',
+    color: 'emerald',
+    size: 'medium'
+  },
+  innovation: {
+    type: 'text',
+    title: 'Innovation & Learning',
+    content: 'We embrace experimentation and learning as pathways to greater impact. Our commitment to innovation means we continuously evaluate our strategies, adapt to changing community needs, and invest in emerging solutions that show promise for creating sustainable change.',
+    icon: 'Lightbulb',
+    color: 'sunset',
     size: 'medium'
   }
 };
 
-// Block size configurations
+// Size options for blocks
 export const BLOCK_SIZES = {
-  small: {
-    className: 'col-span-1',
-    name: 'Small'
-  },
-  medium: {
-    className: 'md:col-span-1',
-    name: 'Medium'
-  },
-  large: {
-    className: 'md:col-span-2',
-    name: 'Large'
-  },
-  full: {
-    className: 'md:col-span-3',
-    name: 'Full Width'
-  }
-};
-
-// Block type configurations
-export const BLOCK_TYPES = {
-  text: {
-    name: 'Text Block',
-    description: 'Rich text content for stories, descriptions, and narratives'
-  },
-  list: {
-    name: 'List Block',
-    description: 'Bulleted lists for values, principles, or key points'
-  },
-  stats: {
-    name: 'Statistics Block',
-    description: 'Numerical data and impact metrics'
-  },
-  priorities: {
-    name: 'Strategic Priorities',
-    description: 'Grid of strategic priorities with icons and descriptions'
-  },
-  locations: {
-    name: 'Focus Areas',
-    description: 'Geographic locations where you operate'
-  }
+  small: { label: 'Small', cols: 'col-span-1' },
+  medium: { label: 'Medium', cols: 'md:col-span-1' },
+  large: { label: 'Large', cols: 'md:col-span-2' },
+  full: { label: 'Full Width', cols: 'md:col-span-3' }
 };
