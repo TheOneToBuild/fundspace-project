@@ -31,6 +31,7 @@ export function hasPermission(userRole, permission, isOmegaAdmin = false) {
       PERMISSIONS.VIEW_ORGANIZATION
     ],
     [ROLES.ADMIN]: [
+      PERMISSIONS.EDIT_ORGANIZATION,  // ✅ FIXED: Now admins can edit organization
       PERMISSIONS.MANAGE_MEMBERS,
       PERMISSIONS.VIEW_ORGANIZATION
     ],

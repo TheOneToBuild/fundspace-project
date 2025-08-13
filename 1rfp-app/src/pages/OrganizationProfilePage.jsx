@@ -1,4 +1,4 @@
-// src/pages/OrganizationProfilePage.jsx - Complete version with global edit mode
+// src/pages/OrganizationProfilePage.jsx - Fixed to allow all organization types to edit
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../supabaseClient.js';
@@ -10,11 +10,9 @@ import { getUserMembershipSafe } from '../utils/membershipQueries.js';
 import PublicPageLayout from '../components/PublicPageLayout.jsx';
 import EditableOrganizationHeader from '../components/organization-profile/EditableOrganizationHeader.jsx';
 import OrganizationHeader from '../components/organization-profile/OrganizationHeader.jsx';
-import OrganizationTabs from '../components/organization-profile/OrganizationTabs.jsx';
 
 // Regular Components
 import OrganizationHome from '../components/organization-profile/OrganizationHome.jsx';
-import OrganizationOverview from '../components/organization-profile/OrganizationOverview.jsx';
 import OrganizationTeam from '../components/organization-profile/OrganizationTeam.jsx';
 
 // Editable Components
@@ -22,7 +20,6 @@ import EditableOrganizationHome from '../components/organization-profile/Editabl
 import EditableOrganizationPhotos from '../components/organization-profile/EditableOrganizationPhotos.jsx';
 
 // New Components for Template Design
-import OrganizationImpact from '../components/organization-profile/OrganizationImpact.jsx';
 import OrganizationNorthStar from '../components/organization-profile/OrganizationNorthStar.jsx';
 import OrganizationPhotos from '../components/organization-profile/OrganizationPhotos.jsx';
 import OrganizationGrantsFixed from '../components/organization-profile/OrganizationGrantsFixed.jsx';
@@ -31,26 +28,65 @@ import OrganizationGrantsFixed from '../components/organization-profile/Organiza
 import { useOrganizationSocial } from '../hooks/useOrganizationSocial.js';
 import { hasPermission, PERMISSIONS } from '../utils/organizationPermissions.js';
 
-// Organization type configurations for different layouts
+// Organization type configurations for different layouts - FIXED: All types can edit
 const ORG_TYPE_CONFIGS = {
   foundation: {
     headerStyle: 'foundation',
     showNorthStar: true,
-    showImpact: true,
     showPhotos: true,
     primaryGradient: 'from-purple-500 to-indigo-600'
   },
   nonprofit: {
     headerStyle: 'nonprofit',
-    showNorthStar: false,
-    showImpact: true,
+    showNorthStar: true,  // ✅ NOW ENABLED for nonprofits
     showPhotos: true,
     primaryGradient: 'from-green-500 to-emerald-600'
   },
+  healthcare: {
+    headerStyle: 'healthcare',
+    showNorthStar: true,  // ✅ NOW ENABLED for healthcare
+    showPhotos: true,
+    primaryGradient: 'from-red-500 to-pink-600'
+  },
+  education: {
+    headerStyle: 'education',
+    showNorthStar: true,  // ✅ NOW ENABLED for education
+    showPhotos: true,
+    primaryGradient: 'from-yellow-500 to-orange-600'
+  },
+  government: {
+    headerStyle: 'government',
+    showNorthStar: true,  // ✅ NOW ENABLED for government
+    showPhotos: true,
+    primaryGradient: 'from-indigo-500 to-blue-600'
+  },
+  'for-profit': {
+    headerStyle: 'for-profit',
+    showNorthStar: true,  // ✅ NOW ENABLED for for-profit
+    showPhotos: true,
+    primaryGradient: 'from-purple-500 to-pink-600'
+  },
+  forprofit: {
+    headerStyle: 'forprofit',
+    showNorthStar: true,  // ✅ NOW ENABLED for forprofit
+    showPhotos: true,
+    primaryGradient: 'from-purple-500 to-pink-600'
+  },
+  religious: {
+    headerStyle: 'religious',
+    showNorthStar: true,  // ✅ NOW ENABLED for religious
+    showPhotos: true,
+    primaryGradient: 'from-pink-500 to-rose-600'
+  },
+  international: {
+    headerStyle: 'international',
+    showNorthStar: true,  // ✅ NOW ENABLED for international
+    showPhotos: true,
+    primaryGradient: 'from-teal-500 to-cyan-600'
+  },
   default: {
     headerStyle: 'default',
-    showNorthStar: false,
-    showImpact: true,
+    showNorthStar: true,  // ✅ NOW ENABLED for all other types
     showPhotos: true,
     primaryGradient: 'from-slate-500 to-slate-600'
   }
@@ -148,19 +184,21 @@ const OrganizationProfilePage = () => {
       { id: 'home', label: 'Home', icon: 'Globe' }
     ];
 
-    // Add North Star for foundations first (right after home)
+    // Add North Star for ALL organization types (now enabled for all)
     if (orgConfig.showNorthStar) {
       baseTabs.push({ id: 'northstar', label: 'North Star', icon: 'Target' });
     }
 
-    // Add Impact tab for foundations and nonprofits
-    if (orgConfig.showImpact) {
-      baseTabs.push({ id: 'impact', label: 'Impact', icon: 'TrendingUp' });
+    // Add Programs right after North Star
+    const typeSpecificTabs = getTypeSpecificTabs(orgType);
+    const programsTab = typeSpecificTabs.find(tab => tab.id === 'programs');
+    if (programsTab) {
+      baseTabs.push(programsTab);
     }
 
-    // Add Action tab (formerly Photos) if enabled
+    // Add Photos tab if enabled (now enabled for all types)
     if (orgConfig.showPhotos) {
-      baseTabs.push({ id: 'photos', label: 'Action', icon: 'Camera' });
+      baseTabs.push({ id: 'photos', label: 'Photos', icon: 'Camera' });
     }
 
     // Add standard tabs
@@ -168,9 +206,9 @@ const OrganizationProfilePage = () => {
       { id: 'team', label: 'Team', icon: 'Users' }
     );
 
-    // Add type-specific tabs
-    const typeSpecificTabs = getTypeSpecificTabs(orgType);
-    return [...baseTabs, ...typeSpecificTabs];
+    // Add remaining type-specific tabs (excluding programs which we already added)
+    const remainingTabs = typeSpecificTabs.filter(tab => tab.id !== 'programs');
+    return [...baseTabs, ...remainingTabs];
   };
 
   const getTypeSpecificTabs = (orgType) => {
@@ -209,6 +247,28 @@ const OrganizationProfilePage = () => {
         tabs.push(
           { id: 'services', label: 'Public Services', icon: 'Building2' },
           { id: 'initiatives', label: 'Initiatives', icon: 'Flag' }
+        );
+        break;
+      
+      case 'religious':
+        tabs.push(
+          { id: 'services', label: 'Services', icon: 'Heart' },
+          { id: 'community', label: 'Community', icon: 'Users' }
+        );
+        break;
+      
+      case 'international':
+        tabs.push(
+          { id: 'programs', label: 'Programs', icon: 'Rocket' },
+          { id: 'regions', label: 'Regions', icon: 'Globe' }
+        );
+        break;
+      
+      case 'for-profit':
+      case 'forprofit':
+        tabs.push(
+          { id: 'services', label: 'Services', icon: 'Briefcase' },
+          { id: 'products', label: 'Products', icon: 'Star' }
         );
         break;
       
@@ -517,8 +577,6 @@ const OrganizationProfilePage = () => {
           <OrganizationHome {...props} />;
       case 'team':
         return <OrganizationTeam {...props} userMembership={userMembership} session={session} />;
-      case 'impact':
-        return <OrganizationImpact {...props} />;
       case 'northstar':
         return <OrganizationNorthStar {...props} userMembership={userMembership} session={session} isEditMode={isEditMode} />;
       case 'photos':
@@ -571,6 +629,34 @@ const OrganizationProfilePage = () => {
             return <PlaceholderContent contentType="Public Services" organizationType="government" />;
           case 'initiatives':
             return <PlaceholderContent contentType="Initiatives" organizationType="government" />;
+        }
+        break;
+
+      case 'religious':
+        switch (activeTab) {
+          case 'services':
+            return <PlaceholderContent contentType="Services" organizationType="religious" />;
+          case 'community':
+            return <PlaceholderContent contentType="Community" organizationType="religious" />;
+        }
+        break;
+
+      case 'international':
+        switch (activeTab) {
+          case 'programs':
+            return <PlaceholderContent contentType="Programs" organizationType="international" />;
+          case 'regions':
+            return <PlaceholderContent contentType="Regions" organizationType="international" />;
+        }
+        break;
+
+      case 'for-profit':
+      case 'forprofit':
+        switch (activeTab) {
+          case 'services':
+            return <PlaceholderContent contentType="Services" organizationType="for-profit" />;
+          case 'products':
+            return <PlaceholderContent contentType="Products" organizationType="for-profit" />;
         }
         break;
     }

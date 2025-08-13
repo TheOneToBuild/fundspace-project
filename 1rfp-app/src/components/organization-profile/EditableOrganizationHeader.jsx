@@ -1,4 +1,4 @@
-// src/components/organization-profile/EditableOrganizationHeader.jsx - IMPROVED VERSION
+// src/components/organization-profile/EditableOrganizationHeader.jsx - Updated with Edit Section Button
 import React, { useState } from 'react';
 import { 
   Eye, AlertTriangle, X, ArrowLeft, Edit3, Save, MapPin, ExternalLink, 
@@ -330,10 +330,10 @@ const EditableOrganizationHeader = ({
               {canEdit && (
                 <button
                   onClick={startEditing}
-                  className="text-slate-400 hover:text-slate-600 p-1"
-                  title="Edit basic info"
+                  className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
                 >
-                  <Edit3 className="w-5 h-5" />
+                  <Edit3 className="w-4 h-4" />
+                  Edit Section
                 </button>
               )}
               {organization.isVerified && (

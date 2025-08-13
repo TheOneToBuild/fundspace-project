@@ -1,4 +1,4 @@
-// src/components/organization-profile/OrganizationHome.jsx - Updated with OrganizationPostsManager
+// src/components/organization-profile/OrganizationHome.jsx - Updated with "About Us" title
 import React, { useState } from 'react';
 import { MessageSquare, Plus } from 'lucide-react';
 import OrganizationPostsManager from './OrganizationPostsManager.jsx';
@@ -38,10 +38,10 @@ const OrganizationHome = ({
 
   return (
     <div className="space-y-10">
-      {/* Mission Section */}
+      {/* About Us Section */}
       <div className="bg-white rounded-3xl p-10 border border-slate-200 shadow-sm grid md:grid-cols-2 gap-10 items-center">
         <div className="flex flex-col h-full">
-          <h2 className="text-3xl font-black text-slate-900 mb-4">Our Mission ✨</h2>
+          <h2 className="text-3xl font-black text-slate-900 mb-4">About Us ✨</h2>
           <p className="text-slate-700 leading-relaxed text-lg flex-grow">
             {organization.description || "Working to create positive impact in our community through strategic partnerships and innovative solutions."}
           </p>
@@ -62,7 +62,7 @@ const OrganizationHome = ({
         {/* Mission Image */}
         <img 
           src={organization.mission_image_url || 'https://images.unsplash.com/photo-1582213782179-e0d53f98f2ca?w=800&h=600&fit=crop'} 
-          alt="Our Mission" 
+          alt="About Us" 
           className="rounded-2xl object-cover w-full h-full max-h-[450px]" 
         />
       </div>
