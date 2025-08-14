@@ -1,4 +1,4 @@
-// src/components/organization-profile/EditableOrganizationHome.jsx - Updated with "About Us" title
+// src/components/organization-profile/EditableOrganizationHome.jsx
 import React, { useState } from 'react';
 import { MessageSquare, Plus, Edit3, X } from 'lucide-react';
 import { supabase } from '../../supabaseClient.js';
@@ -12,57 +12,36 @@ import { FocusAreaPill } from './FocusAreasManager.jsx';
 
 const EditableOrganizationHome = ({ 
   organization, 
-  organizationPosts, 
   session, 
-  onPostDelete,
   userMembership,
-  photos = [],
+  currentUserProfile,
   onUpdate,
-  activeTab,
   setActiveTab
 }) => {
-  // State management - simplified
   const [isEditingMission, setIsEditingMission] = useState(false);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
 
-  // Check permissions
   const canCreatePosts = userMembership && hasPermission(
     userMembership.role, 
     PERMISSIONS.EDIT_ORGANIZATION, 
     session?.user?.is_omega_admin
   );
 
-  const handleViewAllPhotos = () => {
-    if (setActiveTab) {
-      setActiveTab('photos');
-      setTimeout(() => {
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-      }, 100);
-    }
-  };
-
-  // Handle mission image upload
   const handleMissionImageUpload = async (file) => {
     try {
       setUploading(true);
       setError('');
 
-      // Validate file
-      if (file.size > 5 * 1024 * 1024) {
-        throw new Error('File size must be less than 5MB');
-      }
-
-      if (!file.type.startsWith('image/')) {
-        throw new Error('File must be an image');
-      }
+      if (file.size > 5 * 1024 * 1024) throw new Error('File size must be less than 5MB');
+      if (!file.type.startsWith('image/')) throw new Error('File must be an image');
 
       const fileExt = file.name.split('.').pop();
       const fileName = `org-${organization.id}-mission-${Date.now()}.${fileExt}`;
       const filePath = `organizations/${fileName}`;
 
-      const { data: uploadData, error: uploadError } = await supabase.storage
+      const { error: uploadError } = await supabase.storage
         .from('avatars')
         .upload(filePath, file, {
           cacheControl: '3600',
@@ -85,19 +64,15 @@ const EditableOrganizationHome = ({
     }
   };
 
-  // Handle comprehensive save (mission + focus areas)
   const handleMissionSave = async (editData) => {
     try {
       setSaving(true);
       setError('');
 
-      // Step 1: Update organization basic info
       const orgUpdateData = {};
-      
       if (editData.description !== organization.description) {
         orgUpdateData.description = editData.description;
       }
-      
       if (editData.mission_image_url !== organization.mission_image_url) {
         orgUpdateData.mission_image_url = editData.mission_image_url;
       }
@@ -107,71 +82,35 @@ const EditableOrganizationHome = ({
           .from('organizations')
           .update(orgUpdateData)
           .eq('id', organization.id);
-
         if (updateError) throw updateError;
       }
 
-      // Step 2: Update focus areas if they changed
       const currentFocusAreas = organization.focusAreas || [];
       const newFocusAreas = editData.focusAreas || [];
-      
-      // Check if focus areas changed
       const areasChanged = JSON.stringify(currentFocusAreas.sort()) !== JSON.stringify(newFocusAreas.sort());
       
       if (areasChanged) {
-        // Remove all existing categories for this organization
-        const { error: deleteError } = await supabase
-          .from('organization_categories')
-          .delete()
-          .eq('organization_id', organization.id);
+        await supabase.from('organization_categories').delete().eq('organization_id', organization.id);
 
-        if (deleteError) throw deleteError;
-
-        // Add the new focus areas
         if (newFocusAreas.length > 0) {
-          // Get or create category IDs
           const categoryPromises = newFocusAreas.map(async (areaName) => {
-            // Try to find existing category
-            let { data: existingCategory } = await supabase
-              .from('categories')
-              .select('id')
-              .eq('name', areaName)
-              .single();
-
+            let { data: existingCategory } = await supabase.from('categories').select('id').eq('name', areaName).single();
             if (!existingCategory) {
-              // Create new category
-              const { data: newCategory, error: createError } = await supabase
-                .from('categories')
-                .insert({ name: areaName })
-                .select('id')
-                .single();
-
+              const { data: newCategory, error: createError } = await supabase.from('categories').insert({ name: areaName }).select('id').single();
               if (createError) throw createError;
               existingCategory = newCategory;
             }
-
             return existingCategory.id;
           });
-
           const categoryIds = await Promise.all(categoryPromises);
-
-          // Insert organization_categories relationships
-          const organizationCategories = categoryIds.map(categoryId => ({
-            organization_id: organization.id,
-            category_id: categoryId
-          }));
-
-          const { error: insertError } = await supabase
-            .from('organization_categories')
-            .insert(organizationCategories);
-
-          if (insertError) throw insertError;
+          const organizationCategories = categoryIds.map(categoryId => ({ organization_id: organization.id, category_id: categoryId }));
+          await supabase.from('organization_categories').insert(organizationCategories);
         }
       }
 
-      // Call the onUpdate callback to refresh organization data
       if (onUpdate) {
-        await onUpdate();
+        const updatedFields = { ...orgUpdateData, focusAreas: newFocusAreas };
+        onUpdate(updatedFields);
       }
 
       setIsEditingMission(false);
@@ -187,7 +126,6 @@ const EditableOrganizationHome = ({
 
   return (
     <div className="space-y-10">
-      {/* Error message */}
       {error && (
         <div className="bg-red-50 border-l-4 border-red-400 p-4 rounded-lg">
           <div className="flex">
@@ -206,7 +144,6 @@ const EditableOrganizationHome = ({
 
       {/* About Us Section */}
       <div className="bg-white rounded-3xl p-10 border border-slate-200 shadow-sm grid md:grid-cols-2 gap-10 items-center relative">
-        {/* Edit Button */}
         {canCreatePosts && (
           <button
             onClick={() => setIsEditingMission(true)}
@@ -219,12 +156,10 @@ const EditableOrganizationHome = ({
 
         <div className="flex flex-col h-full">
           <h2 className="text-3xl font-black text-slate-900 mb-4">About Us ✨</h2>
-          
           <p className="text-slate-700 leading-relaxed text-lg flex-grow">
             {organization.description || "Working to create positive impact in our community through strategic partnerships and innovative solutions."}
           </p>
           
-          {/* Focus Areas */}
           {organization.focusAreas && organization.focusAreas.length > 0 && (
             <div className="mt-8 pt-6 border-t border-slate-200">
               <h4 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-3">Focus Areas</h4>
@@ -237,7 +172,6 @@ const EditableOrganizationHome = ({
           )}
         </div>
         
-        {/* Mission Image */}
         <div className="relative">
           <img 
             src={organization.mission_image_url || 'https://images.unsplash.com/photo-1582213782179-e0d53f98f2ca?w=800&h=600&fit=crop'} 
@@ -247,7 +181,7 @@ const EditableOrganizationHome = ({
         </div>
       </div>
 
-      {/* Organization Posts Section - Using OrganizationPostsManager */}
+      {/* Organization Posts Section */}
       <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm">
         <div className="mb-6">
           <h3 className="text-lg font-bold text-slate-900">Manage Organization Updates</h3>
@@ -258,7 +192,7 @@ const EditableOrganizationHome = ({
           organization={organization}
           session={session}
           userMembership={userMembership}
-          currentUserProfile={session?.user}
+          currentUserProfile={currentUserProfile}
         />
       </div>
 
