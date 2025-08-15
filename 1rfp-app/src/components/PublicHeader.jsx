@@ -1,4 +1,4 @@
-// 1. UPDATE: src/components/PublicHeader.jsx
+// src/components/PublicHeader.jsx
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, NavLink } from 'react-router-dom';
 import { Menu, X, PlusCircle } from './Icons.jsx';
@@ -27,7 +27,6 @@ export default function PublicHeader() {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const mobileMenuRef = useRef(null);
 
-    // UPDATED: Unified navigation links
     const mainNavLinks = [
         { to: "/grants", text: "Find Grants", activeClassName: "text-blue-600 font-semibold" },
         { to: "/organizations", text: "Explore Organizations", activeClassName: "text-blue-600 font-semibold" },
@@ -154,69 +153,3 @@ export default function PublicHeader() {
         </>
     );
 }
-
-// 2. UPDATE: src/components/DashboardHeader.jsx
-// The DashboardHeader in your documents already has the correct navigation:
-// ✅ "Explore Organizations" instead of separate funders/nonprofits
-// ✅ Routes to "/profile/organizations"
-// The mobile menu also correctly shows "Explore Organizations"
-
-// 3. UPDATE: Any standalone AppNavLink components
-const AppNavLink = ({ to, children, activeClassName, ...props }) => {
-    return (
-        <NavLink
-            to={to}
-            className={({ isActive }) =>
-                `text-sm md:text-base font-medium transition-colors ${
-                    isActive ? activeClassName : 'text-slate-700 hover:text-blue-600'
-                }`
-            }
-            {...props}
-        >
-            {children}
-        </NavLink>
-    );
-};
-
-// 4. UPDATE: If you have any inline navigation in other components, update like this:
-const UpdatedInlineNavigation = () => (
-    <nav className="hidden md:flex items-center space-x-4 md:space-x-6">
-        <AppNavLink to="/grants" activeClassName="text-blue-600 font-semibold">
-            Find Grants
-        </AppNavLink>
-        <AppNavLink to="/organizations" activeClassName="text-blue-600 font-semibold">
-            Explore Organizations
-        </AppNavLink>
-        <AppNavLink to="/spotlight" activeClassName="text-rose-600 font-semibold">
-            Spotlight
-        </AppNavLink>
-    </nav>
-);
-
-// 5. UPDATE: Any buttons or links that reference old routes
-const UpdatedActionButtons = () => (
-    <>
-        {/* Update any buttons that linked to /funders or /nonprofits */}
-        <Link 
-            to="/organizations" 
-            className="inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-0.5"
-        >
-            Explore Organizations
-        </Link>
-        
-        {/* Update any filter buttons */}
-        <Link 
-            to="/organizations?type=foundation" 
-            className="inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-lg text-white bg-green-600 hover:bg-green-700 shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-0.5"
-        >
-            Explore Funders
-        </Link>
-        
-        <Link 
-            to="/organizations?type=nonprofit" 
-            className="inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-lg text-white bg-purple-600 hover:bg-purple-700 shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-0.5"
-        >
-            Explore Nonprofits
-        </Link>
-    </>
-);

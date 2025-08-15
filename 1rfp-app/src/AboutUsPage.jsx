@@ -3,7 +3,6 @@ import React, { useEffect, useContext } from 'react';
 import { motion } from 'framer-motion';
 import { Users, BarChart3, Briefcase, Heart, Home, AlertTriangle, Coffee, Building, Sparkles, TrendingUp, Star, Clock, Target, Zap, Bot, Shield, Search, ArrowRight, ChevronDown, ExternalLink } from './components/Icons.jsx';
 import AnimatedCounter from './components/AnimatedCounter.jsx';
-import ScrollArrow from './components/ScrollArrow.jsx';
 import { LayoutContext } from './App.jsx';
 import PublicPageLayout from './components/PublicPageLayout.jsx';
 

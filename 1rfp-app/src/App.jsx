@@ -20,7 +20,6 @@ import SubmitGrantPage from './SubmitGrantPage.jsx';
 import LoginPage from './LoginPage.jsx';
 import ProfilePage from './ProfilePage.jsx';
 import SettingsPage from './SettingsPage.jsx';
-import SavedGrantsPage from './SavedGrantsPage.jsx';
 import ExploreMembersPage from './ExploreMembersPage.jsx';
 import MemberProfilePage from './MemberProfilePage.jsx';
 import HomeDashboard from './components/HomeDashboard.jsx';
@@ -34,7 +33,6 @@ import OmegaAdminOrgSelector from './components/OmegaAdminOrgSelector.jsx';
 import OmegaAdminEditOrg from './components/OmegaAdminEditOrg.jsx';
 import OmegaAdminManageMembers from './components/OmegaAdminManageMembers.jsx';
 import MyOrganizationPage from './components/MyOrganizationPage.jsx';
-import EditOrganizationPage from './components/EditOrganizationPage.jsx';
 import OrganizationProfilePage from './pages/OrganizationProfilePage.jsx';
 import SignUpWizard from './components/auth/SignUpWizard.jsx';
 import OnboardingWizard from './components/OnboardingWizard.jsx';
@@ -445,7 +443,6 @@ export default function App() {
               <Route path="grants" element={<GrantsPageContent hideHero={true} isProfileView={true} />} />
               <Route path="organizations" element={<ExploreOrganizations isProfileView={true} />} />
               <Route path="members" element={<ExploreMembersPage />} />
-              <Route path="saved-grants" element={<SavedGrantsPage />} />
               <Route path="grants-portal" element={<GrantsPortalPage />} />
               <Route path="hello-community" element={<HelloCommunityRoute />} />
               <Route path="settings" element={<SettingsPage />} />
@@ -453,7 +450,6 @@ export default function App() {
               <Route path="following" element={<FollowingPage />} />
               <Route path="connections" element={<ConnectionsPage />} />
               <Route path="my-organization" element={<MyOrganizationPage />} />
-              <Route path="my-organization/edit" element={<EditOrganizationPage />} />
               <Route path="omega-admin" element={<OmegaAdminDashboard />} />
               <Route path="omega-admin/analytics" element={<OmegaAdminAnalytics />} />
               <Route path="omega-admin/organizations" element={<OmegaAdminOrgSelector />} />

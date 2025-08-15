@@ -16,6 +16,7 @@ export default function ProfileNav() {
     const [stats, setStats] = useState({ followersCount: 0, followingCount: 0, connectionsCount: 0 });
     const [organizationName, setOrganizationName] = useState('');
     const [organizationSlug, setOrganizationSlug] = useState('');
+    const [hasOrganizationAccess, setHasOrganizationAccess] = useState(false);
     const isOmegaAdmin = isPlatformAdmin(profile?.is_omega_admin);
     const sidebarRef = useRef(null);
 
@@ -30,6 +31,29 @@ export default function ProfileNav() {
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [isExpanded]);
+
+    // Check if user has organization membership for grants portal access
+    const checkOrganizationAccess = useCallback(async () => {
+        if (!profile?.id) return;
+        
+        try {
+            const { data, error } = await supabase
+                .from('organization_memberships')
+                .select('role')
+                .eq('profile_id', profile.id)
+                .in('role', ['super_admin', 'admin'])
+                .limit(1);
+                
+            if (!error && data && data.length > 0) {
+                setHasOrganizationAccess(true);
+            } else {
+                setHasOrganizationAccess(false);
+            }
+        } catch (err) {
+            console.error('Error checking organization access:', err);
+            setHasOrganizationAccess(false);
+        }
+    }, [profile?.id]);
 
     // --- DATA FETCHING & LOGIC ---
     // FIXED: Replace problematic query with safe function
@@ -66,6 +90,7 @@ export default function ProfileNav() {
     // FIXED: Improved real-time subscription cleanup
     useEffect(() => {
         fetchProfileStats();
+        checkOrganizationAccess();
         
         // Fetch organization data
         if (profile?.id) {
@@ -100,6 +125,8 @@ export default function ProfileNav() {
                 table: 'organization_memberships', 
                 filter: `profile_id.eq.${profile.id}` 
             }, () => {
+                // Update both organization data and access permissions
+                checkOrganizationAccess();
                 if (profile?.id) {
                     fetchOrganizationData(profile.id).then(({ name, slug }) => {
                         setOrganizationName(name);
@@ -131,7 +158,7 @@ export default function ProfileNav() {
                 }, 100);
             }
         };
-    }, [profile?.id, fetchProfileStats, fetchOrganizationData]);
+    }, [profile?.id, fetchProfileStats, fetchOrganizationData, checkOrganizationAccess]);
 
     // --- NAVIGATION STRUCTURE ---
     const navItems = [
@@ -139,6 +166,8 @@ export default function ProfileNav() {
             section: 'Community',
             links: [
                 { icon: <Home size={20} />, text: "Dashboard", to: "/profile" },                           // NEW: Main dashboard
+                                { icon: <FileText size={20} />, text: "Grants Portal", to: "/profile/grants-portal", hide: !isOmegaAdmin && !hasOrganizationAccess },
+
                 { icon: <Globe size={20} />, text: "Hello World", to: "/profile/hello-world" },          // UPDATED: Moved HelloWorld
                 { icon: <Handshake size={20} />, text: "Hello Community", to: "/profile/hello-community" },
                 { icon: <Search size={20} />, text: "Discover People", to: "/profile/members" },
@@ -149,7 +178,6 @@ export default function ProfileNav() {
             links: [
                 { icon: <Users size={20} />, text: "My Connections", to: "/profile/connections", badge: stats.connectionsCount },
                 { icon: <Briefcase size={20} />, text: "My Organization", to: "/profile/my-organization", hide: isOmegaAdmin },
-                { icon: <Bookmark size={20} />, text: "Saved Grants", to: "/profile/saved-grants" },
                 { icon: <Bell size={20} />, text: "Notifications", to: "/profile/notifications" },
                 { icon: <Settings size={20} />, text: "Settings", to: "/profile/settings" },
             ]

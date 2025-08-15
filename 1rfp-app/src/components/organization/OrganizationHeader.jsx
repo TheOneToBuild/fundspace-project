@@ -37,17 +37,6 @@ export default function OrganizationHeader({
     const canDeleteOrg = hasPermission(userRole, PERMISSIONS.DELETE_ORGANIZATION, isOmegaAdmin);
     const canLeave = !isOmegaAdmin && userMembership;
 
-    const handleDropdownToggle = () => {
-        if (!showDropdown && buttonRef.current) {
-            const rect = buttonRef.current.getBoundingClientRect();
-            setDropdownPosition({
-                top: rect.bottom + window.scrollY + 8,
-                right: window.innerWidth - rect.right
-            });
-        }
-        setShowDropdown(!showDropdown);
-    };
-
     const handleEditOrganization = () => {
         setShowDropdown(false);
         
@@ -66,6 +55,17 @@ export default function OrganizationHeader({
             // Fallback if no slug
             navigate(`/organizations/${organization.id}?edit=true`);
         }
+    };
+
+    const handleDropdownToggle = () => {
+        if (!showDropdown && buttonRef.current) {
+            const rect = buttonRef.current.getBoundingClientRect();
+            setDropdownPosition({
+                top: rect.bottom + window.scrollY + 8,
+                right: window.innerWidth - rect.right
+            });
+        }
+        setShowDropdown(!showDropdown);
     };
 
     if (!organization) return null;
@@ -221,7 +221,7 @@ export default function OrganizationHeader({
                                             )}
                                             {canLeave && (
                                                 <>
-                                                    <div className="border-t border-slate-100 my-1" />
+                                                    {canEditOrg && <div className="border-t border-slate-100 my-1" />}
                                                     <button
                                                         onClick={() => {
                                                             setShowDropdown(false);
@@ -239,7 +239,7 @@ export default function OrganizationHeader({
                                             )}
                                             {canDeleteOrg && (
                                                 <>
-                                                    <div className="border-t border-slate-100 my-1" />
+                                                    {(canEditOrg || canLeave) && <div className="border-t border-slate-100 my-1" />}
                                                     <button
                                                         onClick={() => {
                                                             setShowDropdown(false);

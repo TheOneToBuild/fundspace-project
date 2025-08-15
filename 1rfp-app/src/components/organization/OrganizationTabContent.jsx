@@ -3,7 +3,9 @@ import React from 'react';
 import { 
     MessageSquare, Plus, Users, ClipboardList, Star 
 } from 'lucide-react';
+import { useOutletContext } from 'react-router-dom';
 import TeamManagement from './TeamManagement.jsx';
+import OrganizationPostsManager from '../organization-profile/OrganizationPostsManager.jsx';
 
 export default function OrganizationTabContent({ 
     activeTab, 
@@ -14,19 +16,21 @@ export default function OrganizationTabContent({
     onMemberAction, 
     setError 
 }) {
+    const { session } = useOutletContext();
+
     const renderOverviewTab = () => (
         <div className="p-6">
-            <div className="text-center py-12">
-                <MessageSquare className="w-12 h-12 text-slate-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-slate-900 mb-2">Organization Updates</h3>
-                <p className="text-slate-600 mb-6">
-                    Share updates, announcements, and engage with your community.
-                </p>
-                <button className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
-                    <Plus className="w-4 h-4 mr-2" />
-                    Create Post
-                </button>
+            <div className="mb-6">
+                <h3 className="text-lg font-bold text-slate-900">Organization Updates</h3>
+                <p className="text-sm text-slate-600 mt-1">Share updates, announcements, and engage with your community.</p>
             </div>
+            
+            <OrganizationPostsManager 
+                organization={organization}
+                session={session}
+                userMembership={userMembership}
+                currentUserProfile={profile}
+            />
         </div>
     );
 
@@ -80,14 +84,18 @@ export default function OrganizationTabContent({
                 <ClipboardList className="w-12 h-12 text-slate-400 mx-auto mb-4" />
             );
             
-        case 'grantees':
+        case 'our-grantees':
             return renderPlaceholderTab(
                 'Our Grantees',
-                'View and manage your current and past grantees.',
+                'View and manage organizations that have received your grants.',
                 <Users className="w-12 h-12 text-slate-400 mx-auto mb-4" />
             );
             
         default:
-            return renderOverviewTab();
+            return renderPlaceholderTab(
+                'Coming Soon',
+                'This feature is under development.',
+                <MessageSquare className="w-12 h-12 text-slate-400 mx-auto mb-4" />
+            );
     }
 }
