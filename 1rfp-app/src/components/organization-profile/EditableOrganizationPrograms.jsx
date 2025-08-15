@@ -2,10 +2,11 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Plus, Edit3, Trash2, Users, MapPin, Target, Calendar, ExternalLink, 
-  Loader2, X, Zap, Eye, Clock, TrendingUp 
+  Loader2, X, Zap, Eye, Clock, TrendingUp, Building2 
 } from 'lucide-react';
 import { supabase } from '../../supabaseClient.js';
 import ProgramDetailModal from './ProgramDetailModal.jsx';
+import OrganizationSearch from './OrganizationSearch.jsx';
 
 const EditableOrganizationPrograms = ({ 
   organization, 
@@ -36,7 +37,8 @@ const EditableOrganizationPrograms = ({
     start_date: '',
     end_date: '',
     status: 'Active',
-    external_url: ''
+    external_url: '',
+    funded_by_organizations: []
   });
 
   // Check if user can edit
@@ -58,7 +60,27 @@ const EditableOrganizationPrograms = ({
         .order('display_order', { ascending: true });
 
       if (error) throw error;
-      setEditablePrograms(data || []);
+
+      // Fetch funding organizations for each program
+      const programsWithFunding = await Promise.all(
+        (data || []).map(async (program) => {
+          if (program.funded_by_organization_ids && program.funded_by_organization_ids.length > 0) {
+            const { data: fundingOrgs, error: fundingError } = await supabase
+              .from('organizations')
+              .select('id, name, image_url, type')
+              .in('id', program.funded_by_organization_ids);
+            
+            if (!fundingError) {
+              program.funded_by_organizations = fundingOrgs || [];
+            }
+          } else {
+            program.funded_by_organizations = [];
+          }
+          return program;
+        })
+      );
+
+      setEditablePrograms(programsWithFunding);
     } catch (err) {
       console.error('Error fetching programs:', err);
       setError('Failed to load programs');
@@ -68,36 +90,6 @@ const EditableOrganizationPrograms = ({
   };
 
   // Enhanced status styling helpers
-  const getStatusBadge = (status) => {
-    switch (status) {
-      case 'Active':
-        return 'bg-gradient-to-r from-green-50 to-emerald-50 text-emerald-700 border border-emerald-200/50';
-      case 'Planned':
-        return 'bg-gradient-to-r from-blue-50 to-sky-50 text-sky-700 border border-sky-200/50';
-      case 'Completed':
-        return 'bg-gradient-to-r from-slate-50 to-gray-50 text-slate-700 border border-slate-200/50';
-      case 'Paused':
-        return 'bg-gradient-to-r from-amber-50 to-orange-50 text-orange-700 border border-orange-200/50';
-      default:
-        return 'bg-gradient-to-r from-slate-50 to-gray-50 text-slate-700 border border-slate-200/50';
-    }
-  };
-
-  const getStatusColorLine = (status) => {
-    switch (status) {
-      case 'Active':
-        return 'bg-gradient-to-r from-green-400 to-emerald-500';
-      case 'Planned':
-        return 'bg-gradient-to-r from-blue-400 to-sky-500';
-      case 'Completed':
-        return 'bg-gradient-to-r from-slate-400 to-gray-500';
-      case 'Paused':
-        return 'bg-gradient-to-r from-amber-400 to-orange-500';
-      default:
-        return 'bg-gradient-to-r from-slate-400 to-gray-500';
-    }
-  };
-
   const getStatusDot = (status) => {
     switch (status) {
       case 'Active':
@@ -109,7 +101,7 @@ const EditableOrganizationPrograms = ({
       case 'Paused':
         return 'bg-orange-500';
       default:
-        return 'bg-slate-500';
+        return 'bg-emerald-500';
     }
   };
 
@@ -124,7 +116,8 @@ const EditableOrganizationPrograms = ({
       start_date: '',
       end_date: '',
       status: 'Active',
-      external_url: ''
+      external_url: '',
+      funded_by_organizations: []
     });
     setEditingProgram(null);
   };
@@ -145,7 +138,8 @@ const EditableOrganizationPrograms = ({
       start_date: '2024-01-15',
       end_date: '2024-12-15',
       status: 'Active',
-      external_url: 'https://example.org/youth-leadership'
+      external_url: 'https://example.org/youth-leadership',
+      funded_by_organizations: []
     });
   };
 
@@ -168,9 +162,14 @@ const EditableOrganizationPrograms = ({
         goals: formData.goals || null,
         impact_metrics: formData.impact_metrics || null,
         external_url: formData.external_url || null,
+        status: formData.status.toLowerCase(), // Convert to lowercase for database
+        funded_by_organization_ids: formData.funded_by_organizations.map(org => org.id),
         display_order: editingProgram ? editingProgram.display_order : editablePrograms.length + 1,
         is_active: true
       };
+
+      // Remove the client-side organizations array before saving
+      delete cleanData.funded_by_organizations;
 
       let result;
       if (editingProgram) {
@@ -200,6 +199,11 @@ const EditableOrganizationPrograms = ({
   };
 
   const handleDeleteProgram = async (programId) => {
+    if (!programId) {
+      console.error('No program ID provided for deletion');
+      return;
+    }
+
     setIsLoading(true);
     try {
       const { error } = await supabase
@@ -213,7 +217,34 @@ const EditableOrganizationPrograms = ({
       setDeletingProgram(null);
     } catch (err) {
       console.error('Error deleting program:', err);
-      alert('Failed to delete program');
+      alert(`Failed to delete program: ${err.message}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDeleteFromForm = async () => {
+    if (!editingProgram?.id) return;
+    
+    if (!confirm(`Are you sure you want to delete "${editingProgram.name}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const { error } = await supabase
+        .from('organization_programs')
+        .delete()
+        .eq('id', editingProgram.id);
+
+      if (error) throw error;
+
+      await fetchPrograms();
+      setShowForm(false);
+      resetForm();
+    } catch (err) {
+      console.error('Error deleting program:', err);
+      alert(`Failed to delete program: ${err.message}`);
     } finally {
       setIsLoading(false);
     }
@@ -325,9 +356,47 @@ const EditableOrganizationPrograms = ({
               ) : (
                 // Program Card
                 <div className="bg-white/95 backdrop-blur-xl rounded-3xl border border-white/20 overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-300 relative">
-                  {/* Status indicator line */}
-                  <div className={`h-1 w-full ${getStatusColorLine(program.status)}`}></div>
                   
+                  {/* Floating Action Buttons - Outside clickable area */}
+                  <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-all duration-300 flex gap-2 z-20">
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setEditingProgram(program);
+                        setFormData({
+                          name: program.name || '',
+                          description: program.description || '',
+                          target_population: program.target_population || '',
+                          location: program.location || '',
+                          goals: program.goals || '',
+                          impact_metrics: program.impact_metrics || '',
+                          start_date: program.start_date || '',
+                          end_date: program.end_date || '',
+                          status: program.status || 'Active',
+                          external_url: program.external_url || '',
+                          funded_by_organizations: program.funded_by_organizations || []
+                        });
+                        setShowForm(true);
+                      }}
+                      className="p-2.5 bg-white/90 backdrop-blur-sm shadow-lg border border-white/40 rounded-xl hover:bg-white hover:scale-105 transition-all duration-200"
+                      title="Edit Program"
+                    >
+                      <Edit3 className="w-4 h-4 text-slate-600" />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setDeletingProgram(program.id);
+                      }}
+                      className="p-2.5 bg-white/90 backdrop-blur-sm shadow-lg border border-red-200/50 rounded-xl hover:bg-red-50 hover:scale-105 transition-all duration-200"
+                      title="Delete Program"
+                    >
+                      <Trash2 className="w-4 h-4 text-red-500" />
+                    </button>
+                  </div>
+
                   {/* Card Content */}
                   <div
                     onClick={() => openDetailModal(program)}
@@ -350,6 +419,43 @@ const EditableOrganizationPrograms = ({
                     <p className="text-slate-600 text-sm mb-6 line-clamp-3 leading-relaxed">
                       {program.description}
                     </p>
+
+                    {/* Funded By Section */}
+                    {program.funded_by_organizations && program.funded_by_organizations.length > 0 && (
+                      <div className="mb-6">
+                        <div className="flex items-center gap-2 mb-3">
+                          <Building2 className="w-4 h-4 text-slate-500" />
+                          <span className="text-sm font-medium text-slate-700">Funded By</span>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {program.funded_by_organizations.slice(0, 3).map((funder) => (
+                            <div key={funder.id} className="flex items-center gap-2 px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg">
+                              {funder.image_url ? (
+                                <img
+                                  src={funder.image_url}
+                                  alt={funder.name}
+                                  className="w-4 h-4 rounded-full object-cover"
+                                />
+                              ) : (
+                                <div className="w-4 h-4 rounded-full bg-slate-300 flex items-center justify-center">
+                                  <Building2 className="w-2 h-2 text-slate-600" />
+                                </div>
+                              )}
+                              <span className="text-xs font-medium text-slate-700 truncate max-w-20">
+                                {funder.name}
+                              </span>
+                            </div>
+                          ))}
+                          {program.funded_by_organizations.length > 3 && (
+                            <div className="px-2 py-1 bg-slate-100 border border-slate-200 rounded-lg">
+                              <span className="text-xs text-slate-600">
+                                +{program.funded_by_organizations.length - 3} more
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
                     
                     {/* Key Information Cards */}
                     <div className="grid grid-cols-1 gap-4">
@@ -425,41 +531,6 @@ const EditableOrganizationPrograms = ({
                         </div>
                       )}
                     </div>
-                  </div>
-                  
-                  {/* Floating Action Buttons */}
-                  <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-all duration-300 flex gap-2">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setEditingProgram(program);
-                        setFormData({
-                          name: program.name || '',
-                          description: program.description || '',
-                          target_population: program.target_population || '',
-                          location: program.location || '',
-                          goals: program.goals || '',
-                          impact_metrics: program.impact_metrics || '',
-                          start_date: program.start_date || '',
-                          end_date: program.end_date || '',
-                          status: program.status || 'Active',
-                          external_url: program.external_url || ''
-                        });
-                        setShowForm(true);
-                      }}
-                      className="p-2.5 bg-white/90 backdrop-blur-sm shadow-lg border border-white/40 rounded-xl hover:bg-white hover:scale-105 transition-all duration-200"
-                    >
-                      <Edit3 className="w-4 h-4 text-slate-600" />
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setDeletingProgram(program.id);
-                      }}
-                      className="p-2.5 bg-white/90 backdrop-blur-sm shadow-lg border border-red-200/50 rounded-xl hover:bg-red-50 hover:scale-105 transition-all duration-200"
-                    >
-                      <Trash2 className="w-4 h-4 text-red-500" />
-                    </button>
                   </div>
                 </div>
               )}
@@ -564,6 +635,19 @@ const EditableOrganizationPrograms = ({
                     rows={4}
                     className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 resize-none"
                     placeholder="Describe what this program does and its purpose"
+                  />
+                </div>
+
+                {/* Funded By Organizations */}
+                <div>
+                  <label className="block text-sm font-semibold text-slate-900 mb-2">
+                    Funded By
+                  </label>
+                  <OrganizationSearch
+                    selectedOrganizations={formData.funded_by_organizations}
+                    onOrganizationsChange={(orgs) => setFormData({ ...formData, funded_by_organizations: orgs })}
+                    placeholder="Search for funding organizations..."
+                    maxSelections={5}
                   />
                 </div>
 
@@ -687,26 +771,50 @@ const EditableOrganizationPrograms = ({
 
             {/* Footer */}
             <div className="p-8 border-t border-slate-200/50 bg-slate-50/30 backdrop-blur-sm">
-              <div className="flex justify-end gap-4">
-                <button
-                  onClick={() => setShowForm(false)}
-                  className="px-6 py-3 text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 hover:border-slate-300 transition-all duration-200 font-medium"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={saveProgram}
-                  disabled={isLoading || !formData.name.trim()}
-                  className="px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all duration-200 disabled:opacity-50 flex items-center gap-2 font-medium shadow-lg"
-                >
-                  {isLoading ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <>
-                      {editingProgram ? 'Update Program' : 'Create Program'}
-                    </>
+              <div className="flex justify-between items-center">
+                {/* Delete Button for Editing */}
+                <div>
+                  {editingProgram && (
+                    <button
+                      onClick={handleDeleteFromForm}
+                      disabled={isLoading}
+                      className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-xl hover:from-red-600 hover:to-red-700 transition-all duration-200 disabled:opacity-50 font-medium shadow-lg"
+                    >
+                      {isLoading ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <>
+                          <Trash2 className="w-4 h-4" />
+                          Delete Program
+                        </>
+                      )}
+                    </button>
                   )}
-                </button>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex gap-4">
+                  <button
+                    onClick={() => setShowForm(false)}
+                    disabled={isLoading}
+                    className="px-6 py-3 text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 hover:border-slate-300 transition-all duration-200 font-medium disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={saveProgram}
+                    disabled={isLoading || !formData.name.trim()}
+                    className="px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all duration-200 disabled:opacity-50 flex items-center gap-2 font-medium shadow-lg"
+                  >
+                    {isLoading ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <>
+                        {editingProgram ? 'Update Program' : 'Create Program'}
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -735,7 +843,8 @@ const EditableOrganizationPrograms = ({
               start_date: program.start_date || '',
               end_date: program.end_date || '',
               status: program.status || 'Active',
-              external_url: program.external_url || ''
+              external_url: program.external_url || '',
+              funded_by_organizations: program.funded_by_organizations || []
             });
             setShowForm(true);
           }}

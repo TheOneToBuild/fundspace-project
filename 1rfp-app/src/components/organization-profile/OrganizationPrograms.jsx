@@ -1,6 +1,6 @@
 // src/components/organization-profile/OrganizationPrograms.jsx
 import React, { useState, useEffect } from 'react';
-import { ClipboardList, MapPin, Users, Target, Calendar, ExternalLink, Plus, Edit3, Eye } from 'lucide-react';
+import { ClipboardList, MapPin, Users, Target, Calendar, ExternalLink, Plus, Edit3, Eye, Building2 } from 'lucide-react';
 import { supabase } from '../../supabaseClient.js';
 import ProgramDetailModal from './ProgramDetailModal.jsx';
 
@@ -36,7 +36,27 @@ const OrganizationPrograms = ({
         .order('display_order', { ascending: true });
 
       if (error) throw error;
-      setPrograms(data || []);
+
+      // Fetch funding organizations for each program
+      const programsWithFunding = await Promise.all(
+        (data || []).map(async (program) => {
+          if (program.funded_by_organization_ids && program.funded_by_organization_ids.length > 0) {
+            const { data: fundingOrgs, error: fundingError } = await supabase
+              .from('organizations')
+              .select('id, name, image_url, type')
+              .in('id', program.funded_by_organization_ids);
+            
+            if (!fundingError) {
+              program.funded_by_organizations = fundingOrgs || [];
+            }
+          } else {
+            program.funded_by_organizations = [];
+          }
+          return program;
+        })
+      );
+
+      setPrograms(programsWithFunding);
     } catch (err) {
       console.error('Error fetching programs:', err);
       setError('Failed to load programs');
@@ -46,36 +66,6 @@ const OrganizationPrograms = ({
   };
 
   // Enhanced status styling helpers
-  const getStatusBadge = (status) => {
-    switch (status) {
-      case 'Active':
-        return 'bg-gradient-to-r from-green-50 to-emerald-50 text-emerald-700 border border-emerald-200/50';
-      case 'Planned':
-        return 'bg-gradient-to-r from-blue-50 to-sky-50 text-sky-700 border border-sky-200/50';
-      case 'Completed':
-        return 'bg-gradient-to-r from-slate-50 to-gray-50 text-slate-700 border border-slate-200/50';
-      case 'Paused':
-        return 'bg-gradient-to-r from-amber-50 to-orange-50 text-orange-700 border border-orange-200/50';
-      default:
-        return 'bg-gradient-to-r from-slate-50 to-gray-50 text-slate-700 border border-slate-200/50';
-    }
-  };
-
-  const getStatusColorLine = (status) => {
-    switch (status) {
-      case 'Active':
-        return 'bg-gradient-to-r from-green-400 to-emerald-500';
-      case 'Planned':
-        return 'bg-gradient-to-r from-blue-400 to-sky-500';
-      case 'Completed':
-        return 'bg-gradient-to-r from-slate-400 to-gray-500';
-      case 'Paused':
-        return 'bg-gradient-to-r from-amber-400 to-orange-500';
-      default:
-        return 'bg-gradient-to-r from-slate-400 to-gray-500';
-    }
-  };
-
   const getStatusDot = (status) => {
     switch (status) {
       case 'Active':
@@ -87,7 +77,7 @@ const OrganizationPrograms = ({
       case 'Paused':
         return 'bg-orange-500';
       default:
-        return 'bg-slate-500';
+        return 'bg-emerald-500';
     }
   };
 
@@ -142,7 +132,6 @@ const OrganizationPrograms = ({
       {/* Programs Grid */}
       {programs.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {/* Redesigned Program Cards - Matching Detail Modal Style */}
           {programs.map((program) => (
             <div
               key={program.id}
@@ -151,8 +140,6 @@ const OrganizationPrograms = ({
             >
               {/* Program Card */}
               <div className="bg-white/95 backdrop-blur-xl rounded-3xl border border-white/20 overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-300 relative">
-                {/* Status indicator line */}
-                <div className={`h-1 w-full ${getStatusColorLine(program.status)}`}></div>
                 
                 {/* Card Content */}
                 <div className="p-6 relative z-10">
@@ -173,8 +160,45 @@ const OrganizationPrograms = ({
                   <p className="text-slate-600 text-sm mb-6 line-clamp-3 leading-relaxed">
                     {program.description}
                   </p>
+
+                  {/* Funded By Section */}
+                  {program.funded_by_organizations && program.funded_by_organizations.length > 0 && (
+                    <div className="mb-6">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Building2 className="w-4 h-4 text-slate-500" />
+                        <span className="text-sm font-medium text-slate-700">Funded By</span>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {program.funded_by_organizations.slice(0, 3).map((funder) => (
+                          <div key={funder.id} className="flex items-center gap-2 px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg">
+                            {funder.image_url ? (
+                              <img
+                                src={funder.image_url}
+                                alt={funder.name}
+                                className="w-4 h-4 rounded-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-4 h-4 rounded-full bg-slate-300 flex items-center justify-center">
+                                <Building2 className="w-2 h-2 text-slate-600" />
+                              </div>
+                            )}
+                            <span className="text-xs font-medium text-slate-700 truncate max-w-20">
+                              {funder.name}
+                            </span>
+                          </div>
+                        ))}
+                        {program.funded_by_organizations.length > 3 && (
+                          <div className="px-2 py-1 bg-slate-100 border border-slate-200 rounded-lg">
+                            <span className="text-xs text-slate-600">
+                              +{program.funded_by_organizations.length - 3} more
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                   
-                  {/* Key Information Cards - Matching Detail Modal Grid */}
+                  {/* Key Information Cards */}
                   <div className="grid grid-cols-1 gap-4">
                     {/* Target Population */}
                     {program.target_population && (

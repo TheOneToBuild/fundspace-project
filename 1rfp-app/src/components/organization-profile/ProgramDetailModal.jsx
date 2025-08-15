@@ -2,8 +2,8 @@
 import React, { useState } from 'react';
 import { 
   X, ExternalLink, MapPin, Calendar, Users, Target, Info, 
-  FileText, Award, Sparkles, ChevronRight, ClipboardList,
-  TrendingUp, Clock, CheckCircle, AlertCircle, Edit3
+  FileText, Award, ChevronRight, ClipboardList,
+  TrendingUp, Clock, CheckCircle, AlertCircle, Edit3, Building2
 } from 'lucide-react';
 
 const ProgramDetailModal = ({ program, isOpen, onClose, onEdit, canEdit = false }) => {
@@ -62,6 +62,39 @@ const ProgramDetailModal = ({ program, isOpen, onClose, onEdit, canEdit = false 
                   {program.description}
                 </p>
               )}
+
+              {/* Funded By Section in Header */}
+              {program.funded_by_organizations && program.funded_by_organizations.length > 0 && (
+                <div className="mt-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Building2 className="w-4 h-4 text-slate-500" />
+                    <span className="text-sm font-medium text-slate-700">Funded By</span>
+                  </div>
+                  <div className="flex flex-wrap gap-3">
+                    {program.funded_by_organizations.map((funder) => (
+                      <div key={funder.id} className="flex items-center gap-2 px-3 py-2 bg-white/60 border border-slate-200/50 rounded-xl backdrop-blur-sm">
+                        {funder.image_url ? (
+                          <img
+                            src={funder.image_url}
+                            alt={funder.name}
+                            className="w-6 h-6 rounded-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-6 h-6 rounded-full bg-slate-300 flex items-center justify-center">
+                            <Building2 className="w-3 h-3 text-slate-600" />
+                          </div>
+                        )}
+                        <span className="text-sm font-medium text-slate-800">
+                          {funder.name}
+                        </span>
+                        <span className="text-xs text-slate-500 capitalize">
+                          {funder.type}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
             
             <button 
@@ -74,14 +107,27 @@ const ProgramDetailModal = ({ program, isOpen, onClose, onEdit, canEdit = false 
           </div>
         </div>
 
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto p-8">
-          <div className="space-y-8">
+        {/* Content - Single page layout, no scrolling */}
+        <div className="flex-1 p-8 overflow-hidden">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 h-full">
             
-            {/* Key Information Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Left Column - Goals, Target Population, and Location */}
+            <div className="space-y-4">
               
-              {/* Target Population */}
+              {/* Goals Section - Top left */}
+              {program.goals && (
+                <div className="bg-gradient-to-br from-slate-50/50 to-gray-50/30 rounded-2xl p-6 border border-slate-100/50 backdrop-blur-sm">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center">
+                      <Target size={20} className="text-slate-600" />
+                    </div>
+                    <h3 className="font-semibold text-slate-900">Goals & Objectives</h3>
+                  </div>
+                  <p className="text-slate-700 leading-relaxed">{program.goals}</p>
+                </div>
+              )}
+
+              {/* Target Population - Under Goals */}
               {program.target_population && (
                 <div className="bg-gradient-to-br from-purple-50/50 to-indigo-50/30 rounded-2xl p-6 border border-purple-100/50 backdrop-blur-sm">
                   <div className="flex items-center gap-3 mb-3">
@@ -94,7 +140,7 @@ const ProgramDetailModal = ({ program, isOpen, onClose, onEdit, canEdit = false 
                 </div>
               )}
 
-              {/* Location */}
+              {/* Location - Bottom left */}
               {program.location && (
                 <div className="bg-gradient-to-br from-blue-50/50 to-cyan-50/30 rounded-2xl p-6 border border-blue-100/50 backdrop-blur-sm">
                   <div className="flex items-center gap-3 mb-3">
@@ -106,8 +152,25 @@ const ProgramDetailModal = ({ program, isOpen, onClose, onEdit, canEdit = false 
                   <p className="text-slate-700">{program.location}</p>
                 </div>
               )}
+            </div>
 
-              {/* Duration */}
+            {/* Right Column - Impact and Duration */}
+            <div className="space-y-4">
+              
+              {/* Impact Metrics - Top right */}
+              {program.impact_metrics && (
+                <div className="bg-gradient-to-br from-amber-50/50 to-orange-50/30 rounded-2xl p-6 border border-amber-100/50 backdrop-blur-sm">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center">
+                      <TrendingUp size={20} className="text-amber-600" />
+                    </div>
+                    <h3 className="font-semibold text-slate-900">Impact Metrics</h3>
+                  </div>
+                  <p className="text-slate-700 leading-relaxed">{program.impact_metrics}</p>
+                </div>
+              )}
+
+              {/* Duration - Bottom right */}
               {(program.start_date || program.end_date) && (
                 <div className="bg-gradient-to-br from-emerald-50/50 to-teal-50/30 rounded-2xl p-6 border border-emerald-100/50 backdrop-blur-sm">
                   <div className="flex items-center gap-3 mb-3">
@@ -131,69 +194,6 @@ const ProgramDetailModal = ({ program, isOpen, onClose, onEdit, canEdit = false 
                   </p>
                 </div>
               )}
-
-              {/* Impact */}
-              {program.impact_metrics && (
-                <div className="bg-gradient-to-br from-amber-50/50 to-orange-50/30 rounded-2xl p-6 border border-amber-100/50 backdrop-blur-sm">
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center">
-                      <TrendingUp size={20} className="text-amber-600" />
-                    </div>
-                    <h3 className="font-semibold text-slate-900">Impact Metrics</h3>
-                  </div>
-                  <p className="text-slate-700 leading-relaxed">{program.impact_metrics}</p>
-                </div>
-              )}
-            </div>
-
-            {/* Goals Section */}
-            {program.goals && (
-              <div className="bg-gradient-to-br from-slate-50/50 to-gray-50/30 rounded-2xl p-8 border border-slate-100/50 backdrop-blur-sm">
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center">
-                    <Target size={24} className="text-slate-600" />
-                  </div>
-                  <h3 className="text-xl font-semibold text-slate-900">Goals & Objectives</h3>
-                </div>
-                <div className="bg-white/60 rounded-xl p-6 border border-slate-200/50">
-                  <p className="text-slate-700 leading-relaxed whitespace-pre-line text-lg">
-                    {program.goals}
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {/* Program Highlights */}
-            <div className="bg-gradient-to-br from-indigo-50/30 via-purple-50/20 to-pink-50/30 rounded-2xl p-8 border border-indigo-100/30 backdrop-blur-sm">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center">
-                  <Sparkles size={24} className="text-indigo-600" />
-                </div>
-                <h3 className="text-xl font-semibold text-slate-900">Program Features</h3>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="text-center p-6 bg-white/40 rounded-xl border border-white/60">
-                  <div className="w-12 h-12 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                    <Users size={20} className="text-indigo-600" />
-                  </div>
-                  <p className="font-semibold text-slate-900">Community</p>
-                  <p className="text-sm text-slate-600 mt-1">Focused</p>
-                </div>
-                <div className="text-center p-6 bg-white/40 rounded-xl border border-white/60">
-                  <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                    <Target size={20} className="text-purple-600" />
-                  </div>
-                  <p className="font-semibold text-slate-900">Impact</p>
-                  <p className="text-sm text-slate-600 mt-1">Driven</p>
-                </div>
-                <div className="text-center p-6 bg-white/40 rounded-xl border border-white/60">
-                  <div className="w-12 h-12 bg-pink-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                    <TrendingUp size={20} className="text-pink-600" />
-                  </div>
-                  <p className="font-semibold text-slate-900">Results</p>
-                  <p className="text-sm text-slate-600 mt-1">Oriented</p>
-                </div>
-              </div>
             </div>
           </div>
         </div>
