@@ -1,4 +1,4 @@
-// src/pages/OrganizationProfilePage.jsx - Refactored for Real-Time State Updates
+// src/pages/OrganizationProfilePage.jsx - Refactored for Real-Time State Updates with Programs Tab
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../supabaseClient.js';
@@ -16,6 +16,8 @@ import EditableOrganizationPhotos from '../components/organization-profile/Edita
 import OrganizationNorthStar from '../components/organization-profile/OrganizationNorthStar.jsx';
 import OrganizationPhotos from '../components/organization-profile/OrganizationPhotos.jsx';
 import OrganizationGrantsFixed from '../components/organization-profile/OrganizationGrantsFixed.jsx';
+import OrganizationPrograms from '../components/organization-profile/OrganizationPrograms.jsx';
+import EditableOrganizationPrograms from '../components/organization-profile/EditableOrganizationPrograms.jsx';
 
 // Hooks and Utilities
 import { useOrganizationSocial } from '../hooks/useOrganizationSocial.js';
@@ -25,18 +27,21 @@ const ORG_TYPE_CONFIGS = {
   foundation: {
     headerStyle: 'foundation',
     showNorthStar: true,
+    showPrograms: true,
     showPhotos: true,
     primaryGradient: 'from-purple-500 to-indigo-600'
   },
   nonprofit: {
     headerStyle: 'nonprofit',
     showNorthStar: true,
+    showPrograms: true,
     showPhotos: true,
     primaryGradient: 'from-green-500 to-emerald-600'
   },
   default: {
     headerStyle: 'default',
     showNorthStar: true,
+    showPrograms: true,
     showPhotos: true,
     primaryGradient: 'from-slate-500 to-slate-600'
   }
@@ -51,7 +56,6 @@ const PlaceholderContent = ({ contentType, organizationType }) => (
     </p>
   </div>
 );
-
 
 const OrganizationProfilePage = () => {
   const { slug } = useParams();
@@ -70,6 +74,7 @@ const OrganizationProfilePage = () => {
   const [userMembership, setUserMembership] = useState(null);
   const [photos, setPhotos] = useState([]);
   const [hasGrants, setHasGrants] = useState(false);
+  const [hasPrograms, setHasPrograms] = useState(false);
 
   const orgConfig = ORG_TYPE_CONFIGS[organization?.type] || ORG_TYPE_CONFIGS.default;
 
@@ -151,8 +156,12 @@ const OrganizationProfilePage = () => {
         const { data: teamData } = await supabase.from('organization_memberships').select('*, profiles(*)').eq('organization_id', organization.id).eq('is_public', true);
         setTeamMembers(teamData || []);
 
-        const { count } = await supabase.from('grants').select('*', { count: 'exact', head: true }).eq('organization_id', organization.id);
-        setHasGrants(count > 0);
+        const { count: grantsCount } = await supabase.from('grants').select('*', { count: 'exact', head: true }).eq('organization_id', organization.id);
+        setHasGrants(grantsCount > 0);
+
+        // Check for programs
+        const { count: programsCount } = await supabase.from('organization_programs').select('*', { count: 'exact', head: true }).eq('organization_id', organization.id).eq('is_active', true);
+        setHasPrograms(programsCount > 0);
     };
 
     checkUserMembership();
@@ -164,6 +173,7 @@ const OrganizationProfilePage = () => {
   const getTabConfiguration = () => {
     const baseTabs = [{ id: 'home', label: 'Home', icon: 'Globe' }];
     if (orgConfig.showNorthStar) baseTabs.push({ id: 'northstar', label: 'North Star', icon: 'Target' });
+    if (orgConfig.showPrograms) baseTabs.push({ id: 'programs', label: 'Programs', icon: 'ClipboardList' });
     if (orgConfig.showPhotos) baseTabs.push({ id: 'photos', label: 'Photos', icon: 'Camera' });
     baseTabs.push({ id: 'team', label: 'Team', icon: 'Users' });
     if (hasGrants) baseTabs.push({ id: 'grants', label: 'Grants', icon: 'DollarSign' });
@@ -188,6 +198,7 @@ const OrganizationProfilePage = () => {
       case 'home': return isEditMode ? <EditableOrganizationHome {...props} /> : <OrganizationHome {...props} />;
       case 'team': return <OrganizationTeam {...props} />;
       case 'northstar': return <OrganizationNorthStar {...props} isEditMode={isEditMode} />;
+      case 'programs': return isEditMode ? <EditableOrganizationPrograms {...props} /> : <OrganizationPrograms {...props} isEditMode={isEditMode} />;
       case 'photos': return isEditMode ? <EditableOrganizationPhotos {...props} /> : <OrganizationPhotos {...props} />;
       case 'grants': return hasGrants ? <OrganizationGrantsFixed {...props} /> : <PlaceholderContent contentType="Grants" />;
       default: return <PlaceholderContent contentType={activeTab} />;
