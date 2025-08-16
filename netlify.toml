@@ -5,7 +5,7 @@
   publish = "dist"
 
 [functions]
-  directory = "fundspace-app/netlify/functions"
+  directory = "netlify/functions"  # ✅ CORRECT: relative to base directory
   external_node_modules = ["@google/generative-ai", "rss-parser", "@supabase/supabase-js"]
   node_bundler = "esbuild"
 
