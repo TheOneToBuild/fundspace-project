@@ -5,7 +5,7 @@ import { isPlatformAdmin } from '../utils/permissions.js';
 import { getOrganizationForProfileNav } from '../utils/membershipQueries.js';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-    Home, Users, LayoutDashboard, BarChart2, FileText, Building, Bookmark, Bell, Settings, Search, ChevronsRight, Crown, Briefcase, Handshake, Globe
+    Home, Users, LayoutDashboard, BarChart2, FileText, Building, Bookmark, Bell, Settings, Search, ChevronsRight, Crown, Briefcase, Handshake, Globe, UserCircle, ExternalLink
 } from 'lucide-react';
 
 // Main Component
@@ -160,23 +160,23 @@ export default function ProfileNav() {
         };
     }, [profile?.id, fetchProfileStats, fetchOrganizationData, checkOrganizationAccess]);
 
-    // --- NAVIGATION STRUCTURE ---
+    // --- NAVIGATION STRUCTURE - FIXED: Flattened to remove spacing ---
     const navItems = [
         {
             section: 'Community',
             links: [
-                { icon: <Home size={20} />, text: "Dashboard", to: "/profile" },                           // NEW: Main dashboard
-                                { icon: <FileText size={20} />, text: "Grants Portal", to: "/profile/grants-portal", hide: !isOmegaAdmin && !hasOrganizationAccess },
-
-                { icon: <Globe size={20} />, text: "Hello World", to: "/profile/hello-world" },          // UPDATED: Moved HelloWorld
+                { icon: <Home size={20} />, text: "Dashboard", to: "/profile" },
+                { icon: <FileText size={20} />, text: "Grants Portal", to: "/profile/grants-portal", hide: !isOmegaAdmin && !hasOrganizationAccess },
+                { icon: <Globe size={20} />, text: "Hello World", to: "/profile/hello-world" },
                 { icon: <Handshake size={20} />, text: "Hello Community", to: "/profile/hello-community" },
                 { icon: <Search size={20} />, text: "Discover People", to: "/profile/members" },
+                // MOVED: My Connections moved here to eliminate spacing
+                { icon: <Users size={20} />, text: "My Connections", to: "/profile/connections", badge: stats.connectionsCount },
             ]
         },
         {
             section: 'Profile',
             links: [
-                { icon: <Users size={20} />, text: "My Connections", to: "/profile/connections", badge: stats.connectionsCount },
                 { icon: <Briefcase size={20} />, text: "My Organization", to: "/profile/my-organization", hide: isOmegaAdmin },
                 { icon: <Bell size={20} />, text: "Notifications", to: "/profile/notifications" },
                 { icon: <Settings size={20} />, text: "Settings", to: "/profile/settings" },
@@ -193,6 +193,14 @@ export default function ProfileNav() {
             ]
         }
     ];
+
+    // Handle user profile page navigation - navigate to how others see their profile
+    const handleUserProfileClick = () => {
+        if (profile?.id) {
+            // Navigate to the user's member profile page (how others see them)
+            navigate(`/profile/members/${profile.id}`);
+        }
+    };
 
     return (
         <motion.aside
@@ -260,8 +268,8 @@ export default function ProfileNav() {
                 )}
             </AnimatePresence>
 
-            {/* Navigation */}
-            <nav className="flex-1 px-3 py-4 space-y-4 overflow-y-auto">
+            {/* Navigation - FIXED: Reduced spacing between sections */}
+            <nav className="flex-1 px-3 py-4 space-y-2 overflow-y-auto">
                 {navItems.map((section, sIndex) => (
                     !section.hide && (
                         <div key={sIndex}>
@@ -286,6 +294,43 @@ export default function ProfileNav() {
                     )
                 ))}
             </nav>
+
+            {/* User Profile Page Link - Fixed at bottom */}
+            <div className="p-3 border-t border-slate-200">
+                <button
+                    onClick={handleUserProfileClick}
+                    className="group relative flex items-center justify-start w-full h-10 px-3 rounded-lg cursor-pointer transition-colors text-slate-600 hover:bg-blue-50 hover:text-blue-600"
+                    title={!isExpanded ? 'View My Public Profile' : ''}
+                >
+                    <div className="flex items-center justify-center w-5 h-5 flex-shrink-0">
+                        <UserCircle size={20} />
+                    </div>
+                    <AnimatePresence>
+                        {isExpanded && (
+                            <motion.span
+                                initial={{ opacity: 0, x: -10 }}
+                                animate={{ opacity: 1, x: 0, transition: { delay: 0.2, duration: 0.2 } }}
+                                exit={{ opacity: 0, x: -10, transition: { duration: 0.1 } }}
+                                className="ml-3 font-medium text-sm overflow-hidden whitespace-nowrap"
+                            >
+                                View My Profile
+                            </motion.span>
+                        )}
+                    </AnimatePresence>
+                    <AnimatePresence>
+                        {isExpanded && (
+                            <motion.div
+                                initial={{ opacity: 0, scale: 0 }}
+                                animate={{ opacity: 1, scale: 1, transition: { delay: 0.3 } }}
+                                exit={{ opacity: 0, scale: 0, transition: { duration: 0.1 } }}
+                                className="ml-auto opacity-50 group-hover:opacity-100 transition-opacity"
+                            >
+                                <ExternalLink size={14} />
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+                </button>
+            </div>
         </motion.aside>
     );
 }

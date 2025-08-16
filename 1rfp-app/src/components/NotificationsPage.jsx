@@ -1,4 +1,4 @@
-// src/components/NotificationsPage.jsx - Updated with connection notifications support
+// src/components/NotificationsPage.jsx - Updated with expanded layout and fixed JSX
 import React, { useState, useEffect } from 'react';
 import { useOutletContext, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
@@ -80,7 +80,7 @@ const NotificationIcon = ({ type, actor }) => {
 const NotificationItem = ({ notification, onViewPost, onMarkAsRead, onDelete, currentUserId, onRefresh }) => {
     const navigate = useNavigate();
     const [actionLoading, setActionLoading] = useState(false);
-    const [localConnectionStatus, setLocalConnectionStatus] = useState(null); // Track local status changes
+    const [localConnectionStatus, setLocalConnectionStatus] = useState(null);
     
     const { 
         actor_id: actor, 
@@ -113,7 +113,6 @@ const NotificationItem = ({ notification, onViewPost, onMarkAsRead, onDelete, cu
             case 'new_follower':
                 return <><strong className="font-semibold text-slate-900">{actor.full_name}</strong> started following you.</>;
             case 'connection_request':
-                // Show different text based on current connection status
                 if (localConnectionStatus === 'accepted') {
                     return <><strong className="font-semibold text-slate-900">{actor.full_name}</strong> is now connected with you.</>;
                 }
@@ -140,9 +139,7 @@ const NotificationItem = ({ notification, onViewPost, onMarkAsRead, onDelete, cu
         try {
             const result = await acceptConnectionRequest(currentUserId, actor.id);
             if (result.success) {
-                // Update local status immediately
                 setLocalConnectionStatus('accepted');
-                // Mark notification as read and refresh
                 await onMarkAsRead(notification.id);
                 if (onRefresh) onRefresh();
             } else {
@@ -162,7 +159,6 @@ const NotificationItem = ({ notification, onViewPost, onMarkAsRead, onDelete, cu
         try {
             const result = await declineConnectionRequest(currentUserId, actor.id);
             if (result.success) {
-                // Remove this notification
                 await onDelete(notification.id);
                 if (onRefresh) onRefresh();
             } else {
@@ -175,32 +171,22 @@ const NotificationItem = ({ notification, onViewPost, onMarkAsRead, onDelete, cu
         }
     };
 
-    // Function to get organization details and navigate to org profile
     const getOrganizationDetailsAndNavigate = async (orgPostId) => {
         try {
-            console.log('🔍 Fetching organization details for post ID:', orgPostId);
-            
-            // Query the organization_posts table to get org info
             const { data: orgPost, error } = await supabase
                 .from('organization_posts')
                 .select('organization_id, organization_type')
                 .eq('id', orgPostId)
                 .single();
 
-            if (error) {
-                console.error('❌ Error fetching organization post:', error);
-                return false;
-            }
-
-            if (!orgPost) {
-                console.error('❌ Organization post not found');
+            if (error || !orgPost) {
+                console.error('Error fetching organization post:', error);
                 return false;
             }
 
             const { organization_id, organization_type } = orgPost;
-            
-            // Query the appropriate organization table for the slug
             const tableName = organization_type === 'nonprofit' ? 'nonprofits' : 'funders';
+            
             const { data: orgData, error: orgError } = await supabase
                 .from(tableName)
                 .select('slug, name')
@@ -208,18 +194,14 @@ const NotificationItem = ({ notification, onViewPost, onMarkAsRead, onDelete, cu
                 .single();
 
             if (orgError || !orgData?.slug) {
-                console.error(`❌ Error fetching ${organization_type} details:`, orgError);
+                console.error(`Error fetching ${organization_type} details:`, orgError);
                 return false;
             }
 
-            // Navigate to the organization profile page
-            const orgPath = `/organizations/${orgData.slug}`;
-            
-            console.log('🎯 Navigating to organization:', orgPath);
-            navigate(orgPath);
+            navigate(`/organizations/${orgData.slug}`);
             return true;
         } catch (error) {
-            console.error('💥 Error in getOrganizationDetailsAndNavigate:', error);
+            console.error('Error in getOrganizationDetailsAndNavigate:', error);
             return false;
         }
     };
@@ -228,13 +210,9 @@ const NotificationItem = ({ notification, onViewPost, onMarkAsRead, onDelete, cu
         e.stopPropagation();
         
         if (organization_post_id) {
-            console.log('🏢 Viewing organization post:', organization_post_id);
             getOrganizationDetailsAndNavigate(organization_post_id);
         } else if (post_id) {
-            console.log('👤 Viewing user post:', post_id);
             navigate('/profile');
-            
-            // Small delay to ensure navigation completes, then highlight the post
             setTimeout(() => {
                 if (onViewPost) {
                     onViewPost(post_id);
@@ -244,44 +222,23 @@ const NotificationItem = ({ notification, onViewPost, onMarkAsRead, onDelete, cu
     };
 
     const handleNotificationClick = () => {
-        console.log('📱 Notification clicked:', { 
-            type, 
-            post_id, 
-            organization_post_id,
-            actor: actor?.full_name,
-            actorId: actor?.id 
-        });
-        
-        // Mark notification as read when clicked
         if (!is_read) {
             onMarkAsRead(notification.id);
         }
         
-        // Handle different notification types
         if (type === 'new_follower' || type === 'connection_request' || type === 'connection_accepted') {
-            // For people-related notifications, navigate to the person's profile
-            console.log('👥 User notification - navigating to user profile:', actor?.id);
-            const profileUrl = `/profile/members/${actor.id}`;
-            console.log('🔗 Navigating to:', profileUrl);
-            navigate(profileUrl);
+            navigate(`/profile/members/${actor.id}`);
         } else if (organization_post_id) {
-            console.log('🏢 Organization post notification - navigating to org profile');
             getOrganizationDetailsAndNavigate(organization_post_id);
         } else if (post_id) {
-            console.log('👤 Regular post notification - navigating to user profile');
-            // For regular post-related notifications, navigate to profile and highlight post
             navigate('/profile');
-            
             setTimeout(() => {
                 if (onViewPost) {
                     onViewPost(post_id);
                 }
             }, 100);
         } else {
-            // For other notifications (like mentions without posts), go to actor's profile
-            const profileUrl = `/profile/members/${actor.id}`;
-            console.log('🔗 Fallback navigation to:', profileUrl);
-            navigate(profileUrl);
+            navigate(`/profile/members/${actor.id}`);
         }
     };
 
@@ -342,9 +299,7 @@ const NotificationItem = ({ notification, onViewPost, onMarkAsRead, onDelete, cu
                     </div>
                 </div>
                 
-                {/* Action buttons */}
                 <div className="flex flex-wrap gap-2 mt-3">
-                    {/* Connection request actions - only show if not already connected */}
                     {type === 'connection_request' && localConnectionStatus !== 'accepted' && (
                         <>
                             <button 
@@ -364,14 +319,12 @@ const NotificationItem = ({ notification, onViewPost, onMarkAsRead, onDelete, cu
                         </>
                     )}
                     
-                    {/* Show "Connected" status for accepted connections */}
                     {type === 'connection_request' && localConnectionStatus === 'accepted' && (
                         <div className="text-xs bg-green-100 text-green-700 px-3 py-1.5 rounded-full font-medium border border-green-200">
                             ✓ Connected
                         </div>
                     )}
                     
-                    {/* Show "View Post" button only for post-related notifications */}
                     {(post_id || organization_post_id) && (
                         <button 
                             onClick={handleViewPost}
@@ -381,7 +334,6 @@ const NotificationItem = ({ notification, onViewPost, onMarkAsRead, onDelete, cu
                         </button>
                     )}
                     
-                    {/* Show "View Profile" button for people-related notifications */}
                     {(type === 'new_follower' || type === 'connection_request' || type === 'connection_accepted') && (
                         <button 
                             onClick={(e) => {
@@ -403,8 +355,8 @@ export default function NotificationsPage() {
     const { session, profile, handleViewPost } = useOutletContext();
     const [notifications, setNotifications] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [filter, setFilter] = useState('all'); // all, unread, read, connections
-    const [sortBy, setSortBy] = useState('newest'); // newest, oldest
+    const [filter, setFilter] = useState('all');
+    const [sortBy, setSortBy] = useState('newest');
 
     useEffect(() => {
         if (session?.user?.id) {
@@ -424,7 +376,6 @@ export default function NotificationsPage() {
                 `)
                 .eq('user_id', session.user.id);
 
-            // Apply filter
             if (filter === 'unread') {
                 query = query.eq('is_read', false);
             } else if (filter === 'read') {
@@ -433,12 +384,8 @@ export default function NotificationsPage() {
                 query = query.in('type', ['connection_request', 'connection_accepted', 'connection_declined']);
             }
 
-            // Apply sorting
             const ascending = sortBy === 'oldest';
-            query = query.order('created_at', { ascending });
-
-            // Limit to last 100 notifications
-            query = query.limit(100);
+            query = query.order('created_at', { ascending }).limit(100);
 
             const { data, error } = await query;
 
@@ -467,7 +414,6 @@ export default function NotificationsPage() {
                 return;
             }
 
-            // Update local state
             setNotifications(current =>
                 current.map(notification =>
                     notification.id === notificationId
@@ -495,7 +441,6 @@ export default function NotificationsPage() {
                 return;
             }
 
-            // Update local state
             setNotifications(current =>
                 current.map(notification => ({ ...notification, is_read: true }))
             );
@@ -516,7 +461,6 @@ export default function NotificationsPage() {
                 return;
             }
 
-            // Update local state
             setNotifications(current =>
                 current.filter(notification => notification.id !== notificationId)
             );
@@ -553,7 +497,7 @@ export default function NotificationsPage() {
 
     if (loading) {
         return (
-            <div className="max-w-4xl mx-auto p-6">
+            <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-8">
                     <div className="animate-pulse space-y-4">
                         <div className="h-8 bg-slate-200 rounded w-1/3"></div>
@@ -575,7 +519,7 @@ export default function NotificationsPage() {
     }
 
     return (
-        <div className="max-w-4xl mx-auto p-6">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
             {/* Header */}
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
                 <div className="flex items-center justify-between mb-4">

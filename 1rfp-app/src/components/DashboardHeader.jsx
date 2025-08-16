@@ -1,209 +1,137 @@
 // src/components/DashboardHeader.jsx
 import React, { useState, useEffect, useRef } from 'react';
-import { Link, NavLink } from 'react-router-dom';
-import NotificationsPanel from './NotificationsPanel';
-import UserMenu from './UserMenu.jsx';
-import GlobalSearch from './GlobalSearch'; // Import the new search component
+import { Link } from 'react-router-dom';
+import { Menu, X, PlusCircle, Bell, User, ChevronDown } from 'lucide-react';
+import GlobalSearch from './GlobalSearch.jsx';
 import headerLogoImage from '../assets/1rfp-logo.png';
-import { Search, PlusCircle, Home, Building, ClipboardList, Bell, Menu, X, Users } from './Icons';
 
-const HeaderNavLink = ({ to, children, Icon, mobile = false, onClick }) => {
-    const navLinkClass = ({ isActive }) => mobile 
-        ? `flex items-center space-x-3 w-full px-4 py-3 text-left transition-colors duration-200 ${
-            isActive 
-                ? 'text-blue-600 bg-blue-50 border-r-2 border-blue-600' 
-                : 'text-slate-700 hover:text-blue-600 hover:bg-slate-50'
-        }`
-        : `flex flex-col items-center space-y-1 w-24 h-full justify-center transition-colors duration-200 border-b-2 ${
-            isActive
-                ? 'text-blue-600 border-blue-600'
-                : 'text-slate-500 border-transparent hover:text-slate-800 hover:bg-slate-100'
-        }`;
-    
-    return (
-        <NavLink to={to} end className={navLinkClass} onClick={onClick}>
-            <Icon className={mobile ? "h-5 w-5" : "h-6 w-6"} />
-            <span className={mobile ? "font-medium" : "text-xs font-medium"}>{children}</span>
-        </NavLink>
-    );
-};
-
-export default function DashboardHeader({ 
-    profile, 
-    notifications, 
-    unreadCount, 
-    onPanelToggle,
-    onClearAllNotifications,
-    onViewPost 
-}) {
-    const [isPanelOpen, setIsPanelOpen] = useState(false);
+export default function DashboardHeader({ profile }) {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-    const panelRef = useRef(null);
     const mobileMenuRef = useRef(null);
 
-    const handlePanelToggle = () => {
-        if (!isPanelOpen && unreadCount > 0) {
-            onPanelToggle();
-        }
-        setIsPanelOpen(!isPanelOpen);
-    };
+    const toggleMobileMenu = () => setIsMobileMenuOpen(!isMobileMenuOpen);
+    const closeMobileMenu = () => setIsMobileMenuOpen(false);
 
-    const closeMobileMenu = () => {
-        setIsMobileMenuOpen(false);
-    };
-
-    const closeNotificationsPanel = () => {
-        setIsPanelOpen(false);
-    };
-    
+    // Close mobile menu when clicking outside
     useEffect(() => {
-        function handleClickOutside(event) {
-            if (panelRef.current && !panelRef.current.contains(event.target)) {
-                setIsPanelOpen(false);
-            }
+        const handleClickOutside = (event) => {
             if (mobileMenuRef.current && !mobileMenuRef.current.contains(event.target)) {
-                setIsMobileMenuOpen(false);
+                closeMobileMenu();
             }
-        }
-        document.addEventListener("mousedown", handleClickOutside);
-        return () => document.removeEventListener("mousedown", handleClickOutside);
-    }, []);
+        };
 
-    // Prevent body scroll when mobile menu is open
-    useEffect(() => {
         if (isMobileMenuOpen) {
-            document.body.style.overflow = 'hidden';
-        } else {
-            document.body.style.overflow = 'unset';
+            document.addEventListener('mousedown', handleClickOutside);
         }
-        return () => { document.body.style.overflow = 'unset'; };
+
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
     }, [isMobileMenuOpen]);
 
     return (
         <>
-            <header className="bg-white/90 backdrop-blur-lg sticky top-0 z-40 border-b border-slate-200">
-                <div className="container mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
-                    <div className="flex justify-between items-center h-16">
-                        {/* Left side - Logo and Desktop Search */}
-                        <div className="flex items-center space-x-3 sm:space-x-6 flex-1">
-                            <Link to="/profile" aria-label="1RFP Home">
-                                <img src={headerLogoImage} alt="1RFP Logo" className="h-10 sm:h-12 w-auto" />
-                            </Link>
-                            
-                            {/* Desktop Search */}
-                            <div className="relative hidden lg:block">
+            <header className="bg-white shadow-sm sticky top-0 z-50 border-b border-slate-200">
+                <div className="container mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+                    {/* Left side - Logo */}
+                    <div className="flex items-center">
+                        <Link to="/profile" aria-label="1RFP Home">
+                            <img src={headerLogoImage} alt="1RFP Logo" className="h-10 sm:h-12 w-auto" />
+                        </Link>
+                    </div>
+
+                    {/* Center - Extended Search Bar */}
+                    <div className="flex-1 max-w-5xl mx-8 hidden md:block">
+                        <div className="flex justify-center">
+                            <div className="w-full max-w-4xl">
                                 <GlobalSearch />
                             </div>
                         </div>
-
-                        {/* Desktop Navigation */}
-                        <nav className="hidden md:flex items-center justify-center h-full">
-                            <HeaderNavLink to="/profile" Icon={Home}>Dashboard</HeaderNavLink>
-                            <HeaderNavLink to="/profile/grants" Icon={ClipboardList}>Grants</HeaderNavLink>
-                            <HeaderNavLink to="/profile/organizations" Icon={Building}>Organizations</HeaderNavLink>
-                            <HeaderNavLink to="/profile/members" Icon={Users}>Members</HeaderNavLink>
-                        </nav>
-
-                        {/* Right side - Actions and Profile */}
-                        <div className="flex items-center space-x-1 sm:space-x-2 md:space-x-4 flex-1 justify-end">
-                            {/* Mobile Search Button - This can be removed or adapted if the mobile search bar below is sufficient */}
-                            <div className="lg:hidden">
-                                {/* The mobile search bar is now below, this can be a trigger if we want to hide it initially */}
-                            </div>
-
-                            {/* Submit Grant Button - Hidden on smallest screens */}
-                            <Link 
-                                to="/submit-grant" 
-                                className="hidden sm:inline-flex items-center justify-center px-3 md:px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 shadow-sm transition-colors"
-                            >
-                                <PlusCircle size={16} className="mr-1 md:mr-2" />
-                                <span className="hidden md:inline">Submit Grant</span>
-                                <span className="md:hidden">Submit</span>
-                            </Link>
-
-                            {/* Notifications */}
-                            <div className="relative" ref={panelRef}>
-                                <button 
-                                    onClick={handlePanelToggle} 
-                                    className="p-2 sm:p-2.5 rounded-full hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors"
-                                >
-                                    <Bell size={20} />
-                                    {unreadCount > 0 && (
-                                        <span className="absolute top-1 right-1 block h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-white"></span>
-                                    )}
-                                </button>
-                                {isPanelOpen && (
-                                    <NotificationsPanel 
-                                        notifications={notifications} 
-                                        onClose={closeNotificationsPanel}
-                                        onViewPost={onViewPost}
-                                        onClearAll={onClearAllNotifications}
-                                    />
-                                )}
-                            </div>
-                            
-                            {/* User Menu */}
-                            <UserMenu profile={profile} />
-
-                            {/* Mobile Menu Button */}
-                            <button 
-                                onClick={() => setIsMobileMenuOpen(true)}
-                                className="md:hidden p-2 rounded-md text-slate-600 hover:bg-slate-100 transition-colors"
-                                aria-label="Open menu"
-                            >
-                                <Menu size={22} />
-                            </button>
-                        </div>
                     </div>
 
-                    {/* Mobile Search Bar */}
-                    <div className="lg:hidden border-t border-slate-200 bg-white px-4 py-3">
-                        <GlobalSearch mobile={true} />
+                    {/* Right side - Actions and Profile */}
+                    <div className="flex items-center space-x-2 md:space-x-4">
+                        {/* Submit Grant Button */}
+                        <Link 
+                            to="/submit-grant" 
+                            className="inline-flex items-center justify-center px-3 md:px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 transition-colors"
+                        >
+                            <PlusCircle size={16} className="mr-1 md:mr-2" />
+                            <span className="hidden sm:inline">Submit Grant</span>
+                            <span className="sm:hidden">Submit</span>
+                        </Link>
+
+                        {/* Notifications */}
+                        <Link 
+                            to="/profile/notifications"
+                            className="p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors relative"
+                            aria-label="Notifications"
+                        >
+                            <Bell size={20} />
+                            {/* You can add notification badge here if needed */}
+                        </Link>
+
+                        {/* Profile Dropdown */}
+                        <Link 
+                            to="/profile/settings"
+                            className="flex items-center space-x-2 p-1 hover:bg-slate-100 rounded-lg transition-colors"
+                            aria-label="Profile Settings"
+                        >
+                            {profile?.avatar_url ? (
+                                <img 
+                                    src={profile.avatar_url} 
+                                    alt={profile.display_name || 'Profile'} 
+                                    className="w-8 h-8 rounded-full object-cover"
+                                />
+                            ) : (
+                                <div className="w-8 h-8 bg-slate-300 rounded-full flex items-center justify-center">
+                                    <User size={16} className="text-slate-600" />
+                                </div>
+                            )}
+                            <ChevronDown size={14} className="text-slate-400 hidden sm:block" />
+                        </Link>
+
+                        {/* Mobile Menu Button */}
+                        <button
+                            onClick={toggleMobileMenu}
+                            className="md:hidden p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors"
+                            aria-label="Toggle mobile menu"
+                        >
+                            {isMobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+                        </button>
                     </div>
+                </div>
+
+                {/* Mobile Search Bar - Always visible on mobile */}
+                <div className="md:hidden border-t border-slate-200 p-4">
+                    <GlobalSearch />
                 </div>
             </header>
 
-            {/* Mobile Menu Overlay */}
+            {/* Mobile Menu Overlay - Simple menu for mobile actions */}
             {isMobileMenuOpen && (
-                <div 
-                    className="fixed inset-0 bg-black bg-opacity-50 z-50 md:hidden"
-                    onClick={closeMobileMenu}
-                >
+                <div className="fixed inset-0 z-40 md:hidden">
+                    {/* Backdrop */}
+                    <div className="fixed inset-0 bg-black bg-opacity-25" onClick={closeMobileMenu}></div>
+                    
+                    {/* Menu Panel */}
                     <div 
                         ref={mobileMenuRef}
-                        className="fixed inset-y-0 right-0 w-80 max-w-sm bg-white shadow-xl transform transition-transform duration-300 ease-in-out"
-                        onClick={(e) => e.stopPropagation()}
+                        className="fixed top-0 right-0 bottom-0 w-64 bg-white shadow-xl transform transition-transform duration-300 ease-in-out overflow-y-auto"
                     >
-                        {/* Mobile Menu Header */}
+                        {/* Header */}
                         <div className="flex items-center justify-between p-4 border-b border-slate-200">
-                            <img src={headerLogoImage} alt="1RFP Logo" className="h-8 w-auto" />
-                            <button 
+                            <span className="text-lg font-semibold text-slate-900">Quick Actions</span>
+                            <button
                                 onClick={closeMobileMenu}
-                                className="p-2 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100"
-                                aria-label="Close menu"
+                                className="p-1 text-slate-400 hover:text-slate-600 transition-colors"
                             >
                                 <X size={20} />
                             </button>
                         </div>
 
-                        {/* Mobile Navigation Links */}
-                        <nav className="py-4">
-                            <HeaderNavLink to="/profile" Icon={Home} mobile onClick={closeMobileMenu}>
-                                Dashboard
-                            </HeaderNavLink>
-                            <HeaderNavLink to="/profile/grants" Icon={ClipboardList} mobile onClick={closeMobileMenu}>
-                                My Grants
-                            </HeaderNavLink>
-                            <HeaderNavLink to="/profile/organizations" Icon={Building} mobile onClick={closeMobileMenu}>
-                                Explore Organizations
-                            </HeaderNavLink>
-                            <HeaderNavLink to="/profile/members" Icon={Users} mobile onClick={closeMobileMenu}>
-                                Explore Members
-                            </HeaderNavLink>
-                        </nav>
-
                         {/* Mobile Menu Actions */}
-                        <div className="border-t border-slate-200 p-4 space-y-3">
+                        <div className="p-4 space-y-3">
                             <Link 
                                 to="/submit-grant"
                                 onClick={closeMobileMenu}
@@ -213,12 +141,21 @@ export default function DashboardHeader({
                                 Submit Grant
                             </Link>
                             
-                            {/* User Profile Link for Mobile */}
+                            <Link 
+                                to="/profile/notifications"
+                                onClick={closeMobileMenu}
+                                className="flex items-center justify-center w-full px-4 py-3 text-sm font-medium text-slate-700 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors"
+                            >
+                                <Bell size={16} className="mr-2" />
+                                Notifications
+                            </Link>
+                            
                             <Link 
                                 to="/profile/settings"
                                 onClick={closeMobileMenu}
                                 className="flex items-center justify-center w-full px-4 py-3 text-sm font-medium text-slate-700 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors"
                             >
+                                <User size={16} className="mr-2" />
                                 Profile Settings
                             </Link>
                         </div>
