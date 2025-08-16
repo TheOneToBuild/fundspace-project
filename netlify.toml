@@ -2,7 +2,7 @@
 [build]
   base = "fundspace-app"
   command = "npm install && npm run build"
-  publish = "fundspace-app/dist"
+  publish = "dist"
 
 [functions]
   directory = "fundspace-app/netlify/functions"
