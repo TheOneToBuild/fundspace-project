@@ -33,7 +33,7 @@ const CitySpotlightPage = () => {
     }
     
     setSpotlight(spotlightData);
-    document.title = `1RFP - Spotlight on ${spotlightData.communityName}`;
+    document.title = `Fundspace - Spotlight on ${spotlightData.communityName}`;
 
     const fetchCityData = async () => {
       setLoading(true);

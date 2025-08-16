@@ -2,10 +2,10 @@
 [build]
   base = "fundspace-app"
   command = "npm install && npm run build"
-  publish = "dist"
+  publish = "fundspace-app/dist"
 
 [functions]
-  directory = "netlify/functions"
+  directory = "fundspace-app/netlify/functions"
   external_node_modules = ["@google/generative-ai", "rss-parser", "@supabase/supabase-js"]
   node_bundler = "esbuild"
 
