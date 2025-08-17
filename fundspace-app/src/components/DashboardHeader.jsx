@@ -1,16 +1,37 @@
-// src/components/DashboardHeader.jsx
+// src/components/DashboardHeader.jsx - FIXED: Replace direct link with dropdown menu
 import React, { useState, useEffect, useRef } from 'react';
-import { Link } from 'react-router-dom';
-import { Menu, X, PlusCircle, Bell, User, ChevronDown } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Menu, X, PlusCircle, Bell, User, ChevronDown, Home, LogOut } from 'lucide-react';
+import { supabase } from '../supabaseClient';
 import GlobalSearch from './GlobalSearch.jsx';
 import headerLogoImage from '../assets/fundspace-logo2.png';
 
 export default function DashboardHeader({ profile }) {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+    const [isUserMenuOpen, setIsUserMenuOpen] = useState(false); // NEW: User dropdown state
+    const navigate = useNavigate();
+    const userMenuRef = useRef(null); // NEW: Ref for dropdown
     const mobileMenuRef = useRef(null);
 
     const toggleMobileMenu = () => setIsMobileMenuOpen(!isMobileMenuOpen);
     const closeMobileMenu = () => setIsMobileMenuOpen(false);
+
+    // NEW: Handle logout
+    const handleLogout = async () => {
+        await supabase.auth.signOut();
+        navigate('/login');
+    };
+
+    // NEW: Close user menu when clicking outside
+    useEffect(() => {
+        function handleClickOutside(event) {
+            if (userMenuRef.current && !userMenuRef.current.contains(event.target)) {
+                setIsUserMenuOpen(false);
+            }
+        }
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
 
     // Close mobile menu when clicking outside
     useEffect(() => {
@@ -71,25 +92,65 @@ export default function DashboardHeader({ profile }) {
                             {/* You can add notification badge here if needed */}
                         </Link>
 
-                        {/* Profile Dropdown */}
-                        <Link 
-                            to="/profile/settings"
-                            className="flex items-center space-x-2 p-1 hover:bg-slate-100 rounded-lg transition-colors"
-                            aria-label="Profile Settings"
-                        >
-                            {profile?.avatar_url ? (
-                                <img 
-                                    src={profile.avatar_url} 
-                                    alt={profile.display_name || 'Profile'} 
-                                    className="w-8 h-8 rounded-full object-cover"
-                                />
-                            ) : (
-                                <div className="w-8 h-8 bg-slate-300 rounded-full flex items-center justify-center">
-                                    <User size={16} className="text-slate-600" />
+                        {/* FIXED: Profile Dropdown instead of direct link */}
+                        <div className="relative" ref={userMenuRef}>
+                            <button 
+                                onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+                                className="flex items-center space-x-2 p-1 hover:bg-slate-100 rounded-lg transition-colors focus:outline-none"
+                                aria-label="Profile Menu"
+                            >
+                                {profile?.avatar_url ? (
+                                    <img 
+                                        src={profile.avatar_url} 
+                                        alt={profile.display_name || 'Profile'} 
+                                        className="w-8 h-8 rounded-full object-cover"
+                                    />
+                                ) : (
+                                    <div className="w-8 h-8 bg-slate-300 rounded-full flex items-center justify-center">
+                                        <User size={16} className="text-slate-600" />
+                                    </div>
+                                )}
+                                <ChevronDown size={14} className="text-slate-400 hidden sm:block" />
+                            </button>
+                            
+                            {/* NEW: Dropdown Menu */}
+                            {isUserMenuOpen && (
+                                <div className="absolute right-0 mt-2 w-56 bg-white rounded-md shadow-lg border border-slate-200 py-1 z-50">
+                                    <div className="px-4 py-3 border-b border-slate-100">
+                                        <p className="text-sm font-semibold text-slate-800 truncate">
+                                            {profile?.full_name || 'User'}
+                                        </p>
+                                        <p className="text-xs text-slate-500 truncate">
+                                            {profile?.email}
+                                        </p>
+                                    </div>
+                                    <div className="py-1">
+                                        <Link 
+                                            to="/profile" 
+                                            onClick={() => setIsUserMenuOpen(false)}
+                                            className="flex items-center w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-100"
+                                        >
+                                            <Home size={14} className="mr-2" /> Dashboard
+                                        </Link>
+                                        <Link 
+                                            to="/profile/settings" 
+                                            onClick={() => setIsUserMenuOpen(false)}
+                                            className="flex items-center w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-100"
+                                        >
+                                            <User size={14} className="mr-2" /> Profile Settings
+                                        </Link>
+                                    </div>
+                                    <div className="border-t border-slate-100 py-1">
+                                        <button 
+                                            onClick={handleLogout}
+                                            className="flex items-center w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-100"
+                                        >
+                                            <LogOut size={14} className="mr-2" /> Logout
+                                        </button>
+                                    </div>
                                 </div>
                             )}
-                            <ChevronDown size={14} className="text-slate-400 hidden sm:block" />
-                        </Link>
+                        </div>
 
                         {/* Mobile Menu Button */}
                         <button
@@ -130,8 +191,42 @@ export default function DashboardHeader({ profile }) {
                             </button>
                         </div>
 
+                        {/* User Info */}
+                        <div className="p-4 border-b border-slate-200">
+                            <div className="flex items-center space-x-3">
+                                {profile?.avatar_url ? (
+                                    <img 
+                                        src={profile.avatar_url} 
+                                        alt={profile.display_name || 'Profile'} 
+                                        className="w-12 h-12 rounded-full object-cover"
+                                    />
+                                ) : (
+                                    <div className="w-12 h-12 bg-slate-300 rounded-full flex items-center justify-center">
+                                        <User size={20} className="text-slate-600" />
+                                    </div>
+                                )}
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-medium text-slate-900 truncate">
+                                        {profile?.full_name || 'User'}
+                                    </p>
+                                    <p className="text-xs text-slate-500 truncate">
+                                        {profile?.email}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
                         {/* Mobile Menu Actions */}
                         <div className="p-4 space-y-3">
+                            <Link 
+                                to="/profile"
+                                onClick={closeMobileMenu}
+                                className="flex items-center justify-center w-full px-4 py-3 text-sm font-medium text-slate-700 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors"
+                            >
+                                <Home size={16} className="mr-2" />
+                                Dashboard
+                            </Link>
+                            
                             <Link 
                                 to="/submit-grant"
                                 onClick={closeMobileMenu}
@@ -158,6 +253,15 @@ export default function DashboardHeader({ profile }) {
                                 <User size={16} className="mr-2" />
                                 Profile Settings
                             </Link>
+
+                            {/* Logout Button */}
+                            <button 
+                                onClick={handleLogout}
+                                className="flex items-center justify-center w-full px-4 py-3 text-sm font-medium text-slate-700 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors"
+                            >
+                                <LogOut size={16} className="mr-2" />
+                                Sign Out
+                            </button>
                         </div>
                     </div>
                 </div>

@@ -111,7 +111,7 @@ const WelcomeBanner = ({ profile, organizationInfo }) => {
                 /* GRADIENT THEME */
                 <div className="rounded-2xl p-8 relative"
                      style={{
-                         background: 'linear-gradient(135deg, rgba(147, 197, 253, 0.8) 0%, rgba(196, 181, 253, 0.8) 50%, rgba(165, 180, 252, 0.8) 100%)'
+                         background: 'linear-gradient(135deg, rgba(96, 165, 250, 0.85) 0%, rgba(196, 181, 253, 0.75) 40%, rgba(244, 114, 182, 0.7) 80%, rgba(251, 207, 232, 0.65) 100%)'
                      }}>
                     {/* Animated background elements */}
                     <div className="absolute inset-0 overflow-hidden">
@@ -278,15 +278,16 @@ const WelcomeBanner = ({ profile, organizationInfo }) => {
             <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
                 <div className={`rounded-2xl shadow-2xl max-w-md w-full overflow-hidden ${
                     theme === 'gradient' 
-                        ? 'bg-white' 
+                        ? 'bg-white relative' 
                         : 'bg-white'
-                }`}
-                     style={{
-                         boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-                         background: theme === 'gradient' 
-                             ? 'linear-gradient(135deg, rgba(147, 197, 253, 0.95) 0%, rgba(196, 181, 253, 0.95) 50%, rgba(165, 180, 252, 0.95) 100%)'
-                             : 'linear-gradient(145deg, #ffffff 0%, #f8fafc 40%, #f1f5f9 100%)'
-                     }}>
+                }`}>
+                    {theme === 'gradient' && (
+                        <div className="absolute inset-0">
+                            <div className="absolute top-0 left-0 w-64 h-64 bg-gradient-to-br from-blue-200/40 to-indigo-200/40 rounded-full blur-3xl -translate-x-16 -translate-y-16"></div>
+                            <div className="absolute top-0 right-0 w-48 h-48 bg-gradient-to-br from-purple-200/30 to-pink-200/30 rounded-full blur-2xl translate-x-8 -translate-y-8"></div>
+                            <div className="absolute bottom-0 left-1/3 w-56 h-56 bg-gradient-to-br from-indigo-200/25 to-cyan-200/25 rounded-full blur-3xl -translate-y-12"></div>
+                        </div>
+                    )}
                     {/* Header */}
                     <div className={`p-6 relative ${
                         theme === 'gradient' 
