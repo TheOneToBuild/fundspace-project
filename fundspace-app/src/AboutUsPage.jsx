@@ -9,13 +9,13 @@ import PublicPageLayout from './components/PublicPageLayout.jsx';
 const STATIC_MEDIA = {
     collage: [
         'https://plus.unsplash.com/premium_photo-1705882849674-e8ecc5e53f6e?q=80&w=687&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D', // Tech education
-        'https://images.unsplash.com/photo-1544928147-79a2dbc1f389?q=80&w=687&auto=format&fit=crop', // Community collaboration
+        'https://images.pexels.com/photos/6995106/pexels-photo-6995106.jpeg', // Community collaboration
         'https://images.unsplash.com/photo-1527484912758-6e8bf56b18c3?q=80&w=1740&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D', // Community garden
-        'https://plus.unsplash.com/premium_photo-1661544605271-d7da82ccaeb2?q=80&w=1740&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D', // Youth development
+        'https://images.pexels.com/photos/9543414/pexels-photo-9543414.jpeg', // Youth development
         'https://images.unsplash.com/photo-1615856210162-9ae33390b1a2?q=80&w=1742&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D', // Arts collective
     ],
     map: 'https://videos.pexels.com/video-files/8320073/8320073-uhd_2560_1440_25fps.mp4', // San Francisco skyline
-    hero: 'https://videos.pexels.com/video-files/6893839/6893839-uhd_2560_1440_25fps.mp4' // Grant search/technology
+    hero: 'https://videos.pexels.com/video-files/7402746/7402746-hd_1080_1920_30fps.mp4' // Grant search/technology
 };
 
 const advisoryBoard = [
@@ -144,24 +144,25 @@ const AboutUsPage = () => {
               <Bot className="h-10 w-10 text-purple-600" />
             </div>
             
-            <h2 className="text-4xl font-bold text-slate-800 leading-tight mb-8">Our Mission</h2>
+            <h2 className="text-4xl font-bold text-slate-800 leading-tight mb-8">Who We Are</h2>
             
             {/* Updated mission statement */}
-            <div className="bg-gradient-to-r from-purple-100 via-blue-100 to-teal-100 p-8 rounded-3xl mb-8 text-slate-900 shadow-xl border border-slate-200">
-              <h3 className="text-2xl md:text-3xl font-bold leading-tight">
-                To democratize access to funding — so dreamers can dream bigger 💭, builders can build faster 🏗️, and momentum is never lost to bureaucracy 🏃‍♂️💨.
+            <div className="bg-white p-8 rounded-3xl mb-8 text-slate-900 shadow-xl border border-slate-200">
+              <h3 className="text-2xl md:text-3xl font-bold leading-loose">
+                Our mission is to <span className="bg-green-200 px-1 py-0.5 rounded mx-1">democratize</span> <span className="bg-purple-200 px-1 py-0.5 rounded mx-1">access</span> to <span className="bg-orange-200 px-1 py-0.5 rounded mx-1">funding</span> — so dreamers can <span className="bg-yellow-200 px-1 py-0.5 rounded mx-1">dream bigger</span> 💭, builders can <span className="bg-pink-200 px-1 py-0.5 rounded mx-1">build faster</span> 🏗️, and <span className="bg-blue-200 px-1 py-0.5 rounded mx-1">momentum</span> is never lost to bureaucracy 🏃‍♂️💨.
               </h3>
             </div>
             
             <div className="text-lg text-slate-600 space-y-6 leading-relaxed">
-              <p>Critical funding information is scattered across thousands of foundation websites, outdated databases, and word-of-mouth networks. Nonprofits lose countless hours prospecting in isolation instead of building relationships. Funders struggle to discover emerging organizations and connect with passionate changemakers.</p>
+              <p>We believe that funding should be accessible, not aspirational. This is our foundational promise. The ‘grants’ part of what we do is our commitment to connecting you directly with the capital needed to fuel your work. We provide the platform and the financial tools to open doors that were once closed.</p>
               
               <div className="bg-gradient-to-r from-red-50 to-rose-50 p-6 rounded-2xl border border-red-100">
-                <p className="text-slate-700 font-semibold text-xl mb-2">This inefficiency is a tax on progress.</p>
-                <p className="text-slate-600">It slows the very work that aims to uplift our communities.</p>
+                <p className="text-slate-700 font-semibold text-xl mb-2">Our Philosophy: Accessible Capital, Powerful Community
+
+</p>
               </div>
               
-              <p>Fundspace was created to solve this problem by building community first. We use AI not to replace human connection, but to spark the conversations that lead to deeper relationships, stronger partnerships, and faster resource flows to where they're needed most.</p>
+              <p>But we also know that the most powerful resource of all is people. A grant can fund a project, but only a community can sustain a movement. That’s why we’ve built more than a database; we’ve cultivated a living ecosystem of Bay Area changemakers. Here, progress is powered by connection. Whether you're building a company, leading a nonprofit, or looking to fund the future, you have a place here. Let's ensure no great idea is ever left behind.</p>
               
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-8">
                 <div className="text-center p-4 bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl border border-purple-200">
@@ -211,31 +212,55 @@ const AboutUsPage = () => {
             
             {/* Third row - below hero video */}
             <motion.div variants={fadeIn} className="col-span-1 row-span-1 rounded-xl bg-cover bg-center shadow-lg border-2 border-white" style={{backgroundImage: `url(${STATIC_MEDIA.collage[0]})`}}></motion.div>
-            <motion.div variants={fadeIn} className="col-span-1 row-span-1 rounded-xl bg-cover bg-center shadow-lg border-2 border-white" style={{backgroundImage: `url('https://images.unsplash.com/photo-1559027615-cd4628902d4a?q=80&w=1740&auto=format&fit=crop')`}}></motion.div>
+            <motion.div variants={fadeIn} className="col-span-1 row-span-1 rounded-xl bg-cover bg-center shadow-lg border-2 border-white" style={{backgroundImage: `url('https://images.pexels.com/photos/356040/pexels-photo-356040.jpeg')`}}></motion.div>
             <motion.div variants={fadeIn} className="col-span-2 row-span-1 rounded-xl bg-cover bg-center shadow-lg border-2 border-white" style={{backgroundImage: `url('https://images.unsplash.com/photo-1573164713714-d95e436ab8d6?q=80&w=1740&auto=format&fit=crop')`}}></motion.div>
             
             {/* Fourth row */}
-            <motion.div variants={fadeIn} className="col-span-1 row-span-2 rounded-xl bg-cover bg-center shadow-lg border-2 border-white" style={{backgroundImage: `url('https://images.unsplash.com/photo-1582213782179-e0d53f98f2ca?q=80&w=1740&auto=format&fit=crop')`}}></motion.div>
+            <motion.div variants={fadeIn} className="col-span-1 row-span-2 rounded-xl bg-cover bg-center shadow-lg border-2 border-white">   <video
+                src="https://videos.pexels.com/video-files/8120416/8120416-hd_1080_1920_25fps.mp4"
+                autoPlay
+                loop
+                muted
+                playsInline
+                className="w-full h-full object-cover rounded-xl"
+                style={{ minHeight: 0, minWidth: 0 }}
+              /></motion.div>
             <motion.div variants={fadeIn} className="col-span-1 row-span-1 rounded-xl bg-cover bg-center shadow-lg border-2 border-white" style={{backgroundImage: `url('https://images.unsplash.com/photo-1517486808906-6ca8b3f04846?q=80&w=1740&auto=format&fit=crop')`}}></motion.div>
             <motion.div variants={fadeIn} className="col-span-2 row-span-1 rounded-xl bg-cover bg-center shadow-lg border-2 border-white" style={{backgroundImage: `url('https://images.unsplash.com/photo-1559136555-9303baea8ebd?q=80&w=1740&auto=format&fit=crop')`}}></motion.div>
             
             {/* Fifth row */}
             <motion.div variants={fadeIn} className="col-span-1 row-span-1 rounded-xl bg-cover bg-center shadow-lg border-2 border-white" style={{backgroundImage: `url('https://images.unsplash.com/photo-1544928147-79a2dbc1f389?q=80&w=687&auto=format&fit=crop')`}}></motion.div>
-            <motion.div variants={fadeIn} className="col-span-2 row-span-1 rounded-xl bg-cover bg-center shadow-lg border-2 border-white" style={{backgroundImage: `url('https://images.unsplash.com/photo-1527484912758-6e8bf56b18c3?q=80&w=1740&auto=format&fit=crop')`}}></motion.div>
+            <motion.div variants={fadeIn} className="col-span-2 row-span-1 rounded-xl bg-cover bg-center shadow-lg border-2 border-white overflow-hidden">
+              <video
+                src="https://videos.pexels.com/video-files/4808694/4808694-uhd_2560_1440_24fps.mp4"
+                autoPlay
+                loop
+                muted
+                playsInline
+                className="w-full h-full object-cover rounded-xl"
+                style={{ minHeight: 0, minWidth: 0 }}
+              />
+            </motion.div>
+            <motion.div variants={fadeIn} className="col-span-1 row-span-1 rounded-xl bg-cover bg-center shadow-lg border-2 border-white" style={{backgroundImage: `url('https://images.unsplash.com/photo-1600298881974-6be191ceeda1?q=80&w=1740&auto=format&fit=crop')`}}></motion.div>
             
             {/* Sixth row */}
             <motion.div variants={fadeIn} className="col-span-2 row-span-1 rounded-xl bg-cover bg-center shadow-lg border-2 border-white" style={{backgroundImage: `url('https://plus.unsplash.com/premium_photo-1661544605271-d7da82ccaeb2?q=80&w=1740&auto=format&fit=crop')`}}></motion.div>
-            <motion.div variants={fadeIn} className="col-span-1 row-span-2 rounded-xl bg-cover bg-center shadow-lg border-2 border-white" style={{backgroundImage: `url('https://images.unsplash.com/photo-1615856210162-9ae33390b1a2?q=80&w=1742&auto=format&fit=crop')`}}></motion.div>
-            <motion.div variants={fadeIn} className="col-span-1 row-span-1 rounded-xl bg-cover bg-center shadow-lg border-2 border-white" style={{backgroundImage: `url('https://plus.unsplash.com/premium_photo-1705882849674-e8ecc5e53f6e?q=80&w=687&auto=format&fit=crop')`}}></motion.div>
+            <motion.div variants={fadeIn} className="col-span-1 row-span-2 rounded-xl bg-cover bg-center shadow-lg border-2 border-white">             <video
+                src="https://videos.pexels.com/video-files/4668117/4668117-uhd_1440_2732_25fps.mp4"
+                autoPlay
+                loop
+                muted
+                playsInline
+                className="w-full h-full object-cover rounded-xl"
+                style={{ minHeight: 0, minWidth: 0 }}
+              /></motion.div>
+            <motion.div variants={fadeIn} className="col-span-1 row-span-1 rounded-xl bg-cover bg-center shadow-lg border-2 border-white" style={{backgroundImage: `url('https://images.pexels.com/photos/1851164/pexels-photo-1851164.jpeg')`}}></motion.div>
             
             {/* Seventh row - Added missing image */}
-            <motion.div variants={fadeIn} className="col-span-1 row-span-1 rounded-xl bg-cover bg-center shadow-lg border-2 border-white" style={{backgroundImage: `url('https://images.unsplash.com/photo-1544928147-79a2dbc1f389?q=80&w=687&auto=format&fit=crop')`}}></motion.div>
-            <motion.div variants={fadeIn} className="col-span-1 row-span-1 rounded-xl bg-cover bg-center shadow-lg border-2 border-white" style={{backgroundImage: `url('https://images.unsplash.com/photo-1573164713714-d95e436ab8d6?q=80&w=1740&auto=format&fit=crop')`}}></motion.div>
+            <motion.div variants={fadeIn} className="col-span-1 row-span-1 rounded-xl bg-cover bg-center shadow-lg border-2 border-white" style={{backgroundImage: `url('https://images.pexels.com/photos/2608517/pexels-photo-2608517.jpeg')`}}></motion.div>
+            <motion.div variants={fadeIn} className="col-span-1 row-span-1 rounded-xl bg-cover bg-center shadow-lg border-2 border-white" style={{backgroundImage: `url('https://images.pexels.com/photos/106052/pexels-photo-106052.jpeg')`}}></motion.div>
             <motion.div variants={fadeIn} className="col-span-1 row-span-1 rounded-xl bg-cover bg-center shadow-lg border-2 border-white" style={{backgroundImage: `url('https://images.unsplash.com/photo-1582213782179-e0d53f98f2ca?q=80&w=1740&auto=format&fit=crop')`}}></motion.div>
-            <motion.div variants={fadeIn} className="col-span-1 row-span-1 rounded-xl bg-cover bg-center shadow-lg border-2 border-white" style={{backgroundImage: `url('https://images.unsplash.com/photo-1559136555-9303baea8ebd?q=80&w=1740&auto=format&fit=crop')`}}></motion.div>
             
-            {/* Eighth row */}
-            <motion.div variants={fadeIn} className="col-span-4 row-span-1 rounded-xl bg-cover bg-center shadow-lg border-2 border-white" style={{backgroundImage: `url('https://images.unsplash.com/photo-1517486808906-6ca8b3f04846?q=80&w=1740&auto=format&fit=crop')`}}></motion.div>
           </motion.div>
         </div>
       </StorySection>
@@ -321,13 +346,10 @@ const AboutUsPage = () => {
             <div className="inline-block bg-gradient-to-br from-rose-100 to-pink-100 p-4 rounded-2xl mb-6 border border-rose-200">
               <Heart className="h-10 w-10 text-rose-600" />
             </div>
-            <h2 className="text-4xl font-bold text-slate-800 mb-6">
-              <span className="text-red-500">❤️</span> Bay Area Born & Raised
-            </h2>
+            
             <div className="text-lg text-slate-700 space-y-6 leading-relaxed">
               <p>
-                We're not some Silicon Valley tech company that happened to stumble into the nonprofit space. 
-                We <strong>live here</strong>, <strong>work here</strong>, and <strong>care deeply</strong> about our communities.
+               We've built our work around a deep commitment to the people and places we call home. We don't just work here—we live here, and we care about our community.
               </p>
               
               <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-2xl border border-blue-100">
@@ -348,7 +370,7 @@ const AboutUsPage = () => {
               </div>
               
               <p className="text-blue-700 font-semibold">
-                Because when Bay Area nonprofits succeed, our entire region thrives. 🌟
+                Because when Bay Area changemakers succeed, our entire region thrives. 🌟
               </p>
             </div>
           </motion.div>
@@ -356,7 +378,7 @@ const AboutUsPage = () => {
       </StorySection>
 
       {/* CALL TO ACTION - Community focused */}
-      <StorySection className="bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 text-white rounded-3xl shadow-2xl">
+      <StorySection className="bg-gradient-to-br from-sky-200 via-blue-100 to-purple-200 text-slate-800 rounded-3xl shadow-2xl">
         <div className="text-center max-w-4xl px-8">
           <motion.div variants={fadeIn} className="mb-6">
             <span className="text-6xl">🚀</span>
@@ -364,10 +386,10 @@ const AboutUsPage = () => {
           <motion.h2 variants={fadeIn} className="text-4xl md:text-5xl font-bold mb-6">
             Ready to Join Our Community?
           </motion.h2>
-          <motion.p variants={{...fadeIn, transition: {...fadeIn.transition, delay: 0.2}}} className="text-xl mb-8 opacity-95 leading-relaxed">
+          <motion.p variants={{...fadeIn, transition: {...fadeIn.transition, delay: 0.2}}} className="text-xl mb-8 opacity-90 leading-relaxed">
             Join Bay Area changemakers, funders, and nonprofit leaders who've discovered that 
             finding funding is so much better when you're not doing it alone. 
-            <strong> Come for the grants, stay for the community! 🤝</strong>
+            <strong className="text-blue-700"> Come for the grants, stay for the community! 🤝</strong>
           </motion.p>
           
           <motion.div 
@@ -376,13 +398,13 @@ const AboutUsPage = () => {
           >
             <a 
               href="/grants" 
-              className="inline-flex items-center justify-center px-8 py-4 font-semibold rounded-full text-blue-700 bg-white hover:bg-blue-50 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 w-full sm:w-auto"
+              className="inline-flex items-center justify-center px-8 py-4 font-semibold rounded-full text-white bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 w-full sm:w-auto"
             >
               🔍 Start Connecting Today
             </a>
             <a 
               href="/signup" 
-              className="inline-flex items-center justify-center px-8 py-4 font-semibold rounded-full text-white bg-black/20 hover:bg-black/30 backdrop-blur-sm border border-white/20 transition-all duration-300 w-full sm:w-auto"
+              className="inline-flex items-center justify-center px-8 py-4 font-semibold rounded-full text-slate-700 bg-white/80 hover:bg-white backdrop-blur-sm border border-slate-200 hover:border-slate-300 transition-all duration-300 w-full sm:w-auto shadow-lg hover:shadow-xl"
             >
               🎯 Join Free Today
             </a>
@@ -390,7 +412,7 @@ const AboutUsPage = () => {
           
           <motion.p 
             variants={{...fadeIn, transition: {...fadeIn.transition, delay: 0.6}}}
-            className="text-sm opacity-80 mt-6"
+            className="text-sm opacity-70 mt-6 text-slate-600"
           >
             No credit card required. No spam. Just connections, collaboration, and lots of funding opportunities. 📧✨
           </motion.p>
