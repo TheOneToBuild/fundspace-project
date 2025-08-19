@@ -13,9 +13,16 @@ function extractImage(item) {
   const imgMatch = content.match(/<img[^>]+src="([^"]+)"/);
   return imgMatch ? imgMatch[1] : null;
 }
+
 const SPORTS_KEYWORDS = ['sports', 'nba', 'nfl', 'mlb', 'nhl', 'wnba', 'mls', 'olympics', 'world cup', 'super bowl', 'playoffs', 'championship', 'game', 'match', 'player', 'team', 'score', 'inning', 'quarter', 'goal', 'touchdown', 'home run', 'slam dunk', 'athlete', 'warriors', 'giants', '49ers', 'sharks', 'athletics', 'lakers', 'dodgers'];
+
 const CELEBRITY_KEYWORDS = ['celebrity', 'kardashian', 'kanye', 'taylor swift', 'beyoncé', 'movie star', 'red carpet', 'gossip', 'entertainment weekly', 'tmz', 'hollywood', 'actor', 'actress', 'singer'];
-const EXCLUDED_KEYWORDS = [...SPORTS_KEYWORDS, ...CELEBRITY_KEYWORDS];
+
+// NEW: Real estate keywords to filter out
+const REAL_ESTATE_KEYWORDS = ['real estate', 'housing market', 'home sales', 'property', 'mortgage', 'housing prices', 'home prices', 'single-family house', 'condominium', 'condo', 'home sells for', 'house sells for', 'property sells for', 'bedroom home', 'million home', 'million house', 'million property', 'realtor', 'listing', 'home buyer', 'house hunter', 'foreclosure', 'rental market', 'apartment complex', 'residential development'];
+
+const EXCLUDED_KEYWORDS = [...SPORTS_KEYWORDS, ...CELEBRITY_KEYWORDS, ...REAL_ESTATE_KEYWORDS];
+
 function isExcludedTopic(item) {
   const content = `${item.title || ''} ${item.contentSnippet || ''}`.toLowerCase();
   const hasExcludedTerm = EXCLUDED_KEYWORDS.some(keyword => new RegExp(`\\b${keyword}\\b`).test(content));
@@ -35,7 +42,7 @@ export const handler = async () => {
     { category: 'general', url: 'https://www.npr.org/rss/rss.php?id=1001' },
     { category: 'general', url: 'http://feeds.bbci.co.uk/news/world/us_and_canada/rss.xml' },
 
-    // California & SF Bay Area News (for Hello Community)
+    // California & SF Bay Area News (for Hello Community) - EXPANDED
     { category: 'california', url: 'https://www.mercurynews.com/feed/' },
     { category: 'california', url: 'https://www.sfchronicle.com/bayarea/feed/Bay-Area-News-435.php' },
     { category: 'california', url: 'https://www.latimes.com/california/rss2.0.xml' },
@@ -43,6 +50,30 @@ export const handler = async () => {
     { category: 'california', url: 'https://www.kqed.org/news/feed' },
     { category: 'california', url: 'https://abc7news.com/feed/' },
     { category: 'california', url: 'https://www.sfgate.com/bayarea/feed/Bay-Area-News-rss-2.xml' },
+    
+    // NEW BAY AREA LOCAL NEWS SOURCES
+    { category: 'california', url: 'https://www.ktvu.com/feed' },
+    { category: 'california', url: 'https://www.kron4.com/feed/' },
+    { category: 'california', url: 'https://www.smdailyjournal.com/feed/' }, // San Mateo
+    { category: 'california', url: 'https://www.marinij.com/feed/' }, // Marin County
+    { category: 'california', url: 'https://www.eastbaytimes.com/feed/' }, // East Bay
+    { category: 'california', url: 'https://www.pressdemocrat.com/feed/' }, // Sonoma County
+    { category: 'california', url: 'https://www.napavalleyregister.com/feed/' }, // Napa Valley
+    { category: 'california', url: 'https://www.timesheraldonline.com/feed/' }, // Vallejo/Solano
+    { category: 'california', url: 'https://www.contracostatimes.com/feed/' }, // Contra Costa
+    { category: 'california', url: 'https://www.berkeleyside.org/feed' }, // Berkeley local
+    { category: 'california', url: 'https://oaklandside.org/feed/' }, // Oakland local
+    { category: 'california', url: 'https://www.paloaltoonline.com/feed/' }, // Palo Alto
+    { category: 'california', url: 'https://www.sanjoseinside.com/feed/' }, // San Jose
+    { category: 'california', url: 'https://www.mv-voice.com/feed/' }, // Mountain View
+    { category: 'california', url: 'https://www.almanacnews.com/feed/' }, // Peninsula communities
+    { category: 'california', url: 'https://www.marinscope.com/feed/' }, // Additional Marin coverage
+    
+    // TECH & INNOVATION NEWS (Bay Area focused)
+    { category: 'california', url: 'https://techcrunch.com/feed/' },
+    { category: 'california', url: 'https://siliconangle.com/feed/' },
+    { category: 'california', url: 'https://www.bizjournals.com/sanfrancisco/feeds/news.xml' }, // SF Business Journal
+    { category: 'california', url: 'https://www.bizjournals.com/sanjose/feeds/news.xml' }, // Silicon Valley Business Journal
 
     // Philanthropy & Funder News (for Hello Community)
     { category: 'funder', url: 'https://nonprofitquarterly.org/feed/' },
@@ -50,12 +81,15 @@ export const handler = async () => {
     { category: 'funder', url: 'https://www.philanthropy.com/feed/grants' },
     { category: 'funder', url: 'https://candid.org/feed' },
     { category: 'funder', url: 'https://www.hewlett.org/feed/' },
+    { category: 'funder', url: 'https://www.packard.org/feed/' }, // Packard Foundation
+    { category: 'funder', url: 'https://www.siliconvalleycf.org/feed/' }, // Silicon Valley Community Foundation
     
     // Nonprofit Sector News (for Hello Community)
     { category: 'nonprofit', url: 'https://www.philanthropy.com/feed' },
     { category: 'nonprofit', url: 'https://ssir.org/rss' },
     { category: 'nonprofit', url: 'https://www.thenonprofittimes.com/feed/' },
-    { category: 'nonprofit', url: 'https://blueavocado.org/feed/' }
+    { category: 'nonprofit', url: 'https://blueavocado.org/feed/' },
+    { category: 'nonprofit', url: 'https://www.councilofnonprofits.org/feed' }, // Council of Nonprofits
   ];
 
   const fetchPromises = RSS_FEEDS.map(feedInfo =>
