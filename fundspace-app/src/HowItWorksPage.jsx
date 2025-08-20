@@ -1,28 +1,22 @@
-// src/HowItWorksPage.jsx
 import React, { useEffect, useContext } from 'react';
-import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Bot, Users, Search, Handshake, Calendar, Briefcase, BarChart3, TrendingUp, Filter, ShieldCheck, Heart, UserPlus, Zap, Award, DollarSign, Sparkles, ArrowRight, CheckCircle2, Target, MessageSquare } from './components/Icons.jsx';
-import AnimatedCounter from './components/AnimatedCounter.jsx';
-import { LayoutContext } from './App.jsx';
+import { Bot, Users, Search, Handshake, Calendar, Briefcase, BarChart3, TrendingUp, Filter, ShieldCheck, Heart, UserPlus, Zap, Award, DollarSign, Sparkles, ArrowRight, CheckCircle2, Target, MessageSquare, Database, Globe, Lightbulb, Share2, Rocket, Eye, Network } from 'lucide-react';
 
-import fundervideo from './assets/funderrecording.mp4';
-import grantvideo from './assets/grantvideo.mp4';
-import nonprofits from './assets/nonprofits.mp4';
-
-const STATIC_MEDIA = {
-    engineIllustration: 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?q=80&w=1200&auto=format&fit=crop',
-    findGrantsVideo: grantvideo,
-    researchFundersVideo: fundervideo,
-    connectCommunityVideo: nonprofits,
+// Mock AnimatedCounter component
+const AnimatedCounter = ({ targetValue, formatValue, className }) => {
+    const formattedValue = formatValue ? formatValue(targetValue) : targetValue.toLocaleString();
+    return <span className={className}>{formattedValue}</span>;
 };
 
-const platformStats = [
-    { label: "Grants Listed", value: 1250, icon: Award, color: "text-blue-500", format: val => val.toLocaleString() + '+' },
-    { label: "Funders Profiled", value: 8000, icon: Briefcase, color: "text-green-500", format: val => val.toLocaleString() + '+' },
-    { label: "Nonprofits", value: 33000, icon: Users, color: "text-rose-500", format: val => val.toLocaleString() + '+' },
-    { label: "In Annual Funding", value: 13000000000, icon: DollarSign, color: "text-amber-500", format: val => `$${(val / 1000000000).toFixed(0)}B+` },
-];
+// Mock LayoutContext
+const LayoutContext = React.createContext({ setPageBgColor: () => {} });
+
+const STATIC_MEDIA = {
+    aiEngine: 'https://art4d.com/wp-content/uploads/2025/03/1-9.jpg',
+    opportunitiesVideo: 'https://videos.pexels.com/video-files/3191353/3191353-uhd_2732_1440_25fps.mp4',
+    communityVideo: 'https://videos.pexels.com/video-files/6893839/6893839-uhd_2560_1440_25fps.mp4',
+    ecosystemMap: 'https://videos.pexels.com/video-files/8320073/8320073-uhd_2560_1440_25fps.mp4'
+};
 
 const StorySection = ({ children, className = '' }) => ( 
     <motion.div 
@@ -39,7 +33,8 @@ const StorySection = ({ children, className = '' }) => (
 const fadeIn = { hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { duration: 0.8 } } };
 
 const HowItWorksPage = () => {
-    const { setPageBgColor } = useContext(LayoutContext);
+    // Mock setPageBgColor for demo
+    const setPageBgColor = () => {};
 
     useEffect(() => {
         setPageBgColor('bg-gradient-to-br from-slate-50 via-blue-50 to-purple-50');
@@ -52,54 +47,26 @@ const HowItWorksPage = () => {
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
             {/* HERO SECTION */}
             <section className="text-center mb-16 relative">
-                {/* Magical background elements */}
-                <div className="absolute inset-0 overflow-hidden pointer-events-none">
-                    <div className="absolute top-10 left-10 w-32 h-32 bg-gradient-to-r from-blue-400 to-purple-600 rounded-full opacity-10 animate-pulse"></div>
-                    <div className="absolute top-32 right-20 w-24 h-24 bg-gradient-to-r from-pink-400 to-rose-600 rounded-full opacity-10 animate-pulse delay-1000"></div>
-                    <div className="absolute bottom-10 left-1/3 w-20 h-20 bg-gradient-to-r from-emerald-400 to-teal-600 rounded-full opacity-10 animate-pulse delay-2000"></div>
-                </div>
-                
                 <div className="relative bg-white/80 backdrop-blur-sm p-8 md:p-12 rounded-3xl border border-white/60 shadow-2xl">
-                    <motion.div variants={fadeIn} className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-orange-100 to-amber-100 rounded-3xl flex items-center justify-center border border-orange-200 shadow-lg">
-                        <Search className="h-10 w-10 text-orange-600" />
+                    <motion.div variants={fadeIn} className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-purple-100 to-pink-100 rounded-3xl flex items-center justify-center border border-purple-200 shadow-lg">
+                        <Sparkles className="h-10 w-10 text-purple-600" />
                     </motion.div>
                     
                     <motion.h1 variants={fadeIn} className="text-4xl md:text-6xl font-extrabold tracking-tight mb-4">
-                        <span className="text-slate-900">Smarter Grantseeking </span>
+                        <span className="text-slate-900">The Future of </span>
                         <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600">
-                            Starts Here
+                            Funding & Community
                         </span>
                     </motion.h1>
                     
                     <motion.p variants={{...fadeIn, transition: {...fadeIn.transition, delay: 0.2}}} className="text-lg md:text-xl text-slate-600 mb-8 max-w-4xl mx-auto leading-relaxed">
-                        Fundspace combines cutting-edge technology with the power of community to create the most efficient and comprehensive grant discovery platform for the Bay Area.
-                        <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-pink-600 font-semibold"> Technology that empowers, not overwhelms.</span>
+                        Imagine a world where finding funding is as easy as posting on social media, where great ideas get discovered automatically, and where every changemaker has a community cheering them on.
+                        <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-pink-600 font-semibold"> Welcome to that world.</span>
                     </motion.p>
-
-                    {/* Platform Stats */}
-                    <motion.div 
-                        variants={{ hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.1, delayChildren: 0.5 } } }}
-                        className="grid grid-cols-2 md:grid-cols-4 gap-x-4 sm:gap-x-8 gap-y-10 sm:gap-y-12 w-full max-w-4xl mx-auto"
-                    >
-                        {platformStats.map(stat => (
-                            <motion.div variants={fadeIn} key={stat.label} className="text-center">
-                                <div className={`w-16 h-16 mx-auto mb-4 bg-gradient-to-br ${
-                                    stat.color.includes('blue') ? 'from-blue-100 to-indigo-100 border-blue-200' :
-                                    stat.color.includes('green') ? 'from-green-100 to-emerald-100 border-green-200' :
-                                    stat.color.includes('rose') ? 'from-rose-100 to-pink-100 border-rose-200' :
-                                    'from-amber-100 to-yellow-100 border-amber-200'
-                                } rounded-2xl flex items-center justify-center border shadow-lg`}>
-                                    <stat.icon className={`h-8 w-8 ${stat.color}`} />
-                                </div>
-                                <AnimatedCounter targetValue={stat.value} formatValue={stat.format} className="text-3xl sm:text-4xl font-bold text-slate-700" />
-                                <p className="text-xs sm:text-sm font-medium text-slate-500 mt-2">{stat.label}</p>
-                            </motion.div>
-                        ))}
-                    </motion.div>
                 </div>
             </section>
 
-            {/* THE Fundspace ENGINE SECTION */}
+            {/* THE AI ENGINE SECTION */}
             <StorySection>
                 <div className="grid lg:grid-cols-2 gap-16 items-center max-w-7xl">
                     <motion.div variants={fadeIn} className="text-left">
@@ -107,30 +74,32 @@ const HowItWorksPage = () => {
                             <Bot className="h-10 w-10 text-blue-600" />
                         </div>
                         <h2 className="text-4xl font-bold text-slate-800 leading-tight mb-6">
-                            The <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">Fundspace Engine</span>
+                            <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">Smart AI Engine</span><br />
+                            That Never Sleeps
                         </h2>
                         <p className="text-lg text-slate-600 mb-8 leading-relaxed">
-                            Our unique hybrid approach ensures the data you see is timely, relevant, and comprehensive. We've built technology that serves community, not the other way around.
+                            While you're building the future, our AI is scanning thousands of funding sources 24/7, 
+                            organizing opportunities by relevance, and learning what matters most to your community.
                         </p>
                         
                         <div className="space-y-6">
                             <div className="flex items-start gap-4">
                                 <div className="w-12 h-12 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-2xl flex items-center justify-center border border-blue-200 flex-shrink-0">
-                                    <Bot className="h-6 w-6 text-blue-600" />
+                                    <Database className="h-6 w-6 text-blue-600" />
                                 </div>
                                 <div>
-                                    <h3 className="font-bold text-slate-800 mb-2">AI-Powered Aggregation</h3>
-                                    <p className="text-slate-600">Our engine scans thousands of public sources 24/7 to extract key grant information, ensuring you never miss an opportunity.</p>
+                                    <h3 className="font-bold text-slate-800 mb-2">Intelligent Aggregation</h3>
+                                    <p className="text-slate-600">Crawls grants, VCs, accelerators, government programs, crowdfunding, and private opportunities in real-time.</p>
                                 </div>
                             </div>
                             
                             <div className="flex items-start gap-4">
                                 <div className="w-12 h-12 bg-gradient-to-br from-purple-100 to-pink-100 rounded-2xl flex items-center justify-center border border-purple-200 flex-shrink-0">
-                                    <Users className="h-6 w-6 text-purple-600" />
+                                    <Network className="h-6 w-6 text-purple-600" />
                                 </div>
                                 <div>
-                                    <h3 className="font-bold text-slate-800 mb-2">Community-Powered Accuracy</h3>
-                                    <p className="text-slate-600">Users suggest edits and submit new opportunities, ensuring our data is always improving through collective intelligence.</p>
+                                    <h3 className="font-bold text-slate-800 mb-2">Community-Enhanced Intelligence</h3>
+                                    <p className="text-slate-600">Gets smarter with every user interaction, suggestion, and success story shared by our community.</p>
                                 </div>
                             </div>
                         </div>
@@ -138,8 +107,8 @@ const HowItWorksPage = () => {
 
                     <motion.div variants={fadeIn} className="relative">
                         <img 
-                            src={STATIC_MEDIA.engineIllustration} 
-                            alt="Illustration of data and AI working together" 
+                            src={STATIC_MEDIA.aiEngine} 
+                            alt="AI and data visualization" 
                             className="w-full h-auto object-cover rounded-2xl shadow-2xl border-4 border-white"
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-blue-600/20 to-transparent rounded-2xl"></div>
@@ -147,56 +116,54 @@ const HowItWorksPage = () => {
                 </div>
             </StorySection>
 
-            {/* YOUR GRANTSEEKING TOOLKIT SECTION */}
+            {/* THE PLATFORM FLOWS SECTION */}
             <StorySection>
                 <motion.div variants={fadeIn} className="text-center mb-16">
                     <h2 className="text-4xl md:text-5xl font-bold mb-6">
-                        <span className="text-slate-800">Your Grantseeking </span>
-                        <span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-500 to-emerald-600">Toolkit</span>
+                        <span className="text-slate-800">Three Ways to </span>
+                        <span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-500 to-emerald-600">Get Funded</span>
                     </h2>
                     <p className="text-lg md:text-xl text-slate-600 max-w-3xl mx-auto leading-relaxed">
-                        Find what you need in just a few clicks. Our platform is designed to be intuitive, powerful, and focused on results.
+                        Whether you're seeking traditional grants, launching a campaign, or building community support, we've got you covered.
                     </p>
                 </motion.div>
                 
                 <div className="w-full max-w-7xl space-y-20">
-                    {/* Step 1 - Find Grants */}
+                    {/* Flow 1 - Search & Discover */}
                     <motion.div variants={fadeIn} className="grid lg:grid-cols-2 gap-12 items-center">
                         <div className="text-center lg:text-left">
                             <div className="inline-flex items-center gap-2 bg-blue-100 text-blue-800 px-4 py-2 rounded-full text-sm font-semibold mb-4">
                                 <span className="w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs font-bold">1</span>
-                                STEP ONE
+                                SEARCH & DISCOVER
                             </div>
-                            <h3 className="text-3xl font-bold text-slate-800 mb-4">Find Your Next Grant</h3>
+                            <h3 className="text-3xl font-bold text-slate-800 mb-4">Find Perfect-Fit Funding</h3>
                             <p className="text-lg text-slate-600 leading-relaxed mb-8">
-                                Use our powerful, intuitive search and filter system to narrow down hundreds of opportunities. Filter by category, location, funding amount, and more to find grants that perfectly match your mission.
+                                Use our AI-powered search to discover grants, accelerators, VCs, and funding programs that match your mission, stage, and location. 
+                                Filter by amount, deadline, industry, or let our smart recommendations surprise you.
                             </p>
-                            <Link 
-                                to="/grants" 
+                            <a 
+                                href="/grants" 
                                 className="inline-flex items-center justify-center px-8 py-4 font-semibold rounded-2xl text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
                             >
                                 <Search className="mr-2" size={20} />
-                                Explore Grants
-                            </Link>
+                                Explore Funding
+                            </a>
                         </div>
                         <div className="relative">
-                            <video 
-                                src={STATIC_MEDIA.findGrantsVideo} 
-                                className="w-full h-auto rounded-2xl shadow-2xl border-4 border-white" 
-                                autoPlay 
-                                loop 
-                                muted 
-                                playsInline 
-                            />
-                            <div className="absolute inset-0 bg-gradient-to-t from-blue-600/10 to-transparent rounded-2xl pointer-events-none"></div>
+                            <div className="w-full h-96 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-2xl shadow-2xl border-4 border-white flex items-center justify-center">
+                                <div className="text-center">
+                                    <Search className="h-16 w-16 text-blue-600 mx-auto mb-4" />
+                                    <p className="text-blue-700 font-semibold">AI-Powered Discovery</p>
+                                </div>
+                            </div>
                         </div>
                     </motion.div>
 
-                    {/* Step 2 - Research Funders */}
+                    {/* Flow 2 - Launch & Share */}
                     <motion.div variants={fadeIn} className="grid lg:grid-cols-2 gap-12 items-center">
                         <div className="order-2 lg:order-1 relative">
                             <video 
-                                src={STATIC_MEDIA.researchFundersVideo} 
+                                src={STATIC_MEDIA.opportunitiesVideo} 
                                 className="w-full h-auto rounded-2xl shadow-2xl border-4 border-white" 
                                 autoPlay 
                                 loop 
@@ -208,44 +175,46 @@ const HowItWorksPage = () => {
                         <div className="order-1 lg:order-2 text-center lg:text-left">
                             <div className="inline-flex items-center gap-2 bg-green-100 text-green-800 px-4 py-2 rounded-full text-sm font-semibold mb-4">
                                 <span className="w-6 h-6 bg-green-600 text-white rounded-full flex items-center justify-center text-xs font-bold">2</span>
-                                STEP TWO
+                                LAUNCH & SHARE
                             </div>
-                            <h3 className="text-3xl font-bold text-slate-800 mb-4">Research Potential Funders</h3>
+                            <h3 className="text-3xl font-bold text-slate-800 mb-4">Showcase Your Vision</h3>
                             <p className="text-lg text-slate-600 leading-relaxed mb-8">
-                                Move beyond the grant to understand the funder. Our Funder Directory provides key insights into giving history, focus areas, and average grant sizes to help you build a strategic fundraising pipeline.
+                                Create a dynamic profile for your project, startup, or nonprofit. Share your story, goals, and impact. 
+                                Get discovered by funders, collaborators, and supporters who believe in what you're building.
                             </p>
-                            <Link 
-                                to="/organizations?prefilter=foundation" 
+                            <a 
+                                href="/opportunities/create" 
                                 className="inline-flex items-center justify-center px-8 py-4 font-semibold rounded-2xl text-white bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
                             >
-                                <Users className="mr-2" size={20} />
-                                Explore Funders
-                            </Link>
+                                <Rocket className="mr-2" size={20} />
+                                Share Your Project
+                            </a>
                         </div>
                     </motion.div>
 
-                    {/* Step 3 - Connect with Community */}
+                    {/* Flow 3 - Connect & Collaborate */}
                     <motion.div variants={fadeIn} className="grid lg:grid-cols-2 gap-12 items-center">
                         <div className="text-center lg:text-left">
                             <div className="inline-flex items-center gap-2 bg-purple-100 text-purple-800 px-4 py-2 rounded-full text-sm font-semibold mb-4">
                                 <span className="w-6 h-6 bg-purple-600 text-white rounded-full flex items-center justify-center text-xs font-bold">3</span>
-                                STEP THREE
+                                CONNECT & COLLABORATE
                             </div>
-                            <h3 className="text-3xl font-bold text-slate-800 mb-4">Connect with the Community</h3>
+                            <h3 className="text-3xl font-bold text-slate-800 mb-4">Build Your Tribe</h3>
                             <p className="text-lg text-slate-600 leading-relaxed mb-8">
-                                Explore the landscape of other nonprofits in your field. Use our Nonprofit Directory to identify potential collaborators, understand the ecosystem, and see where your organization fits into the bigger picture of Bay Area social change.
+                                Join communities around causes you care about. Connect with potential co-founders, advisors, and supporters. 
+                                Share resources, celebrate wins, and learn from each other's journeys.
                             </p>
-                            <Link 
-                                to="/organizations" 
+                            <a 
+                                href="/community" 
                                 className="inline-flex items-center justify-center px-8 py-4 font-semibold rounded-2xl text-white bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
                             >
-                                <Handshake className="mr-2" size={20} />
-                                Explore Organizations
-                            </Link>
+                                <Users className="mr-2" size={20} />
+                                Join Community
+                            </a>
                         </div>
                         <div className="relative">
                             <video 
-                                src={STATIC_MEDIA.connectCommunityVideo} 
+                                src={STATIC_MEDIA.communityVideo} 
                                 className="w-full h-auto rounded-2xl shadow-2xl border-4 border-white" 
                                 autoPlay 
                                 loop 
@@ -258,137 +227,160 @@ const HowItWorksPage = () => {
                 </div>
             </StorySection>
 
-            {/* WHAT'S ON THE HORIZON SECTION */}
+            {/* THE ECOSYSTEM SECTION */}
+            <StorySection>
+                <div className="grid md:grid-cols-2 gap-12 lg:gap-20 items-center max-w-6xl">
+                    <motion.div variants={fadeIn}>
+                        <video
+                            src={STATIC_MEDIA.ecosystemMap}
+                            autoPlay
+                            loop
+                            muted
+                            playsInline
+                            className="w-full h-96 md:h-[480px] object-cover rounded-3xl shadow-2xl border-4 border-white"
+                            alt="Network visualization"
+                        />
+                    </motion.div>
+                    <motion.div variants={{...fadeIn, transition: {...fadeIn.transition, delay:0.2}}}>
+                        <div className="inline-block bg-gradient-to-br from-rose-100 to-pink-100 p-4 rounded-2xl mb-6 border border-rose-200">
+                            <Globe className="h-10 w-10 text-rose-600" />
+                        </div>
+                        
+                        <h2 className="text-4xl font-bold text-slate-800 leading-tight mb-6">
+                            One Platform.<br />
+                            <span className="text-transparent bg-clip-text bg-gradient-to-r from-rose-500 to-pink-600">Endless Possibilities.</span>
+                        </h2>
+                        
+                        <div className="text-lg text-slate-700 space-y-6 leading-relaxed">
+                            <p>
+                                Think of us as the connective tissue of the funding ecosystem. We bring together 
+                                everything you need to turn ideas into impact.
+                            </p>
+                            
+                            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-2xl border border-blue-100">
+                                <p className="font-semibold text-slate-800 mb-4 text-xl flex items-center">
+                                    <span className="text-2xl mr-2">🌐</span>
+                                    What we're building:
+                                </p>
+                                <div className="grid grid-cols-1 gap-3 text-slate-700">
+                                    {[
+                                        '🔍 Smart Database + AI Search',
+                                        '🚀 Project Showcase Platform', 
+                                        '💬 Community & Messaging',
+                                        '📊 Progress Tracking & Analytics',
+                                        '🤝 Collaboration Tools',
+                                        '🎯 Personalized Recommendations'
+                                    ].map(feature => (
+                                        <div key={feature} className="flex items-center gap-2 bg-white px-3 py-2 rounded-lg">
+                                            <span className="font-medium">{feature}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                            
+                            <p className="text-blue-700 font-semibold">
+                                Because the best ideas shouldn't be limited by who you know or how much time you have to search. 🚀
+                            </p>
+                        </div>
+                    </motion.div>
+                </div>
+            </StorySection>
+
+            {/* FUTURE VISION SECTION */}
             <StorySection>
                 <motion.div variants={fadeIn} className="text-center mb-16">
                     <h2 className="text-4xl md:text-5xl font-bold mb-6">
-                        <span className="text-slate-800">What's on the </span>
-                        <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-600">Horizon?</span>
+                        <span className="text-slate-800">What's </span>
+                        <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-600">Coming Next?</span>
                     </h2>
                     <p className="text-lg md:text-xl text-slate-600 max-w-3xl mx-auto leading-relaxed">
-                        We're building a full suite of tools to make the grant lifecycle easier for everyone in the Bay Area social impact ecosystem.
+                        We're just getting started. Here's a peek at the future we're building together.
                     </p>
                 </motion.div>
 
                 <div className="grid lg:grid-cols-3 gap-8 max-w-7xl mx-auto">
-                    {/* For Grant Seekers */}
+                    {/* For Idea Launchers */}
                     <motion.div variants={fadeIn} className="bg-white/80 backdrop-blur-sm p-8 rounded-3xl border border-white/60 shadow-2xl">
                         <div className="w-16 h-16 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-2xl flex items-center justify-center border border-blue-200 mb-6">
-                            <Heart className="h-8 w-8 text-blue-600" />
+                            <Lightbulb className="h-8 w-8 text-blue-600" />
                         </div>
-                        <h3 className="text-2xl font-bold text-slate-800 mb-6">For Grant Seekers</h3>
+                        <h3 className="text-2xl font-bold text-slate-800 mb-6">For Idea Launchers</h3>
                         <div className="space-y-4 text-slate-600 mb-8">
                             <div className="flex items-start gap-3">
-                                <Calendar className="h-5 w-5 text-teal-500 mt-1 flex-shrink-0" />
+                                <Zap className="h-5 w-5 text-yellow-500 mt-1 flex-shrink-0" />
                                 <div>
-                                    <strong className="text-slate-700">Grant Tracking:</strong> Save opportunities and manage deadlines in a personalized dashboard.
+                                    <strong className="text-slate-700">AI Proposal Assistant:</strong> Get help crafting compelling pitches and applications.
                                 </div>
                             </div>
                             <div className="flex items-start gap-3">
-                                <Bot className="h-5 w-5 text-sky-500 mt-1 flex-shrink-0" />
+                                <Target className="h-5 w-5 text-green-500 mt-1 flex-shrink-0" />
                                 <div>
-                                    <strong className="text-slate-700">AI Proposal Assistant:</strong> Get help drafting and tailoring applications.
+                                    <strong className="text-slate-700">Smart Matching:</strong> Get automatically notified when perfect opportunities arise.
                                 </div>
                             </div>
                             <div className="flex items-start gap-3">
-                                <TrendingUp className="h-5 w-5 text-green-500 mt-1 flex-shrink-0" />
+                                <BarChart3 className="h-5 w-5 text-blue-500 mt-1 flex-shrink-0" />
                                 <div>
-                                    <strong className="text-slate-700">Funding Trend Analysis:</strong> See historical giving patterns to improve strategy.
-                                </div>
-                            </div>
-                            <div className="flex items-start gap-3">
-                                <Filter className="h-5 w-5 text-orange-500 mt-1 flex-shrink-0" />
-                                <div>
-                                    <strong className="text-slate-700">Saved Searches & Alerts:</strong> Get notified when new matching opportunities are posted.
+                                    <strong className="text-slate-700">Impact Tracking:</strong> Showcase your progress and wins to build credibility.
                                 </div>
                             </div>
                         </div>
-                        <Link 
-                            to="/roadmap" 
-                            className="inline-flex items-center justify-center w-full px-6 py-3 font-semibold rounded-2xl text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-lg hover:shadow-xl transition-all duration-300"
-                        >
-                            Learn More
-                        </Link>
                     </motion.div>
 
-                    {/* For Fund Providers */}
+                    {/* For Capital Providers */}
                     <motion.div variants={fadeIn} className="bg-white/80 backdrop-blur-sm p-8 rounded-3xl border border-white/60 shadow-2xl">
                         <div className="w-16 h-16 bg-gradient-to-br from-green-100 to-emerald-100 rounded-2xl flex items-center justify-center border border-green-200 mb-6">
-                            <BarChart3 className="h-8 w-8 text-green-600" />
+                            <DollarSign className="h-8 w-8 text-green-600" />
                         </div>
-                        <h3 className="text-2xl font-bold text-slate-800 mb-6">For Fund Providers</h3>
+                        <h3 className="text-2xl font-bold text-slate-800 mb-6">For Capital Providers</h3>
                         <div className="space-y-4 text-slate-600 mb-8">
                             <div className="flex items-start gap-3">
-                                <BarChart3 className="h-5 w-5 text-indigo-500 mt-1 flex-shrink-0" />
+                                <Eye className="h-5 w-5 text-indigo-500 mt-1 flex-shrink-0" />
                                 <div>
-                                    <strong className="text-slate-700">Portfolio Analytics:</strong> Visualize your impact and gain insights into the funding landscape.
+                                    <strong className="text-slate-700">Discovery Dashboard:</strong> Find and track promising projects and founders.
                                 </div>
                             </div>
                             <div className="flex items-start gap-3">
-                                <Briefcase className="h-5 w-5 text-green-500 mt-1 flex-shrink-0" />
+                                <Users className="h-5 w-5 text-purple-500 mt-1 flex-shrink-0" />
                                 <div>
-                                    <strong className="text-slate-700">Streamlined Pipelines:</strong> Manage your application funnel from a single dashboard.
-                                </div>
-                            </div>
-                            <div className="flex items-start gap-3">
-                                <UserPlus className="h-5 w-5 text-rose-500 mt-1 flex-shrink-0" />
-                                <div>
-                                    <strong className="text-slate-700">Targeted Outreach:</strong> Proactively invite organizations to apply for your opportunities.
+                                    <strong className="text-slate-700">Portfolio Management:</strong> Track your investments and their community impact.
                                 </div>
                             </div>
                             <div className="flex items-start gap-3">
                                 <MessageSquare className="h-5 w-5 text-pink-500 mt-1 flex-shrink-0" />
                                 <div>
-                                    <strong className="text-slate-700">Anonymous Feedback:</strong> Receive anonymized feedback from applicants.
+                                    <strong className="text-slate-700">Direct Connect:</strong> Message promising candidates and build relationships.
                                 </div>
                             </div>
                         </div>
-                        <Link 
-                            to="/roadmap" 
-                            className="inline-flex items-center justify-center w-full px-6 py-3 font-semibold rounded-2xl text-white bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 shadow-lg hover:shadow-xl transition-all duration-300"
-                        >
-                            Learn More
-                        </Link>
                     </motion.div>
 
-                    {/* For the Community */}
+                    {/* For the Ecosystem */}
                     <motion.div variants={fadeIn} className="bg-white/80 backdrop-blur-sm p-8 rounded-3xl border border-white/60 shadow-2xl">
                         <div className="w-16 h-16 bg-gradient-to-br from-purple-100 to-pink-100 rounded-2xl flex items-center justify-center border border-purple-200 mb-6">
-                            <Users className="h-8 w-8 text-purple-600" />
+                            <Network className="h-8 w-8 text-purple-600" />
                         </div>
-                        <h3 className="text-2xl font-bold text-slate-800 mb-6">For the Community</h3>
+                        <h3 className="text-2xl font-bold text-slate-800 mb-6">For the Ecosystem</h3>
                         <div className="space-y-4 text-slate-600 mb-8">
                             <div className="flex items-start gap-3">
-                                <Heart className="h-5 w-5 text-red-500 mt-1 flex-shrink-0" />
+                                <Share2 className="h-5 w-5 text-blue-500 mt-1 flex-shrink-0" />
                                 <div>
-                                    <strong className="text-slate-700">Follow Organizations:</strong> Stay updated on the work of organizations you care about.
+                                    <strong className="text-slate-700">Knowledge Sharing:</strong> Community-driven resources, templates, and best practices.
                                 </div>
                             </div>
                             <div className="flex items-start gap-3">
-                                <Users className="h-5 w-5 text-orange-500 mt-1 flex-shrink-0" />
+                                <Calendar className="h-5 w-5 text-orange-500 mt-1 flex-shrink-0" />
                                 <div>
-                                    <strong className="text-slate-700">Community Forums:</strong> Discuss local issues and connect with passionate neighbors.
+                                    <strong className="text-slate-700">Events & Meetups:</strong> Connect in person at funding showcases and community events.
                                 </div>
                             </div>
                             <div className="flex items-start gap-3">
-                                <Zap className="h-5 w-5 text-yellow-500 mt-1 flex-shrink-0" />
+                                <Award className="h-5 w-5 text-yellow-500 mt-1 flex-shrink-0" />
                                 <div>
-                                    <strong className="text-slate-700">Direct Support:</strong> Find opportunities to donate or volunteer for campaigns.
-                                </div>
-                            </div>
-                            <div className="flex items-start gap-3">
-                                <Target className="h-5 w-5 text-blue-500 mt-1 flex-shrink-0" />
-                                <div>
-                                    <strong className="text-slate-700">Explore Impact:</strong> See how fund providers and grant seekers are shaping your community.
+                                    <strong className="text-slate-700">Success Stories:</strong> Celebrate wins and learn from the community's journey.
                                 </div>
                             </div>
                         </div>
-                        <button 
-                            disabled 
-                            className="inline-flex items-center justify-center w-full px-6 py-3 font-semibold rounded-2xl text-slate-500 bg-slate-200 cursor-not-allowed border border-slate-300"
-                        >
-                            Coming Soon
-                        </button>
                     </motion.div>
                 </div>
             </StorySection>
@@ -397,31 +389,31 @@ const HowItWorksPage = () => {
             <section className="mt-20">
                 <div className="bg-gradient-to-r from-slate-800 to-slate-900 p-8 md:p-12 rounded-3xl text-white shadow-2xl max-w-4xl mx-auto text-center">
                     <div className="w-16 h-16 mx-auto mb-6 bg-white/10 backdrop-blur-sm rounded-2xl flex items-center justify-center border border-white/20">
-                        <Sparkles className="h-8 w-8 text-white" />
+                        <Rocket className="h-8 w-8 text-white" />
                     </div>
                     
                     <h2 className="text-3xl md:text-4xl font-bold mb-4">
-                        Ready to Transform Your Grant Search?
+                        Ready to Join the Future of Funding?
                     </h2>
                     <p className="text-lg md:text-xl opacity-90 mb-8 max-w-2xl mx-auto">
-                        Join the Bay Area nonprofits already discovering funding faster and focusing on what matters most: their mission.
+                        Whether you're launching the next big thing or looking to fund it, your community is waiting.
                     </p>
                     
                     <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-                        <Link 
-                            to="/grants" 
+                        <a 
+                            href="/opportunities/create" 
                             className="inline-flex items-center justify-center px-8 py-4 bg-white text-slate-900 hover:bg-gray-100 rounded-2xl font-semibold transition-all duration-300 hover:scale-105 shadow-lg"
                         >
-                            <Search className="mr-2" size={20} />
-                            Start Exploring Grants
-                        </Link>
-                        <Link 
-                            to="/signup" 
+                            <Rocket className="mr-2" size={20} />
+                            Launch Your Project
+                        </a>
+                        <a 
+                            href="/signup" 
                             className="inline-flex items-center justify-center px-8 py-4 bg-white/20 hover:bg-white/30 backdrop-blur-sm border border-white/20 rounded-2xl text-white font-semibold transition-all duration-300"
                         >
                             <ArrowRight className="mr-2" size={20} />
-                            Create Free Account
-                        </Link>
+                            Join the Community
+                        </a>
                     </div>
                 </div>
             </section>

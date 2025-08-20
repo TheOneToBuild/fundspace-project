@@ -101,7 +101,7 @@ export default function MinimalSignupForm({ onSwitchToLogin, onSignupSuccess }) 
           </motion.span>
         </h1>
         <p className="text-slate-600 text-lg">
-          Yay! We're so excited to have you join us. Let's get you started on your impact journey! 
+          Yay! We're so excited to have you join us. Let's get you started on your journey! 
           <span className="inline-block ml-1">✨</span>
         </p>
       </motion.div>

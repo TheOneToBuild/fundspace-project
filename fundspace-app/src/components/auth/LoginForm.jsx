@@ -89,7 +89,7 @@ export default function LoginForm({ onSwitchToSignUp, onSwitchToForgotPassword, 
           </motion.span>
         </h1>
         <p className="text-slate-600 text-lg">
-          Ready to continue building impact together?
+          Ready to continue building together?
         </p>
       </motion.div>
       

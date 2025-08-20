@@ -1,4 +1,3 @@
-// src/AboutUsPage.jsx
 import React, { useEffect, useContext } from 'react';
 import { motion } from 'framer-motion';
 import { Users, BarChart3, Briefcase, Heart, Home, AlertTriangle, Coffee, Building, Sparkles, TrendingUp, Star, Clock, Target, Zap, Bot, Shield, Search, ArrowRight, ChevronDown, ExternalLink } from './components/Icons.jsx';
@@ -8,14 +7,14 @@ import PublicPageLayout from './components/PublicPageLayout.jsx';
 
 const STATIC_MEDIA = {
     collage: [
-        'https://plus.unsplash.com/premium_photo-1705882849674-e8ecc5e53f6e?q=80&w=687&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D', // Tech education
-        'https://images.pexels.com/photos/6995106/pexels-photo-6995106.jpeg', // Community collaboration
-        'https://images.unsplash.com/photo-1527484912758-6e8bf56b18c3?q=80&w=1740&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D', // Community garden
-        'https://images.pexels.com/photos/9543414/pexels-photo-9543414.jpeg', // Youth development
-        'https://images.unsplash.com/photo-1615856210162-9ae33390b1a2?q=80&w=1742&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D', // Arts collective
+        'https://plus.unsplash.com/premium_photo-1705882849674-e8ecc5e53f6e?q=80&w=687&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
+        'https://images.pexels.com/photos/6995106/pexels-photo-6995106.jpeg',
+        'https://images.unsplash.com/photo-1527484912758-6e8bf56b18c3?q=80&w=1740&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
+        'https://images.pexels.com/photos/9543414/pexels-photo-9543414.jpeg',
+        'https://images.unsplash.com/photo-1615856210162-9ae33390b1a2?q=80&w=1742&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
     ],
-    map: 'https://videos.pexels.com/video-files/8320073/8320073-uhd_2560_1440_25fps.mp4', // San Francisco skyline
-    hero: 'https://videos.pexels.com/video-files/7402746/7402746-hd_1080_1920_30fps.mp4' // Grant search/technology
+    map: 'https://videos.pexels.com/video-files/8320073/8320073-uhd_2560_1440_25fps.mp4',
+    hero: 'https://videos.pexels.com/video-files/7402746/7402746-hd_1080_1920_30fps.mp4'
 };
 
 const advisoryBoard = [
@@ -120,7 +119,7 @@ const AboutUsPage = () => {
           </h1>
           
           <p className="text-lg md:text-xl text-slate-700 mb-8 max-w-4xl mx-auto leading-relaxed">
-            We've been in your shoes—staying up late scrolling through endless grant databases, 
+            We've been in your shoes—staying up late scrolling through endless funding databases, 
             bookmarking opportunities that disappear, and wondering if there's a better way to connect with funders and fellow change-makers. 
             <span className="font-semibold text-blue-700"> Spoiler alert: there is! ✨</span>
           </p>
@@ -154,15 +153,13 @@ const AboutUsPage = () => {
             </div>
             
             <div className="text-lg text-slate-600 space-y-6 leading-relaxed">
-              <p>We believe that funding should be accessible, not aspirational. This is our foundational promise. The ‘grants’ part of what we do is our commitment to connecting you directly with the capital needed to fuel your work. We provide the platform and the financial tools to open doors that were once closed.</p>
+              <p>We believe that funding should be accessible, not aspirational. This is our foundational promise. The ‘fund’ part of what we do is our commitment to connecting you directly with the capital needed to fuel your work. We provide the platform and the financial tools to open doors that were once closed.</p>
               
               <div className="bg-gradient-to-r from-red-50 to-rose-50 p-6 rounded-2xl border border-red-100">
-                <p className="text-slate-700 font-semibold text-xl mb-2">Our Philosophy: Accessible Capital, Powerful Community
-
-</p>
+                <p className="text-slate-700 font-semibold text-xl mb-2">Our Philosophy: Accessible Capital, Powerful Community</p>
               </div>
               
-              <p>But we also know that the most powerful resource of all is people. A grant can fund a project, but only a community can sustain a movement. That’s why we’ve built more than a database; we’ve cultivated a living ecosystem of Bay Area changemakers. Here, progress is powered by connection. Whether you're building a company, leading a nonprofit, or looking to fund the future, you have a place here. Let's ensure no great idea is ever left behind.</p>
+              <p>While capital is crucial, we know people are the most powerful resource. A grant funds a project; a community sustains a movement. That's why the "Space" at Fundspace is an active ecosystem, not just a database. Whether you're building a company, leading a nonprofit, or looking to fund the future, you have a place here. Let's ensure no great idea is ever left behind.</p>
               
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-8">
                 <div className="text-center p-4 bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl border border-purple-200">
@@ -275,7 +272,7 @@ const AboutUsPage = () => {
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-indigo-500">Magic</span>
           </motion.h2>
           <motion.p variants={{...fadeIn, transition: {...fadeIn.transition, delay:0.2}}} className="text-lg text-slate-600 max-w-3xl mx-auto">
-            Our advisory board comes from nonprofits, government, and foundations who believe the Bay Area deserves funding infrastructure that brings people together.
+            Our advisory board comes from philanthropy, public, and private sectors who believe the Bay Area deserves funding infrastructure that brings people together.
           </motion.p>
         </div>
         
@@ -287,7 +284,12 @@ const AboutUsPage = () => {
             <motion.div
               key={index}
               variants={fadeIn}
-              className="bg-white rounded-3xl shadow-lg border border-slate-200 p-8 hover:shadow-xl transition-all duration-300 transform hover:scale-105 relative overflow-hidden"
+              className="bg-white rounded-3xl shadow-lg border border-slate-200 p-8 relative overflow-hidden"
+              whileHover={{
+                scale: 1.05,
+                y: -5,
+                transition: { duration: 0.2 },
+              }}
             >
               {/* Fun background decoration */}
               <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-amber-100 to-orange-100 rounded-full opacity-50 -translate-y-10 translate-x-10"></div>
@@ -389,7 +391,7 @@ const AboutUsPage = () => {
           <motion.p variants={{...fadeIn, transition: {...fadeIn.transition, delay: 0.2}}} className="text-xl mb-8 opacity-90 leading-relaxed">
             Join Bay Area changemakers, funders, and nonprofit leaders who've discovered that 
             finding funding is so much better when you're not doing it alone. 
-            <strong className="text-blue-700"> Come for the grants, stay for the community! 🤝</strong>
+            <strong className="text-blue-700"> Come for the funds, stay for the community! 🤝</strong>
           </motion.p>
           
           <motion.div 

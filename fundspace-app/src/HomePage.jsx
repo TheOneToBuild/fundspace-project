@@ -14,8 +14,12 @@ const Styles = () => (
     }
     .tracking-tighter { letter-spacing: -0.05em; }
     .scroller {
-      -webkit-mask: linear-gradient(90deg, transparent, white 20%, white 80%, transparent);
-      mask: linear-gradient(90deg, transparent, white 20%, white 80%, transparent);
+      overflow-x: auto;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+    }
+    .scroller::-webkit-scrollbar {
+      display: none;
     }
     .scroller-inner {
       display: flex;
@@ -60,18 +64,19 @@ const Plus = (props) => <Icon {...props}><line x1="12" y1="5" x2="12" y2="19"></
 const DYNAMIC_WORDS = ["build", "grow", "dream", "learn", "thrive", "stands"];
 
 const carouselData = [
-  { type: 'image', title: '', image: 'https://images.unsplash.com/photo-1519671845924-1fd18db430b8?q=80&w=816&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D' },
-  { type: 'image', title: '', image: 'https://cdn.pixabay.com/photo/2016/03/18/15/21/help-1265227_1280.jpg' },
-  { type: 'image', title: '', image: 'https://images.unsplash.com/photo-1722963220293-aff91802d709?q=80&w=687' },
-  { type: 'video', title: '', videoSrc: 'https://cdn.pixabay.com/video/2024/01/20/197486-905015022_tiny.mp4' },
-  { type: 'image', title: '', image: 'https://plus.unsplash.com/premium_photo-1677171749367-85d6d2d1f81f?q=80&w=687' },
-  { type: 'image', title: '', image: 'https://images.unsplash.com/photo-1643321610692-719deb378a33?q=80&w=687' },
-  { type: 'image', title: '', image: 'https://images.unsplash.com/photo-1583743220494-3da91330c2fd?q=80&w=930' },
-  { type: 'video', title: '', videoSrc: 'https://cdn.pixabay.com/video/2024/02/02/198898-909564555_tiny.mp4' },
+  { type: 'image', title: 'Mission Economic Development Agency', image: 'https://media.licdn.com/dms/image/v2/C561BAQGwhXHEN7fTVg/company-background_10000/company-background_10000/0/1585481344716/mission_economic_development_agency_cover?e=2147483647&v=beta&t=qypVn1yoDmdyZVIuhXoxuGyv7JmMM-NmkuNdv8OPtnI' },
+  { type: 'video', title: '', videoSrc: 'https://videos.pexels.com/video-files/9363691/9363691-hd_1080_1920_25fps.mp4' },
+  { type: 'image', title: 'Pacific Islander Community Partnership', image: 'https://scontent-sjc6-1.xx.fbcdn.net/v/t39.30808-6/490909697_994255009530222_3430361906916357371_n.jpg?stp=cp6_dst-jpg_tt6&_nc_cat=104&ccb=1-7&_nc_sid=833d8c&_nc_ohc=i__LEAceW98Q7kNvwFQs1Bo&_nc_oc=AdnouoOZnyiqOPmmKhIHPZL_c317YnEAJDYjKlyOJk26iaIuerIXmu-QjIps8bj7L0I&_nc_zt=23&_nc_ht=scontent-sjc6-1.xx&_nc_gid=o5xmTwlVo0g5rLT4DgJ7FQ&oh=00_AfXYWiKFMbECu93lQZGebttFTNkS6WbH5yUMk9YwpsAXwQ&oe=68AB13BC' },
+  { type: 'image', title: 'Future Construction Leaders Silicon Valley', image: 'https://images.squarespace-cdn.com/content/v1/64bfe92e203a2c626566aaca/1751316493749-Z5OFLWE8QBDIP9H05ST6/DSC00129.JPG' },
+  { type: 'video', title: '', videoSrc: 'https://videos.pexels.com/video-files/3191353/3191353-uhd_2732_1440_25fps.mp4' },
+  { type: 'image', title: 'The RILEY Project', image: 'https://scontent-sjc6-1.xx.fbcdn.net/v/t39.30808-6/480182066_674930054891057_6225268670759551493_n.jpg?_nc_cat=108&ccb=1-7&_nc_sid=127cfc&_nc_ohc=bBeS_lu6fwYQ7kNvwFhwpux&_nc_oc=AdlxjAr1GRJ3cNfUPDVVn8xruH1vY2_JwDpMeXm7GDAeDAfZ6aPLAtCEpbPOaiaHzXM&_nc_zt=23&_nc_ht=scontent-sjc6-1.xx&_nc_gid=QqwEgyvQYuHiguDY668Dbg&oh=00_AfVirmDp3xJdnb-OQ7VDapsn6c8yzDN_G-s6VuFwAOXqcw&oe=68AB250F' },
+  { type: 'image', title: 'Pilipino Bayanihan Resource Center', image: 'https://static.wixstatic.com/media/de0c33_57840cb972484c00ae6423895af087a2~mv2_d_2048_1365_s_2.jpg/v1/fill/w_640,h_808,al_c,q_85,usm_0.66_1.00_0.01,enc_avif,quality_auto/de0c33_57840cb972484c00ae6423895af087a2~mv2_d_2048_1365_s_2.jpg' },
+  { type: 'video', title: '', videoSrc: 'https://videos.pexels.com/video-files/6893839/6893839-uhd_2560_1440_25fps.mp4' },
+  { type: 'image', title: 'Dev/Mission', image: 'https://devmission.org/wp-content/uploads/2024/08/53835579331_8a5c917d82_k.jpg' },
 ];
 
 const platformFeatures = [
-  { title: "Find Funding, Faster", description: "Our AI-powered search matches you with relevant grants in minutes, not weeks.", image: "https://images.unsplash.com/photo-1569292567773-229e2b7521ee?q=80&w=689&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D" },
+  { title: "Find Funding, Faster", description: "Our AI-powered search matches you with relevant funds in minutes, not weeks.", image: "https://images.unsplash.com/photo-1569292567773-229e2b7521ee?q=80&w=689&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D" },
   { title: "Tell Your Story", description: "Create a dynamic profile that showcases your impact and connects you with supporters.", image: "https://plus.unsplash.com/premium_photo-1705882849674-e8ecc5e53f6e?q=80&w=687&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D" },
   { title: "Build Your Network", description: "Connect with funders, collaborators, and peers in a community built for social impact.", image: "https://images.unsplash.com/photo-1544928147-79a2dbc1f389?q=80&w=687&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D" },
 ];
@@ -88,7 +93,11 @@ const CarouselCard = ({ item }) => (
       <img src={item.image} alt={item.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
     )}
     <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div>
-    <h3 className="absolute top-4 left-4 text-white text-lg font-bold">{item.title}</h3>
+    {item.title && (
+      <div className="absolute bottom-4 left-4 right-4">
+        <h3 className="text-white text-lg font-semibold">{item.title}</h3>
+      </div>
+    )}
   </div>
 );
 
@@ -168,6 +177,7 @@ function HomePage() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [grants, setGrants] = useState([]);
   const [totalFunding, setTotalFunding] = useState(0);
+  const scrollRef = useRef(null);
 
   // Fetch grants data to calculate actual total funding
   useEffect(() => {
@@ -216,6 +226,22 @@ function HomePage() {
     };
 
     fetchGrantsData();
+  }, []);
+
+  // Handle mouse wheel scroll for carousel
+  useEffect(() => {
+    const handleWheel = (e) => {
+      if (scrollRef.current) {
+        e.preventDefault();
+        scrollRef.current.scrollLeft += e.deltaY;
+      }
+    };
+
+    const scrollElement = scrollRef.current;
+    if (scrollElement) {
+      scrollElement.addEventListener('wheel', handleWheel, { passive: false });
+      return () => scrollElement.removeEventListener('wheel', handleWheel);
+    }
   }, []);
 
   useEffect(() => {
@@ -274,7 +300,10 @@ function HomePage() {
 
       {/* CAROUSEL */}
       <section className="py-8 md:py-16 bg-white">
-        <div className="scroller w-full overflow-hidden">
+        <div 
+          ref={scrollRef}
+          className="scroller w-full overflow-hidden cursor-grab active:cursor-grabbing"
+        >
           <div className="scroller-inner">
             {[...carouselData, ...carouselData].map((item, i) => <CarouselCard key={i} item={item} />)}
           </div>
@@ -288,7 +317,7 @@ function HomePage() {
             <div className="text-center lg:text-left">
               <h2 className="text-3xl md:text-4xl font-extrabold text-slate-800 leading-tight">Unlock Millions in Funding Opportunities</h2>
               <p className="mt-4 text-base md:text-lg text-slate-600 max-w-xl mx-auto lg:mx-0">
-                Our platform aggregates grants from across the Bay Area, putting a comprehensive database of funding at your fingertips.
+                Our platform aggregates opportunities from across the Bay Area, putting a comprehensive database of funding at your fingertips.
               </p>
             </div>
             <div className="text-center">
@@ -305,9 +334,9 @@ function HomePage() {
       <section className="py-16 md:py-28">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12 md:mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold text-slate-800 mb-4">Designed by Community. Built for Community.</h2>
+            <h2 className="text-3xl md:text-4xl font-bold text-slate-800 mb-4">Accessible Capital, Powerful Community</h2>
             <p className="text-base md:text-lg text-slate-600 max-w-2xl mx-auto">
-              Our platform is built by community members, for community members. We understand the unique challenges and opportunities in the Bay Area, and we're here to support you every step of the way.
+              Our platform is powered by the very people it serves—a vibrant network of changemakers helping each other find funding and build connections. 
             </p>
           </div>
           <div className="grid md:grid-cols-3 gap-6 md:gap-8 h-auto md:h-[600px]">
