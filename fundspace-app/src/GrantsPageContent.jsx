@@ -560,7 +560,7 @@ const GrantsPageContent = ({ isProfileView = false }) => {
               </h2>
               
               <p className="text-md md:text-lg text-slate-600 mb-6 max-w-3xl mx-auto leading-relaxed">
-                Our comprehensive database connects you with RFPs and grants from across the Bay Area. 
+                Our AI-powered database pulls funding opportunities from across the Bay Area.
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-pink-600 font-semibold"> Discover your perfect match.</span>
               </p>
 

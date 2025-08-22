@@ -28,7 +28,7 @@ export default function PublicHeader() {
     const mobileMenuRef = useRef(null);
 
     const mainNavLinks = [
-        { to: "/grants", text: "Find Grants", activeClassName: "text-blue-600 font-semibold" },
+        { to: "/grants", text: "Find Funding", activeClassName: "text-blue-600 font-semibold" },
         { to: "/organizations", text: "Explore Organizations", activeClassName: "text-blue-600 font-semibold" },
         { to: "/spotlight", text: "Spotlight", activeClassName: "text-rose-600 font-semibold" },
     ];
@@ -56,95 +56,97 @@ export default function PublicHeader() {
             document.body.style.overflow = 'unset';
         }
         return () => { document.body.style.overflow = 'unset'; };
-    }, [isMobileMenuOpen]);
+    }, []);
 
     return (
         <>
             <header className="bg-white/80 backdrop-blur-lg shadow-sm sticky top-0 z-40 border-b border-slate-200">
-                <div className="container mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-3 flex justify-between items-center">
+                <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-3 flex justify-between items-center">
                     <Link to="/" aria-label="Fundspace Home">
-                        <img src={headerLogoImage} alt="Fundspace Logo" className="h-10 sm:h-12 md:h-14 w-auto" />
+                        <img src={headerLogoImage} alt="Fundspace Logo" className="h-12 md:h-14 w-auto" />
                     </Link>
-                    <nav className="hidden md:flex items-center space-x-4 lg:space-x-6">
-                        {mainNavLinks.map(({ to, text, activeClassName }) => (
-                            <PublicNavLink key={to} to={to} activeClassName={activeClassName}>
-                                {text}
+                    
+                    {/* Desktop Navigation */}
+                    <nav className="hidden md:flex items-center space-x-4 md:space-x-6">
+                        {mainNavLinks.map((link) => (
+                            <PublicNavLink 
+                                key={link.to} 
+                                to={link.to} 
+                                activeClassName={link.activeClassName}
+                            >
+                                {link.text}
                             </PublicNavLink>
                         ))}
                     </nav>
-                    <div className="hidden md:flex items-center space-x-3 lg:space-x-4">
+
+                    {/* Desktop Auth & Submit Grant Button */}
+                    <div className="hidden md:flex items-center space-x-3">
                         <AuthButton />
                         <Link 
                             to="/submit-grant" 
-                            className="inline-flex items-center justify-center px-3 lg:px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 transition-all duration-200 ease-in-out shadow-sm"
+                            className="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 transition-colors duration-200 shadow-sm hover:shadow-md"
                         >
-                            <PlusCircle size={16} className="mr-1 lg:mr-2" />
-                            <span className="hidden lg:inline">Submit Grant</span>
-                            <span className="lg:hidden">Submit</span>
+                            <PlusCircle className="w-4 h-4 mr-2" />
+                            Submit Grant
                         </Link>
                     </div>
-                    <div className="md:hidden">
-                        <button 
-                            onClick={() => setIsMobileMenuOpen(true)} 
-                            aria-label="Open menu" 
-                            className="p-2 rounded-md text-slate-600 hover:bg-slate-100 transition-colors"
-                        >
-                            <Menu size={24} />
-                        </button>
-                    </div>
+
+                    {/* Mobile Menu Button */}
+                    <button
+                        onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                        className="md:hidden p-2 rounded-md text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors"
+                        aria-expanded={isMobileMenuOpen}
+                        aria-label="Toggle mobile menu"
+                    >
+                        {isMobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+                    </button>
                 </div>
             </header>
 
             {/* Mobile Menu Overlay */}
             {isMobileMenuOpen && (
-                <div 
-                    className="fixed inset-0 bg-black bg-opacity-50 z-50 md:hidden"
-                    onClick={closeMobileMenu}
-                >
+                <div className="fixed inset-0 z-50 md:hidden">
+                    <div className="fixed inset-0 bg-black bg-opacity-25" onClick={closeMobileMenu}></div>
                     <div 
                         ref={mobileMenuRef}
-                        className="fixed inset-y-0 right-0 w-80 max-w-sm bg-white shadow-xl transform transition-transform duration-300 ease-in-out"
-                        onClick={(e) => e.stopPropagation()}
+                        className="fixed top-0 right-0 bottom-0 w-full max-w-sm bg-white shadow-xl"
                     >
-                        {/* Mobile Menu Header */}
                         <div className="flex items-center justify-between p-4 border-b border-slate-200">
-                            <img src={headerLogoImage} alt="Fundspace Logo" className="h-8 w-auto" />
-                            <button 
+                            <span className="text-lg font-semibold text-slate-900">Menu</span>
+                            <button
                                 onClick={closeMobileMenu}
-                                className="p-2 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
-                                aria-label="Close menu"
+                                className="p-2 rounded-md text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+                                aria-label="Close mobile menu"
                             >
-                                <X size={20} />
+                                <X className="h-5 w-5" />
                             </button>
                         </div>
-
-                        {/* Mobile Navigation Links */}
-                        <nav className="py-4">
-                            {mainNavLinks.map(({ to, text, activeClassName }) => (
+                        
+                        <nav className="px-2 py-4 space-y-1">
+                            {mainNavLinks.map((link) => (
                                 <PublicNavLink 
-                                    key={to} 
-                                    to={to} 
-                                    activeClassName={activeClassName}
-                                    mobile 
+                                    key={link.to} 
+                                    to={link.to} 
+                                    activeClassName={link.activeClassName}
+                                    mobile={true}
                                     onClick={closeMobileMenu}
                                 >
-                                    {text}
+                                    {link.text}
                                 </PublicNavLink>
                             ))}
                         </nav>
 
-                        {/* Mobile Menu Actions */}
                         <div className="border-t border-slate-200 p-4 space-y-3">
-                            <Link 
-                                to="/submit-grant"
-                                onClick={closeMobileMenu}
-                                className="flex items-center justify-center w-full px-4 py-3 border border-transparent text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 transition-colors"
-                            >
-                                <PlusCircle size={16} className="mr-2" />
-                                Submit Grant
-                            </Link>
-                            <div className="w-full">
-                                <AuthButton mobile onClose={closeMobileMenu} />
+                            <div className="flex flex-col space-y-3">
+                                <AuthButton mobile />
+                                <Link 
+                                    to="/submit-grant" 
+                                    onClick={closeMobileMenu}
+                                    className="w-full inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 transition-colors duration-200"
+                                >
+                                    <PlusCircle className="w-4 h-4 mr-2" />
+                                    Submit Grant
+                                </Link>
                             </div>
                         </div>
                     </div>

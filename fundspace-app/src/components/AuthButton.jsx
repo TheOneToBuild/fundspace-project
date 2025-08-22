@@ -125,11 +125,11 @@ export default function AuthButton({ mobile = false, onClose }) {
     // Loading state
     if (loading) {
         return mobile ? (
-            <div className="w-full px-4 py-3 bg-slate-100 rounded-lg animate-pulse">
+            <div className="w-full px-4 py-3 bg-slate-100 rounded-full animate-pulse">
                 <div className="h-4 bg-slate-300 rounded"></div>
             </div>
         ) : (
-            <div className="px-4 py-2 bg-slate-100 rounded-lg animate-pulse">
+            <div className="px-4 py-2 bg-slate-100 rounded-full animate-pulse">
                 <div className="h-4 w-16 bg-slate-300 rounded"></div>
             </div>
         );
@@ -241,13 +241,13 @@ export default function AuthButton({ mobile = false, onClose }) {
             <Link 
                 to="/login"
                 onClick={handleLinkClick}
-                className="block w-full px-4 py-2 text-center text-sm font-medium text-blue-600 hover:text-blue-700 border border-blue-600 rounded-lg hover:bg-blue-50 transition-colors"
+                className="block w-full px-4 py-2 text-center text-sm font-medium text-blue-600 hover:text-blue-700 border border-blue-600 rounded-full hover:bg-blue-50 transition-colors"
             >
                 Sign In
             </Link>
             <button 
                 onClick={handleSignUpClick}
-                className="block w-full px-4 py-2 text-center text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+                className="block w-full px-4 py-2 text-center text-sm font-medium text-white bg-blue-600 rounded-full hover:bg-blue-700 transition-colors"
             >
                 Sign Up
             </button>
@@ -256,13 +256,13 @@ export default function AuthButton({ mobile = false, onClose }) {
         <div className="flex items-center space-x-3">
             <Link 
                 to="/login"
-                className="px-3 lg:px-4 py-2 text-sm font-medium rounded-lg text-slate-700 bg-white hover:bg-slate-50 border border-slate-300 shadow-sm transition-colors cursor-pointer"
+                className="px-3 lg:px-4 py-2 text-sm font-medium rounded-full text-slate-700 bg-white hover:bg-slate-50 border border-slate-300 shadow-sm transition-colors cursor-pointer"
             >
                 Sign In
             </Link>
             <button 
                 onClick={handleSignUpClick}
-                className="inline-flex items-center justify-center px-3 lg:px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 transition-colors cursor-pointer"
+                className="inline-flex items-center justify-center px-3 lg:px-4 py-2 border border-transparent text-sm font-medium rounded-full text-white bg-blue-600 hover:bg-blue-700 transition-colors cursor-pointer"
             >
                 Sign Up
             </button>

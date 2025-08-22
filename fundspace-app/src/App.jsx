@@ -106,7 +106,7 @@ const PublicHeader = () => {
   const mobileMenuRef = useRef(null);
 
   const mainNavLinks = [
-    { to: "/grants", text: "Find Grants", active: "text-blue-600 font-semibold" },
+    { to: "/grants", text: "Find Funding", active: "text-blue-600 font-semibold" },
     { to: "/organizations", text: "Explore Organizations", active: "text-blue-600 font-semibold" },
     { to: "/spotlight", text: "Spotlight", active: "text-rose-600 font-semibold" },
   ];
@@ -146,38 +146,44 @@ const PublicHeader = () => {
               </NavLink>
             ))}
           </nav>
-          <div className="hidden md:flex items-center space-x-3 lg:space-x-4">
-            <AuthButton />
+          <div className="flex items-center space-x-2 sm:space-x-3">
+            <div className="hidden md:block">
+              <AuthButton />
+            </div>
             <Link 
               to="/submit-grant" 
-              className="inline-flex items-center justify-center px-3 lg:px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 transition-all duration-200 ease-in-out shadow-sm"
+              className="hidden md:inline-flex items-center justify-center px-3 sm:px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 transition-colors"
             >
-              <PlusCircle size={16} className="mr-1 lg:mr-2" />
-              <span className="hidden lg:inline">Submit Grant</span>
-              <span className="lg:hidden">Submit</span>
+              <PlusCircle size={16} className="mr-1 sm:mr-2" />
+              <span className="hidden sm:inline">Submit Grant</span>
+              <span className="sm:hidden">Submit</span>
             </Link>
-          </div>
-          <div className="md:hidden">
             <button 
               onClick={() => setIsMobileMenuOpen(true)} 
               aria-label="Open menu" 
-              className="p-2 rounded-md text-slate-600 hover:bg-slate-100 transition-colors"
+              className="md:hidden p-2 rounded-md text-slate-600 hover:bg-slate-100 transition-colors"
             >
               <Menu size={24} />
             </button>
           </div>
         </div>
       </header>
+
+      {/* Mobile Menu Overlay */}
       {isMobileMenuOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 md:hidden" onClick={closeMobileMenu}>
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 z-50 md:hidden"
+          onClick={closeMobileMenu}
+        >
           <div 
             ref={mobileMenuRef}
             className="fixed inset-y-0 right-0 w-80 max-w-sm bg-white shadow-xl transform transition-transform duration-300 ease-in-out"
             onClick={(e) => e.stopPropagation()}
           >
+            {/* Mobile Menu Header */}
             <div className="flex items-center justify-between p-4 border-b border-slate-200">
               <img src={headerLogoImage} alt="Fundspace Logo" className="h-8 w-auto" />
-              <button
+              <button 
                 onClick={closeMobileMenu}
                 className="p-2 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
                 aria-label="Close menu"
@@ -185,6 +191,8 @@ const PublicHeader = () => {
                 <X size={20} />
               </button>
             </div>
+
+            {/* Mobile Navigation Links */}
             <nav className="py-4">
               {mainNavLinks.map(({ to, text, active }) => (
                 <NavLink 
@@ -197,6 +205,8 @@ const PublicHeader = () => {
                 </NavLink>
               ))}
             </nav>
+
+            {/* Mobile Menu Actions */}
             <div className="border-t border-slate-200 p-4 space-y-3">
               <Link 
                 to="/submit-grant"
