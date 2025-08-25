@@ -39,6 +39,7 @@ import OnboardingWizard from './components/OnboardingWizard.jsx';
 import AuthButton from './components/AuthButton.jsx';
 import Footer from './components/Footer.jsx';
 import DashboardHeader from './components/DashboardHeader.jsx';
+import PublicHeader from './components/PublicHeader.jsx';
 import './components/skeleton-animations.css';
 import headerLogoImage from './assets/fundspace-logo2.png';
 import { PlusCircle, Menu, X } from './components/Icons.jsx';
@@ -99,132 +100,6 @@ const PublicRoute = ({ children }) => {
     return <Navigate to={location.state?.from?.pathname || '/profile'} replace />;
   }
   return children;
-};
-
-const PublicHeader = () => {
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const mobileMenuRef = useRef(null);
-
-  const mainNavLinks = [
-    { to: "/grants", text: "Find Funding", active: "text-blue-600 font-semibold" },
-    { to: "/organizations", text: "Explore Organizations", active: "text-blue-600 font-semibold" },
-    { to: "/spotlight", text: "Spotlight", active: "text-rose-600 font-semibold" },
-  ];
-
-  const closeMobileMenu = () => setIsMobileMenuOpen(false);
-
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (mobileMenuRef.current && !mobileMenuRef.current.contains(event.target)) {
-        setIsMobileMenuOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  useEffect(() => {
-    document.body.style.overflow = isMobileMenuOpen ? 'hidden' : 'unset';
-    return () => { document.body.style.overflow = 'unset'; };
-  }, [isMobileMenuOpen]);
-
-  return (
-    <>
-      <header className="bg-white/80 backdrop-blur-lg shadow-sm sticky top-0 z-40 border-b border-slate-200">
-        <div className="container mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-3 flex justify-between items-center">
-          <Link to="/" aria-label="Fundspace Home">
-            <img src={headerLogoImage} alt="Fundspace Logo" className="h-10 sm:h-12 md:h-14 w-auto" />
-          </Link>
-          <nav className="hidden md:flex items-center space-x-4 lg:space-x-6">
-            {mainNavLinks.map(({ to, text, active }) => (
-              <NavLink 
-                key={to} 
-                to={to} 
-                className={({ isActive }) => `text-sm md:text-base font-medium transition-colors ${isActive ? active : 'text-slate-700 hover:text-blue-600'}`}
-              >
-                {text}
-              </NavLink>
-            ))}
-          </nav>
-          <div className="flex items-center space-x-2 sm:space-x-3">
-            <div className="hidden md:block">
-              <AuthButton />
-            </div>
-            <Link 
-              to="/submit-grant" 
-              className="hidden md:inline-flex items-center justify-center px-3 sm:px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 transition-colors"
-            >
-              <PlusCircle size={16} className="mr-1 sm:mr-2" />
-              <span className="hidden sm:inline">Submit Grant</span>
-              <span className="sm:hidden">Submit</span>
-            </Link>
-            <button 
-              onClick={() => setIsMobileMenuOpen(true)} 
-              aria-label="Open menu" 
-              className="md:hidden p-2 rounded-md text-slate-600 hover:bg-slate-100 transition-colors"
-            >
-              <Menu size={24} />
-            </button>
-          </div>
-        </div>
-      </header>
-
-      {/* Mobile Menu Overlay */}
-      {isMobileMenuOpen && (
-        <div 
-          className="fixed inset-0 bg-black bg-opacity-50 z-50 md:hidden"
-          onClick={closeMobileMenu}
-        >
-          <div 
-            ref={mobileMenuRef}
-            className="fixed inset-y-0 right-0 w-80 max-w-sm bg-white shadow-xl transform transition-transform duration-300 ease-in-out"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Mobile Menu Header */}
-            <div className="flex items-center justify-between p-4 border-b border-slate-200">
-              <img src={headerLogoImage} alt="Fundspace Logo" className="h-8 w-auto" />
-              <button 
-                onClick={closeMobileMenu}
-                className="p-2 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
-                aria-label="Close menu"
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            {/* Mobile Navigation Links */}
-            <nav className="py-4">
-              {mainNavLinks.map(({ to, text, active }) => (
-                <NavLink 
-                  key={to} 
-                  to={to} 
-                  className={({ isActive }) => `block w-full text-left px-4 py-3 transition-colors ${isActive ? `${active} bg-blue-50 border-r-2 border-blue-600` : 'text-slate-700 hover:text-blue-600 hover:bg-slate-50'}`}
-                  onClick={closeMobileMenu}
-                >
-                  {text}
-                </NavLink>
-              ))}
-            </nav>
-
-            {/* Mobile Menu Actions */}
-            <div className="border-t border-slate-200 p-4 space-y-3">
-              <Link 
-                to="/submit-grant"
-                onClick={closeMobileMenu}
-                className="flex items-center justify-center w-full px-4 py-3 border border-transparent text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 transition-colors"
-              >
-                <PlusCircle size={16} className="mr-2" />
-                Submit Grant
-              </Link>
-              <div className="w-full">
-                <AuthButton mobile onClose={closeMobileMenu} />
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-    </>
-  );
 };
 
 const AppLayout = () => {

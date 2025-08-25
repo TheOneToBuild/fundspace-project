@@ -1,20 +1,19 @@
-// src/components/PublicHeader.jsx
 import React, { useState, useEffect, useRef } from 'react';
-import { Link, NavLink } from 'react-router-dom';
-import { Menu, X, PlusCircle } from './Icons.jsx';
+import { Link, NavLink, useLocation } from 'react-router-dom';
+import { Menu, X, PlusCircle, ChevronDown } from './Icons.jsx';
 import AuthButton from './AuthButton.jsx';
-import headerLogoImage from '../assets/fundspace-logo.png';
+import headerLogoImage from '../assets/fundspace-logo2.png';
 
 const PublicNavLink = ({ to, children, activeClassName, mobile = false, onClick }) => {
     const linkClass = ({ isActive }) => mobile
         ? `block w-full text-left px-4 py-3 transition-colors ${
-            isActive 
-                ? `${activeClassName} bg-blue-50 border-r-2 border-blue-600` 
-                : 'text-slate-700 hover:text-blue-600 hover:bg-slate-50'
-        }`
+              isActive 
+                  ? `${activeClassName} bg-blue-50 border-r-2 border-blue-600` 
+                  : 'text-slate-700 hover:text-blue-600 hover:bg-slate-50'
+          }`
         : `text-sm md:text-base font-medium transition-colors ${
-            isActive ? activeClassName : 'text-slate-700 hover:text-blue-600'
-        }`;
+              isActive ? activeClassName : 'text-slate-700 hover:text-blue-600'
+          }`;
 
     return (
         <NavLink to={to} className={linkClass} onClick={onClick}>
@@ -25,87 +24,343 @@ const PublicNavLink = ({ to, children, activeClassName, mobile = false, onClick 
 
 export default function PublicHeader() {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-    const mobileMenuRef = useRef(null);
+    const [isScrolled, setIsScrolled] = useState(false);
+    const [activeDropdown, setActiveDropdown] = useState(null);
+    const [isAnimatingOut, setIsAnimatingOut] = useState(false);
+    const dropdownTimeoutRef = useRef(null);
+    const location = useLocation();
+    
+    const showNotificationBar = location.pathname === '/';
 
     const mainNavLinks = [
-        { to: "/grants", text: "Find Funding", activeClassName: "text-blue-600 font-semibold" },
-        { to: "/organizations", text: "Explore Organizations", activeClassName: "text-blue-600 font-semibold" },
-        { to: "/spotlight", text: "Spotlight", activeClassName: "text-rose-600 font-semibold" },
+        { 
+            to: "/grants", 
+            text: "Explore", 
+            active: "text-blue-600 font-semibold",
+            dropdown: {
+                sections: [
+                    {
+                        title: "Find Opportunities",
+                        links: [
+                            { to: "/grants", text: "Find Funding" },
+                            { to: "/organizations", text: "Explore Organizations" },
+                            { to: "/submit-grant", text: "Submit Grant" }
+                        ]
+                    }
+                ],
+                image: "https://i.imgur.com/X5UvEv6.png"
+            }
+        },
+        { 
+            to: "/spotlight", 
+            text: "Spotlight", 
+            active: "text-rose-600 font-semibold",
+            dropdown: {
+                sections: [
+                    {
+                        title: "Bay Area Counties",
+                        links: [
+                            { to: "/spotlight/san-francisco", text: "San Francisco County" },
+                            { to: "/spotlight/alameda", text: "Alameda County" },
+                            { to: "/spotlight/santa-clara", text: "Santa Clara County" },
+                            { to: "/spotlight/contra-costa", text: "Contra Costa County" },
+                            { to: "/spotlight/marin", text: "Marin County" },
+                            { to: "/spotlight/san-mateo", text: "San Mateo County" },
+                            { to: "/spotlight/solano", text: "Solano County" },
+                            { to: "/spotlight/sonoma", text: "Sonoma County" },
+                            { to: "/spotlight/napa", text: "Napa County" }
+                        ]
+                    },
+                    {
+                        title: "Peninsula",
+                        links: [
+                            { to: "/spotlight/san-mateo/palo-alto", text: "Palo Alto" },
+                            { to: "/spotlight/san-mateo/redwood-city", text: "Redwood City" },
+                            { to: "/spotlight/san-mateo/menlo-park", text: "Menlo Park" },
+                            { to: "/spotlight/san-mateo/mountain-view", text: "Mountain View" }
+                        ]
+                    },
+                    {
+                        title: "South Bay",
+                        links: [
+                            { to: "/spotlight/santa-clara/san-jose", text: "San Jose" },
+                            { to: "/spotlight/santa-clara/sunnyvale", text: "Sunnyvale" },
+                            { to: "/spotlight/santa-clara/santa-clara", text: "Santa Clara" },
+                            { to: "/spotlight/santa-clara/cupertino", text: "Cupertino" }
+                        ]
+                    },
+                    {
+                        title: "East Bay",
+                        links: [
+                            { to: "/spotlight/alameda/oakland", text: "Oakland" },
+                            { to: "/spotlight/alameda/berkeley", text: "Berkeley" },
+                            { to: "/spotlight/alameda/fremont", text: "Fremont" },
+                            { to: "/spotlight/contra-costa/concord", text: "Concord" }
+                        ]
+                    },
+                    {
+                        title: "North Bay",
+                        links: [
+                            { to: "/spotlight/marin/san-rafael", text: "San Rafael" },
+                            { to: "/spotlight/sonoma/santa-rosa", text: "Santa Rosa" },
+                            { to: "/spotlight/napa/napa", text: "Napa" },
+                            { to: "/spotlight/solano/vallejo", text: "Vallejo" }
+                        ]
+                    },
+                    {
+                        title: "Community",
+                        links: [
+                            { to: "/spotlight", text: "All Spotlights" },
+                            { to: "/spotlight/submit", text: "Submit Story" },
+                            { to: "/spotlight/featured", text: "Featured Stories" }
+                        ]
+                    }
+                ],
+                image: "https://i.imgur.com/4pVbT87.png"
+            }
+        },
+        { 
+            to: "/about", 
+            text: "About", 
+            active: "text-blue-600 font-semibold",
+            dropdown: {
+                sections: [
+                    {
+                        title: "Company",
+                        links: [
+                            { to: "/about", text: "About Us" },
+                            { to: "/contact", text: "Contact" },
+                            { to: "/how-it-works", text: "How It Works" },
+                            { to: "/roadmap", text: "Roadmap" }
+                        ]
+                    },
+                    {
+                        title: "Resources",
+                        links: [
+                            { to: "/for-seekers", text: "For Seekers" },
+                            { to: "/for-funders", text: "For Funders" },
+                            { to: "/faq", text: "FAQ" }
+                        ]
+                    }
+                ],
+                image: "https://i.imgur.com/RLlEUMG.png"
+            }
+        }
     ];
 
-    const closeMobileMenu = () => {
-        setIsMobileMenuOpen(false);
+    const handleMouseEnter = (index) => {
+        if (dropdownTimeoutRef.current) {
+            clearTimeout(dropdownTimeoutRef.current);
+        }
+        setActiveDropdown(index);
     };
 
-    // Handle clicks outside mobile menu
+    const handleMouseLeave = () => {
+        dropdownTimeoutRef.current = setTimeout(() => {
+            setActiveDropdown(null);
+        }, 300); // 300ms delay to allow cursor to move to the dropdown
+    };
+
+    const toggleDropdown = (index, event) => {
+        event.stopPropagation();
+        if (dropdownTimeoutRef.current) {
+            clearTimeout(dropdownTimeoutRef.current);
+        }
+        setActiveDropdown(activeDropdown === index ? null : index);
+    };
+
+    const closeMobileMenu = () => setIsMobileMenuOpen(false);
+
+    useEffect(() => {
+        const handleScroll = () => {
+            setIsScrolled(window.scrollY > 0);
+        };
+        window.addEventListener('scroll', handleScroll);
+        return () => window.removeEventListener('scroll', handleScroll);
+    }, []);
+
     useEffect(() => {
         function handleClickOutside(event) {
             if (mobileMenuRef.current && !mobileMenuRef.current.contains(event.target)) {
                 setIsMobileMenuOpen(false);
+            }
+            
+            // Close dropdown when clicking anywhere outside
+            const dropdownContainer = document.querySelector('[data-dropdown-container]');
+            const navContainer = document.querySelector('[data-nav-container]');
+            
+            if ((!dropdownContainer || !dropdownContainer.contains(event.target)) && 
+                (!navContainer || !navContainer.contains(event.target))) {
+                setActiveDropdown(null);
             }
         }
         document.addEventListener("mousedown", handleClickOutside);
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
-    // Prevent body scroll when mobile menu is open
     useEffect(() => {
-        if (isMobileMenuOpen) {
-            document.body.style.overflow = 'hidden';
-        } else {
-            document.body.style.overflow = 'unset';
-        }
+        document.body.style.overflow = isMobileMenuOpen ? 'hidden' : 'unset';
         return () => { document.body.style.overflow = 'unset'; };
-    }, []);
+    }, [isMobileMenuOpen]);
 
     return (
         <>
-            <header className="bg-white/80 backdrop-blur-lg shadow-sm sticky top-0 z-40 border-b border-slate-200">
-                <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-3 flex justify-between items-center">
-                    <Link to="/" aria-label="Fundspace Home">
-                        <img src={headerLogoImage} alt="Fundspace Logo" className="h-12 md:h-14 w-auto" />
-                    </Link>
-                    
-                    {/* Desktop Navigation */}
-                    <nav className="hidden md:flex items-center space-x-4 md:space-x-6">
-                        {mainNavLinks.map((link) => (
-                            <PublicNavLink 
-                                key={link.to} 
-                                to={link.to} 
-                                activeClassName={link.activeClassName}
-                            >
-                                {link.text}
-                            </PublicNavLink>
-                        ))}
-                    </nav>
-
-                    {/* Desktop Auth & Submit Grant Button */}
-                    <div className="hidden md:flex items-center space-x-3">
-                        <AuthButton />
-                        <Link 
-                            to="/submit-grant" 
-                            className="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 transition-colors duration-200 shadow-sm hover:shadow-md"
-                        >
-                            <PlusCircle className="w-4 h-4 mr-2" />
-                            Submit Grant
-                        </Link>
-                    </div>
-
-                    {/* Mobile Menu Button */}
-                    <button
-                        onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                        className="md:hidden p-2 rounded-md text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors"
-                        aria-expanded={isMobileMenuOpen}
-                        aria-label="Toggle mobile menu"
+            {showNotificationBar && (
+                <div className={`bg-gradient-to-r from-purple-200/50 via-pink-200/40 to-blue-200/50 text-slate-700 py-4 px-6 text-center text-base font-medium fixed top-0 left-0 right-0 z-50 transition-transform duration-300 ${
+                    isScrolled ? 'transform -translate-y-full' : 'transform translate-y-0'
+                }`}>
+                    <span>🚀 Alpha Testing Open — </span>
+                    <Link 
+                        to="/login?view=signup" 
+                        className="underline hover:no-underline font-semibold text-slate-800"
                     >
-                        {isMobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-                    </button>
+                        Register for early access
+                    </Link>
                 </div>
-            </header>
+            )}
 
-            {/* Mobile Menu Overlay */}
+            <div className={`transition-all duration-300 ${
+                showNotificationBar 
+                    ? (isScrolled ? 'h-[73px]' : 'h-[137px]')
+                    : 'h-[73px]'
+            }`}></div>
+
+            <div className="relative">
+                <header className={`bg-white/90 backdrop-blur-lg fixed left-0 right-0 z-40 transition-all duration-300 ${
+                    showNotificationBar && !isScrolled 
+                        ? 'top-16 border-b border-transparent'
+                        : 'top-0 border-b border-slate-200 shadow-sm'
+                }`}>
+                    <div className="w-full max-w-none px-6 lg:px-12 xl:px-16 py-4 flex justify-between items-center">
+                        <div className="flex items-center space-x-8 lg:space-x-12">
+                            <Link to="/" aria-label="Fundspace Home">
+                                <img src={headerLogoImage} alt="Fundspace Logo" className="h-10 sm:h-12 md:h-14 w-auto" />
+                            </Link>
+                            
+                            <nav className="hidden lg:flex items-center space-x-6 xl:space-x-8 relative" data-nav-container>
+                                {mainNavLinks.map((link, index) => (
+                                    <div 
+                                        key={link.to}
+                                        className="relative"
+                                        onMouseEnter={() => handleMouseEnter(index)}
+                                        onMouseLeave={handleMouseLeave}
+                                    >
+                                        <div className="flex items-center">
+                                            <NavLink 
+                                                to={link.to} 
+                                                className={({ isActive }) => `text-base font-medium transition-colors ${isActive ? link.active : 'text-slate-700 hover:text-blue-600'}`}
+                                            >
+                                                {link.text}
+                                            </NavLink>
+                                            <button
+                                                onClick={(e) => toggleDropdown(index, e)}
+                                                className="ml-2 p-1 text-slate-400 hover:text-slate-700 transition-colors rounded"
+                                                aria-label="Toggle dropdown"
+                                            >
+                                                <ChevronDown 
+                                                    size={18} 
+                                                    className={`transition-transform duration-200 ${
+                                                        activeDropdown === index ? 'rotate-180' : 'rotate-0'
+                                                    }`} 
+                                                />
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </nav>
+                        </div>
+
+                        <div className="flex items-center space-x-4">
+                            <div className="hidden lg:block">
+                                <AuthButton />
+                            </div>
+                            <Link 
+                                to="/submit-grant" 
+                                className="hidden lg:inline-flex items-center justify-center px-5 py-2.5 border border-transparent text-sm font-semibold rounded-full text-white bg-blue-600 hover:bg-blue-700 transition-all duration-200 shadow-md hover:shadow-lg"
+                            >
+                                <PlusCircle size={16} className="mr-2" />
+                                Submit Grant
+                            </Link>
+                            <button 
+                                onClick={() => setIsMobileMenuOpen(true)} 
+                                aria-label="Open menu" 
+                                className="lg:hidden p-2 rounded-md text-slate-600 hover:bg-slate-100 transition-colors"
+                            >
+                                <Menu size={24} />
+                            </button>
+                        </div>
+                    </div>
+                </header>
+
+                {activeDropdown !== null && mainNavLinks[activeDropdown]?.dropdown && (
+                    <div 
+                        className="fixed left-0 w-full bg-white border-b border-slate-200 shadow-lg z-50 animate-fadeInDown"
+                        onMouseEnter={() => handleMouseEnter(activeDropdown)}
+                        onMouseLeave={handleMouseLeave}
+                        style={{
+                            borderRadius: '0 0 16px 16px',
+                            top: showNotificationBar 
+                                ? (isScrolled ? '73px' : '137px')
+                                : '73px'
+                        }}
+                    >
+                        <div className="w-full px-6 lg:px-12 xl:px-16 py-8">
+                            <div className="flex">
+                                <div className="flex gap-16" style={{ marginLeft: '48px' }}>
+                                    {mainNavLinks[activeDropdown].dropdown.sections.map((section, sectionIndex) => (
+                                        <div key={sectionIndex} className="min-w-0">
+                                            <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4">
+                                                {section.title}
+                                            </h3>
+                                            <ul className="space-y-3">
+                                                {section.links.map((dropdownLink, linkIndex) => (
+                                                    <li key={linkIndex}>
+                                                        <Link 
+                                                            to={dropdownLink.to} 
+                                                            className="text-slate-600 hover:text-blue-600 transition-colors block py-1 text-base leading-snug whitespace-nowrap"
+                                                            onClick={() => setActiveDropdown(null)}
+                                                        >
+                                                            {dropdownLink.text}
+                                                        </Link>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    ))}
+                                </div>
+                                
+                                <div className="w-80 h-60 rounded-xl overflow-hidden bg-slate-100 shadow-lg ml-auto flex-shrink-0">
+                                    <img 
+                                        src={mainNavLinks[activeDropdown].dropdown.image} 
+                                        alt={mainNavLinks[activeDropdown].text}
+                                        className="w-full h-full object-cover"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        <style jsx>{`
+                            @keyframes fadeInDown {
+                                0% {
+                                    opacity: 0;
+                                    transform: translateY(-10px);
+                                }
+                                100% {
+                                    opacity: 1;
+                                    transform: translateY(0);
+                                }
+                            }
+                            
+                            .animate-fadeInDown {
+                                animation: fadeInDown 0.3s ease-out forwards;
+                            }
+                        `}</style>
+                    </div>
+                )}
+            </div>
+
             {isMobileMenuOpen && (
-                <div className="fixed inset-0 z-50 md:hidden">
+                <div className="fixed inset-0 z-50 lg:hidden">
                     <div className="fixed inset-0 bg-black bg-opacity-25" onClick={closeMobileMenu}></div>
                     <div 
                         ref={mobileMenuRef}
@@ -127,7 +382,7 @@ export default function PublicHeader() {
                                 <PublicNavLink 
                                     key={link.to} 
                                     to={link.to} 
-                                    activeClassName={link.activeClassName}
+                                    activeClassName={link.active}
                                     mobile={true}
                                     onClick={closeMobileMenu}
                                 >
