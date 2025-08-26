@@ -182,18 +182,18 @@ const CreatorCard = ({ creator }) => {
 const CreatorTestimonialsSection = () => {
   const creators = [
     {
-      name: "Alex Rivera",
-      title: "Nonprofit Grant Seeker",
+      name: "The Housing Advocate",
+      title: "",
       image: "https://images.unsplash.com/photo-1755541516453-201559bec161?q=80&w=1160&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDF8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
     },
     {
-      name: "Kenya Ward",
-      title: "Community Organization Leader",
+      name: "The Community Leader",
+      title: "",
       image: "https://images.unsplash.com/photo-1755541516450-644adb257ad0?q=80&w=1160&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDF8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
     },
     {
-      name: "Jordan Malik",
-      title: "Small Business Owner",
+      name: "The Small Business Owner",
+      title: "",
       image: "https://images.unsplash.com/photo-1755541516517-bb95790dc7ad?q=80&w=1160&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDF8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
     }
   ];
