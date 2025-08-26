@@ -1,9 +1,8 @@
-// src/GrantsPageContent.jsx - FIXED VERSION
 import React, { useState, useEffect, useMemo, useCallback, useContext } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from './supabaseClient.js';
 import { refreshGrantBookmarkCounts } from './utils/grantUtils';
-import { Search, Users, MapPin, Calendar, DollarSign, Info, ChevronDown, ExternalLink, Zap, Clock, Target, Briefcase as IconBriefcase, BarChart3, ClipboardList, TrendingUp, Loader, XCircle, Heart, Bot, Briefcase, LayoutGrid, List, SlidersHorizontal, Bookmark, ArrowRight, Sparkles, Star, TrendingUp as TrendingUpIcon } from './components/Icons.jsx';
+import { Search, Users, Calendar, DollarSign, ChevronDown, XCircle, LayoutGrid, List, SlidersHorizontal, Bookmark, Sparkles, TrendingUp as TrendingUpIcon } from './components/Icons.jsx';
 import GrantCard from './components/GrantCard.jsx';
 import GrantDetailModal from './GrantDetailModal.jsx';
 import FilterBar from './components/FilterBar.jsx';
@@ -16,9 +15,7 @@ import { filterGrantsWithTaxonomy } from './filtering.js';
 import { SearchResultsSkeleton } from './components/SkeletonLoader.jsx';
 import { LayoutContext } from './App.jsx';
 
-// --- Helper functions & objects (some might be from GrantCard.jsx for consistency) ---
-
-// Taxonomy code to display name mapping (shortened for list view)
+// Taxonomy display names
 const TAXONOMY_DISPLAY_NAMES = {
   'nonprofit.501c3': '501(c)(3)',
   'nonprofit.501c4': '501(c)(4)',
@@ -53,34 +50,19 @@ const isGrantActive = (grant) => {
     return new Date(grant.dueDate) >= today;
 };
 
-const sortGrants = (grants, sortCriteria) => {
-    return [...grants].sort((a, b) => {
-        const aIsActive = isGrantActive(a);
-        const bIsActive = isGrantActive(b);
-        if (aIsActive && !bIsActive) return -1;
-        if (!aIsActive && bIsActive) return 1;
-        switch (sortCriteria) {
-            case 'dueDate_asc': {
-                const dateA = a.dueDate ? new Date(a.dueDate) : new Date('9999-12-31');
-                const dateB = b.dueDate ? new Date(b.dueDate) : new Date('9999-12-31');
-                return dateA - dateB;
-            }
-            case 'dueDate_desc': {
-                const dateA = a.dueDate ? new Date(a.dueDate) : new Date('9999-12-31');
-                const dateB = b.dueDate ? new Date(b.dueDate) : new Date('9999-12-31');
-                return dateB - dateA;
-            }
-            case 'amount_desc':
-                return parseMaxFundingAmount(b.max_funding_amount) - parseMaxFundingAmount(a.max_funding_amount);
-            case 'amount_asc':
-                return parseMaxFundingAmount(a.max_funding_amount) - parseMaxFundingAmount(b.max_funding_amount);
-            default:
-                return 0;
-        }
-    });
-};
+const sortGrants = (grants, sort) => [...grants].sort((a,b)=>{
+  const aAct = isGrantActive(a), bAct = isGrantActive(b);
+  if (aAct!==bAct) return aAct? -1:1;
+  const dateOrMax = (g)=> g.dueDate? new Date(g.dueDate): new Date('9999-12-31');
+  switch (sort){
+    case 'dueDate_asc': return dateOrMax(a)-dateOrMax(b);
+    case 'dueDate_desc': return dateOrMax(b)-dateOrMax(a);
+    case 'amount_desc': return parseMaxFundingAmount(b.max_funding_amount)-parseMaxFundingAmount(a.max_funding_amount);
+    case 'amount_asc': return parseMaxFundingAmount(a.max_funding_amount)-parseMaxFundingAmount(b.max_funding_amount);
+    default: return 0;
+  }
+});
 
-// --- Updated Grant List Item Component ---
 const GrantListItem = ({ grant, onOpenDetailModal, isSaved, onSave, onUnsave, session }) => {
     const dueDateText = grant.dueDate ? new Date(grant.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'Rolling';
     const fundingText = grant.fundingAmount ? formatCurrency(parseMaxFundingAmount(grant.fundingAmount.toString())) : 'Not Specified';
@@ -91,32 +73,14 @@ const GrantListItem = ({ grant, onOpenDetailModal, isSaved, onSave, onUnsave, se
         isSaved ? onUnsave(grant.id) : onSave(grant.id);
     };
 
-    const getInitials = (name) => {
-        if (!name) return '?';
-        const words = name.split(' ');
-        return words.length > 1 
-            ? (words[0][0] + words[1][0]).toUpperCase() 
-            : name.substring(0, 2).toUpperCase();
-    };
+  const getInitials = (name) => !name? '?' : name.split(' ').slice(0,2).map(w=>w[0]).join('').toUpperCase();
 
     return (
         <div 
             onClick={() => onOpenDetailModal(grant)} 
             className="group bg-white p-4 md:p-5 rounded-2xl border border-slate-200 hover:border-blue-400 hover:shadow-2xl transition-all duration-300 flex flex-col md:flex-row items-start md:items-center gap-4 cursor-pointer transform hover:-translate-y-1"
         >
-            <div className="flex-shrink-0">
-                {grant.organization?.image_url ? (
-                    <img 
-                        src={grant.organization.image_url} 
-                        alt={`${grant.foundationName} logo`}
-                        className="h-14 w-14 md:h-16 md:w-16 rounded-xl object-contain border-2 border-white shadow-lg group-hover:shadow-xl transition-shadow duration-300" 
-                    />
-                ) : (
-                    <div className="h-14 w-14 md:h-16 md:w-16 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-xl shadow-lg group-hover:shadow-xl transition-shadow duration-300">
-                        {getInitials(grant.foundationName)}
-                    </div>
-                )}
-            </div>
+            <div className="flex-shrink-0">{grant.organization?.image_url ? (<img src={grant.organization.image_url} alt={`${grant.foundationName} logo`} className="h-14 w-14 md:h-16 md:w-16 rounded-xl object-contain border-2 border-white shadow-lg group-hover:shadow-xl transition-shadow duration-300" />) : (<div className="h-14 w-14 md:h-16 md:w-16 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-xl shadow-lg group-hover:shadow-xl transition-shadow duration-300">{getInitials(grant.foundationName)}</div>)}</div>
             
             <div className="flex-grow min-w-0 w-full">
                 <div className="flex items-center gap-3 mb-1.5">
@@ -154,19 +118,7 @@ const GrantListItem = ({ grant, onOpenDetailModal, isSaved, onSave, onUnsave, se
             </div>
             
             <div className="w-full md:w-auto flex-shrink-0 flex flex-row items-center gap-3 mt-4 md:mt-0">
-                {session && (
-                    <button
-                        onClick={handleBookmarkClick}
-                        className={`p-3 rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105 ${
-                            isSaved 
-                                ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white' 
-                                : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-50'
-                        }`}
-                        aria-label={isSaved ? 'Unsave grant' : 'Save grant'}
-                    >
-                        <Bookmark size={18} fill={isSaved ? 'currentColor' : 'none'} />
-                    </button>
-                )}
+                {session && (<button onClick={handleBookmarkClick} className={`p-3 rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105 ${isSaved? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white':'bg-white text-slate-500 border border-slate-200 hover:bg-slate-50'}`} aria-label={isSaved? 'Unsave grant':'Save grant'}><Bookmark size={18} fill={isSaved? 'currentColor':'none'} /></button>)}
                 <button
                     onClick={(e) => { e.stopPropagation(); onOpenDetailModal(grant); }}
                     className="w-full md:w-auto px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold rounded-xl hover:from-blue-700 hover:to-purple-700 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105 flex items-center justify-center gap-2"
@@ -219,7 +171,6 @@ const GrantsPageContent = ({ isProfileView = false }) => {
       const { data: { session } } = await supabase.auth.getSession();
       setSession(session);
 
-      // FIXED: Use simple query from grants_with_taxonomy view without complex joins
       const { data: grantsData, error: grantsError } = await supabase
         .from('grants_with_taxonomy')
         .select('*')
@@ -228,7 +179,6 @@ const GrantsPageContent = ({ isProfileView = false }) => {
       if (grantsError) {
         console.error('Error fetching grants:', grantsError);
       } else {
-        // Get organization IDs and fetch organizations separately
         const orgIds = [...new Set(grantsData.map(g => g.organization_id).filter(Boolean))];
         const { data: orgsData } = await supabase
           .from('organizations')
@@ -249,7 +199,6 @@ const GrantsPageContent = ({ isProfileView = false }) => {
             categories: grant.category_names ? grant.category_names.map((name, idx) => ({ id: idx, name })) : [],
             locations: grant.location_names ? grant.location_names.map((name, idx) => ({ id: idx, name })) : [],
             eligible_organization_types: grant.taxonomy_codes || [],
-            // Updated organization object to use joined data
             organization: {
               image_url: orgData?.image_url || grant.funder_logo_url || null,
               banner_image_url: orgData?.banner_image_url || null
@@ -258,11 +207,9 @@ const GrantsPageContent = ({ isProfileView = false }) => {
           };
         });
 
-        // FIXED: Get fresh bookmark counts from database
         const grantIds = formattedData.map(grant => grant.id);
         const bookmarkCounts = await refreshGrantBookmarkCounts(grantIds);
 
-        // Update grants with accurate bookmark counts
         formattedData.forEach(grant => {
           grant.save_count = bookmarkCounts[grant.id] || 0;
         });
@@ -349,7 +296,6 @@ const GrantsPageContent = ({ isProfileView = false }) => {
           g.id === grantId ? { ...g, save_count: Math.max(0, (g.save_count || 1) - 1) } : g
         ));
       } else {
-        // SUCCESS: Get fresh count from database
         const bookmarkCounts = await refreshGrantBookmarkCounts([grantId]);
         setGrants(prevGrants => prevGrants.map(g => 
           g.id === grantId ? { ...g, save_count: bookmarkCounts[grantId] || 0 } : g
@@ -396,7 +342,6 @@ const GrantsPageContent = ({ isProfileView = false }) => {
           g.id === grantId ? { ...g, save_count: (g.save_count || 0) + 1 } : g
         ));
       } else {
-        // SUCCESS: Get fresh count from database
         const bookmarkCounts = await refreshGrantBookmarkCounts([grantId]);
         setGrants(prevGrants => prevGrants.map(g => 
           g.id === grantId ? { ...g, save_count: bookmarkCounts[grantId] || 0 } : g

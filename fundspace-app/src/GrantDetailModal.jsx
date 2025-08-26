@@ -1,9 +1,7 @@
-// src/GrantDetailModal.jsx
 import React, { useState } from 'react';
-import { X, ExternalLink, MapPin, Calendar, DollarSign, Tag, ShieldCheck, Bookmark, Users, Building2, Clock, Zap, Target, Info, CheckCircle, AlertCircle, Sparkles, ChevronRight, Globe, Mail, Phone, FileText, Award } from 'lucide-react';
-import { formatDate, getPillClasses } from './utils.js';
+import { X, ExternalLink, MapPin, Calendar, DollarSign, ShieldCheck, Bookmark, Users, Building2, Clock, Target, Info, CheckCircle, AlertCircle, Sparkles, ChevronRight, Mail, FileText, Award } from 'lucide-react';
+import { formatDate } from './utils.js';
 
-// Enhanced taxonomy display names
 const TAXONOMY_DISPLAY_NAMES = {
   'nonprofit.501c3': '501(c)(3) Nonprofits',
   'nonprofit.501c4': '501(c)(4) Organizations', 
@@ -25,49 +23,37 @@ const TAXONOMY_DISPLAY_NAMES = {
   'religious.church': 'Religious Organizations'
 };
 
-// Enhanced pill classes with gradients
-const getEnhancedPillClasses = (categoryName) => {
-  const categoryMap = {
-    'Arts': 'bg-gradient-to-r from-purple-100 to-pink-100 text-purple-700 border-purple-200',
-    'Culture': 'bg-gradient-to-r from-purple-100 to-pink-100 text-purple-700 border-purple-200',
-    'Education': 'bg-gradient-to-r from-blue-100 to-indigo-100 text-blue-700 border-blue-200',
-    'Health': 'bg-gradient-to-r from-emerald-100 to-green-100 text-emerald-700 border-emerald-200',
-    'Healthcare': 'bg-gradient-to-r from-emerald-100 to-green-100 text-emerald-700 border-emerald-200',
-    'Environment': 'bg-gradient-to-r from-green-100 to-teal-100 text-green-700 border-green-200',
-    'Housing': 'bg-gradient-to-r from-orange-100 to-amber-100 text-orange-700 border-orange-200',
-    'Technology': 'bg-gradient-to-r from-cyan-100 to-blue-100 text-cyan-700 border-cyan-200',
-    'Innovation': 'bg-gradient-to-r from-violet-100 to-purple-100 text-violet-700 border-violet-200',
-    'Community': 'bg-gradient-to-r from-rose-100 to-pink-100 text-rose-700 border-rose-200',
-    'Community Development': 'bg-gradient-to-r from-rose-100 to-pink-100 text-rose-700 border-rose-200',
-    'Social Impact': 'bg-gradient-to-r from-indigo-100 to-purple-100 text-indigo-700 border-indigo-200',
-    'Research': 'bg-gradient-to-r from-slate-100 to-blue-100 text-slate-700 border-slate-200'
-  };
-  
-  return categoryMap[categoryName] || 'bg-gradient-to-r from-slate-100 to-gray-100 text-slate-700 border-slate-200';
-};
+const getEnhancedPillClasses = (name) => ({
+  Arts:'bg-gradient-to-r from-purple-100 to-pink-100 text-purple-700 border-purple-200',
+  Culture:'bg-gradient-to-r from-purple-100 to-pink-100 text-purple-700 border-purple-200',
+  Education:'bg-gradient-to-r from-blue-100 to-indigo-100 text-blue-700 border-blue-200',
+  Health:'bg-gradient-to-r from-emerald-100 to-green-100 text-emerald-700 border-emerald-200',
+  Healthcare:'bg-gradient-to-r from-emerald-100 to-green-100 text-emerald-700 border-emerald-200',
+  Environment:'bg-gradient-to-r from-green-100 to-teal-100 text-green-700 border-green-200',
+  Housing:'bg-gradient-to-r from-orange-100 to-amber-100 text-orange-700 border-orange-200',
+  Technology:'bg-gradient-to-r from-cyan-100 to-blue-100 text-cyan-700 border-cyan-200',
+  Innovation:'bg-gradient-to-r from-violet-100 to-purple-100 text-violet-700 border-violet-200',
+  Community:'bg-gradient-to-r from-rose-100 to-pink-100 text-rose-700 border-rose-200',
+  'Community Development':'bg-gradient-to-r from-rose-100 to-pink-100 text-rose-700 border-rose-200',
+  'Social Impact':'bg-gradient-to-r from-indigo-100 to-purple-100 text-indigo-700 border-indigo-200',
+  Research:'bg-gradient-to-r from-slate-100 to-blue-100 text-slate-700 border-slate-200'
+}[name] || 'bg-gradient-to-r from-slate-100 to-gray-100 text-slate-700 border-slate-200');
 
-const getOrgTypePillClasses = (taxonomyCode) => {
-  const typeMap = {
-    'nonprofit': 'bg-gradient-to-r from-rose-100 to-red-100 text-rose-700 border-rose-200',
-    'education': 'bg-gradient-to-r from-indigo-100 to-blue-100 text-indigo-700 border-indigo-200',
-    'healthcare': 'bg-gradient-to-r from-emerald-100 to-green-100 text-emerald-700 border-emerald-200',
-    'government': 'bg-gradient-to-r from-blue-100 to-cyan-100 text-blue-700 border-blue-200',
-    'foundation': 'bg-gradient-to-r from-purple-100 to-violet-100 text-purple-700 border-purple-200',
-    'forprofit': 'bg-gradient-to-r from-green-100 to-emerald-100 text-green-700 border-green-200',
-    'religious': 'bg-gradient-to-r from-amber-100 to-yellow-100 text-amber-700 border-amber-200',
-    'international': 'bg-gradient-to-r from-cyan-100 to-teal-100 text-cyan-700 border-cyan-200'
-  };
-  
-  const prefix = taxonomyCode.split('.')[0];
-  return typeMap[prefix] || 'bg-gradient-to-r from-slate-100 to-gray-100 text-slate-700 border-slate-200';
-};
+const getOrgTypePillClasses = (code) => ({
+  nonprofit:'bg-gradient-to-r from-rose-100 to-red-100 text-rose-700 border-rose-200',
+  education:'bg-gradient-to-r from-indigo-100 to-blue-100 text-indigo-700 border-indigo-200',
+  healthcare:'bg-gradient-to-r from-emerald-100 to-green-100 text-emerald-700 border-emerald-200',
+  government:'bg-gradient-to-r from-blue-100 to-cyan-100 text-blue-700 border-blue-200',
+  foundation:'bg-gradient-to-r from-purple-100 to-violet-100 text-purple-700 border-purple-200',
+  forprofit:'bg-gradient-to-r from-green-100 to-emerald-100 text-green-700 border-green-200',
+  religious:'bg-gradient-to-r from-amber-100 to-yellow-100 text-amber-700 border-amber-200',
+  international:'bg-gradient-to-r from-cyan-100 to-teal-100 text-cyan-700 border-cyan-200'
+}[code.split('.')[0]] || 'bg-gradient-to-r from-slate-100 to-gray-100 text-slate-700 border-slate-200');
 
 const GrantDetailModal = ({ grant, isOpen, onClose, session, isSaved, onSave, onUnsave }) => {
   const [activeTab, setActiveTab] = useState('overview');
 
-  if (!isOpen || !grant) {
-    return null;
-  }
+  if (!isOpen || !grant) return null;
   
   const grantData = {
     ...grant,
@@ -79,14 +65,7 @@ const GrantDetailModal = ({ grant, isOpen, onClose, session, isSaved, onSave, on
     eligibility_criteria: grant.eligibility_criteria || grant.eligibility,
   };
 
-  const getInitials = (name) => {
-      if (!name) return '?';
-      const words = name.split(' ');
-      if (words.length > 1 && words[0] && words[1]) {
-          return (words[0][0] + words[1][0]).toUpperCase();
-      }
-      return name.substring(0, 2).toUpperCase();
-  };
+  const getInitials = (n) => !n ? '?' : n.split(' ').slice(0,2).map(w=>w[0]).join('').toUpperCase();
 
   const formatFunding = (amount) => {
     if (typeof amount === 'string' && amount.includes('$')) return amount;
@@ -97,20 +76,7 @@ const GrantDetailModal = ({ grant, isOpen, onClose, session, isSaved, onSave, on
     return `$${num.toLocaleString()}`;
   };
 
-  const handleBookmarkClick = async () => {
-    if (!session) return;
-    
-    try {
-      if (isSaved) {
-        await onUnsave(grant.id);
-      } else {
-        await onSave(grant.id);
-      }
-    } catch (error) {
-      console.error('Error handling bookmark:', error);
-      // Could add a toast notification here
-    }
-  };
+  const handleBookmarkClick = async () => { if (!session) return; try { isSaved? await onUnsave(grant.id): await onSave(grant.id); } catch (e) { console.error('Bookmark error:', e);} };
 
   const isEndingSoon = grantData.dueDate && new Date(grantData.dueDate) <= new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
   const isExpired = grantData.dueDate && new Date(grantData.dueDate) < new Date();
@@ -124,9 +90,7 @@ const GrantDetailModal = ({ grant, isOpen, onClose, session, isSaved, onSave, on
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100]">
       <div className="bg-white rounded-3xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden border border-white/20">
-        {/* Enhanced Header */}
         <div className="relative p-6 bg-gradient-to-r from-blue-50 via-purple-50 to-pink-50 border-b border-slate-200">
-          {/* Background decoration */}
           <div className="absolute inset-0 overflow-hidden">
             <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-blue-400/10 to-purple-600/10 rounded-full -translate-y-8 translate-x-8"></div>
             <div className="absolute bottom-0 left-0 w-24 h-24 bg-gradient-to-tr from-pink-400/10 to-rose-600/10 rounded-full translate-y-4 -translate-x-4"></div>
@@ -134,7 +98,6 @@ const GrantDetailModal = ({ grant, isOpen, onClose, session, isSaved, onSave, on
           
           <div className="relative flex justify-between items-start">
             <div className="flex-1 pr-4">
-              {/* Status badges */}
               <div className="flex flex-wrap gap-2 mb-4">
                 {isExpired && (
                   <span className="inline-flex items-center gap-1 px-3 py-1 bg-gradient-to-r from-slate-400 to-slate-500 text-white text-sm font-semibold rounded-full">
@@ -160,7 +123,6 @@ const GrantDetailModal = ({ grant, isOpen, onClose, session, isSaved, onSave, on
                 {grantData.title}
               </h2>
               
-              {/* Funder info */}
               <div className="flex items-center">
                 {grantData.funderLogoUrl ? (
                   <img 
@@ -193,7 +155,6 @@ const GrantDetailModal = ({ grant, isOpen, onClose, session, isSaved, onSave, on
           </div>
         </div>
 
-        {/* Navigation Tabs */}
         <div className="flex border-b border-slate-200 bg-slate-50">
           {tabs.map((tab) => {
             const Icon = tab.icon;
@@ -214,11 +175,9 @@ const GrantDetailModal = ({ grant, isOpen, onClose, session, isSaved, onSave, on
           })}
         </div>
 
-        {/* Content Area */}
         <div className="flex-1 overflow-y-auto">
           {activeTab === 'overview' && (
             <div className="p-6 space-y-6">
-              {/* Key Metrics Grid */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="bg-gradient-to-br from-green-50 to-emerald-50 p-4 rounded-2xl border border-green-100">
                   <div className="flex items-center gap-3 mb-2">
@@ -261,7 +220,6 @@ const GrantDetailModal = ({ grant, isOpen, onClose, session, isSaved, onSave, on
                 </div>
               </div>
 
-              {/* Description */}
               <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200">
                 <h3 className="text-lg font-semibold text-slate-800 mb-3 flex items-center gap-2">
                   <FileText size={20} className="text-slate-600" />
@@ -272,7 +230,6 @@ const GrantDetailModal = ({ grant, isOpen, onClose, session, isSaved, onSave, on
                 </p>
               </div>
 
-              {/* Focus Areas */}
               {grantData.categories && grantData.categories.length > 0 && (
                 <div>
                   <h3 className="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
@@ -299,7 +256,6 @@ const GrantDetailModal = ({ grant, isOpen, onClose, session, isSaved, onSave, on
 
           {activeTab === 'eligibility' && (
             <div className="p-6 space-y-6">
-              {/* Eligible Organizations */}
               {grantData.eligible_organization_types && grantData.eligible_organization_types.length > 0 && (
                 <div>
                   <h3 className="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
@@ -325,7 +281,6 @@ const GrantDetailModal = ({ grant, isOpen, onClose, session, isSaved, onSave, on
                 </div>
               )}
 
-              {/* Detailed Eligibility Criteria */}
               {grantData.eligibility_criteria && (
                 <div className="bg-gradient-to-br from-indigo-50 to-purple-50 p-6 rounded-2xl border border-indigo-100">
                   <h3 className="text-lg font-semibold text-indigo-800 mb-4 flex items-center gap-2">
@@ -340,7 +295,6 @@ const GrantDetailModal = ({ grant, isOpen, onClose, session, isSaved, onSave, on
                 </div>
               )}
 
-              {/* Additional Requirements */}
               <div className="bg-amber-50 p-6 rounded-2xl border border-amber-200">
                 <h3 className="text-lg font-semibold text-amber-800 mb-3 flex items-center gap-2">
                   <AlertCircle size={20} className="text-amber-600" />
@@ -366,7 +320,6 @@ const GrantDetailModal = ({ grant, isOpen, onClose, session, isSaved, onSave, on
 
           {activeTab === 'details' && (
             <div className="p-6 space-y-6">
-              {/* Application Information */}
               <div className="bg-gradient-to-br from-blue-50 to-cyan-50 p-6 rounded-2xl border border-blue-100">
                 <h3 className="text-lg font-semibold text-blue-800 mb-4 flex items-center gap-2">
                   <ExternalLink size={20} className="text-blue-600" />
@@ -386,7 +339,6 @@ const GrantDetailModal = ({ grant, isOpen, onClose, session, isSaved, onSave, on
                 </div>
               </div>
 
-              {/* Contact Information */}
               <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200">
                 <h3 className="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
                   <Mail size={20} className="text-slate-600" />
@@ -403,7 +355,6 @@ const GrantDetailModal = ({ grant, isOpen, onClose, session, isSaved, onSave, on
                 </div>
               </div>
 
-              {/* Additional Resources */}
               <div className="bg-gradient-to-br from-purple-50 to-pink-50 p-6 rounded-2xl border border-purple-100">
                 <h3 className="text-lg font-semibold text-purple-800 mb-4 flex items-center gap-2">
                   <Sparkles size={20} className="text-purple-600" />
@@ -437,7 +388,6 @@ const GrantDetailModal = ({ grant, isOpen, onClose, session, isSaved, onSave, on
           )}
         </div>
 
-        {/* Enhanced Footer */}
         <div className="p-6 border-t border-slate-200 bg-gradient-to-r from-slate-50 to-slate-100">
           <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
             <div className="flex items-center gap-3">
