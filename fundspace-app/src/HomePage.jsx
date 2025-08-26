@@ -10,7 +10,6 @@ const Styles = () => (
     .tracking-tighter { letter-spacing: -0.05em; }
     .scroller { overflow-x: auto; scrollbar-width: none; -ms-overflow-style: none; }
     .scroller::-webkit-scrollbar { display: none; }
-  /* Updated carousel card size from 300x400 to 360x480 (longer & larger) */
   .scroller-inner { display: flex; gap: 1.5rem; animation: scroll 80s linear infinite; width: calc(360px * 18 + 1.5rem * 17); }
     @keyframes scroll {
       0% { transform: translateX(0); }
@@ -60,6 +59,18 @@ const Styles = () => (
       transition:opacity .5s ease, transform 1s ease;
     }
     .magic-mission:hover::after { opacity:.9; transform:translateX(25%); }
+    /* Popup hover animation for Build Your Mission section cards */
+    .mission-card { 
+      transition: transform .45s cubic-bezier(.22,.9,.3,1), box-shadow .5s ease, filter .45s ease; 
+      will-change: transform; 
+    }
+    .mission-card:hover { 
+      transform: translateY(-8px) scale(1.035); 
+      box-shadow: 0 8px 28px -6px rgba(0,0,0,.15), 0 12px 48px -12px rgba(16,24,40,.25); 
+      filter: brightness(1.02) saturate(1.05);
+    }
+    .mission-card:active { transform: translateY(-4px) scale(1.02); }
+    @media (prefers-reduced-motion: reduce) { .mission-card { transition: none; } }
   `}</style>
 );
 
@@ -73,12 +84,7 @@ const Icons = {
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
       <path d="M5 12h14" /><path d="m12 5 7 7-7 7" />
     </svg>
-  ),
-  Plus: (props) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
-      <line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line>
-    </svg>
-  ),
+  )
 };
 
 const carouselData = [
@@ -110,8 +116,6 @@ const CarouselCard = ({ item }) => (
     )}
   </div>
 );
-
-// Feature card removed in cleanup
 
 const AnimatedCounter = ({ targetValue }) => {
   const [count, setCount] = useState(0);
@@ -229,8 +233,8 @@ const CreatorTestimonialsSection = () => {
   );
 };
 
-// Case Study / Success Story Section (Reusable)
-const CaseStudySection = ({ data }) => {
+// Generic 2-column section block used for Vision / Mission / Impact themes
+const ThemedSection = ({ data }) => {
   const {
     badgeText,
     heading,
@@ -257,6 +261,7 @@ const CaseStudySection = ({ data }) => {
       halo: 'from-orange-400/20 to-pink-400/10'
     }
   } = data;
+  const animateCards = /(fund your vision|build your mission|scale your impact)/i.test(badgeText || '');
   // Dynamic height syncing: enlarge right side container to match left image height
   const [leftImageHeight, setLeftImageHeight] = useState(null);
   const leftImageRef = useRef(null);
@@ -274,25 +279,34 @@ const CaseStudySection = ({ data }) => {
     <section className={`relative ${gradient.wrapperBg} py-28`}>
       <div className="max-w-7xl mx-auto px-6 lg:px-12 grid lg:grid-cols-2 gap-20">
         <div className="flex flex-col">
-      <span className={`inline-flex w-fit items-center uppercase font-semibold mb-8 shadow-sm transition-all ${largeBadge ? 'text-sm tracking-wide px-5 py-3 rounded-lg bg-amber-100 text-amber-800' : 'tracking-wide text-[11px] px-3 py-1 rounded-full bg-amber-100 text-amber-700'}`}>{badgeText}</span>
+      {(() => {
+        const base = largeBadge ? 'text-sm tracking-wide px-5 py-3 rounded-lg' : 'tracking-wide text-[11px] px-3 py-1 rounded-full';
+        let color = 'bg-amber-100 text-amber-800';
+        if (/fund your vision/i.test(badgeText)) color = 'bg-blue-100 text-blue-700';
+        else if (/build your mission/i.test(badgeText)) color = 'bg-emerald-100 text-emerald-700';
+        else if (/scale your impact/i.test(badgeText)) color = 'bg-purple-100 text-purple-700';
+        return (
+          <span className={`inline-flex w-fit items-center uppercase font-semibold mb-8 shadow-sm transition-all ${base} ${color}`}>{badgeText}</span>
+        );
+      })()}
           <h3 className="text-4xl md:text-5xl font-black leading-[1.1] text-slate-900 mb-10" dangerouslySetInnerHTML={{ __html: heading }} />
           {profile && (
             fullImage ? (
               <div className="mb-12">
-                <div ref={leftImageRef} className="relative w-full rounded-3xl overflow-hidden shadow-xl bg-slate-300" style={{ minHeight: '520px' }}>
+                <div ref={leftImageRef} className={`relative w-full rounded-3xl overflow-hidden shadow-xl bg-slate-300 ${animateCards ? 'mission-card' : ''}`} style={{ minHeight: '520px' }}>
                   <img src={profile.image} alt={profile.name} className="absolute inset-0 w-full h-full object-cover object-cover" />
                 </div>
                 {additionalTextBox && (
-                  <div className={`mt-10 relative rounded-3xl p-10 md:p-16 ${additionalTextBoxPlainWhite ? 'bg-white' : 'bg-gradient-to-br ' + additionalTextBoxGradient} shadow-2xl ring-1 ring-slate-900/5 overflow-hidden flex items-center`} style={{ minHeight: additionalTextBoxPlainWhite ? '420px' : '300px' }}> 
+                  <div className={`mt-10 relative rounded-3xl p-10 md:p-16 ${additionalTextBoxPlainWhite ? 'bg-white' : 'bg-gradient-to-br ' + additionalTextBoxGradient} shadow-2xl ring-1 ring-slate-900/5 overflow-hidden flex items-center ${animateCards ? 'mission-card' : ''}`} style={{ minHeight: additionalTextBoxPlainWhite ? '420px' : '300px' }}> 
                     <div className="pointer-events-none absolute -top-24 -left-20 w-80 h-80 bg-gradient-to-tr from-white/50 to-white/10 rounded-full blur-3xl opacity-70" />
                     <div className="pointer-events-none absolute -bottom-24 -right-16 w-72 h-72 bg-gradient-to-tr from-white/40 to-white/5 rounded-full blur-3xl opacity-60" />
-                    <p className={`relative w-full ${additionalTextBoxPlainWhite ? 'text-3xl sm:text-4xl lg:text-[2.85rem] font-black leading-[1.15] tracking-tight text-slate-900' : 'text-2xl sm:text-3xl lg:text-4xl font-black leading-tight tracking-tight text-slate-900'}`}>
+                    <p className={`relative w-full ${additionalTextBoxPlainWhite ? 'text-3xl sm:text-4xl lg:text-[2.85rem] font-black leading-[1.4] tracking-tight text-slate-900' : 'text-2xl sm:text-3xl lg:text-4xl font-black leading-[1.32] tracking-tight text-slate-900'}`}>
                       {additionalTextBox}
                     </p>
                   </div>
                 )}
                 {additionalTextBoxesLeft && additionalTextBoxesLeft.map((box, idx) => (
-                  <div key={idx} className={`mt-10 relative rounded-3xl p-10 md:p-16 bg-gradient-to-br ${box.gradient || additionalTextBoxGradient} shadow-2xl ring-1 ring-slate-900/5 overflow-hidden flex items-center`} style={ box.minHeight !== undefined ? { minHeight: box.minHeight } : { minHeight: '260px' } }>
+                  <div key={idx} className={`mt-10 relative rounded-3xl p-10 md:p-16 bg-gradient-to-br ${box.gradient || additionalTextBoxGradient} shadow-2xl ring-1 ring-slate-900/5 overflow-hidden flex items-center ${animateCards ? 'mission-card' : ''}`} style={ box.minHeight !== undefined ? { minHeight: box.minHeight } : { minHeight: '260px' } }>
                     <div className="pointer-events-none absolute -top-24 -left-20 w-80 h-80 bg-gradient-to-tr from-white/50 to-white/10 rounded-full blur-3xl opacity-40" />
                     <div className="pointer-events-none absolute -bottom-24 -right-16 w-72 h-72 bg-gradient-to-tr from-white/40 to-white/5 rounded-full blur-3xl opacity-30" />
                     <p className={box.textClass || 'relative w-full text-2xl sm:text-3xl font-black leading-tight tracking-tight text-slate-900'}>
@@ -322,12 +336,12 @@ const CaseStudySection = ({ data }) => {
         <div className="relative">
           <div className="mb-10">
             <h4 className="font-bold text-slate-900 text-lg md:text-xl leading-snug mb-3">{introTitle}</h4>
-            <p className="text-slate-600 text-sm md:text-base leading-relaxed mb-6 max-w-md">{introParagraph}</p>
+            <p className="text-slate-700 text-lg md:text-xl leading-relaxed mb-6 max-w-md">{introParagraph}</p>
             <a href={cta.href} className="inline-flex items-center justify-center px-5 py-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm shadow-md transition-colors">
               {cta.label}
             </a>
           </div>
-          <div className={`relative rounded-3xl bg-gradient-to-br ${gradient.card} p-6 md:p-10 shadow-xl ring-1 ring-amber-300/30 overflow-hidden`} style={leftImageHeight ? { minHeight: leftImageHeight } : {}}>
+          <div className={`relative rounded-3xl bg-gradient-to-br ${gradient.card} p-6 md:p-10 shadow-xl ring-1 ring-amber-300/30 overflow-hidden ${animateCards ? 'mission-card' : ''}`} style={leftImageHeight ? { minHeight: leftImageHeight } : {}}>
             <div className={`absolute -top-24 -right-16 w-72 h-72 bg-gradient-to-tr ${gradient.halo} rounded-full blur-3xl`} />
       <div className={`relative ${platformShowcaseFeatures ? 'h-full flex items-center' : 'grid gap-6'}`}>
               {platformShowcaseFeatures ? (
@@ -335,7 +349,7 @@ const CaseStudySection = ({ data }) => {
                 <p className="w-full text-3xl sm:text-4xl lg:text-5xl font-black leading-[1.15] tracking-tight text-white drop-shadow-sm m-0">{platformShowcaseFeatures}</p>
               ) : (
                 <>
-                  <div className="rounded-2xl overflow-hidden bg-white shadow-lg ring-1 ring-slate-900/5 flex" style={fullImage && leftImageHeight ? { height: leftImageHeight } : {}}>
+                  <div className={`rounded-2xl overflow-hidden bg-white shadow-lg ring-1 ring-slate-900/5 flex ${animateCards ? 'mission-card' : ''}`} style={fullImage && leftImageHeight ? { height: leftImageHeight } : {}}>
                     <div className="flex-1 p-6 space-y-4 overflow-y-auto">
                       <div>
                         <p className="text-xs font-medium tracking-wide text-slate-500 mb-2">{workspace.badge}</p>
@@ -357,7 +371,7 @@ const CaseStudySection = ({ data }) => {
                       </div>
                     )}
                   </div>
-                  <div className="rounded-2xl bg-white shadow-lg ring-1 ring-slate-900/5 p-6 grid gap-4">
+                  <div className={`rounded-2xl bg-white shadow-lg ring-1 ring-slate-900/5 p-6 grid gap-4 ${animateCards ? 'mission-card' : ''}`}>
                     <div className="flex items-center gap-4">
                       <div className="flex-1">
                         <p className="text-xs font-medium tracking-wide text-slate-500">CAPACITY BUILT</p>
@@ -382,13 +396,13 @@ const CaseStudySection = ({ data }) => {
             </div>
           </div>
           {extraImage && (
-            <div className="mt-10 rounded-3xl overflow-hidden shadow-xl ring-1 ring-slate-900/5 bg-slate-100">
+            <div className={`mt-10 rounded-3xl overflow-hidden shadow-xl ring-1 ring-slate-900/5 bg-slate-100 ${animateCards ? 'mission-card' : ''}`}>
               {/* Enlarged height from h-72/md:h-80 to h-96/md:h-[430px] */}
               <img src={extraImage.src} alt={extraImage.alt || ''} className="w-full h-[520px] md:h-[580px] object-cover" />
             </div>
           )}
           {additionalTextBoxesRight && additionalTextBoxesRight.map((box, idx) => (
-            <div key={idx} className="mt-10 rounded-3xl overflow-hidden shadow-xl ring-1 ring-slate-900/5">
+            <div key={idx} className={`mt-10 rounded-3xl overflow-hidden shadow-xl ring-1 ring-slate-900/5 ${animateCards ? 'mission-card' : ''}`}>
               <div className={`h-full w-full p-10 md:p-16 ${box.plainWhite ? 'bg-white' : `bg-gradient-to-br ${box.gradient || 'from-indigo-200/70 via-sky-200/70 to-cyan-200/70'}`} flex items-center`} style={{ minHeight: box.plainWhite ? '420px' : '260px' }}>
                 <p className={`${box.plainWhite ? 'text-3xl sm:text-4xl lg:text-[2.85rem] font-black leading-[1.15] tracking-tight bg-gradient-to-r from-rose-400 via-orange-400 to-indigo-500 bg-clip-text text-transparent' : 'text-2xl sm:text-3xl font-black leading-tight tracking-tight text-slate-900'}`}>{box.text}</p>
               </div>
@@ -400,8 +414,66 @@ const CaseStudySection = ({ data }) => {
   );
 };
 
-// Data for three consecutive case studies
-const caseStudies = [
+const homepageSections = [
+  {
+    badgeText: 'Fund your Vision',
+    heading: 'Fundspace helps organizations surface aligned capital, streamline readiness, and unlock sustainable funding momentum.',
+    profile: {
+      image: 'https://images.unsplash.com/photo-1755541516554-7c5126ec7f7b?q=80&w=1160&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDF8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D'
+    },
+    quote: '',
+    introTitle: 'Great ideas need more than discovery—they need fuel, credibility, and a repeatable pathway to capital.',
+    introParagraph: 'Use smart matching, reusable assets, and collaborative review to move from scattered opportunities to a strategic funding pipeline.',
+  cta: { label: 'Start visioning', href: '/login?view=signup' },
+    fullImage: true,
+    showProfileMeta: false,
+    largeBadge: true,
+    platformShowcaseFeatures: 'Discover grants, catalytic capital, and strategic partners—then convert them faster with organized, AI-assisted assets.',
+    additionalTextBox: 'Centralize narratives, budgets, impact stats, and past proposals so every new application starts at 60% complete.',
+    additionalTextBoxGradient: 'from-amber-200/70 via-orange-200/70 to-rose-200/70',
+    additionalTextBoxPlainWhite: true,
+    additionalTextBoxesLeft: [
+      {
+        text: 'Build a living funding pipeline with status tracking, deadline intelligence, and automated reminders that keep teams aligned.',
+        gradient: 'from-orange-400 via-rose-400 to-pink-400',
+        textClass: 'relative w-full text-3xl sm:text-4xl lg:text-[2.85rem] font-black leading-[1.15] tracking-tight text-white',
+        minHeight: 420
+      }
+    ],
+    additionalTextBoxesRight: [
+      {
+        text: 'Accelerate credibility with peer-reviewed templates, reusable logic models, and consistent impact framing.',
+        plainWhite: true
+      }
+    ],
+    extraImage: { src: 'https://images.unsplash.com/photo-1633113214207-1568ec4b3298?q=80&w=1740&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D', alt: 'Funding collaboration' },
+    gradient: {
+      wrapperBg: 'bg-[#f9f6f4]',
+      card: 'from-amber-300/70 via-orange-300/70 to-rose-300/70',
+      halo: 'from-orange-400/25 to-rose-400/10'
+    },
+    workspace: {
+      badge: 'FUNDING WORKSPACE',
+      title: 'Grant & Capital Pipeline',
+      description: 'Central dashboard of opportunities with readiness score, deadlines, owner, and progress state.',
+      metrics: [
+        { label: 'ACTIVE LEADS', value: 22 },
+        { label: 'READY PACKETS', value: 14 },
+        { label: 'SUBMISSIONS', value: 9 }
+      ],
+      image: 'https://images.unsplash.com/photo-1553877522-43269d4ea984?q=80&w=600&auto=format&fit=crop'
+    },
+    capacity: {
+      assetsFrom: 5,
+      assetsTo: 18,
+      timeSaved: '58%',
+      bullets: [
+        { color: 'bg-orange-500', text: 'Reusable asset library reduced first‑draft creation time.' },
+        { color: 'bg-rose-500', text: 'Automated deadline & task reminders lowered missed submissions.' },
+        { color: 'bg-pink-500', text: 'Pipeline visibility improved internal coordination & prioritization.' }
+      ]
+    }
+  },
   {
   badgeText: 'Build your Mission',
     heading: 'Fundspace helps organizations build capacity, connect, and sustain impact beyond funding.',
@@ -414,18 +486,13 @@ const caseStudies = [
   fullImage: true,
   showProfileMeta: false,
   largeBadge: true,
-  // Replaced feature boxes with a single descriptive sentence per user request
   platformShowcaseFeatures: 'Meet peers, funders, and experts in a collaborative hub for sharing resources, exchanging knowledge, and sparking partnerships.',
-  // New additional gradient text box beneath the image per request
   additionalTextBox: 'Join workshops, forums, and mentorship opportunities that help leaders grow their skills and share what works.',
   additionalTextBoxGradient: 'from-fuchsia-200/70 via-pink-200/70 to-rose-200/70',
   additionalTextBoxPlainWhite: true,
-  // Newly added arrays for extra text cards left & right
   additionalTextBoxesLeft: [
     { 
       text: 'Use Fundspace’s integrated tools to streamline applications, manage opportunities, and measure impact—so organizations spend less time on paperwork and more time on their mission.', 
-  // Darker, higher-contrast gradient for improved readability
-  // Light purple gradient variant
   gradient: 'from-violet-300 via-purple-200 to-fuchsia-200',
   textClass: 'relative w-full text-3xl sm:text-4xl lg:text-[2.85rem] font-black leading-[1.15] tracking-tight text-white',
   minHeight: 420
@@ -437,9 +504,7 @@ const caseStudies = [
       plainWhite: true 
     }
   ],
-  // Additional image card beneath text card
   extraImage: { src: 'https://images.unsplash.com/photo-1544928147-79a2dbc1f389?q=80&w=774&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D', alt: 'Collaborative workspace' },
-  // Updated gradient to green/teal per design request
   gradient: {
     wrapperBg: 'bg-[#f9f6f4]', // reverted to original background
     card: 'from-lime-300/70 via-emerald-300/70 to-teal-300/70',
@@ -467,9 +532,68 @@ const caseStudies = [
       ]
     }
   },
+  {
+    badgeText: 'Scale your Impact',
+    heading: 'Fundspace helps organizations amplify outcomes, deepen partnerships, and convert momentum into lasting systems change.',
+    profile: {
+      image: 'https://images.unsplash.com/photo-1663743556587-b0cd1a9cd61d?q=80&w=772&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D'
+    },
+    quote: '',
+    introTitle: 'Growth is only the beginning—impact multiplies when insights and relationships compound.',
+    introParagraph: 'Turn wins into repeatable systems. Fundspace equips teams to measure, communicate, and expand the value they create across communities and partners.',
+  cta: { label: 'Start scaling', href: '/login?view=signup' },
+    fullImage: true,
+    showProfileMeta: false,
+    largeBadge: true,
+    platformShowcaseFeatures: 'Track outcomes, activate partners, and showcase credible progress with data that inspires continued investment.',
+    additionalTextBox: 'Leverage dashboards, automated reporting, and shared learning to extend every dollar and hour of effort.',
+    additionalTextBoxGradient: 'from-sky-200/70 via-blue-200/70 to-indigo-200/70',
+    additionalTextBoxPlainWhite: true,
+    additionalTextBoxesLeft: [
+      {
+        text: 'Use real-time impact KPIs, storytelling assets, and partner collaboration tools to accelerate expansion without losing mission focus.',
+        gradient: 'from-indigo-400 via-blue-400 to-cyan-400',
+        textClass: 'relative w-full text-3xl sm:text-4xl lg:text-[2.85rem] font-black leading-[1.15] tracking-tight text-white',
+        minHeight: 420
+      }
+    ],
+    additionalTextBoxesRight: [
+      {
+        text: 'Generate investor- and funder-ready narratives backed by live metrics to unlock renewal and multi-year support.',
+        plainWhite: true
+      }
+    ],
+    extraImage: { src: 'https://images.unsplash.com/photo-1674574124340-c00cc2dae99c?q=80&w=1740&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D', alt: 'Impact data collaboration' },
+    gradient: {
+      wrapperBg: 'bg-[#f9f6f4]',
+      card: 'from-sky-300/70 via-blue-300/70 to-indigo-300/70',
+      halo: 'from-sky-400/25 to-indigo-400/10'
+    },
+    workspace: {
+      badge: 'IMPACT WORKSPACE',
+      title: 'Impact Intelligence Dashboard',
+      description: 'Centralized KPIs, outcome narratives, media assets, and partner engagement activity—kept current & presentation ready.',
+      metrics: [
+        { label: 'ACTIVE KPIs', value: 18 },
+        { label: 'DATA SOURCES', value: 9 },
+        { label: 'PARTNER LOGINS', value: 34 }
+      ],
+      image: 'https://images.unsplash.com/photo-1504384308090-c894fdcc538d?q=80&w=600&auto=format&fit=crop'
+    },
+    capacity: {
+      assetsFrom: 6,
+      assetsTo: 24,
+      timeSaved: '71%',
+      bullets: [
+        { color: 'bg-blue-500', text: 'Automated rollups replaced manual spreadsheet consolidation.' },
+        { color: 'bg-cyan-500', text: 'Unified dashboard reduced ad‑hoc status requests from stakeholders.' },
+        { color: 'bg-indigo-500', text: 'Sharable visuals accelerated renewal & multi‑year discussions.' }
+      ]
+    }
+  }
 ];
 
-export default function App() {
+export default function HomePage() {
   const [totalFunding, setTotalFunding] = useState(87_500_000);
   const scrollRef = useRef(null);
 
@@ -558,7 +682,7 @@ export default function App() {
             </div>
           </div>
         </section>
-  {caseStudies.map((cs, i) => <CaseStudySection key={i} data={cs} />)}
+  {homepageSections.map((section, i) => <ThemedSection key={i} data={section} />)}
       </main>
     </div>
   );
