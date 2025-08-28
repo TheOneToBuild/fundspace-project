@@ -295,15 +295,16 @@ export default function PublicHeader() {
 
                 {activeDropdown !== null && mainNavLinks[activeDropdown]?.dropdown && (
                     <div 
-                        className="fixed left-0 w-full bg-white border-b border-slate-200 shadow-lg z-50 animate-fadeInDown"
-                        onMouseEnter={() => handleMouseEnter(activeDropdown)}
-                        onMouseLeave={handleMouseLeave}
-                        style={{
-                            borderRadius: '0 0 16px 16px',
-                            top: showNotificationBar 
-                                ? (isScrolled ? '73px' : '137px')
-                                : '73px'
-                        }}
+                        className="fixed left-0 w-full bg-white border-b border-slate-200 shadow-lg z-[9999] animate-fadeInDown"
+                        data-dropdown-container
+    onMouseEnter={() => handleMouseEnter(activeDropdown)}
+    onMouseLeave={handleMouseLeave}
+    style={{
+        borderRadius: '0 0 16px 16px',
+        top: showNotificationBar 
+            ? (isScrolled ? '73px' : '137px')
+            : '73px'
+    }}
                     >
                         <div className="w-full px-6 lg:px-12 xl:px-16 py-8">
                             <div className="flex">
