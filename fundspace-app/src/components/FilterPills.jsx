@@ -45,21 +45,21 @@ const FilterPills = ({ activeFilters, onRemoveFilter }) => {
   };
 
   return (
-    <div className="flex flex-wrap items-center gap-2 mt-4 text-sm font-medium">
+    <div className="flex flex-wrap items-center gap-3 mt-4 text-base font-semibold">
       {activeFilters.map((filter, index) => (
         <span
-          // Use a more robust key that includes the value for multi-select items
           key={`${filter.key}-${filter.value || index}`}
-          className={`inline-flex items-center px-3 py-1 rounded-full border ${getPillColorClasses(filter.key)} whitespace-nowrap`}
+          className={`inline-flex items-center px-4 py-2 rounded-2xl border shadow-md ${getPillColorClasses(filter.key)} whitespace-nowrap filter-pill-modern`}
+          style={{fontWeight:600, fontSize:'1rem', letterSpacing:'0.01em', boxShadow:'0 2px 8px 0 rgba(80,80,120,0.07)'}}
         >
           {filter.label}
           <button
-            // Pass both the key and the specific value to remove for multi-select filters
             onClick={() => onRemoveFilter(filter.key, filter.value)}
-            className={`ml-2 p-0.5 rounded-full hover:bg-black/10 focus:outline-none focus:ring-1 focus:ring-offset-1 transition-colors`}
+            className={`ml-2 p-1 rounded-full hover:bg-black/10 focus:outline-none focus:ring-2 focus:ring-offset-2 transition-colors`}
             aria-label={`Remove filter ${filter.label}`}
+            style={{marginLeft:'0.75rem'}}
           >
-            <X size={12} />
+            <X size={16} />
           </button>
         </span>
       ))}

@@ -12,7 +12,7 @@ const EnhancedSearchInput = ({
   placeholder = "Search funders, focus areas, locations...",
   className = "",
   showRecentSearches = true,
-  showTrendingSearches = true
+  showTrendingSearches = false
 }) => {
   const [inputValue, setInputValue] = useState(searchTerm || '');
   const [isFocused, setIsFocused] = useState(false);
@@ -113,8 +113,8 @@ const EnhancedSearchInput = ({
     localStorage.removeItem('recentSearches');
   };
 
-  const trendingSearches = [ "Healthcare", "Education", "Environment", "Arts & Culture", "Social Justice" ];
-  const showDropdown = isFocused && (suggestions.length > 0 || (inputValue.length < 2 && (recentSearches.length > 0 || showTrendingSearches)));
+  // Trending searches removed
+  const showDropdown = isFocused && (suggestions.length > 0 || (inputValue.length < 2 && recentSearches.length > 0));
 
   return (
     <div className={`relative ${className}`}>
@@ -126,7 +126,8 @@ const EnhancedSearchInput = ({
           ref={inputRef} type="text" value={inputValue}
           onChange={handleInputChange} onFocus={handleInputFocus} onBlur={handleInputBlur} onKeyDown={handleKeyDown}
           placeholder={placeholder}
-          className="block w-full pl-10 pr-10 py-3 border border-slate-300 rounded-lg placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+          className="block w-full pl-10 pr-10 py-3 bg-transparent border-none outline-none shadow-none rounded-none placeholder-slate-400 focus:ring-0 focus:border-none focus:outline-none transition-all duration-200"
+          style={{ boxShadow: 'none', border: 'none', background: 'transparent', borderRadius: 0 }}
           autoComplete="off"
         />
         {inputValue && (
@@ -168,21 +169,7 @@ const EnhancedSearchInput = ({
                 </div>
               )}
 
-              {inputValue.length < 2 && suggestions.length === 0 && recentSearches.length === 0 && showTrendingSearches && (
-                <div>
-                  <div className="px-4 py-2 text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-100"><TrendingUp size={12} className="inline mr-1" />Trending Searches</div>
-                  {trendingSearches.map((term, index) => (
-                    <button
-                      key={`trending-${index}`} type="button"
-                      // CORRECTED: This now sends a suggestion of type 'text' instead of 'category'
-                      onMouseDown={(e) => { e.preventDefault(); handleSelection({ text: term, type: 'text' }); }}
-                      className="w-full px-4 py-3 text-left hover:bg-slate-50 flex items-center transition-colors cursor-pointer text-slate-700 focus:outline-none focus:bg-blue-50"
-                    >
-                      <TrendingUp size={16} className="mr-3 text-slate-400" /><span>{term}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
+              {/* Trending searches dropdown removed */}
             </>
         </div>
       )}

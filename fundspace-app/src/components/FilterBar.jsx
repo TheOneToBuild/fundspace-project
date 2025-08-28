@@ -31,6 +31,7 @@ const NONPROFIT_BUDGET_RANGES = [
 const FilterBar = ({
   isMobileVisible,
   searchTerm, setSearchTerm,
+  // keep for other pages, but will not render for grants
   // Grant Filters
   locationFilter, setLocationFilter,
   categoryFilter, setCategoryFilter,
@@ -98,12 +99,12 @@ const FilterBar = ({
     searchPlaceholder = "Search by name, focus area...";
     accentColorClass = 'focus:ring-green-500';
     sortOptions = (
-        <>
-          <option value="name_asc">Name (A-Z)</option>
-          <option value="name_desc">Name (Z-A)</option>
-          <option value="funding_desc">Annual Giving (Highest)</option>
-          <option value="funding_asc">Annual Giving (Lowest)</option>
-        </>
+      <>
+        <option value="name_asc">Name (A-Z)</option>
+        <option value="name_desc">Name (Z-A)</option>
+        <option value="funding_desc">Annual Giving (Highest)</option>
+        <option value="funding_asc">Annual Giving (Lowest)</option>
+      </>
     );
   } else if (isNonprofitsPage) {
     searchLabel = 'Search Nonprofits';
@@ -190,92 +191,270 @@ const FilterBar = ({
   const selectedFocusAreaValues = useMemo(() => getSelectedValues(focusAreaFilter, focusAreaOptions), [focusAreaFilter, focusAreaOptions]);
   const selectedScopeValues = useMemo(() => getSelectedValues(geographicScopeFilter, geographicScopeOptions), [geographicScopeFilter, geographicScopeOptions]);
 
-  const containerClasses = `mt-8 max-w-6xl mx-auto bg-white p-6 sm:p-8 rounded-2xl border border-slate-200 shadow-lg ${isMobileVisible ? 'block' : 'hidden'} md:block`;
+  // --- INTEGRATED FILTER BAR ---
+  const integratedBarClasses = `w-full flex flex-wrap gap-3 items-center px-0 py-0 mt-6 ${isMobileVisible ? '' : 'hidden md:flex'} transition-all`;
 
   return (
-    <div className={containerClasses}>
-      <div className="mb-6">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center">
-            <Filter size={20} className={`mr-3 ${isFundersPage ? 'text-green-600' : isNonprofitsPage ? 'text-purple-600' : 'text-blue-600'}`} />
-            <h3 className="text-lg font-semibold text-slate-800">Refine Your Search</h3>
-          </div>
-          {activeFilters && activeFilters.length > 0 && (
-            <button 
-              onClick={onClearFilters} 
-              className={`inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
-                isFundersPage ? 'text-green-700 bg-green-100 hover:bg-green-200' :
-                isNonprofitsPage ? 'text-purple-700 bg-purple-100 hover:bg-purple-200' :
-                'text-blue-700 bg-blue-100 hover:bg-blue-200'
-              }`}
-            >
-              <XCircle size={14} className="mr-1" />
-              Clear All
-            </button>
-          )}
+    <div className={integratedBarClasses}>
+      {/* Search Input removed for organizations page as well */}
+      {(!hideSearchInput && !isGrantsPage && !isOrganizationsPage) && (
+        <div className="flex items-center flex-1 min-w-[200px] max-w-[320px]">
+          <Search size={20} className="text-slate-400 mr-2" />
+          <EnhancedSearchInput
+            searchTerm={searchTerm} onSearchChange={setSearchTerm} onSuggestionSelect={onSuggestionSelect}
+            funders={funders} nonprofits={nonprofits} organizations={organizations} placeholder={searchPlaceholder} className="w-full border-none shadow-none px-0 py-0 bg-transparent focus:ring-0 text-base"
+          />
         </div>
+      )}
 
-        {!hideSearchInput && (
-          <div className="flex gap-4 items-end">
-            <div className="flex-1">
-              <label htmlFor="enhanced-search" className="block text-sm font-medium text-slate-700 mb-2">{searchLabel}</label>
-              <EnhancedSearchInput
-                searchTerm={searchTerm} onSearchChange={setSearchTerm} onSuggestionSelect={onSuggestionSelect}
-                funders={funders} nonprofits={nonprofits} organizations={organizations} placeholder={searchPlaceholder} className=""
-              />
-            </div>
-            <div className="w-64">
-              <label htmlFor="sort-criteria" className="block text-sm font-medium text-slate-700 mb-2">Sort By</label>
-              <div className="relative">
-                <ListFilter size={16} className="text-slate-400 absolute left-3 top-1/2 transform -translate-y-1/2 pointer-events-none" />
-                <select id="sort-criteria" value={sortCriteria} onChange={(e) => setSortCriteria(e.target.value)} 
-                  className={`w-full pl-10 pr-4 py-3 border border-slate-300 rounded-lg bg-white text-sm focus:ring-1 ${accentColorClass} transition-colors hover:border-slate-400 appearance-none`}
+      {/* Divider */}
+      <div className="h-8 w-px bg-slate-100 mx-2 hidden sm:block" />
+
+      {/* Grant Filters (as selects) */}
+      {isGrantsPage && (
+        <>
+          <div className="flex gap-3">
+            <div className="flex gap-3">
+              <div className="min-w-[140px]">
+                <Select
+                  id="category-filter"
+                  isMulti
+                  options={categoryOptions}
+                  value={[]}
+                  onChange={handleMultiSelectChange(setCategoryFilter)}
+                  placeholder="Categories"
+                  classNamePrefix="filter-pill"
+                  styles={{
+                    ...customSelectStyles,
+                    control: (base, state) => ({
+                      ...base,
+                      borderRadius: '9999px',
+                      minHeight: '44px',
+                      maxHeight: '44px',
+                      paddingLeft: '20px',
+                      paddingRight: '20px',
+                      fontWeight: 500,
+                      fontSize: '15px',
+                      boxShadow: 'none',
+                      borderColor: state.isFocused ? '#3b82f6' : '#e5e7eb',
+                      background: '#fff',
+                      cursor: 'pointer',
+                    }),
+                    placeholder: (base) => ({ ...base, color: '#64748b', fontWeight: 500 }),
+                  }}
+                  isClearable
+                  menuIsOpen={undefined}
+                />
+              </div>
+              <div className="min-w-[140px]">
+                <Select
+                  id="location-filter"
+                  isMulti
+                  options={locationOptions}
+                  value={[]}
+                  onChange={handleMultiSelectChange(setLocationFilter)}
+                  placeholder="Locations"
+                  classNamePrefix="filter-pill"
+                  styles={{
+                    ...customSelectStyles,
+                    control: (base, state) => ({
+                      ...base,
+                      borderRadius: '9999px',
+                      minHeight: '44px',
+                      maxHeight: '44px',
+                      paddingLeft: '20px',
+                      paddingRight: '20px',
+                      fontWeight: 500,
+                      fontSize: '15px',
+                      boxShadow: 'none',
+                      borderColor: state.isFocused ? '#3b82f6' : '#e5e7eb',
+                      background: '#fff',
+                      cursor: 'pointer',
+                    }),
+                    placeholder: (base) => ({ ...base, color: '#64748b', fontWeight: 500 }),
+                  }}
+                  isClearable
+                  menuIsOpen={undefined}
+                />
+              </div>
+              <div className="min-w-[140px]">
+                <select id="grant-type-filter" value={grantTypeFilter || ''} onChange={(e) => setGrantTypeFilter(e.target.value)}
+                  className="w-full px-5 py-2 rounded-full border border-slate-300 bg-white text-sm font-medium focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none appearance-none shadow-sm hover:shadow-md transition-shadow duration-300 cursor-pointer min-h-[44px] max-h-[44px]"
+                  style={{ fontWeight: 500, fontSize: '15px' }}
                 >
-                  {sortOptions}
+                  <option value="">All Types</option>
+                  {uniqueGrantTypes.map((type) => (<option key={type} value={type}>{type}</option>))}
                 </select>
-                <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
+              </div>
+              <div className="min-w-[140px]">
+                <select id="grant-status-filter" value={grantStatusFilter || ''} onChange={(e) => setGrantStatusFilter(e.target.value)}
+                  className="w-full px-5 py-2 rounded-full border border-slate-300 bg-white text-sm font-medium focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none appearance-none shadow-sm hover:shadow-md transition-shadow duration-300 cursor-pointer min-h-[44px] max-h-[44px]"
+                  style={{ fontWeight: 500, fontSize: '15px' }}
+                >
+                  <option value="">All Statuses</option>
+                  {uniqueGrantStatuses.map(status => (<option key={status} value={status}>{status}</option>))}
+                </select>
               </div>
             </div>
           </div>
-        )}
+        </>
+      )}
+
+      {/* Organization Filters (as selects, for organizations page) */}
+      {isOrganizationsPage && (
+        <>
+          <div className="flex gap-3">
+            <div className="min-w-[140px]">
+              <Select
+                id="org-type-filter"
+                isMulti={false}
+                options={[{ value: '', label: 'All Types' }, ...(availableTypes?.map(type => {
+                  const config = orgTypeConfig?.[type];
+                  return { value: type, label: config?.label || type };
+                }) || [])]}
+                value={(() => {
+                  const val = typeFilter?.[0] || '';
+                  return [{ value: val, label: (orgTypeConfig?.[val]?.label || val) || 'All Types' }];
+                })()}
+                onChange={opt => setTypeFilter(opt && opt.value ? [opt.value] : [])}
+                placeholder="Organization Type"
+                classNamePrefix="filter-pill"
+                styles={{
+                  ...customSelectStyles,
+                  control: (base, state) => ({
+                    ...base,
+                    borderRadius: '9999px',
+                    minHeight: '44px',
+                    maxHeight: '44px',
+                    paddingLeft: '20px',
+                    paddingRight: '20px',
+                    fontWeight: 500,
+                    fontSize: '15px',
+                    boxShadow: 'none',
+                    borderColor: state.isFocused ? '#3b82f6' : '#e5e7eb',
+                    background: '#fff',
+                    cursor: 'pointer',
+                  }),
+                  placeholder: (base) => ({ ...base, color: '#64748b', fontWeight: 500 }),
+                }}
+                isClearable
+                menuIsOpen={undefined}
+              />
+            </div>
+            <div className="min-w-[140px]">
+              <Select
+                id="org-focus-area-filter"
+                isMulti
+                options={focusAreaOptions}
+                value={getSelectedValues(focusAreaFilter, focusAreaOptions)}
+                onChange={handleMultiSelectChange(setFocusAreaFilter)}
+                placeholder="Focus Areas"
+                classNamePrefix="filter-pill"
+                styles={{
+                  ...customSelectStyles,
+                  control: (base, state) => ({
+                    ...base,
+                    borderRadius: '9999px',
+                    minHeight: '44px',
+                    maxHeight: '44px',
+                    paddingLeft: '20px',
+                    paddingRight: '20px',
+                    fontWeight: 500,
+                    fontSize: '15px',
+                    boxShadow: 'none',
+                    borderColor: state.isFocused ? '#3b82f6' : '#e5e7eb',
+                    background: '#fff',
+                    cursor: 'pointer',
+                  }),
+                  placeholder: (base) => ({ ...base, color: '#64748b', fontWeight: 500 }),
+                }}
+                isClearable
+                menuIsOpen={undefined}
+              />
+            </div>
+            <div className="min-w-[140px]">
+              <Select
+                id="org-location-filter"
+                isMulti
+                options={locationOptions}
+                value={getSelectedValues(locationFilter, locationOptions)}
+                onChange={handleMultiSelectChange(setLocationFilter)}
+                placeholder="Locations"
+                classNamePrefix="filter-pill"
+                styles={{
+                  ...customSelectStyles,
+                  control: (base, state) => ({
+                    ...base,
+                    borderRadius: '9999px',
+                    minHeight: '44px',
+                    maxHeight: '44px',
+                    paddingLeft: '20px',
+                    paddingRight: '20px',
+                    fontWeight: 500,
+                    fontSize: '15px',
+                    boxShadow: 'none',
+                    borderColor: state.isFocused ? '#3b82f6' : '#e5e7eb',
+                    background: '#fff',
+                    cursor: 'pointer',
+                  }),
+                  placeholder: (base) => ({ ...base, color: '#64748b', fontWeight: 500 }),
+                }}
+                isClearable
+                menuIsOpen={undefined}
+              />
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Divider */}
+      <div className="h-8 w-px bg-slate-100 mx-2 hidden sm:block" />
+
+      {/* Sort By */}
+      <div className="min-w-[140px]">
+        <div className="relative">
+          <ListFilter size={16} className="text-slate-400 absolute left-3 top-1/2 transform -translate-y-1/2 pointer-events-none" />
+          <select
+            id="sort-criteria"
+            value={sortCriteria}
+            onChange={(e) => setSortCriteria(e.target.value)}
+            className={`w-full pl-10 pr-4 py-2 border border-slate-300 rounded-full bg-white text-sm font-medium focus:ring-2 ${accentColorClass} focus:border-blue-500 outline-none appearance-none shadow-sm hover:shadow-md transition-shadow duration-300 cursor-pointer min-h-[44px] max-h-[44px]`}
+            style={{ fontWeight: 500, fontSize: '15px' }}
+          >
+            {sortOptions}
+          </select>
+          <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">        
-        {/* --- GRANTS FILTERS --- */}
-        {isGrantsPage && (
-          <>
-            <div className="relative">
-              <label htmlFor="category-filter" className="block text-sm font-medium text-slate-700 mb-2">Categories</label>
-              <Select id="category-filter" isMulti options={categoryOptions} value={selectedCategoryValues} 
-                onChange={handleMultiSelectChange(setCategoryFilter)} placeholder="Select categories..." className="text-sm" styles={customSelectStyles} isClearable
-              />
-            </div>
-            <div className="relative">
-              <label htmlFor="location-filter" className="block text-sm font-medium text-slate-700 mb-2"><MapPin size={16} className="inline mr-1" />Locations</label>
-              <Select id="location-filter" isMulti options={locationOptions} value={selectedLocationValues} 
-                onChange={handleMultiSelectChange(setLocationFilter)} placeholder="Select locations..." className="text-sm" styles={customSelectStyles} isClearable
-              />
-            </div>
-            <div className="relative">
-              <label htmlFor="grant-type-filter" className="block text-sm font-medium text-slate-700 mb-2">Grant Types</label>
-              <select id="grant-type-filter" value={grantTypeFilter || ''} onChange={(e) => setGrantTypeFilter(e.target.value)}
-                className={`w-full pl-3 pr-8 py-3 border border-slate-300 rounded-lg focus:ring-2 ${accentColorClass} bg-white text-sm transition-colors hover:border-slate-400`} 
-              >
-                <option value="">All Grant Types</option>
-                {uniqueGrantTypes.map((type) => (<option key={type} value={type}>{type}</option>))}
-              </select>
-            </div>
-            <div className="relative">
-              <label htmlFor="grant-status-filter" className="block text-sm font-medium text-slate-700 mb-2">Status</label>
-              <select id="grant-status-filter" value={grantStatusFilter || ''} onChange={(e) => setGrantStatusFilter(e.target.value)}
-                className={`w-full pl-3 pr-8 py-3 border border-slate-300 rounded-lg focus:ring-2 ${accentColorClass} bg-white text-sm transition-colors hover:border-slate-400`} 
-              >
-                <option value="">All Statuses</option>
-                {uniqueGrantStatuses.map(status => (<option key={status} value={status}>{status}</option>))}
-              </select>
-            </div>
-          </>
-        )}
+      {/* Clear All Button */}
+      {activeFilters && activeFilters.length > 0 && (
+        <button
+          onClick={onClearFilters}
+          className={`ml-2 inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-full transition-colors whitespace-nowrap ${
+            isFundersPage ? 'text-green-700 bg-green-100 hover:bg-green-200' :
+            isNonprofitsPage ? 'text-purple-700 bg-purple-100 hover:bg-purple-200' :
+            'text-blue-700 bg-blue-100 hover:bg-blue-200'
+          }`}
+        >
+          <XCircle size={14} className="mr-1" />
+          Clear All
+        </button>
+      )}
+
+      {/* Active Filter Pills */}
+      {activeFilters && activeFilters.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 ml-2">
+          <FilterPills 
+            activeFilters={activeFilters} 
+            onRemoveFilter={onRemoveFilter}
+            pillClassName="rounded-full px-5 py-2 text-sm font-medium bg-blue-100 text-blue-700 hover:bg-blue-200 transition-colors min-h-[44px] max-h-[44px] shadow-sm"
+            pillRemoveClassName="ml-2 text-blue-500 hover:text-blue-700"
+          />
+        </div>
+      )}
+    </div>
+  );
 
         {/* --- FUNDERS FILTERS --- */}
         {isFundersPage && (
@@ -341,55 +520,8 @@ const FilterBar = ({
             </>
         )}
 
-        {/* --- ORGANIZATIONS FILTERS (NEW) --- */}
-        {isOrganizationsPage && (
-          <>
-            <div className="relative">
-              <label htmlFor="org-type-filter" className="block text-sm font-medium text-slate-700 mb-2"><Building size={16} className="inline mr-1" />Organization Type</label>
-              <select
-                id="org-type-filter"
-                value={typeFilter?.[0] || ''}
-                onChange={(e) => setTypeFilter(e.target.value ? [e.target.value] : [])}
-                className={`w-full pl-3 pr-8 py-3 border border-slate-300 rounded-lg focus:ring-2 ${accentColorClass} bg-white text-sm transition-colors hover:border-slate-400 appearance-none`}
-              >
-                <option value="">All Types</option>
-                {availableTypes?.map(type => {
-                  const config = orgTypeConfig?.[type];
-                  return (
-                    <option key={type} value={type}>
-                      {config?.label || type}
-                    </option>
-                  );
-                })}
-              </select>
-              <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
-            </div>
-            <div className="relative">
-              <label htmlFor="org-focus-area-filter" className="block text-sm font-medium text-slate-700 mb-2"><Tag size={16} className="inline mr-1" />Focus Areas</label>
-              <Select id="org-focus-area-filter" isMulti options={focusAreaOptions} value={getSelectedValues(focusAreaFilter, focusAreaOptions)} 
-                onChange={handleMultiSelectChange(setFocusAreaFilter)} placeholder="Select focus areas..." className="text-sm" styles={customSelectStyles} isClearable
-              />
-            </div>
-            <div className="relative">
-              <label htmlFor="org-location-filter" className="block text-sm font-medium text-slate-700 mb-2"><MapPin size={16} className="inline mr-1" />Location</label>
-              <Select id="org-location-filter" isMulti options={locationOptions} value={getSelectedValues(locationFilter, locationOptions)} 
-                onChange={handleMultiSelectChange(setLocationFilter)} placeholder="Select locations..." className="text-sm" styles={customSelectStyles} isClearable
-              />
-            </div>
-          </>
-        )}
-      </div>
-
-      {activeFilters && activeFilters.length > 0 && (
-        <div className="mt-6 pt-6 border-t border-slate-200">
-          <div className="flex flex-wrap items-center gap-3">
-            <span className="text-sm font-medium text-slate-700">Active Filters:</span>
-            <FilterPills activeFilters={activeFilters} onRemoveFilter={onRemoveFilter} />
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
-
+  {/* --- ORGANIZATIONS FILTERS (NEW) --- */}
+  {/* (Moved to integrated filter bar above) */}
+  // End of integrated bar JSX
+}
 export default FilterBar;

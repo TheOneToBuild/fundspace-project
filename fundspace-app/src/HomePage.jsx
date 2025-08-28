@@ -90,7 +90,7 @@ const Icons = {
 const carouselData = [
   { type: 'image', title: 'Mission Economic Development Agency', image: 'https://media.licdn.com/dms/image/v2/C561BAQGwhXHEN7fTVg/company-background_10000/company-background_10000/0/1585481344716/mission_economic_development_agency_cover?e=2147483647&v=beta&t=qypVn1yoDmdyZVIuhXoxuGyv7JmMM-NmkuNdv8OPtnI' },
   { type: 'video', title: '', videoSrc: 'https://videos.pexels.com/video-files/9363691/9363691-hd_1080_1920_25fps.mp4' },
-  { type: 'image', title: 'Pacific Islander Community Partnership', image: 'https://scontent-sjc3-1.xx.fbcdn.net/v/t39.30808-6/480823688_957226053233118_926561803234476192_n.jpg?stp=cp6_dst-jpg_tt6&_nc_cat=100&ccb=1-7&_nc_sid=833d8c&_nc_ohc=aox946v1B-cQ7kNvwE20EdA&_nc_oc=Adkk_cPsfZAJmE81L5KbdGAmSfFbhzwVOQz_tll4VOlxc2cU5yE4wDyg_l7WK17UGoU&_nc_zt=23&_nc_ht=scontent-sjc3-1.xx&_nc_gid=5qjemzmdB3TZWjKjAHNj6Q&oh=00_AfXV00wQzOlwAV79ZcCXqzfmxtcxWP3pipfGqXo68WhIXw&oe=68AE0246' },
+  { type: 'image', title: 'Pacific Islander Community Partnership', image: 'https://impactaapi.org/org/pacific-islander-community-partnership/attaf0kGrmdkK7Wmi.jpg' },
   { type: 'image', title: 'Future Construction Leaders Silicon Valley', image: 'https://images.squarespace-cdn.com/content/v1/64bfe92e203a2c626566aaca/1751316493749-Z5OFLWE8QBDIP9H05ST6/DSC00129.JPG' },
   { type: 'video', title: '', videoSrc: 'https://videos.pexels.com/video-files/3191353/3191353-uhd_2732_1440_25fps.mp4' },
   { type: 'image', title: 'The RILEY Project', image: 'https://www.therileyproject.org/wp-content/uploads/2022/07/Elaina-.jpeg' },

@@ -1,5 +1,3 @@
-// src/ExploreOrganizations.jsx - OPTIMIZED VERSION
-// Batches category queries to avoid hundreds of individual requests
 import React, { useState, useMemo, useEffect, useCallback, useContext } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { supabase } from './supabaseClient.js';
@@ -13,6 +11,7 @@ import usePaginatedFilteredData from './hooks/usePaginatedFilteredData.js';
 import { filterOrganizations } from './filtering.js';
 import { sortOrganizations } from './sorting.js';
 import { LayoutContext } from './App.jsx';
+import EnhancedSearchInput from './components/EnhancedSearchInput.jsx';
 
 // Organization type configurations (for filtering UI)
 const ORG_TYPE_CONFIG = {
@@ -146,12 +145,13 @@ const OrganizationListItem = ({ organization }) => {
   );
 };
 
+
 const ExploreOrganizations = ({ isProfileView = false }) => {
   const { setPageBgColor } = useContext(LayoutContext);
 
   useEffect(() => {
     if (!isProfileView) {
-      setPageBgColor('bg-gradient-to-br from-slate-50 via-blue-50 to-purple-50');
+      setPageBgColor('bg-[#faf7f5]'); // Match GrantsPageContent background
       return () => {
         setPageBgColor('bg-white');
       };
@@ -172,7 +172,8 @@ const ExploreOrganizations = ({ isProfileView = false }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const [orgsPerPage, setOrgsPerPage] = useState(12);
   const [viewMode, setViewMode] = useState('grid');
-  const [filtersVisible, setFiltersVisible] = useState(!isProfileView);
+  // Hide filters by default, only show when button is clicked
+  const [filtersVisible, setFiltersVisible] = useState(false);
   
   const location = useLocation();
 
@@ -338,23 +339,21 @@ const ExploreOrganizations = ({ isProfileView = false }) => {
   const uniqueLocations = useMemo(() => Array.from(new Set(organizations.map(org => org.location).filter(Boolean))).sort(), [organizations]);
   const availableTypes = useMemo(() => Array.from(new Set(organizations.map(org => org.type).filter(Boolean))).sort(), [organizations]);
 
+  // Restore organization type and focus area filters in FilterBar
   const filterBarProps = {
-    searchTerm: filterConfig.searchTerm, 
-    onSuggestionSelect: handleSearchAction,
-    setSearchTerm: (value) => handleFilterChange('searchTerm', value),
     locationFilter: filterConfig.locationFilter, 
     setLocationFilter: (value) => handleFilterChange('locationFilter', value),
     focusAreaFilter: filterConfig.focusAreaFilter, 
     setFocusAreaFilter: (value) => handleFilterChange('focusAreaFilter', value),
     typeFilter: filterConfig.typeFilter,
     setTypeFilter: (value) => handleFilterChange('typeFilter', value),
-    sortCriteria: filterConfig.sortCriteria, 
-    setSortCriteria: (value) => handleFilterChange('sortCriteria', value),
-    uniqueFocusAreas, 
+    uniqueFocusAreas,
     uniqueLocations,
     availableTypes,
     orgTypeConfig: ORG_TYPE_CONFIG,
-    organizations, 
+    organizations,
+    sortCriteria: filterConfig.sortCriteria, 
+    setSortCriteria: (value) => handleFilterChange('sortCriteria', value),
     pageType: "organizations",
     onClearFilters: handleClearFilters, 
     activeFilters: activeFilters, 
@@ -379,30 +378,70 @@ const ExploreOrganizations = ({ isProfileView = false }) => {
     );
   }
 
-  return (
-    <div className={isProfileView ? "" : "container mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12"}>
-      {!isProfileView && (
-        <section id="organization-intro" className="text-center mb-12 relative">
-          <div className="absolute inset-0 overflow-hidden pointer-events-none">
-            <div className="absolute top-10 left-10 w-32 h-32 bg-gradient-to-r from-blue-400 to-purple-600 rounded-full opacity-10 animate-pulse"></div>
-            <div className="absolute top-32 right-20 w-24 h-24 bg-gradient-to-r from-pink-400 to-rose-600 rounded-full opacity-10 animate-pulse delay-1000"></div>
-            <div className="absolute bottom-10 left-1/3 w-20 h-20 bg-gradient-to-r from-emerald-400 to-teal-600 rounded-full opacity-10 animate-pulse delay-2000"></div>
-          </div>
-          
-          <div className="relative bg-white/80 backdrop-blur-sm p-6 md:p-10 rounded-3xl border border-white/60 shadow-2xl">
-            <h2 className="text-3xl md:text-5xl font-extrabold tracking-tight mb-3">
-              <span className="text-slate-900">Explore </span>
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600">
-                Organizations
-              </span>
-            </h2>
-            
-            <p className="text-md md:text-lg text-slate-600 mb-6 max-w-3xl mx-auto leading-relaxed">
-              Discover nonprofits, foundations, government agencies, and other organizations making an impact in the Bay Area.
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-pink-600 font-semibold"> Find your community.</span>
-            </p>
 
-            <FilterBar {...filterBarProps} isMobileVisible={true} />
+  return (
+    <div className={isProfileView ? "" : "container mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12 bg-[#faf7f5]"}>
+      {/* Search bar and filter section, matching GrantsPageContent */}
+      {!isProfileView && (
+        <section className="mb-12 flex flex-col items-center w-full pt-14 sm:pt-20">
+          <div className="w-full flex flex-col items-center">
+            <div className="w-full flex items-center bg-white border border-slate-100 rounded-[2.5rem] shadow-xl px-8 py-5 focus-within:ring-2 focus-within:ring-blue-400 transition-all duration-200 ring-1 ring-slate-100 hover:ring-blue-200 hover:shadow-2xl relative" style={{ minHeight: 72, marginLeft: 0, marginRight: 0 }}>
+              <EnhancedSearchInput
+                searchTerm={filterConfig.searchTerm}
+                onSearchChange={val => {
+                  handleFilterChange('searchTerm', typeof val === 'string' ? val : val.text);
+                }}
+                onSuggestionSelect={val => {
+                  handleFilterChange('searchTerm', typeof val === 'string' ? val : val.text);
+                  setCurrentPage(1);
+                }}
+                placeholder="Search for organizations..."
+                className="flex-1 bg-transparent outline-none text-2xl text-slate-800 placeholder-slate-400 font-semibold tracking-wide"
+                showRecentSearches={false}
+              />
+              <div className="h-8 w-px bg-slate-100 mx-4 hidden md:block" />
+              <button
+                className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold rounded-2xl shadow-md hover:from-blue-700 hover:to-purple-700 hover:scale-[1.04] focus:ring-2 focus:ring-blue-400 transition-all duration-200 text-base tracking-wide ml-2"
+                onClick={() => setFiltersVisible(v => !v)}
+                aria-expanded={filtersVisible}
+                style={{ minHeight: '48px' }}
+              >
+                <SlidersHorizontal size={22} />
+                <span className="hidden sm:inline">{filtersVisible ? 'Hide Filters' : 'Show Filters'}</span>
+                {activeFilters.length > 0 && (
+                  <span className="ml-2 inline-flex items-center justify-center px-2 py-0.5 text-xs font-bold leading-none text-blue-600 bg-white rounded-full border border-blue-100 shadow-sm">
+                    {activeFilters.length}
+                  </span>
+                )}
+              </button>
+            </div>
+            {/* Seamless filter dropdown, visually attached to search bar */}
+            {/* Filter dropdown, no keyword search bar */}
+            <div
+              className={`w-full max-w-6xl -mt-2 pt-0 pb-0 px-0 flex flex-col items-center transition-all duration-500 ease-in-out ${filtersVisible ? 'opacity-100 translate-y-0 max-h-[500px]' : 'opacity-0 -translate-y-4 pointer-events-none max-h-0'}`}
+              style={{ willChange: 'opacity, transform, maxHeight', zIndex: 50, borderTopLeftRadius: 0, borderTopRightRadius: 0 }}
+            >
+              <FilterBar
+                locationFilter={filterConfig.locationFilter}
+                setLocationFilter={value => handleFilterChange('locationFilter', value)}
+                focusAreaFilter={filterConfig.focusAreaFilter}
+                setFocusAreaFilter={value => handleFilterChange('focusAreaFilter', value)}
+                typeFilter={filterConfig.typeFilter}
+                setTypeFilter={value => handleFilterChange('typeFilter', value)}
+                sortCriteria={filterConfig.sortCriteria}
+                setSortCriteria={value => handleFilterChange('sortCriteria', value)}
+                uniqueFocusAreas={uniqueFocusAreas}
+                uniqueLocations={uniqueLocations}
+                availableTypes={availableTypes}
+                orgTypeConfig={ORG_TYPE_CONFIG}
+                organizations={organizations}
+                pageType="organizations"
+                onClearFilters={handleClearFilters}
+                activeFilters={activeFilters}
+                onRemoveFilter={handleRemoveFilter}
+                isMobileVisible={true}
+              />
+            </div>
           </div>
         </section>
       )}

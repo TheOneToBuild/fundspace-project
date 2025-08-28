@@ -5,6 +5,7 @@ import { refreshGrantBookmarkCounts } from './utils/grantUtils';
 import { Search, Users, Calendar, DollarSign, ChevronDown, XCircle, LayoutGrid, List, SlidersHorizontal, Bookmark, Sparkles, TrendingUp as TrendingUpIcon } from './components/Icons.jsx';
 import GrantCard from './components/GrantCard.jsx';
 import GrantDetailModal from './GrantDetailModal.jsx';
+import EnhancedSearchInput from './components/EnhancedSearchInput.jsx';
 import FilterBar from './components/FilterBar.jsx';
 import Pagination from './components/Pagination.jsx';
 import AnimatedCounter from './components/AnimatedCounter.jsx';
@@ -137,9 +138,9 @@ const GrantsPageContent = ({ isProfileView = false }) => {
 
   useEffect(() => {
     if (!isProfileView) {
-      setPageBgColor('bg-gradient-to-br from-slate-50 via-blue-50 to-purple-50');
+      setPageBgColor('bg-[#faf7f5]'); // Match About Us section background
       return () => {
-          setPageBgColor('bg-white');
+        setPageBgColor('bg-white');
       };
     }
   }, [isProfileView, setPageBgColor]);
@@ -155,6 +156,7 @@ const GrantsPageContent = ({ isProfileView = false }) => {
     sortCriteria: 'dueDate_asc', 
     taxonomyFilter: [],
   });
+  // Trending/recent search feature removed
   const [currentPage, setCurrentPage] = useState(1);
   const [grantsPerPage, setGrantsPerPage] = useState(12);
   const [isDetailModalOpen, setIsDetailModal] = useState(false);
@@ -459,71 +461,78 @@ const GrantsPageContent = ({ isProfileView = false }) => {
   }, [filterConfig]);
 
   const filterBarProps = {
-      isMobileVisible: isMobileFiltersVisible,
-      searchTerm: filterConfig.searchTerm,
-      onSuggestionSelect: handleSearchAction,
-      onSearchChange: (value) => handleFilterChange('searchTerm', value),
-      locationFilter: filterConfig.locationFilter,
-      setLocationFilter: (value) => handleFilterChange('locationFilter', value),
-      categoryFilter: filterConfig.categoryFilter,
-      setCategoryFilter: (value) => handleFilterChange('categoryFilter', value),
-      grantStatusFilter: filterConfig.grantStatusFilter,
-      setGrantStatusFilter: (value) => handleFilterChange('grantStatusFilter', value),
-      grantTypeFilter: filterConfig.grantTypeFilter,
-      setGrantTypeFilter: (value) => handleFilterChange('grantTypeFilter', value),
-      sortCriteria: filterConfig.sortCriteria,
-      setSortCriteria: (value) => handleFilterChange('sortCriteria', value),
-      taxonomyFilter: filterConfig.taxonomyFilter,
-      setTaxonomyFilter: handleTaxonomyChange,
-      uniqueCategories: uniqueCategories,
-      uniqueLocations: uniqueLocations,
-      uniqueGrantTypes: uniqueGrantTypes,
-      uniqueGrantStatuses: GRANT_STATUSES,
-      pageType: "grants",
-      onClearFilters: handleClearFilters,
-      activeFilters: activeGrantFilters,
-      onRemoveFilter: handleRemoveGrantFilter,
+            isMobileVisible: isMobileFiltersVisible,
+            // Remove searchTerm/onSearchChange/onSuggestionSelect for grants page filter bar
+            locationFilter: filterConfig.locationFilter,
+            setLocationFilter: (value) => handleFilterChange('locationFilter', value),
+            categoryFilter: filterConfig.categoryFilter,
+            setCategoryFilter: (value) => handleFilterChange('categoryFilter', value),
+            grantStatusFilter: filterConfig.grantStatusFilter,
+            setGrantStatusFilter: (value) => handleFilterChange('grantStatusFilter', value),
+            grantTypeFilter: filterConfig.grantTypeFilter,
+            setGrantTypeFilter: (value) => handleFilterChange('grantTypeFilter', value),
+            sortCriteria: filterConfig.sortCriteria,
+            setSortCriteria: (value) => handleFilterChange('sortCriteria', value),
+            taxonomyFilter: filterConfig.taxonomyFilter,
+            setTaxonomyFilter: handleTaxonomyChange,
+            uniqueCategories: uniqueCategories,
+            uniqueLocations: uniqueLocations,
+            uniqueGrantTypes: uniqueGrantTypes,
+            uniqueGrantStatuses: GRANT_STATUSES,
+            pageType: "grants",
+            onClearFilters: handleClearFilters,
+            activeFilters: activeGrantFilters,
+            onRemoveFilter: handleRemoveGrantFilter,
   };
+
 
   return (
     <>
-      <div className={isProfileView ? "" : "container mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12"}>
+      <div className={isProfileView ? "" : "container mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12 bg-[#faf7f5]"}>
+        {/* Reserve space for filter dropdown to prevent layout shift */}
+        {!isProfileView && <div className="h-[110px] md:h-[110px] lg:h-[110px] w-full" style={{pointerEvents:'none',marginBottom:'-110px'}}></div>}
+        {/* Redesigned full-width search bar with integrated filters, kit.com inspired */}
         {!isProfileView && (
-          <section id="funding-opportunity-intro" className="text-center mb-12 relative">
-            <div className="absolute inset-0 overflow-hidden pointer-events-none">
-              <div className="absolute top-10 left-10 w-32 h-32 bg-gradient-to-r from-blue-400 to-purple-600 rounded-full opacity-10 animate-pulse"></div>
-              <div className="absolute top-32 right-20 w-24 h-24 bg-gradient-to-r from-pink-400 to-rose-600 rounded-full opacity-10 animate-pulse delay-1000"></div>
-              <div className="absolute bottom-10 left-1/3 w-20 h-20 bg-gradient-to-r from-emerald-400 to-teal-600 rounded-full opacity-10 animate-pulse delay-2000"></div>
-            </div>
-            
-            <div className="relative bg-white/80 backdrop-blur-sm p-6 md:p-10 rounded-3xl border border-white/60 shadow-2xl">
-              <h2 className="text-3xl md:text-5xl font-extrabold tracking-tight mb-3">
-                <span className="text-slate-900">Find Your Next </span>
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600">
-                  Funding Opportunity
-                </span>
-              </h2>
-              
-              <p className="text-md md:text-lg text-slate-600 mb-6 max-w-3xl mx-auto leading-relaxed">
-                Our AI-powered database pulls funding opportunities from across the Bay Area.
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-pink-600 font-semibold"> Discover your perfect match.</span>
-              </p>
-
-              <div className="mt-8 md:hidden">
-                <button 
-                  onClick={() => setIsMobileFiltersVisible(!isMobileFiltersVisible)} 
-                  className="w-full inline-flex items-center justify-center px-6 py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
+          <section className="mb-12 flex flex-col items-center w-full pt-14 sm:pt-20">
+            {/* Full-bleed search bar with recent/trending search logic */}
+            <div className="w-full flex flex-col items-center">
+              <div className="w-full flex items-center bg-white border border-slate-100 rounded-2xl shadow-xl px-4 py-2 focus-within:ring-2 focus-within:ring-blue-400 transition-all duration-200 ring-1 ring-slate-100 hover:ring-blue-200 hover:shadow-2xl relative" style={{ minHeight: 48, marginLeft: 0, marginRight: 0 }}>
+                <EnhancedSearchInput
+                  searchTerm={filterConfig.searchTerm}
+                  onSearchChange={val => {
+                    setFilterConfig(cfg => ({ ...cfg, searchTerm: typeof val === 'string' ? val : val.text }));
+                  }}
+                  onSuggestionSelect={val => {
+                    setFilterConfig(cfg => ({ ...cfg, searchTerm: typeof val === 'string' ? val : val.text }));
+                    setCurrentPage(1);
+                  }}
+                  placeholder="Search for grants..."
+                  className="flex-1 bg-transparent outline-none text-base text-slate-800 placeholder-slate-400 font-semibold tracking-wide"
+                  showRecentSearches={false}
+                />
+                <div className="h-8 w-px bg-slate-100 mx-4 hidden md:block" />
+                <button
+                  className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold rounded-2xl shadow-md hover:from-blue-700 hover:to-purple-700 hover:scale-[1.04] focus:ring-2 focus:ring-blue-400 transition-all duration-200 text-base tracking-wide ml-2"
+                  onClick={() => setIsMobileFiltersVisible(v => !v)}
+                  aria-expanded={isMobileFiltersVisible}
+                  style={{ minHeight: '48px' }}
                 >
-                  {isMobileFiltersVisible ? 'Hide Filters' : 'Show Filters'}
-                  {activeGrantFilters.length > 0 && ( 
-                    <span className="ml-3 inline-flex items-center justify-center px-3 py-1 text-xs font-bold leading-none text-blue-600 bg-white rounded-full">
+                  <SlidersHorizontal size={22} />
+                  <span className="hidden sm:inline">{isMobileFiltersVisible ? 'Hide Filters' : 'Show Filters'}</span>
+                  {activeGrantFilters.length > 0 && (
+                    <span className="ml-2 inline-flex items-center justify-center px-2 py-0.5 text-xs font-bold leading-none text-blue-600 bg-white rounded-full border border-blue-100 shadow-sm">
                       {activeGrantFilters.length}
-                    </span> 
+                    </span>
                   )}
                 </button>
               </div>
-
-              <FilterBar {...filterBarProps} isMobileVisible={isMobileFiltersVisible} />
+              {/* Seamless filter dropdown, visually attached to search bar */}
+              <div
+                className={`w-full max-w-6xl -mt-2 pt-0 pb-0 px-0 flex flex-col items-center transition-all duration-500 ease-in-out ${isMobileFiltersVisible ? 'opacity-100 translate-y-0 max-h-[500px]' : 'opacity-0 -translate-y-4 pointer-events-none max-h-0'}`}
+                style={{ willChange: 'opacity, transform, maxHeight', zIndex: 50, borderTopLeftRadius: 0, borderTopRightRadius: 0 }}
+              >
+                <FilterBar {...filterBarProps} isMobileVisible={true} />
+              </div>
             </div>
           </section>
         )}

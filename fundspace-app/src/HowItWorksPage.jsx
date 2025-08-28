@@ -150,7 +150,7 @@ const HowItWorksPage = () => {
                     <div className="relative">
                         <div className="relative rounded-3xl overflow-hidden shadow-2xl">
                             <img 
-                                src="https://images.unsplash.com/photo-1612115958726-9af4b6bd28d1?q=80&w=1744&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D" 
+                                src="https://images.unsplash.com/photo-1719937206313-f77e1173ceb0?q=80&w=1740&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D" 
                                 alt="Diverse team collaborating on funding solutions"
                                 className="w-full h-96 md:h-[480px] object-cover"
                             />
