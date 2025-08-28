@@ -192,7 +192,7 @@ const CreatorTestimonialsSection = () => {
       image: "https://images.unsplash.com/photo-1755541516450-644adb257ad0?q=80&w=1160&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDF8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
     },
     {
-      name: "The Small Business Owner",
+      name: "The Youth Mentor",
       title: "",
       image: "https://images.unsplash.com/photo-1755541516517-bb95790dc7ad?q=80&w=1160&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDF8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
     }
@@ -205,7 +205,7 @@ const CreatorTestimonialsSection = () => {
           <div>
             <div className="max-w-xl">
               <h2 className="text-4xl md:text-5xl lg:text-6xl font-black leading-tight mb-6 tracking-tight text-slate-900">
-                For changemakers building a better world.
+                For changemakers building a brighter future.
               </h2>
               <p className="text-lg md:text-xl text-slate-700 leading-relaxed">
                 From discovery to impact—all in one place. <span className="magic-fundspace font-bold">Fundspace</span> helps you find funding, build your capacity, and showcase your impact, so you can focus on what matters most: <span className="magic-mission font-semibold">your mission</span>
@@ -428,13 +428,13 @@ const homepageSections = [
     fullImage: true,
     showProfileMeta: false,
     largeBadge: true,
-    platformShowcaseFeatures: 'Discover grants, catalytic capital, and strategic partners—then convert them faster with organized, AI-assisted assets.',
-    additionalTextBox: 'Centralize narratives, budgets, impact stats, and past proposals so every new application starts at 60% complete.',
+    platformShowcaseFeatures: 'Discover a new path to capital, where our AI-powered database and community submissions help you find and secure the funding you need to thrive.',
+    additionalTextBox: 'Discover a new path to capital where aligned funders and funding opportunities meet your mission with precision.',
     additionalTextBoxGradient: 'from-amber-200/70 via-orange-200/70 to-rose-200/70',
     additionalTextBoxPlainWhite: true,
     additionalTextBoxesLeft: [
       {
-        text: 'Build a living funding pipeline with status tracking, deadline intelligence, and automated reminders that keep teams aligned.',
+        text: 'Unlock sustainable funding momentum by streamlining readiness and matching directly with the resources that fit your vision.',
         gradient: 'from-orange-400 via-rose-400 to-pink-400',
         textClass: 'relative w-full text-3xl sm:text-4xl lg:text-[2.85rem] font-black leading-[1.15] tracking-tight text-white',
         minHeight: 420
@@ -442,7 +442,7 @@ const homepageSections = [
     ],
     additionalTextBoxesRight: [
       {
-        text: 'Accelerate credibility with peer-reviewed templates, reusable logic models, and consistent impact framing.',
+        text: 'Join a network that shares more than funding — collaborate, learn, and build resilience alongside changemakers who are rewriting what opportunity feels like.',
         plainWhite: true
       }
     ],
@@ -487,12 +487,12 @@ const homepageSections = [
   showProfileMeta: false,
   largeBadge: true,
   platformShowcaseFeatures: 'Meet peers, funders, and experts in a collaborative hub for sharing resources, exchanging knowledge, and sparking partnerships.',
-  additionalTextBox: 'Join workshops, forums, and mentorship opportunities that help leaders grow their skills and share what works.',
+  additionalTextBox: 'Grow resilience by building systems and practices that sustain your work beyond a single grant cycle.',
   additionalTextBoxGradient: 'from-fuchsia-200/70 via-pink-200/70 to-rose-200/70',
   additionalTextBoxPlainWhite: true,
   additionalTextBoxesLeft: [
     { 
-      text: 'Use Fundspace’s integrated tools to streamline applications, manage opportunities, and measure impact—so organizations spend less time on paperwork and more time on their mission.', 
+      text: 'Transform ambition into action by building the foundation—people, processes, and partnerships—that make your mission thrive.', 
   gradient: 'from-violet-300 via-purple-200 to-fuchsia-200',
   textClass: 'relative w-full text-3xl sm:text-4xl lg:text-[2.85rem] font-black leading-[1.15] tracking-tight text-white',
   minHeight: 420
@@ -500,7 +500,7 @@ const homepageSections = [
   ],
   additionalTextBoxesRight: [
     { 
-      text: 'Access templates, guides, and playbooks to strengthen operations—from writing compelling proposals to tracking budgets and reporting outcomes.', 
+      text: 'Clarify your mission with tools that help you articulate impact, sharpen goals, and tell your story with confidence.', 
       plainWhite: true 
     }
   ],
@@ -545,13 +545,13 @@ const homepageSections = [
     fullImage: true,
     showProfileMeta: false,
     largeBadge: true,
-    platformShowcaseFeatures: 'Track outcomes, activate partners, and showcase credible progress with data that inspires continued investment.',
-    additionalTextBox: 'Leverage dashboards, automated reporting, and shared learning to extend every dollar and hour of effort.',
+    platformShowcaseFeatures: 'Measure what matters most by capturing real outcomes, transforming data into proof of impact, and giving funders and communities a clear view of the change you’re driving.',
+    additionalTextBox: 'Expand your reach by scaling local successes into regional and national movements, turning grassroots momentum into a wider force for lasting change.',
     additionalTextBoxGradient: 'from-sky-200/70 via-blue-200/70 to-indigo-200/70',
     additionalTextBoxPlainWhite: true,
     additionalTextBoxesLeft: [
       {
-        text: 'Use real-time impact KPIs, storytelling assets, and partner collaboration tools to accelerate expansion without losing mission focus.',
+        text: 'Scale your vision into reality by combining the right resources, connections, and strategies—so the impact you spark today grows into the systems-level change the world needs tomorrow.',
         gradient: 'from-indigo-400 via-blue-400 to-cyan-400',
         textClass: 'relative w-full text-3xl sm:text-4xl lg:text-[2.85rem] font-black leading-[1.15] tracking-tight text-white',
         minHeight: 420
@@ -559,7 +559,7 @@ const homepageSections = [
     ],
     additionalTextBoxesRight: [
       {
-        text: 'Generate investor- and funder-ready narratives backed by live metrics to unlock renewal and multi-year support.',
+        text: 'Multiply your influence by sharing your stories, insights, and results in ways that inspire action, attract new allies, and position your organization as a leader in your field.',
         plainWhite: true
       }
     ],
