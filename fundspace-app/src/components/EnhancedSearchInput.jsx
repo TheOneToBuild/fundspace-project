@@ -40,14 +40,11 @@ const EnhancedSearchInput = ({
 
   // When the user stops typing, this effect runs.
   useEffect(() => {
-    // Only trigger a search if the debounced value is different from the parent's state.
-    // This prevents re-triggering a search with the same term after clicking a suggestion.
-    if (debouncedInputValue !== searchTerm) {
-       const handler = onSuggestionSelect || onSearchChange;
-       if (handler) {
-         // Treat debounced typing as a standard text search.
-         handler({ text: debouncedInputValue, type: 'text' });
-       }
+    if (debouncedInputValue !== searchTerm && debouncedInputValue.trim()) {
+      const handler = onSuggestionSelect || onSearchChange;
+      if (handler) {
+        handler({ text: debouncedInputValue, type: 'text' });
+      }
     }
   }, [debouncedInputValue]);
 

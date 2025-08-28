@@ -28,6 +28,7 @@ export default function PublicHeader() {
     const [activeDropdown, setActiveDropdown] = useState(null);
     const [isAnimatingOut, setIsAnimatingOut] = useState(false);
     const dropdownTimeoutRef = useRef(null);
+    const mobileMenuRef = useRef(null); // Add this line in the component
     const location = useLocation();
     
     const showNotificationBar = location.pathname === '/';
@@ -339,22 +340,7 @@ export default function PublicHeader() {
                             </div>
                         </div>
 
-                        <style jsx>{`
-                            @keyframes fadeInDown {
-                                0% {
-                                    opacity: 0;
-                                    transform: translateY(-10px);
-                                }
-                                100% {
-                                    opacity: 1;
-                                    transform: translateY(0);
-                                }
-                            }
-                            
-                            .animate-fadeInDown {
-                                animation: fadeInDown 0.3s ease-out forwards;
-                            }
-                        `}</style>
+                       
                     </div>
                 )}
             </div>

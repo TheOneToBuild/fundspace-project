@@ -138,11 +138,11 @@ const GrantsPageContent = ({ isProfileView = false }) => {
 
   useEffect(() => {
     if (!isProfileView) {
-      setPageBgColor('bg-[#faf7f5]'); // Match About Us section background
-      return () => {
-        setPageBgColor('bg-white');
-      };
+      setPageBgColor('bg-[#faf7f5]');
     }
+    return () => {
+      setPageBgColor('bg-white');
+    };
   }, [isProfileView, setPageBgColor]);
 
   const [grants, setGrants] = useState([]);
@@ -253,6 +253,18 @@ const GrantsPageContent = ({ isProfileView = false }) => {
   const openDetail = useCallback((grant) => { 
     setSelectedGrant(grant); 
     setIsDetailModal(true); 
+  }, []);
+
+  // Close modal automatically on route change
+  useEffect(() => {
+    // Listen for changes in the location (URL)
+    const unlisten = window.addEventListener('popstate', () => {
+      setIsDetailModal(false);
+      setSelectedGrant(null);
+    });
+    return () => {
+      window.removeEventListener('popstate', unlisten);
+    };
   }, []);
 
   const closeDetail = useCallback(() => { 

@@ -67,19 +67,19 @@ export const useSearchSuggestions = (searchTerm, funders, maxSuggestions = 5) =>
   }, [searchTerm, funders, maxSuggestions]);
 
   useEffect(() => {
-    if (searchTerm && searchTerm.length >= 2) {
-      setIsLoading(true);
-      // Simulate API delay for more realistic behavior
-      const timer = setTimeout(() => {
-        setSuggestions(funderSuggestions);
-        setIsLoading(false);
-      }, 150);
-      return () => clearTimeout(timer);
-    } else {
+    if (!searchTerm || searchTerm.length < 2) {
       setSuggestions([]);
       setIsLoading(false);
+      return;
     }
-  }, [funderSuggestions, searchTerm]);
+
+    setIsLoading(true);
+    const timer = setTimeout(() => {
+      setSuggestions(funderSuggestions);
+      setIsLoading(false);
+    }, 150);
+    return () => clearTimeout(timer);
+  }, [searchTerm, funderSuggestions.length]);
 
   return { suggestions, isLoading };
 };
