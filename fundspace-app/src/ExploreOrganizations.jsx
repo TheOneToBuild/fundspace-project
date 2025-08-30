@@ -385,7 +385,7 @@ const ExploreOrganizations = ({ isProfileView = false }) => {
       {!isProfileView && (
         <section className="mb-12 flex flex-col items-center w-full pt-14 sm:pt-20">
           <div className="w-full flex flex-col items-center">
-            <div className="w-full flex items-center bg-white border border-slate-100 rounded-[2.5rem] shadow-xl px-8 py-5 focus-within:ring-2 focus-within:ring-blue-400 transition-all duration-200 ring-1 ring-slate-100 hover:ring-blue-200 hover:shadow-2xl relative" style={{ minHeight: 72, marginLeft: 0, marginRight: 0 }}>
+            <div className="w-full flex items-center bg-white border border-slate-100 rounded-2xl shadow-xl px-4 py-2 focus-within:ring-2 focus-within:ring-blue-400 transition-all duration-200 ring-1 ring-slate-100 hover:ring-blue-200 hover:shadow-2xl relative" style={{ minHeight: 48, marginLeft: 0, marginRight: 0 }}>
               <EnhancedSearchInput
                 searchTerm={filterConfig.searchTerm}
                 onSearchChange={val => {
@@ -396,7 +396,7 @@ const ExploreOrganizations = ({ isProfileView = false }) => {
                   setCurrentPage(1);
                 }}
                 placeholder="Search for organizations..."
-                className="flex-1 bg-transparent outline-none text-2xl text-slate-800 placeholder-slate-400 font-semibold tracking-wide"
+                className="flex-1 bg-transparent outline-none text-base text-slate-800 placeholder-slate-400 font-semibold tracking-wide"
                 showRecentSearches={false}
               />
               <div className="h-8 w-px bg-slate-100 mx-4 hidden md:block" />
