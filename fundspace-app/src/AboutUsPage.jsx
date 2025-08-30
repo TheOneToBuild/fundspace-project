@@ -78,7 +78,7 @@ const AboutUsPage = () => {
             </h1>
             <div className="group inline-flex flex-col rounded-3xl border border-slate-200/70 bg-white/80 backdrop-blur-sm px-7 py-6 shadow-lg shadow-slate-900/5 hover:shadow-xl transition-all">
               <p className="text-[11px] font-semibold tracking-wider text-slate-500 mb-2">WHY WE EXIST</p>
-              <p className="text-slate-800/95 text-base md:text-lg leading-relaxed max-w-lg">Late-night spreadsheets. Vanishing RFP links. Rewriting the same narrative for an opportunity that never fit. We lived the fragmentation. We decided the infrastructure had to change—starting locally, building openly, and centering community-first over closed databases.</p>
+              <p className="text-slate-800/95 text-base md:text-lg leading-relaxed max-w-lg">Late-night spreadsheets. Vanishing RFP links. Rewriting the same narrative for an opportunity that never fit. We lived the fragmentation. We decided the infrastructure had to change—starting locally, building openly, and centering community intelligence over closed databases.</p>
             </div>
             <div className="flex flex-wrap gap-3 pt-2">
               <a href="/grants" className="inline-flex items-center justify-center px-6 py-3 rounded-full font-semibold bg-blue-600 text-white hover:bg-blue-700 shadow-lg hover:shadow-xl transition-all text-sm">Explore Funding <Search className="ml-2 h-4 w-4" /></a>
