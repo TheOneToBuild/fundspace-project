@@ -742,23 +742,9 @@ async function saveGrantsToSupabase(grants, primaryUrl, organizationId) {
 }
 
 export const handler = async function(event, context) {
-    // ADD THESE DEBUG LINES FIRST
-    console.log('=== FUNCTION CALLED ===');
-    console.log('Time:', new Date().toISOString());
-    console.log('Method:', event.httpMethod);
-    console.log('Body:', event.body);
-    console.log('Auth header:', event.headers.authorization);
-    
     const authHeader = event.headers.authorization || '';
     const token = authHeader.split(' ')[1];
-    
-    console.log('Extracted token:', token);
-    console.log('Expected token:', process.env.WORKER_SHARED_SECRET);
-    console.log('Tokens match:', token === process.env.WORKER_SHARED_SECRET);
-
-    // THEN YOUR EXISTING CODE
     if (token !== process.env.WORKER_SHARED_SECRET) {
-        console.log('Unauthorized access attempt');
         return { statusCode: 401, body: 'Unauthorized' };
     }
 
