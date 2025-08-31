@@ -2,42 +2,34 @@ import { createClient } from '@supabase/supabase-js';
 import Parser from 'rss-parser';
 
 // Initialize clients
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
+const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
 const parser = new Parser({ timeout: 10000 });
 
 // Constants
-const DB_BATCH_SIZE = 100; // Process Supabase upserts in batches of 100
+const DB_BATCH_SIZE = 100;
 
 // --- HELPER FUNCTIONS ---
 
-/**
- * Fetches the active RSS feed URLs and the keyword filters from Supabase.
- */
 async function fetchConfiguration() {
   console.log('Fetching configuration from Supabase...');
   const { data: feeds, error: feedsError } = await supabase
     .from('rss_sources')
     .select('url, category')
     .eq('is_enabled', true);
-
   if (feedsError) throw new Error(`Failed to fetch RSS sources: ${feedsError.message}`);
 
   const { data: keywords, error: keywordsError } = await supabase
     .from('excluded_keywords')
     .select('keyword, type');
-    
   if (keywordsError) throw new Error(`Failed to fetch keywords: ${keywordsError.message}`);
 
-  const excludedKeywords = keywords.filter(k => k.type === 'exclude').map(k => k.keyword);
-  const allowedKeywords = keywords.filter(k => k.type === 'allow').map(k => k.keyword);
+  const excludedKeywords = new Set(keywords.filter(k => k.type === 'exclude').map(k => k.keyword));
+  const allowedKeywords = new Set(keywords.filter(k => k.type === 'allow').map(k => k.keyword));
 
-  console.log(`Loaded ${feeds.length} feeds, ${excludedKeywords.length} excluded keywords, and ${allowedKeywords.length} allowed keywords.`);
+  console.log(`Loaded ${feeds.length} feeds, ${excludedKeywords.size} excluded keywords, and ${allowedKeywords.size} allowed keywords.`);
   return { feeds, excludedKeywords, allowedKeywords };
 }
 
-/**
- * Extracts an image from an RSS item.
- */
 function extractImage(item) {
   if (item['media:content']?.$?.url) return item['media:content'].$.url;
   if (item.enclosure?.url && item.enclosure.type?.includes('image')) return item.enclosure.url;
@@ -47,30 +39,32 @@ function extractImage(item) {
 }
 
 /**
- * Performs a smarter topic check using both "allow" and "exclude" keywords.
+ * NEW: Updated topic check using a scoring system.
  */
 function isExcludedTopic(item, { excludedKeywords, allowedKeywords }) {
   const content = `${item.title || ''} ${item.contentSnippet || ''}`.toLowerCase();
+  let score = 0;
 
-  // 1. Check for "allow" keywords first. If a match is found, keep the article.
-  const hasAllowedTerm = allowedKeywords.some(keyword => new RegExp(`\\b${keyword}\\b`).test(content));
-  if (hasAllowedTerm) {
-    return false; // Do NOT exclude
+  for (const keyword of excludedKeywords) {
+    if (new RegExp(`\\b${keyword}\\b`).test(content)) {
+      score++;
+    }
   }
 
-  // 2. If no "allow" keywords, check for "exclude" keywords.
-  const hasExcludedTerm = excludedKeywords.some(keyword => new RegExp(`\\b${keyword}\\b`).test(content));
-  if (hasExcludedTerm) {
-    console.log(`Excluding: "${item.title}"`);
-    return true; // Exclude
+  for (const keyword of allowedKeywords) {
+    if (new RegExp(`\\b${keyword}\\b`).test(content)) {
+      score--;
+    }
   }
   
-  return false; // No exclusion matched
+  if (score > 0) {
+    console.log(`Excluding (score: ${score}): "${item.title}"`);
+    return true;
+  }
+  
+  return false;
 }
 
-/**
- * Upserts articles to Supabase in batches to avoid payload size limits.
- */
 async function batchUpsertArticles(articles) {
   let totalUpserted = 0;
   for (let i = 0; i < articles.length; i += DB_BATCH_SIZE) {
@@ -85,7 +79,6 @@ async function batchUpsertArticles(articles) {
   }
   return totalUpserted;
 }
-
 
 // --- MAIN HANDLER ---
 
@@ -107,7 +100,8 @@ export const handler = async () => {
   );
   
   const settledResults = await Promise.all(fetchPromises);
-  let articlesToUpsert = [];
+  const articlesToUpsert = [];
+  const processedTitles = new Set(); // NEW: Set to track titles for deduplication
 
   for (const result of settledResults) {
     if (result.status === 'rejected') {
@@ -119,13 +113,14 @@ export const handler = async () => {
     if (feed?.items) {
       for (const item of feed.items) {
         if (!item.title || !item.link) continue;
+        if (processedTitles.has(item.title.trim())) continue; // NEW: Skip if title is already processed
         if (isExcludedTopic(item, config)) continue;
         
         const image = extractImage(item);
         if (image) {
           articlesToUpsert.push({
             article_id: item.guid || item.link,
-            title: item.title,
+            title: item.title.trim(),
             summary: item.contentSnippet?.substring(0, 200).trim() || '',
             full_content: item.content || item.contentSnippet || '',
             url: item.link,
@@ -134,6 +129,7 @@ export const handler = async () => {
             source_name: feed.title,
             category: feed.category,
           });
+          processedTitles.add(item.title.trim()); // NEW: Add title to the processed set
         }
       }
     }
