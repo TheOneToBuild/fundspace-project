@@ -1,15 +1,55 @@
 // src/components/Footer.jsx - COMPLETE FILE WITH TRANSPARENT BACKGROUND
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { supabase } from '../supabaseClient';
 import footerLogoImage from '../assets/fundspace-logo2.png';
 import { Facebook, Twitter, Linkedin, Youtube, Instagram } from './Icons.jsx';
 
 export default function Footer() {
+  const [session, setSession] = useState(null);
+  const [profile, setProfile] = useState(null);
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      if (session?.user) {
+        supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', session.user.id)
+          .single()
+          .then(({ data }) => setProfile(data));
+      } else {
+        setProfile(null);
+      }
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      setSession(newSession);
+      if (newSession?.user) {
+        supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', newSession.user.id)
+          .single()
+          .then(({ data }) => setProfile(data));
+      } else {
+        setProfile(null);
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const handleSubmitGrantClick = (e) => {
+    if (!session || !profile) {
+      e.preventDefault();
+      window.location.href = '/login';
+    }
+  };
+
   const productLinks = [
     { to: "/how-it-works", text: "How Fundspace Works" },
     { to: "/for-seekers", text: "For Grant Seekers" },
     { to: "/for-funders", text: "For Fund Providers" },
-    { to: "/submit-grant", text: "Submit a Grant" },
+    { to: "/submit-grant", text: "Submit a Grant", onClick: handleSubmitGrantClick },
   ];
 
   const companyLinks = [
@@ -45,7 +85,15 @@ export default function Footer() {
             <h4 className="text-sm font-bold text-slate-800 mb-3 tracking-wider uppercase">Product</h4>
             <ul className="space-y-2 text-base">
               {productLinks.map(link => (
-                  <li key={link.to}><Link to={link.to} className="text-slate-600 hover:text-blue-600 transition-colors">{link.text}</Link></li>
+                <li key={link.to}>
+                  <Link 
+                    to={link.to} 
+                    className="text-slate-600 hover:text-blue-600 transition-colors"
+                    onClick={link.onClick}
+                  >
+                    {link.text}
+                  </Link>
+                </li>
               ))}
             </ul>
           </div>

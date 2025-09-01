@@ -266,7 +266,7 @@ const ForSeekersPage = () => {
                 <div className="relative max-w-7xl mx-auto px-6 lg:px-12 grid md:grid-cols-2 gap-14 items-start">
                     <div className="space-y-10 relative">
                         <h1 className="font-black tracking-tight leading-[0.95] text-[2.65rem] sm:text-6xl md:text-7xl text-slate-900">
-                            For Nonprofits &<br /> Community <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 via-teal-600 to-sky-600">Grant Seekers</span>
+                            For Nonprofits &<br /> Community <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 via-teal-600 to-sky-600">Fund Seekers</span>
                         </h1>
                         <div className="group inline-flex flex-col rounded-3xl border border-slate-200/70 bg-white/80 backdrop-blur-sm px-7 py-6 shadow-lg shadow-slate-900/5 hover:shadow-xl transition-all w-full md:w-auto">
                             <p className="text-[11px] font-semibold tracking-wider text-slate-500 mb-2">WHY FUNDSPACE</p>

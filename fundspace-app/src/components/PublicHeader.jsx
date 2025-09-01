@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
 import { Menu, X, PlusCircle, ChevronDown } from './Icons.jsx';
 import AuthButton from './AuthButton.jsx';
+import { supabase } from '../supabaseClient';
 import headerLogoImage from '../assets/fundspace-logo2.png';
 
 const PublicNavLink = ({ to, children, activeClassName, mobile = false, onClick }) => {
@@ -27,11 +28,51 @@ export default function PublicHeader() {
     const [isScrolled, setIsScrolled] = useState(false);
     const [activeDropdown, setActiveDropdown] = useState(null);
     const [isAnimatingOut, setIsAnimatingOut] = useState(false);
+    const [session, setSession] = useState(null);
+    const [profile, setProfile] = useState(null);
     const dropdownTimeoutRef = useRef(null);
-    const mobileMenuRef = useRef(null); // Add this line in the component
+    const mobileMenuRef = useRef(null);
     const location = useLocation();
-    
+    const navigate = typeof useLocation === 'function' ? useLocation() : null;
     const showNotificationBar = location.pathname === '/';
+
+    // Fetch session/profile on mount
+    useEffect(() => {
+        supabase.auth.getSession().then(({ data: { session } }) => {
+            setSession(session);
+            if (session?.user) {
+                supabase
+                    .from('profiles')
+                    .select('*')
+                    .eq('id', session.user.id)
+                    .single()
+                    .then(({ data }) => setProfile(data));
+            } else {
+                setProfile(null);
+            }
+        });
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, newSession) => {
+            setSession(newSession);
+            if (newSession?.user) {
+                supabase
+                    .from('profiles')
+                    .select('*')
+                    .eq('id', newSession.user.id)
+                    .single()
+                    .then(({ data }) => setProfile(data));
+            } else {
+                setProfile(null);
+            }
+        });
+        return () => subscription.unsubscribe();
+    }, []);
+
+    const handleSubmitGrantClick = (e) => {
+        if (!session || !profile) {
+            e.preventDefault();
+            window.location.href = '/login';
+        }
+    };
 
     const mainNavLinks = [
         { 
@@ -278,6 +319,7 @@ export default function PublicHeader() {
                             <Link 
                                 to="/submit-grant" 
                                 className="hidden lg:inline-flex items-center justify-center px-5 py-2.5 border border-transparent text-sm font-semibold rounded-full text-white bg-blue-600 hover:bg-blue-700 transition-all duration-200 shadow-md hover:shadow-lg"
+                                onClick={handleSubmitGrantClick}
                             >
                                 <PlusCircle size={16} className="mr-2" />
                                 Submit Grant
@@ -383,7 +425,14 @@ export default function PublicHeader() {
                                 <AuthButton mobile />
                                 <Link 
                                     to="/submit-grant" 
-                                    onClick={closeMobileMenu}
+                                    onClick={e => {
+                                        if (!session || !profile) {
+                                            e.preventDefault();
+                                            window.location.href = '/login';
+                                        } else {
+                                            closeMobileMenu();
+                                        }
+                                    }}
                                     className="w-full inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 transition-colors duration-200"
                                 >
                                     <PlusCircle className="w-4 h-4 mr-2" />

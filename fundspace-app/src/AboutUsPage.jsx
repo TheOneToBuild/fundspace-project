@@ -165,7 +165,7 @@ const AboutUsPage = () => {
                 <span key={c} className="px-3 py-2 rounded-xl bg-gradient-to-br from-slate-50 to-white border border-slate-200 shadow-sm text-slate-700 font-medium text-center">{c}</span>
               ))}
             </div>
-            <p className="text-sky-600 font-semibold">We look forwar</p>
+            <p className="text-sky-600 font-semibold">We look forward to expanding in other regions once we have time to learn and adapt our model.</p>
           </motion.div>
         </div>
       </Section>

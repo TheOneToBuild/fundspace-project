@@ -2,11 +2,12 @@ import { createClient } from '@supabase/supabase-js';
 import Parser from 'rss-parser';
 
 // Initialize clients
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
+const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 const parser = new Parser({ timeout: 10000 });
 
 // Constants
 const DB_BATCH_SIZE = 100;
+const ARTICLES_PER_FEED = 6; // Changed from 2 to 3
 
 // --- HELPER FUNCTIONS ---
 
@@ -38,9 +39,6 @@ function extractImage(item) {
   return imgMatch ? imgMatch[1] : null;
 }
 
-/**
- * NEW: Updated topic check using a scoring system.
- */
 function isExcludedTopic(item, { excludedKeywords, allowedKeywords }) {
   const content = `${item.title || ''} ${item.contentSnippet || ''}`.toLowerCase();
   let score = 0;
@@ -101,7 +99,7 @@ export const handler = async () => {
   
   const settledResults = await Promise.all(fetchPromises);
   const articlesToUpsert = [];
-  const processedTitles = new Set(); // NEW: Set to track titles for deduplication
+  const processedTitles = new Set();
 
   for (const result of settledResults) {
     if (result.status === 'rejected') {
@@ -111,9 +109,11 @@ export const handler = async () => {
 
     const feed = result;
     if (feed?.items) {
-      for (const item of feed.items) {
+      const recentItems = feed.items.slice(0, ARTICLES_PER_FEED);
+
+      for (const item of recentItems) {
         if (!item.title || !item.link) continue;
-        if (processedTitles.has(item.title.trim())) continue; // NEW: Skip if title is already processed
+        if (processedTitles.has(item.title.trim())) continue;
         if (isExcludedTopic(item, config)) continue;
         
         const image = extractImage(item);
@@ -129,7 +129,7 @@ export const handler = async () => {
             source_name: feed.title,
             category: feed.category,
           });
-          processedTitles.add(item.title.trim()); // NEW: Add title to the processed set
+          processedTitles.add(item.title.trim());
         }
       }
     }
