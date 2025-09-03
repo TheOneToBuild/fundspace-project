@@ -5,7 +5,7 @@ import PropTypes from 'prop-types';
 
 const NewsCard = ({ title, timeAgo, image, url, category }) => (
     <div
-        className="flex-shrink-0 w-80 h-64 bg-white rounded-xl overflow-hidden hover:shadow-lg transition-all duration-200 cursor-pointer group relative"
+        className="w-80 h-80 bg-white rounded-xl overflow-hidden hover:shadow-lg transition-all duration-200 cursor-pointer group relative"
         onClick={() => url && window.open(url, '_blank')}
     >
         {image ? (

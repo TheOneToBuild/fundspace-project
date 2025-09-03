@@ -278,7 +278,7 @@ export default function GlobalSearch({ mobile = false }) {
             <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 z-10" />
             <input
                 type="text"
-                placeholder="Search grants, organizations, members..."
+                placeholder="Search"
                 className={inputClass}
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}

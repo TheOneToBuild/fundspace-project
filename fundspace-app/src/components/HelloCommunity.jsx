@@ -112,10 +112,14 @@ const getNewsServiceForChannel = (channelType) => {
 };
 
 const NewsCard = memo(({ title, summary, timeAgo, image, url, category }) => {
+  const handleClick = () => {
+    if (url) window.open(url, '_blank', 'noopener,noreferrer');
+  };
+
   return (
     <div
-      className="flex-shrink-0 w-80 h-64 bg-white rounded-xl overflow-hidden hover:shadow-lg transition-all duration-200 cursor-pointer group relative"
-      onClick={() => url && window.open(url, '_blank')}
+      onClick={handleClick}
+      className="w-80 h-80 bg-white rounded-xl overflow-hidden shadow-lg group cursor-pointer relative"
     >
       {/* Full Background Image */}
       {image ? (

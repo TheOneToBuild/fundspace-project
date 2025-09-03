@@ -17,12 +17,16 @@ import { getChannelInfo } from '../utils/channelUtils.js';
 import PropTypes from 'prop-types';
 
 const NewsCard = memo(({ title, timeAgo, image, url, category }) => {
+  const handleClick = () => {
+    if (url) window.open(url, '_blank', 'noopener,noreferrer');
+  };
+
   return (
-    <div
-      className="flex-shrink-0 w-80 h-64 bg-white rounded-xl overflow-hidden hover:shadow-lg transition-all duration-200 cursor-pointer group relative"
-      onClick={() => url && window.open(url, '_blank')}
+    <div 
+      onClick={handleClick}
+      className="relative w-80 h-80 bg-white rounded-xl overflow-hidden shadow-lg group cursor-pointer"
     >
-      {/* Full Background Image */}
+      {/* Image */}
       {image ? (
         <img 
           src={image} 
