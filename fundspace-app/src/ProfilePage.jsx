@@ -383,7 +383,7 @@ export default function ProfilePage() {
     }
 
     return (
-        <div className="pb-72">
+        <div className="pb-16">
             <ProfileLayout
                 profile={profile}
                 user={session?.user}

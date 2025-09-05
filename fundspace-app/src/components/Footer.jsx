@@ -114,7 +114,7 @@ export default function Footer() {
             </ul>
           </div>
         </div>
-        <div className="pt-8 border-t border-slate-100 flex flex-col sm:flex-row justify-between items-center">
+  <div className="pt-8 flex flex-col sm:flex-row justify-between items-center">
           <p className="text-base text-slate-500 mb-4 sm:mb-0">&copy; {new Date().getFullYear()} Fundspace. All rights reserved.</p>
           <div className="flex space-x-4 text-slate-500">
             <a href="#" aria-label="Facebook" className="hover:text-blue-600 transition-colors"><Facebook size={18} /></a>

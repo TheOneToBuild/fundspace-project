@@ -17,12 +17,12 @@ const ADVISORY = [
 ];
 
 const CORE_VALUES = [
-  { icon: Search, title: 'Radical Clarity', text: 'Surface aligned capital & remove noise so energy goes to impact—not scavenger hunts.' },
-  { icon: Users, title: 'Community First', text: 'People > portal. Relationships compound faster than cold submissions.' },
-  { icon: Target, title: 'Fit Over Volume', text: 'Precision matching replaces spray & pray cycles that exhaust small teams.' },
-  { icon: Zap, title: 'Momentum Preservation', text: 'Reusable assets + automation protect flow from deadline & admin drag.' },
-  { icon: Shield, title: 'Trust & Stewardship', text: 'Data stays private; only anonymized signals strengthen the ecosystem.' },
-  { icon: Star, title: 'Equity By Design', text: 'Infrastructure that narrows network privilege gaps instead of widening them.' }
+  { icon: Search, title: 'Radical Clarity', text: 'Surface aligned capital & remove noise so energy goes to impact—not scavenger hunts.', bgColor: 'bg-green-100 text-green-700' },
+  { icon: Users, title: 'Community First', text: 'People > portal. Relationships compound faster than cold submissions.', bgColor: 'bg-blue-100 text-blue-700' },
+  { icon: Target, title: 'Fit Over Volume', text: 'Precision matching replaces spray & pray cycles that exhaust small teams.', bgColor: 'bg-pink-100 text-pink-700' },
+  { icon: Zap, title: 'Momentum Preservation', text: 'Reusable assets + automation protect flow from deadline & admin drag.', bgColor: 'bg-yellow-100 text-yellow-700' },
+  { icon: Shield, title: 'Trust & Stewardship', text: 'Data stays private; only anonymized signals strengthen the ecosystem.', bgColor: 'bg-violet-100 text-violet-700' },
+  { icon: Star, title: 'Equity By Design', text: 'Infrastructure that narrows network privilege gaps instead of widening them.', bgColor: 'bg-rose-100 text-rose-700' }
 ];
 
 
@@ -48,10 +48,10 @@ const Pill = ({ children, color='blue' }) => {
   return <span className={`inline-flex items-center uppercase tracking-wide text-[11px] font-semibold px-4 py-1.5 rounded-full shadow-sm ${map[color]}`}>{children}</span>;
 };
 
-const ValueCard = ({ icon:Icon, title, text }) => (
+const ValueCard = ({ icon:Icon, title, text, bgColor }) => (
   <motion.div variants={fade} className="group relative rounded-3xl bg-white shadow-xl ring-1 ring-slate-900/5 p-8 flex flex-col gap-5 overflow-hidden hover:shadow-2xl transition-all hover:-translate-y-1">
     <div className="absolute -top-20 -right-24 w-64 h-64 rounded-full blur-3xl opacity-30 bg-gradient-to-br from-slate-200 via-white to-white" />
-    <div className="h-14 w-14 rounded-2xl flex items-center justify-center bg-gradient-to-br from-slate-800 via-slate-900 to-slate-900 text-white shadow-lg"><Icon className="h-7 w-7" /></div>
+    <div className={`h-14 w-14 rounded-2xl flex items-center justify-center shadow-lg ${bgColor}`}><Icon className="h-7 w-7" /></div>
     <h3 className="text-xl font-bold text-slate-900 leading-snug">{title}</h3>
     <p className="text-slate-600 text-sm leading-relaxed flex-1">{text}</p>
   </motion.div>
@@ -137,7 +137,7 @@ const AboutUsPage = () => {
           <p className="mt-6 text-lg md:text-xl text-slate-600 max-w-3xl mx-auto leading-relaxed">Designing infrastructure that compounds community power requires guardrails. These values shape product decisions & partnerships.</p>
         </div>
         <div className="max-w-7xl mx-auto px-6 lg:px-12 grid md:grid-cols-2 lg:grid-cols-3 gap-10">
-          {CORE_VALUES.map(v => <ValueCard key={v.title} icon={v.icon} title={v.title} text={v.text} />)}
+          {CORE_VALUES.map(v => <ValueCard key={v.title} icon={v.icon} title={v.title} text={v.text} bgColor={v.bgColor} />)}
         </div>
       </Section>
 

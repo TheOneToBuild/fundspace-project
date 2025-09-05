@@ -443,7 +443,7 @@ const GrantsPortalPage = () => {
 
   return (
     <PortalAccessControl checkingAccess={checkingAccess} hasAccess={hasAccess}>
-      <div className="min-h-screen">
+      <div className="min-h-screen pb-16">
         <div className="px-2 lg:px-4 py-8">
           <PortalBanner userMembership={userMembership} />
           <PortalActionCards 
