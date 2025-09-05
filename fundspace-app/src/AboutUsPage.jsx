@@ -174,7 +174,7 @@ const AboutUsPage = () => {
       <Section className="bg-[#f9f6f4] pt-28 pb-40 md:pt-40 md:pb-48">
         <div className="text-center max-w-5xl mx-auto px-6 mb-16">
           <Pill color="blue">OUR GUIDES</Pill>
-          <h2 className="mt-6 text-4xl md:text-5xl font-black tracking-tight text-slate-900 leading-tight">Advisory Voices From Philanthropy, Public & Private</h2>
+          <h2 className="mt-6 text-4xl md:text-5xl font-black tracking-tight text-slate-900 leading-tight">Advisory Voices From Philanthropy, Public & Private Sectors</h2>
           <p className="mt-6 text-lg text-slate-600 leading-relaxed">We co‑design with leaders who believe infrastructure should shift power closer to community problem solvers.</p>
         </div>
         <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-10">

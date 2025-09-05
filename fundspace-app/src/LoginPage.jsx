@@ -84,7 +84,7 @@ export default function LoginPage() {
   // Enhanced loading screen with modern design
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center relative overflow-hidden">
+      <div className="min-h-screen bg-[#faf7f4] flex items-center justify-center relative overflow-hidden">
         {/* Animated background elements */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <motion.div
@@ -142,35 +142,37 @@ export default function LoginPage() {
   }
 
   return (
-    <AuthLayout>
-      <motion.div
-        key={view} // This will trigger re-animation when view changes
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: -20 }}
-        transition={{ duration: 0.3 }}
-      >
-        {view === 'sign_in' && (
-          <LoginForm
-            onSwitchToSignUp={handleSwitchToSignUp}
-            onSwitchToForgotPassword={handleSwitchToForgotPassword}
-            onLoginSuccess={handleLoginSuccess}
-          />
-        )}
+    <div className="min-h-screen bg-[#faf7f4]">
+      <AuthLayout>
+        <motion.div
+          key={view} // This will trigger re-animation when view changes
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -20 }}
+          transition={{ duration: 0.3 }}
+        >
+          {view === 'sign_in' && (
+            <LoginForm
+              onSwitchToSignUp={handleSwitchToSignUp}
+              onSwitchToForgotPassword={handleSwitchToForgotPassword}
+              onLoginSuccess={handleLoginSuccess}
+            />
+          )}
 
-        {view === 'signup' && (
-          <MinimalSignupForm
-            onSwitchToLogin={handleSwitchToLogin}
-            onSignupSuccess={handleSignupSuccess}
-          />
-        )}
+          {view === 'signup' && (
+            <MinimalSignupForm
+              onSwitchToLogin={handleSwitchToLogin}
+              onSignupSuccess={handleSignupSuccess}
+            />
+          )}
 
-        {view === 'forgot-password' && (
-          <ForgotPasswordForm
-            onSwitchToLogin={handleSwitchToLogin}
-          />
-        )}
-      </motion.div>
-    </AuthLayout>
+          {view === 'forgot-password' && (
+            <ForgotPasswordForm
+              onSwitchToLogin={handleSwitchToLogin}
+            />
+          )}
+        </motion.div>
+      </AuthLayout>
+    </div>
   );
 }

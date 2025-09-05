@@ -33,7 +33,7 @@ export default function DashboardHeader({ profile }) {
             const [followersRes, followingRes, connectionsRes] = await Promise.all([
                 supabase.from('followers').select('id').eq('following_id', profile.id),
                 supabase.from('followers').select('id').eq('follower_id', profile.id),
-                supabase.from('connections').select('id').or(`user_id.eq.${profile.id},connected_user_id.eq.${profile.id}`).eq('status', 'accepted')
+                supabase.from('user_connections').select('id').or(`requester_id.eq.${profile.id},recipient_id.eq.${profile.id}`).eq('status', 'accepted')
             ]);
 
             setStats({
@@ -52,10 +52,9 @@ export default function DashboardHeader({ profile }) {
         
         try {
             const { data } = await supabase
-                .from('memberships')
+                .from('organization_memberships')
                 .select('id')
-                .eq('user_id', profile.id)
-                .eq('status', 'active')
+                .eq('profile_id', profile.id)
                 .limit(1);
             
             setHasOrganizationAccess(data && data.length > 0);
@@ -92,47 +91,53 @@ export default function DashboardHeader({ profile }) {
     }, []);
 
     // Navigation items
+    // Build nav items in desired order
+    const grantsPortalItem = {
+        label: 'Grants Portal',
+        to: '/profile/grants-portal',
+        icon: <FileText size={16} />
+    };
+
     const mainNavItems = [
-        { 
-            label: 'Home', 
-            to: '/profile', 
+        {
+            label: 'Home',
+            to: '/profile',
             icon: <Home size={16} />,
             exact: true
         },
-        { 
-            label: 'Community', 
+        {
+            label: 'Profile',
+            to: profile?.id ? `/profile/members/${profile.id}` : '/profile/members/',
+            icon: <User size={16} />,
+            exact: true
+        },
+        {
+            label: 'Community',
             icon: <Globe size={16} />,
             dropdown: [
                 { label: 'Hello World', to: '/profile/hello-world', icon: <Globe size={14} /> },
                 { label: 'Hello Community', to: '/profile/hello-community', icon: <Handshake size={14} /> }
             ]
         },
-        { 
-            label: 'Discover', 
-            to: '/profile/members', 
-            icon: <Search size={16} /> 
+        // Grants Portal (conditionally)
+        ...(isOmegaAdmin || hasOrganizationAccess ? [grantsPortalItem] : []),
+        {
+            label: 'Discover',
+            to: '/profile/members',
+            icon: <Search size={16} />
         },
-        { 
-            label: 'Connections', 
-            to: '/profile/connections', 
+        {
+            label: 'Connections',
+            to: '/profile/connections',
             icon: <Users size={16} />
         },
-        { 
-            label: 'Organization', 
-            to: '/profile/my-organization', 
+        {
+            label: 'Organization',
+            to: '/profile/my-organization',
             icon: <Building size={16} />,
             hide: isOmegaAdmin
         }
     ];
-
-    // Add Grants Portal if user has access
-    if ((isOmegaAdmin || hasOrganizationAccess)) {
-        mainNavItems.splice(1, 0, {
-            label: 'Grants Portal',
-            to: '/profile/grants-portal',
-            icon: <FileText size={16} />
-        });
-    }
 
     const toggleMobileMenu = () => setIsMobileMenuOpen(!isMobileMenuOpen);
     const closeMobileMenu = () => setIsMobileMenuOpen(false);
@@ -192,7 +197,7 @@ export default function DashboardHeader({ profile }) {
                                     ) : (
                                         <NavLink
                                             to={item.to}
-                                            end={item.exact}
+                                            end={['/profile', '/profile/members'].includes(item.to)}
                                             className={({ isActive }) =>
                                                 `flex items-center space-x-2 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
                                                     isActive 
@@ -203,11 +208,6 @@ export default function DashboardHeader({ profile }) {
                                         >
                                             {item.icon}
                                             <span>{item.label}</span>
-                                            {item.badge && item.badge > 0 && (
-                                                <span className="ml-1 text-xs bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full font-semibold">
-                                                    {item.badge}
-                                                </span>
-                                            )}
                                         </NavLink>
                                     )}
                                 </div>
@@ -282,6 +282,13 @@ export default function DashboardHeader({ profile }) {
                                             className="flex items-center w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-100"
                                         >
                                             <Home size={14} className="mr-2" /> Dashboard
+                                        </Link>
+                                        <Link 
+                                            to={profile?.id ? `/profile/members/${profile.id}` : '/profile/members/'}
+                                            onClick={() => setIsUserMenuOpen(false)}
+                                            className="flex items-center w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-100"
+                                        >
+                                            <User size={14} className="mr-2" /> Profile
                                         </Link>
                                         <Link 
                                             to="/profile/settings" 

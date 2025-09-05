@@ -47,7 +47,7 @@ export default function Footer() {
 
   const productLinks = [
     { to: "/how-it-works", text: "How Fundspace Works" },
-    { to: "/for-seekers", text: "For Grant Seekers" },
+    { to: "/for-seekers", text: "For Fund Seekers" },
     { to: "/for-funders", text: "For Fund Providers" },
     { to: "/submit-grant", text: "Submit a Grant", onClick: handleSubmitGrantClick },
   ];
@@ -79,7 +79,7 @@ export default function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
           <div>
             <img src={footerLogoImage} alt="Fundspace Logo" className="h-20 mb-6 w-auto" />
-            <p className="text-slate-600">Democratizing access to funding for a better Bay Area.</p>
+            <p className="text-slate-600">Democratizing access to funding for a brighter Bay Area.</p>
           </div>
           <div>
             <h4 className="text-sm font-bold text-slate-800 mb-3 tracking-wider uppercase">Product</h4>

@@ -31,7 +31,7 @@ const useNews = () => {
         const fetchNews = async () => {
             try {
                 const newsData = await newsService.getGlobalBreakingNews();
-                setNews(Array.isArray(newsData) ? newsData.slice(0, 6) : []);
+                setNews(Array.isArray(newsData) ? newsData.slice(0, 12) : []);
             } catch {
                 setNews([]);
             }
