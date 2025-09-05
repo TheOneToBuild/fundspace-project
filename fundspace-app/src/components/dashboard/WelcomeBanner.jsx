@@ -81,26 +81,56 @@ const WelcomeBanner = ({ profile, organizationInfo }) => {
             color: currentTheme.buttonStyle,
             action: () => setShowCreatePopup(true)
         },
-        // Add Grants Portal button - only show for admins or organization members
+        // FIXED: Navigate to grants portal page instead of grants page
         ...(profile?.is_omega_admin || organizationInfo ? [{
             icon: FileText,
             label: 'Grants Portal',
-            action: () => navigate('/profile/grants-portal'),
-            color: currentTheme.buttonStyle
+            color: currentTheme.buttonStyle,
+            action: () => navigate('/profile/grants-portal')
         }] : []),
         {
             icon: Calendar,
             label: 'Events',
-            action: () => navigate('/profile/events'),
-            color: currentTheme.buttonStyle
+            color: currentTheme.buttonStyle,
+            action: () => navigate('/events')
         },
         {
             icon: Bell,
             label: 'Notifications',
-            action: () => navigate('/profile/notifications'),
-            color: currentTheme.buttonStyle
+            color: currentTheme.buttonStyle,
+            action: () => navigate('/notifications')
         }
     ];
+
+    // Get the user's display role - FIXED: Use profile.title first, then fallback logic
+    const getUserDisplayRole = () => {
+        // First priority: Use the user's actual title from their profile
+        if (profile?.title) {
+            return profile.title;
+        }
+        
+        // Second priority: Use organization role if available
+        if (organizationInfo?.role) {
+            return organizationInfo.role;
+        }
+        
+        // Final fallback: Use a generic role based on organization type or default
+        if (organizationInfo?.type) {
+            const typeRoleMap = {
+                'nonprofit': 'Nonprofit Professional',
+                'foundation': 'Foundation Professional', 
+                'funder': 'Funder',
+                'education': 'Education Professional',
+                'healthcare': 'Healthcare Professional',
+                'government': 'Government Professional',
+                'religious': 'Religious Organization Member',
+                'forprofit': 'Professional'
+            };
+            return typeRoleMap[organizationInfo.type] || 'Team Member';
+        }
+        
+        return 'Team Member';
+    };
 
     return (
         <>
@@ -144,7 +174,7 @@ const WelcomeBanner = ({ profile, organizationInfo }) => {
                                     {getCurrentTimeGreeting()}, {profile?.full_name?.split(' ')[0] || 'there'}! 👋
                                 </h1>
 
-                                {/* Organization and role info */}
+                                {/* Organization and role info - FIXED */}
                                 <div className={`${currentTheme.orgColor} text-lg mb-6`}>
                                     {organizationInfo ? (
                                         <div className="flex items-center gap-2 flex-wrap">
@@ -155,7 +185,7 @@ const WelcomeBanner = ({ profile, organizationInfo }) => {
                                                 {organizationInfo.name}
                                             </button>
                                             <span className="opacity-60">•</span>
-                                            <span className="opacity-80">{organizationInfo.role || 'Team Member'}</span>
+                                            <span className="opacity-80">{getUserDisplayRole()}</span>
                                         </div>
                                     ) : (
                                         <span className="opacity-80">Ready to discover new opportunities</span>

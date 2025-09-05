@@ -121,6 +121,7 @@ export function useOrganizationData(profile, session) {
             setLoading(true);
             setError('');
 
+            // Step 1: Delete from main organization_memberships table
             const { error: deleteError } = await supabase
                 .from('organization_memberships')
                 .delete()
@@ -132,15 +133,45 @@ export function useOrganizationData(profile, session) {
                 return;
             }
 
+            // Step 2: Also delete from the cache table
+            const { error: cacheDeleteError } = await supabase
+                .from('organization_membership_cache')
+                .delete()
+                .eq('profile_id', session.user.id)
+                .eq('organization_id', userMembership.organization_id);
+
+            if (cacheDeleteError) {
+                console.warn('Warning: Failed to clean cache, but main membership deleted:', cacheDeleteError);
+            }
+
+            // Step 3: Update profile to clear organization references
             await supabase
                 .from('profiles')
                 .update({
                     organization_choice: null,
                     selected_organization_id: null,
                     selected_organization_type: null,
+                    organization_name: null, // Clear organization name too
                     updated_at: new Date()
                 })
                 .eq('id', session.user.id);
+
+            // Step 4: Try to refresh the cache if there's a function for it
+            try {
+                await supabase.rpc('refresh_org_cache');
+            } catch (refreshError) {
+                console.warn('Cache refresh failed (this may be normal):', refreshError);
+            }
+
+            // NEW: Trigger refresh of dashboard organization data
+            if (window.refreshDashboardOrganizationData) {
+                window.refreshDashboardOrganizationData();
+            }
+
+            // NEW: Trigger refresh of member profile data
+            if (window.refreshMemberProfileData) {
+                window.refreshMemberProfileData();
+            }
 
             setUserMembership(null);
             setOrganization(null);

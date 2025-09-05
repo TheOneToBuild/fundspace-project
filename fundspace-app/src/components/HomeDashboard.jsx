@@ -270,7 +270,7 @@ const useTrendingGrants = () => {
     return { trendingGrants, setTrendingGrants };
 };
 
-// FIXED: useUserData hook with safe query
+// UPDATED: useUserData hook with refresh capability
 const useUserData = (profile) => {
     const [organizationInfo, setOrganizationInfo] = useState(null);
     const [stats, setStats] = useState({
@@ -280,13 +280,18 @@ const useUserData = (profile) => {
         posts: 0
     });
     const [loading, setLoading] = useState(true);
+    const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+    const refreshOrganizationData = () => {
+        setRefreshTrigger(prev => prev + 1);
+    };
 
     useEffect(() => {
         const fetchUserData = async () => {
             if (!profile?.id) return;
             setLoading(true);
             try {
-                // FIXED: Use safe query function instead of problematic join
+                // Use safe query function instead of problematic join
                 const orgData = await getOrganizationInfoForDashboard(profile.id);
                 setOrganizationInfo(orgData);
             } catch (err) {
@@ -297,9 +302,9 @@ const useUserData = (profile) => {
             }
         };
         fetchUserData();
-    }, [profile?.id]);
+    }, [profile?.id, refreshTrigger]); // Add refreshTrigger as dependency
 
-    return { organizationInfo, stats, loading };
+    return { organizationInfo, stats, loading, refreshOrganizationData };
 };
 
 export default function HomeDashboard() {
@@ -311,11 +316,19 @@ export default function HomeDashboard() {
     const [isGrantModalOpen, setIsGrantModalOpen] = useState(false);
     const [savedGrantIds, setSavedGrantIds] = useState(new Set());
 
-    const { organizationInfo, stats, loading } = useUserData(profile);
+    const { organizationInfo, stats, loading, refreshOrganizationData } = useUserData(profile);
     const news = useNews();
     const trendingPosts = useTrendingPosts();
     const { trendingGrants, setTrendingGrants } = useTrendingGrants();
     const helloCommunityPosts = useHelloCommunityPosts(organizationInfo);
+
+    // NEW: Expose refresh function globally for organization changes
+    useEffect(() => {
+        window.refreshDashboardOrganizationData = refreshOrganizationData;
+        return () => {
+            delete window.refreshDashboardOrganizationData;
+        };
+    }, [refreshOrganizationData]);
 
     useEffect(() => {
         const fetchSavedGrants = async () => {

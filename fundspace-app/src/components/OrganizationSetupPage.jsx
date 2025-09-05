@@ -258,7 +258,6 @@ export default function StreamlinedOrganizationSetupPage({ onJoinSuccess }) {
         setLoading(true);
         setError('');
         setMessage('');
-        
         try {
             const { data: { session } } = await supabase.auth.getSession();
             if (!session) {
@@ -267,53 +266,63 @@ export default function StreamlinedOrganizationSetupPage({ onJoinSuccess }) {
 
             const hasExistingSuperAdmins = await checkExistingSuperAdmins(organization.id);
             const role = hasExistingSuperAdmins ? 'member' : 'super_admin';
-            
-            const membershipData = {
-                profile_id: session.user.id,
-                organization_id: organization.id,
-                organization_type: organization.type,
-                role: role,
-                membership_type: 'staff',
-                is_public: true
-            };
 
+            // Create organization membership
             const { error: membershipError } = await supabase
                 .from('organization_memberships')
-                .insert(membershipData);
+                .insert({
+                    profile_id: session.user.id,
+                    organization_id: organization.id,
+                    organization_type: organization.type,
+                    role: role,
+                    membership_type: 'staff',
+                    is_public: true
+                });
 
             if (membershipError) {
                 throw new Error(`Failed to join organization: ${membershipError.message}`);
             }
 
+            // Update profile with organization info (add organization_name)
             const { error: profileError } = await supabase
                 .from('profiles')
                 .update({
                     organization_choice: 'join',
                     selected_organization_id: organization.id,
                     selected_organization_type: organization.type,
+                    organization_name: organization.name,
                     updated_at: new Date()
                 })
                 .eq('id', session.user.id);
 
             if (profileError) {
-                setError('Profile update failed (non-critical)');
+                console.warn('Membership created but profile update failed:', profileError);
             }
 
-            const roleMessage = role === 'super_admin' 
-                ? `Successfully joined ${organization.name} as Super Admin! You're the first admin for this organization.`
-                : `Successfully joined ${organization.name} as Member!`;
-                
-            setMessage(roleMessage);
+            // NEW: Trigger refresh of all organization-related components
+            if (window.refreshDashboardOrganizationData) {
+                window.refreshDashboardOrganizationData();
+            }
+            if (window.refreshMemberProfileData) {
+                window.refreshMemberProfileData();
+            }
+            if (window.refreshMyOrganizationPage) {
+                window.refreshMyOrganizationPage();
+            }
+
+            setMessage(`Successfully joined ${organization.name} as ${role === 'super_admin' ? 'Super Admin' : 'Member'}! You're ${role === 'super_admin' ? 'the first admin for this organization' : 'now part of the team'}.`);
+
             clearPersistedData();
-            
             setTimeout(() => {
-                if (onJoinSuccess) {
-                    onJoinSuccess();
+                // Trigger the completion callback if provided
+                if (typeof onComplete === 'function') {
+                    onComplete();
                 }
-            }, 1000);
+            }, 2000);
 
         } catch (err) {
-            setError(err.message || 'Failed to join organization');
+            console.error('Error joining organization:', err);
+            setError(err.message || 'Failed to join organization. Please try again.');
         } finally {
             setLoading(false);
         }
@@ -322,11 +331,9 @@ export default function StreamlinedOrganizationSetupPage({ onJoinSuccess }) {
     // 🚀 ENHANCED: Create a new organization with INSTANT EVENTS
     const handleCreateOrganization = async (e) => {
         e.preventDefault();
-        console.log('🏗️ INSTANT CREATE: Starting to create organization:', createForm.name);
-        setCreating(true);
+        setLoading(true);
         setError('');
         setMessage('');
-
         try {
             const { data: { session } } = await supabase.auth.getSession();
             if (!session) {
@@ -334,36 +341,24 @@ export default function StreamlinedOrganizationSetupPage({ onJoinSuccess }) {
             }
 
             // Validate required fields
-            if (!createForm.name.trim() || !createForm.type || !createForm.description.trim() || 
-                !createForm.website.trim() || !createForm.location.trim()) {
-                throw new Error('Name, type, description, website, and headquarters location are required');
+            if (!createForm.name?.trim()) {
+                throw new Error('Organization name is required');
+            }
+            if (!createForm.type) {
+                throw new Error('Organization type is required');
             }
 
-            // Validate EIN for nonprofits
-            if (createForm.type === 'nonprofit' && !createForm.ein.trim()) {
-                throw new Error('EIN number is required for nonprofit organizations');
-            }
-
-            // Validate taxonomy selection
-            if (!createForm.taxonomy_code) {
-                throw new Error('Please select a specific organization category');
-            }
-
-            // Validate focus areas
-            if (selectedCategories.length === 0) {
-                throw new Error('Please select at least one focus area');
-            }
-
-            // Create organization in unified table
             const orgData = {
                 name: createForm.name.trim(),
                 type: createForm.type,
-                taxonomy_code: createForm.taxonomy_code,
-                description: createForm.description.trim(),
-                website: createForm.website.trim(),
-                location: createForm.location.trim(),
-                contact_email: createForm.contact_email.trim() || null,
-                ein: createForm.type === 'nonprofit' ? createForm.ein.trim() : null,
+                tagline: createForm.tagline?.trim() || null,
+                description: createForm.description?.trim() || null,
+                website: createForm.website?.trim() || null,
+                location: createForm.location?.trim() || null,
+                contact_email: createForm.contactEmail?.trim() || session.user.email,
+                annual_budget: createForm.annualBudget || null,
+                staff_count: createForm.staffCount || null,
+                ein: createForm.ein?.trim() || null,
                 admin_profile_id: session.user.id,
                 image_url: null,
                 is_verified: false,
@@ -383,7 +378,7 @@ export default function StreamlinedOrganizationSetupPage({ onJoinSuccess }) {
                 throw new Error(`Failed to create organization: ${orgError.message}`);
             }
 
-            console.log('✅ INSTANT CREATE: Successfully created organization in database:', newOrg);
+            console.log('✅ Successfully created organization in database:', newOrg);
 
             // Create organization membership for creator (as super_admin)
             const membershipData = {
@@ -403,7 +398,7 @@ export default function StreamlinedOrganizationSetupPage({ onJoinSuccess }) {
                 throw new Error(`Organization created but failed to set up membership: ${membershipError.message}`);
             }
 
-            console.log('✅ INSTANT CREATE: Successfully created membership');
+            console.log('✅ Successfully created membership');
 
             // Create category relationships
             if (selectedCategories.length > 0) {
@@ -417,7 +412,7 @@ export default function StreamlinedOrganizationSetupPage({ onJoinSuccess }) {
                     .insert(categoryData);
 
                 if (categoryError) {
-                    console.warn('Failed to create category relationships:', categoryError);
+                    console.warn('Organization created but category relationships failed:', categoryError);
                 }
             }
 
@@ -428,33 +423,41 @@ export default function StreamlinedOrganizationSetupPage({ onJoinSuccess }) {
                     organization_choice: 'create',
                     selected_organization_id: newOrg.id,
                     selected_organization_type: newOrg.type,
+                    organization_name: newOrg.name,
                     updated_at: new Date()
                 })
                 .eq('id', session.user.id);
 
             if (profileError) {
-                console.warn('⚠️ Profile update error (non-critical):', profileError);
+                console.warn('Organization created but profile update failed:', profileError);
             }
 
-            // 🚀 INSTANT EVENT: Notify organization joined immediately
-            console.log('📡 INSTANT CREATE: Dispatching instant organization change event');
-            notifyOrganizationJoined(session.user.id, newOrg);
+            // NEW: Trigger refresh of all organization-related components
+            if (window.refreshDashboardOrganizationData) {
+                window.refreshDashboardOrganizationData();
+            }
+            if (window.refreshMemberProfileData) {
+                window.refreshMemberProfileData();
+            }
+            if (window.refreshMyOrganizationPage) {
+                window.refreshMyOrganizationPage();
+            }
 
-            setMessage(`Successfully created ${newOrg.name}! You are now the organization's administrator.`);
-            clearPersistedData(); // Clear form data on success
-            
-            // Short delay then trigger success callback
+            setMessage(`Successfully created ${newOrg.name}! You're now the admin of this organization.`);
+            clearPersistedData();
+
+            // Clear form and redirect after a short delay
             setTimeout(() => {
-                if (onJoinSuccess) {
-                    onJoinSuccess();
+                if (typeof onComplete === 'function') {
+                    onComplete();
                 }
-            }, 1000); // Reduced from 1500ms to 1000ms
+            }, 2000);
 
         } catch (err) {
-            console.error('❌ Create organization error:', err);
-            setError(err.message || 'Failed to create organization');
+            console.error('Error creating organization:', err);
+            setError(err.message || 'Failed to create organization. Please try again.');
         } finally {
-            setCreating(false);
+            setLoading(false);
         }
     };
 

@@ -1,5 +1,5 @@
-// src/components/MyOrganizationPage.jsx - Updated with fully expanded layout
-import React, { useState } from 'react';
+// src/components/MyOrganizationPage.jsx - Updated with refresh capability
+import React, { useState, useEffect } from 'react';
 import { useOutletContext, useNavigate } from 'react-router-dom';
 import { AlertTriangle, Crown } from 'lucide-react';
 import StreamlinedOrganizationSetupPage from './OrganizationSetupPage.jsx';
@@ -35,6 +35,17 @@ export default function MyOrganizationPage() {
     const isOmegaAdmin = profile?.is_omega_admin === true;
     const userRole = userMembership?.role;
     const canViewAnalytics = ['super_admin', 'admin'].includes(userRole) || isOmegaAdmin;
+
+    // NEW: Expose refresh function globally for organization joins
+    useEffect(() => {
+        window.refreshMyOrganizationPage = () => {
+            checkMembership();
+            fetchOrganizationData();
+        };
+        return () => {
+            delete window.refreshMyOrganizationPage;
+        };
+    }, [checkMembership, fetchOrganizationData]);
 
     // Loading state with expanded layout
     if (loading) {

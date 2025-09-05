@@ -1,4 +1,4 @@
-// MemberProfilePage.jsx - Updated with light beige background
+// MemberProfilePage.jsx - Updated with refresh capability
 import React, { useState, useEffect, useContext } from 'react';
 import { useParams, useOutletContext } from 'react-router-dom';
 import { LayoutContext } from './App.jsx';
@@ -22,7 +22,8 @@ export default function MemberProfilePage() {
         followingInProgress,
         handleFollow,
         handleUnfollow,
-        isCurrentUser
+        isCurrentUser,
+        refreshMemberData
     } = useMemberProfile(memberIdToUse, currentUserProfile);
 
     // Tab state management
@@ -33,6 +34,14 @@ export default function MemberProfilePage() {
         setPageBgColor('bg-[#faf7f4]');
         return () => setPageBgColor('bg-white');
     }, [setPageBgColor]);
+
+    // Expose refresh function globally for organization changes
+    useEffect(() => {
+        window.refreshMemberProfileData = refreshMemberData;
+        return () => {
+            delete window.refreshMemberProfileData;
+        };
+    }, [refreshMemberData]);
 
     // Handle tab changes from header stats clicks
     const handleTabChange = (tabName) => {
