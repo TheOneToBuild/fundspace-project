@@ -93,7 +93,7 @@ export default function DashboardHeader({ profile }) {
     // Navigation items
     // Build nav items in desired order
     const grantsPortalItem = {
-        label: 'Grants Portal',
+        label: 'Fund Portal',
         to: '/profile/grants-portal',
         icon: <FileText size={16} />
     };

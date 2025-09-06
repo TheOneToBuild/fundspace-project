@@ -1,10 +1,11 @@
-// MemberProfilePage.jsx - Updated with refresh capability
+// MemberProfilePage.jsx - Updated with refresh capability and Photos tab
 import React, { useState, useEffect, useContext } from 'react';
 import { useParams, useOutletContext } from 'react-router-dom';
 import { LayoutContext } from './App.jsx';
 import { useMemberProfile } from './hooks/useMemberProfile';
 import MemberProfileHeader from './components/member-profile/MemberProfileHeader';
 import MemberProfileActivity from './components/member-profile/MemberProfileActivity';
+import MemberProfilePhotos from './components/member-profile/MemberProfilePhotos';
 
 export default function MemberProfilePage() {
     const { memberId, profileId } = useParams();
@@ -81,9 +82,10 @@ export default function MemberProfilePage() {
         );
     }
 
-    // Tab configuration
+    // Tab configuration - Updated to include Photos tab
     const tabs = [
         { id: 'activity', label: 'Activity', icon: '📝' },
+        { id: 'photos', label: 'Photos', icon: '📸' },
         { id: 'connections', label: 'Connections', icon: '🤝' },
         { id: 'followers', label: 'Followers', icon: '👥' },
         { id: 'following', label: 'Following', icon: '👤' }
@@ -95,6 +97,14 @@ export default function MemberProfilePage() {
             case 'activity':
                 return (
                     <MemberProfileActivity 
+                        member={member}
+                        posts={posts}
+                        loading={false}
+                    />
+                );
+            case 'photos':
+                return (
+                    <MemberProfilePhotos 
                         member={member}
                         posts={posts}
                         loading={false}

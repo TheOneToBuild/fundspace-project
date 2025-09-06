@@ -84,7 +84,7 @@ const WelcomeBanner = ({ profile, organizationInfo }) => {
         // FIXED: Navigate to grants portal page instead of grants page
         ...(profile?.is_omega_admin || organizationInfo ? [{
             icon: FileText,
-            label: 'Grants Portal',
+            label: 'Fund Portal',
             color: currentTheme.buttonStyle,
             action: () => navigate('/profile/grants-portal')
         }] : []),

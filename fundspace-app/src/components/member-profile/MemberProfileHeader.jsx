@@ -1,6 +1,5 @@
 // components/member-profile/MemberProfileHeader.jsx - Complete Fixed Version
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../supabaseClient';
 import { 
   sendConnectionRequest, 
@@ -21,10 +20,9 @@ const MemberProfileHeader = ({
     isCurrentUser, 
     followingInProgress = false,
     currentUserId,
-    onTabChange,
-    activeTab = 'activity'
+    onTabChange, // New prop to handle tab changes
+    activeTab = 'activity' // New prop with default value to show which tab is active
 }) => {
-    const navigate = useNavigate();
     const [followStats, setFollowStats] = useState({
         followersCount: 0,
         followingCount: 0
@@ -281,68 +279,20 @@ const MemberProfileHeader = ({
         return member.title || null;
     };
 
-    // UPDATED: Helper function to get the display organization info with clickable link
+    // Helper function to get the display organization info - FIXED
     const getOrganizationDisplay = () => {
-        // Priority 1: Use organization_name from profile (most current)
-        // Priority 2: Use organization name from membership data (cached/legacy)
-        const orgName = member.organization_name || member.organization?.name;
-        const orgId = member.organization_id || member.organization?.id;
-        
-        if (orgName) {
-            if (orgId) {
+        if (member.organization_name) {
+            if (member.organization_id) {
                 return (
-                    <button
-                        onClick={() => navigate(`/organizations/${orgId}`)}
-                        className="text-blue-600 hover:text-blue-800 hover:underline transition-colors cursor-pointer"
+                    <a
+                        href={`/organizations/${member.organization_id}`}
+                        className="text-blue-600 hover:underline"
                     >
-                        {orgName}
-                    </button>
+                        {member.organization_name}
+                    </a>
                 );
             } else {
-                // If we have organization name but no ID, search for the organization
-                return (
-                    <button
-                        onClick={async () => {
-                            try {
-                                // Try to find the organization by name to get its ID
-                                const { data: orgs, error } = await supabase
-                                    .from('organizations')
-                                    .select('id, slug')
-                                    .ilike('name', orgName)
-                                    .limit(1);
-
-                                if (!error && orgs && orgs.length > 0) {
-                                    const org = orgs[0];
-                                    // Use slug if available, otherwise use ID
-                                    const identifier = org.slug || org.id;
-                                    navigate(`/organizations/${identifier}`);
-                                } else {
-                                    // Fallback: create a slug from the organization name
-                                    const slug = orgName
-                                        .toLowerCase()
-                                        .replace(/[^a-z0-9\s-]/g, '')
-                                        .replace(/\s+/g, '-')
-                                        .replace(/-+/g, '-')
-                                        .trim();
-                                    navigate(`/organizations/${slug}`);
-                                }
-                            } catch (error) {
-                                console.error('Error navigating to organization:', error);
-                                // Fallback navigation
-                                const slug = orgName
-                                    .toLowerCase()
-                                    .replace(/[^a-z0-9\s-]/g, '')
-                                    .replace(/\s+/g, '-')
-                                    .replace(/-+/g, '-')
-                                    .trim();
-                                navigate(`/organizations/${slug}`);
-                            }
-                        }}
-                        className="text-blue-600 hover:text-blue-800 hover:underline transition-colors cursor-pointer"
-                    >
-                        {orgName}
-                    </button>
-                );
+                return member.organization_name;
             }
         }
         return null;
