@@ -1,4 +1,4 @@
-// MemberProfilePage.jsx - Updated with refresh capability and Photos tab
+// MemberProfilePage.jsx - Updated with consolidated Connections tab
 import React, { useState, useEffect, useContext } from 'react';
 import { useParams, useOutletContext } from 'react-router-dom';
 import { LayoutContext } from './App.jsx';
@@ -6,6 +6,7 @@ import { useMemberProfile } from './hooks/useMemberProfile';
 import MemberProfileHeader from './components/member-profile/MemberProfileHeader';
 import MemberProfileActivity from './components/member-profile/MemberProfileActivity';
 import MemberProfilePhotos from './components/member-profile/MemberProfilePhotos';
+import MemberProfileConnections from './components/member-profile/MemberProfileConnections';
 
 export default function MemberProfilePage() {
     const { memberId, profileId } = useParams();
@@ -27,7 +28,7 @@ export default function MemberProfilePage() {
         refreshMemberData
     } = useMemberProfile(memberIdToUse, currentUserProfile);
 
-    // Tab state management
+    // Tab state management - Updated with only 3 tabs now
     const [activeTab, setActiveTab] = useState('activity');
 
     // Set the light beige background color
@@ -82,15 +83,6 @@ export default function MemberProfilePage() {
         );
     }
 
-    // Tab configuration - Updated to include Photos tab
-    const tabs = [
-        { id: 'activity', label: 'Activity', icon: '📝' },
-        { id: 'photos', label: 'Photos', icon: '📸' },
-        { id: 'connections', label: 'Connections', icon: '🤝' },
-        { id: 'followers', label: 'Followers', icon: '👥' },
-        { id: 'following', label: 'Following', icon: '👤' }
-    ];
-
     // Render tab content
     const renderTabContent = () => {
         switch (activeTab) {
@@ -112,51 +104,12 @@ export default function MemberProfilePage() {
                 );
             case 'connections':
                 return (
-                    <div className="max-w-7xl mx-auto px-8 py-8">
-                        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-                            <h3 className="text-xl font-bold text-slate-800 mb-6">
-                                {member.full_name.split(' ')[0]}'s Connections
-                            </h3>
-                            <div className="text-center py-12">
-                                <div className="w-16 h-16 bg-slate-100 rounded-full mx-auto mb-4 flex items-center justify-center">
-                                    <span className="text-2xl">🤝</span>
-                                </div>
-                                <p className="text-slate-500">Connections feature coming soon!</p>
-                            </div>
-                        </div>
-                    </div>
-                );
-            case 'followers':
-                return (
-                    <div className="max-w-7xl mx-auto px-8 py-8">
-                        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-                            <h3 className="text-xl font-bold text-slate-800 mb-6">
-                                {member.full_name.split(' ')[0]}'s Followers
-                            </h3>
-                            <div className="text-center py-12">
-                                <div className="w-16 h-16 bg-slate-100 rounded-full mx-auto mb-4 flex items-center justify-center">
-                                    <span className="text-2xl">👥</span>
-                                </div>
-                                <p className="text-slate-500">Followers feature coming soon!</p>
-                            </div>
-                        </div>
-                    </div>
-                );
-            case 'following':
-                return (
-                    <div className="max-w-7xl mx-auto px-8 py-8">
-                        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-                            <h3 className="text-xl font-bold text-slate-800 mb-6">
-                                Who {member.full_name.split(' ')[0]} Follows
-                            </h3>
-                            <div className="text-center py-12">
-                                <div className="w-16 h-16 bg-slate-100 rounded-full mx-auto mb-4 flex items-center justify-center">
-                                    <span className="text-2xl">👤</span>
-                                </div>
-                                <p className="text-slate-500">Following feature coming soon!</p>
-                            </div>
-                        </div>
-                    </div>
+                    <MemberProfileConnections 
+                        member={member}
+                        loading={false}
+                        currentUserId={currentUserProfile?.id}
+                        isCurrentUser={isCurrentUser}
+                    />
                 );
             default:
                 return null;
@@ -177,7 +130,7 @@ export default function MemberProfilePage() {
                 activeTab={activeTab}
             />
             
-            {/* Tab Content - No separate tab navigation needed */}
+            {/* Tab Content */}
             <div className="pb-8">
                 {renderTabContent()}
             </div>

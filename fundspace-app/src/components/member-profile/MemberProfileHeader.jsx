@@ -1,5 +1,6 @@
-// components/member-profile/MemberProfileHeader.jsx - Complete Fixed Version
+// components/member-profile/MemberProfileHeader.jsx - Complete consolidated version
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../supabaseClient';
 import { 
   sendConnectionRequest, 
@@ -20,9 +21,11 @@ const MemberProfileHeader = ({
     isCurrentUser, 
     followingInProgress = false,
     currentUserId,
-    onTabChange, // New prop to handle tab changes
-    activeTab = 'activity' // New prop with default value to show which tab is active
+    onTabChange,
+    activeTab = 'activity'
 }) => {
+    const navigate = useNavigate();
+    
     const [followStats, setFollowStats] = useState({
         followersCount: 0,
         followingCount: 0
@@ -80,7 +83,6 @@ const MemberProfileHeader = ({
                         });
                     } catch (connectionError) {
                         console.error('Connection stats error:', connectionError);
-                        // Set default values if connection functions fail
                         setConnectionStats({
                             connectionStatus: 'none',
                             isRequester: false,
@@ -255,44 +257,63 @@ const MemberProfileHeader = ({
 
     // Handle stats clicks - trigger tab changes instead of navigation
     const handleConnectionsClick = () => {
-        // Call a prop function to change tabs in the parent component
         if (onTabChange) {
             onTabChange('connections');
         }
     };
 
-    const handleFollowersClick = () => {
-        if (onTabChange) {
-            onTabChange('followers');
-        }
-    };
-
-    const handleFollowingClick = () => {
-        if (onTabChange) {
-            onTabChange('following');
-        }
-    };
-
-    // Helper function to get the display title - FIXED
+    // Helper function to get the display title
     const getDisplayTitle = () => {
-        // Use member.title if available, otherwise return null to hide the section
         return member.title || null;
     };
 
-    // Helper function to get the display organization info - FIXED
+    // Helper function to get the display organization info
     const getOrganizationDisplay = () => {
         if (member.organization_name) {
-            if (member.organization_id) {
+            // Check if we have organization routing information
+            const hasOrgId = member.organization_id || member.selected_organization_id;
+            const orgSlug = member.organization_slug;
+            
+            if (hasOrgId) {
+                const handleOrgClick = async () => {
+                    try {
+                        // If we already have a slug, use it
+                        if (orgSlug) {
+                            navigate(`/organizations/${orgSlug}`);
+                            return;
+                        }
+                        
+                        // If no slug, fetch it from the database
+                        const { data: orgData, error } = await supabase
+                            .from('organizations')
+                            .select('slug')
+                            .eq('id', hasOrgId)
+                            .single();
+                        
+                        if (!error && orgData?.slug) {
+                            navigate(`/organizations/${orgData.slug}`);
+                        } else {
+                            // Fallback to generic route with ID if no slug found
+                            navigate(`/organizations/${hasOrgId}`);
+                        }
+                    } catch (error) {
+                        console.error('Error navigating to organization:', error);
+                        // Fallback to search if all else fails
+                        navigate(`/organizations?search=${encodeURIComponent(member.organization_name)}`);
+                    }
+                };
+                
                 return (
-                    <a
-                        href={`/organizations/${member.organization_id}`}
-                        className="text-blue-600 hover:underline"
+                    <button
+                        onClick={handleOrgClick}
+                        className="text-blue-600 hover:text-blue-800 hover:underline transition-colors bg-transparent border-none p-0 cursor-pointer font-inherit text-lg leading-relaxed"
                     >
                         {member.organization_name}
-                    </a>
+                    </button>
                 );
             } else {
-                return member.organization_name;
+                // No routing info available, show as plain text
+                return <span className="text-lg leading-relaxed">{member.organization_name}</span>;
             }
         }
         return null;
@@ -341,14 +362,14 @@ const MemberProfileHeader = ({
                             </div>
                         </div>
                         
-                        {/* Profile Info - FIXED */}
+                        {/* Profile Info */}
                         <div className="flex-1 py-4">
                             <div className="mb-3">
                                 <h1 className="text-4xl font-bold text-slate-900 mb-2">
                                     {member.full_name}
                                 </h1>
                                 
-                                {/* Combined title and organization - FIXED */}
+                                {/* Combined title and organization */}
                                 <div className="text-lg text-slate-600 space-y-1">
                                     {(() => {
                                         const title = getDisplayTitle();
@@ -416,9 +437,9 @@ const MemberProfileHeader = ({
                             )}
                         </div>
 
-                        {/* Stats - clickable for all users */}
+                        {/* Stats - Show individual breakdown */}
                         <div className="flex-shrink-0 py-4">
-                            <div className="flex space-x-8 text-center">
+                            <div className="flex space-x-6 text-center">
                                 <div 
                                     className="cursor-pointer hover:bg-slate-50 p-2 rounded-lg transition-colors"
                                     onClick={handleConnectionsClick}
@@ -433,7 +454,7 @@ const MemberProfileHeader = ({
                                 </div>
                                 <div 
                                     className="cursor-pointer hover:bg-slate-50 p-2 rounded-lg transition-colors"
-                                    onClick={handleFollowersClick}
+                                    onClick={handleConnectionsClick}
                                     title={`View ${isCurrentUser ? 'your' : member.full_name + "'s"} followers`}
                                 >
                                     <div className="text-2xl font-bold text-slate-900">
@@ -445,7 +466,7 @@ const MemberProfileHeader = ({
                                 </div>
                                 <div 
                                     className="cursor-pointer hover:bg-slate-50 p-2 rounded-lg transition-colors"
-                                    onClick={handleFollowingClick}
+                                    onClick={handleConnectionsClick}
                                     title={`View who ${isCurrentUser ? 'you follow' : member.full_name + ' follows'}`}
                                 >
                                     <div className="text-2xl font-bold text-slate-900">
@@ -457,14 +478,13 @@ const MemberProfileHeader = ({
                         </div>
                     </div>
 
-                    {/* Tabs Navigation - Integrated into header */}
+                    {/* Tabs Navigation - Updated with only 3 tabs */}
                     <div className="border-t border-slate-200">
                         <div className="flex space-x-0 overflow-x-auto">
                             {[
                                 { id: 'activity', label: 'Activity', icon: '📝' },
-                                { id: 'connections', label: 'Connections', icon: '🤝' },
-                                { id: 'followers', label: 'Followers', icon: '👥' },
-                                { id: 'following', label: 'Following', icon: '👤' }
+                                { id: 'photos', label: 'Photos', icon: '📸' },
+                                { id: 'connections', label: 'Network', icon: '🤝' }
                             ].map((tab) => (
                                 <button
                                     key={tab.id}

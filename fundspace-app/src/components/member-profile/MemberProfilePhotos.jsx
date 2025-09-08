@@ -1,10 +1,11 @@
 // components/member-profile/MemberProfilePhotos.jsx
-import React, { useState, useMemo } from 'react';
-import { Calendar, MessageSquare, Heart } from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
+import React, { useState, useMemo, useEffect } from 'react';
+import { MessageSquare, Heart } from 'lucide-react';
+import PostCard from '../PostCard';
 
 const MemberProfilePhotos = ({ member, posts, loading }) => {
     const [selectedPhoto, setSelectedPhoto] = useState(null);
+    const [selectedPost, setSelectedPost] = useState(null);
 
     // Extract all photos from posts with metadata
     const allPhotos = useMemo(() => {
@@ -13,17 +14,19 @@ const MemberProfilePhotos = ({ member, posts, loading }) => {
         const photos = [];
         
         posts.forEach(post => {
-            // Get images from different sources
-            const images = [];
+            // Use Set to avoid duplicates
+            const uniqueImages = new Set();
             
             // From image_urls array
             if (post.image_urls && Array.isArray(post.image_urls)) {
-                images.push(...post.image_urls);
+                post.image_urls.forEach(url => {
+                    if (url) uniqueImages.add(url);
+                });
             }
             
-            // From single image_url
-            if (post.image_url) {
-                images.push(post.image_url);
+            // From single image_url (only if not already in array)
+            if (post.image_url && !uniqueImages.has(post.image_url)) {
+                uniqueImages.add(post.image_url);
             }
             
             // From content HTML (embedded images)
@@ -32,22 +35,25 @@ const MemberProfilePhotos = ({ member, posts, loading }) => {
                 div.innerHTML = post.content;
                 const imgElements = div.querySelectorAll('img');
                 const contentImages = Array.from(imgElements).map(img => img.src).filter(src => src);
-                images.push(...contentImages);
+                contentImages.forEach(url => {
+                    if (url && !uniqueImages.has(url)) {
+                        uniqueImages.add(url);
+                    }
+                });
             }
 
-            // Add each image with post metadata
-            images.forEach(imageUrl => {
-                if (imageUrl) {
-                    photos.push({
-                        id: `${post.id}-${imageUrl}`,
-                        url: imageUrl,
-                        postId: post.id,
-                        postContent: post.content,
-                        createdAt: post.created_at,
-                        likesCount: post.likes_count || 0,
-                        commentsCount: post.comments_count || 0
-                    });
-                }
+            // Add each unique image with post metadata and reference to full post
+            Array.from(uniqueImages).forEach((imageUrl, index) => {
+                photos.push({
+                    id: `${post.id}-${index}-${imageUrl.split('/').pop()}`,
+                    url: imageUrl,
+                    post: post, // Store full post data
+                    postId: post.id,
+                    postContent: post.content,
+                    createdAt: post.created_at,
+                    likesCount: post.likes_count || 0,
+                    commentsCount: post.comments_count || 0
+                });
             });
         });
 
@@ -55,13 +61,59 @@ const MemberProfilePhotos = ({ member, posts, loading }) => {
         return photos.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
     }, [posts]);
 
+    // Handler functions
     const handlePhotoClick = (photo) => {
         setSelectedPhoto(photo);
+        setSelectedPost(photo.post); // Set the full post data
     };
 
     const closeModal = () => {
         setSelectedPhoto(null);
+        setSelectedPost(null);
     };
+
+    const navigatePhoto = (direction) => {
+        if (!selectedPhoto || allPhotos.length === 0) return;
+        
+        const currentIndex = allPhotos.findIndex(photo => photo.id === selectedPhoto.id);
+        let newIndex;
+        
+        if (direction === 'next') {
+            newIndex = currentIndex === allPhotos.length - 1 ? 0 : currentIndex + 1;
+        } else {
+            newIndex = currentIndex === 0 ? allPhotos.length - 1 : currentIndex - 1;
+        }
+        
+        const newPhoto = allPhotos[newIndex];
+        setSelectedPhoto(newPhoto);
+        setSelectedPost(newPhoto.post);
+    };
+
+    // Keyboard navigation
+    useEffect(() => {
+        const handleKeyPress = (e) => {
+            if (!selectedPhoto) return;
+            
+            if (e.key === 'ArrowLeft') {
+                e.preventDefault();
+                navigatePhoto('prev');
+            } else if (e.key === 'ArrowRight') {
+                e.preventDefault();
+                navigatePhoto('next');
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                closeModal();
+            }
+        };
+
+        if (selectedPhoto) {
+            document.addEventListener('keydown', handleKeyPress);
+        }
+
+        return () => {
+            document.removeEventListener('keydown', handleKeyPress);
+        };
+    }, [selectedPhoto, allPhotos]);
 
     if (loading) {
         return (
@@ -112,62 +164,69 @@ const MemberProfilePhotos = ({ member, posts, loading }) => {
                         ))}
                     </div>
 
-                    {/* Photo Modal */}
-                    {selectedPhoto && (
+                    {/* Photo Modal using PostCard component */}
+                    {selectedPhoto && selectedPost && (
                         <div 
                             className="fixed inset-0 bg-black bg-opacity-90 z-50 flex items-center justify-center p-4"
                             onClick={closeModal}
                         >
-                            <div className="max-w-4xl max-h-full flex flex-col">
-                                {/* Modal Header */}
-                                <div className="flex items-center justify-between text-white mb-4">
-                                    <div className="flex items-center space-x-4">
-                                        <div className="flex items-center space-x-2">
-                                            <Calendar className="w-4 h-4" />
-                                            <span className="text-sm">
-                                                {formatDistanceToNow(new Date(selectedPhoto.createdAt), { addSuffix: true })}
-                                            </span>
-                                        </div>
-                                        <div className="flex items-center space-x-4 text-sm">
-                                            <div className="flex items-center space-x-1">
-                                                <Heart className="w-4 h-4" />
-                                                <span>{selectedPhoto.likesCount}</span>
-                                            </div>
-                                            <div className="flex items-center space-x-1">
-                                                <MessageSquare className="w-4 h-4" />
-                                                <span>{selectedPhoto.commentsCount}</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <button 
-                                        onClick={closeModal}
-                                        className="text-white hover:text-gray-300 text-2xl font-light"
+                            {/* Navigation Arrows */}
+                            {allPhotos.length > 1 && (
+                                <>
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            navigatePhoto('prev');
+                                        }}
+                                        className="absolute left-6 z-60 p-3 rounded-full bg-white bg-opacity-30 backdrop-blur text-white hover:bg-opacity-50 transition-all"
+                                        aria-label="Previous photo"
                                     >
-                                        ×
+                                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                                        </svg>
                                     </button>
-                                </div>
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            navigatePhoto('next');
+                                        }}
+                                        className="absolute right-6 z-60 p-3 rounded-full bg-white bg-opacity-30 backdrop-blur text-white hover:bg-opacity-50 transition-all"
+                                        aria-label="Next photo"
+                                    >
+                                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                        </svg>
+                                    </button>
+                                </>
+                            )}
 
-                                {/* Photo */}
-                                <div className="flex-1 flex items-center justify-center">
-                                    <img
-                                        src={selectedPhoto.url}
-                                        alt="Selected photo"
-                                        className="max-w-full max-h-[70vh] object-contain rounded-lg"
-                                        onClick={(e) => e.stopPropagation()}
-                                    />
-                                </div>
+                            {/* Close Button */}
+                            <button 
+                                onClick={closeModal}
+                                className="absolute top-6 right-6 z-60 p-2 rounded-full bg-white bg-opacity-30 backdrop-blur text-white hover:bg-opacity-50 transition-all"
+                                aria-label="Close modal"
+                            >
+                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
 
-                                {/* Post content if available */}
-                                {selectedPhoto.postContent && (
-                                    <div className="mt-4 text-white">
-                                        <div 
-                                            className="text-sm opacity-80 max-h-20 overflow-y-auto"
-                                            dangerouslySetInnerHTML={{ 
-                                                __html: selectedPhoto.postContent.replace(/<img[^>]*>/g, '') 
-                                            }}
-                                        />
-                                    </div>
-                                )}
+                            {/* Photo counter */}
+                            {allPhotos.length > 1 && (
+                                <div className="absolute top-6 left-1/2 transform -translate-x-1/2 z-60 bg-white bg-opacity-30 backdrop-blur text-white px-3 py-1 rounded-full text-sm">
+                                    {allPhotos.findIndex(photo => photo.id === selectedPhoto.id) + 1} of {allPhotos.length}
+                                </div>
+                            )}
+
+                            {/* Use your existing PostCard component - this gives you all the functionality! */}
+                            <div 
+                                className="max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto"
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                <PostCard 
+                                    post={selectedPost}
+                                    focusedImage={selectedPhoto.url} // Pass the specific image to focus on
+                                />
                             </div>
                         </div>
                     )}
