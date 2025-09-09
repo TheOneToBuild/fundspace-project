@@ -1,4 +1,4 @@
-// MemberProfilePage.jsx - Updated with consolidated Connections tab
+// MemberProfilePage.jsx - Updated with Experience tab
 import React, { useState, useEffect, useContext } from 'react';
 import { useParams, useOutletContext } from 'react-router-dom';
 import { LayoutContext } from './App.jsx';
@@ -7,6 +7,7 @@ import MemberProfileHeader from './components/member-profile/MemberProfileHeader
 import MemberProfileActivity from './components/member-profile/MemberProfileActivity';
 import MemberProfilePhotos from './components/member-profile/MemberProfilePhotos';
 import MemberProfileConnections from './components/member-profile/MemberProfileConnections';
+import MemberProfileExperience from './components/member-profile/MemberProfileExperience';
 
 export default function MemberProfilePage() {
     const { memberId, profileId } = useParams();
@@ -28,7 +29,7 @@ export default function MemberProfilePage() {
         refreshMemberData
     } = useMemberProfile(memberIdToUse, currentUserProfile);
 
-    // Tab state management - Updated with only 3 tabs now
+    // Tab state management - Updated with 4 tabs now
     const [activeTab, setActiveTab] = useState('activity');
 
     // Set the light beige background color
@@ -92,6 +93,15 @@ export default function MemberProfilePage() {
                         member={member}
                         posts={posts}
                         loading={false}
+                    />
+                );
+            case 'experience':
+                return (
+                    <MemberProfileExperience 
+                        member={member}
+                        loading={false}
+                        currentUserId={currentUserProfile?.id}
+                        isCurrentUser={isCurrentUser}
                     />
                 );
             case 'photos':

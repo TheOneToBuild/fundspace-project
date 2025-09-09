@@ -1,4 +1,4 @@
-// components/member-profile/MemberProfileHeader.jsx - Complete consolidated version
+// components/member-profile/MemberProfileHeader.jsx - Complete consolidated version with Social Profiles
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../supabaseClient';
@@ -11,7 +11,7 @@ import {
   removeConnection,
   getMutualConnectionsCount 
 } from '../../utils/userConnectionsUtils';
-import { UserPlus, UserCheck, User, Users, UserX } from 'lucide-react';
+import { UserPlus, UserCheck, User, Users, UserX, Linkedin, Twitter, Globe, ExternalLink } from 'lucide-react';
 
 const MemberProfileHeader = ({ 
     member, 
@@ -319,6 +319,58 @@ const MemberProfileHeader = ({
         return null;
     };
 
+    // Social profiles helper function
+    const getSocialProfiles = () => {
+        const profiles = [];
+        
+        if (member.linkedin_url) {
+            profiles.push({
+                platform: 'LinkedIn',
+                url: member.linkedin_url,
+                icon: Linkedin,
+                color: 'bg-blue-600 hover:bg-blue-700'
+            });
+        }
+        
+        if (member.twitter_url) {
+            profiles.push({
+                platform: 'Twitter/X',
+                url: member.twitter_url,
+                icon: Twitter,
+                color: 'bg-slate-900 hover:bg-slate-800'
+            });
+        }
+        
+        if (member.website_url) {
+            profiles.push({
+                platform: 'Website',
+                url: member.website_url,
+                icon: Globe,
+                color: 'bg-green-600 hover:bg-green-700'
+            });
+        }
+        
+        return profiles;
+    };
+
+    const socialProfiles = getSocialProfiles();
+
+    // For testing - add some test profiles
+    const testSocialProfiles = [
+        {
+            platform: 'LinkedIn',
+            url: 'https://linkedin.com/in/test',
+            icon: Linkedin,
+            color: 'bg-blue-600 hover:bg-blue-700'
+        },
+        {
+            platform: 'Twitter/X',
+            url: 'https://twitter.com/test',
+            icon: Twitter,
+            color: 'bg-slate-900 hover:bg-slate-800'
+        }
+    ];
+
     return (
         <>
             {/* Banner Image Section - Full width with rounded top corners */}
@@ -478,11 +530,35 @@ const MemberProfileHeader = ({
                         </div>
                     </div>
 
-                    {/* Tabs Navigation - Updated with only 3 tabs */}
+                    {/* Social Profiles Section - Only show if user has social profiles */}
+                    {socialProfiles.length > 0 && (
+                        <div className="flex justify-end pb-6">
+                            <div className="flex gap-3">
+                                {socialProfiles.map((profile, index) => {
+                                    const IconComponent = profile.icon;
+                                    return (
+                                        <a
+                                            key={index}
+                                            href={profile.url}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className={`w-10 h-10 rounded-full flex items-center justify-center text-white transition-all duration-200 hover:scale-110 hover:shadow-lg ${profile.color}`}
+                                            title={`View ${member.full_name}'s ${profile.platform}`}
+                                        >
+                                            <IconComponent className="w-5 h-5" />
+                                        </a>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Tabs Navigation - Updated with 4 tabs */}
                     <div className="border-t border-slate-200">
                         <div className="flex space-x-0 overflow-x-auto">
                             {[
                                 { id: 'activity', label: 'Activity', icon: '📝' },
+                                { id: 'experience', label: 'Experience', icon: '💼' },
                                 { id: 'photos', label: 'Photos', icon: '📸' },
                                 { id: 'connections', label: 'Network', icon: '🤝' }
                             ].map((tab) => (

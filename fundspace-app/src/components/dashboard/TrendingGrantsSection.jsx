@@ -236,6 +236,17 @@ const TrendingGrantsSection = ({ currentUserProfile, onOpenGrantModal, trendingG
     const navigate = useNavigate();
     const [loading, setLoading] = useState(false);
 
+    // Filter out expired grants
+    const activeGrants = trendingGrants.filter(grant => {
+        if (!grant.due_date && !grant.dueDate && !grant.deadline) return true; // No deadline = rolling
+        const deadlineDate = grant.due_date || grant.dueDate || grant.deadline;
+        if (!deadlineDate) return true;
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const grantDeadline = new Date(deadlineDate);
+        return grantDeadline >= today;
+    });
+
     const scrollGrants = (direction) => {
         const container = document.getElementById('trending-grants-scroll');
         if (container) {
@@ -283,7 +294,7 @@ const TrendingGrantsSection = ({ currentUserProfile, onOpenGrantModal, trendingG
                     <p className="text-sm text-slate-600 mt-1">Popular funding opportunities from the community</p>
                 </div>
                 <div className="flex items-center space-x-2">
-                    {trendingGrants.length > 0 && (
+                    {activeGrants.length > 0 && (
                         <div className="flex space-x-2">
                             <button
                                 onClick={() => scrollGrants('left')}
@@ -308,9 +319,9 @@ const TrendingGrantsSection = ({ currentUserProfile, onOpenGrantModal, trendingG
                 </div>
             </div>
 
-            {trendingGrants.length > 0 ? (
+            {activeGrants.length > 0 ? (
                 <div id="trending-grants-scroll" className="flex space-x-4 overflow-x-auto scrollbar-hide pb-4">
-                    {trendingGrants.map(grant => (
+                    {activeGrants.map(grant => (
                         <TrendingGrantCard
                             key={grant.id}
                             grant={grant}
