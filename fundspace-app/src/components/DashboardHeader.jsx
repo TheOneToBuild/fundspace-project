@@ -1,9 +1,9 @@
-// src/components/DashboardHeader.jsx - REDESIGNED: Integrated horizontal navigation
+// src/components/DashboardHeader.jsx - REDESIGNED: Integrated horizontal navigation with Omega Admin
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { 
   Menu, X, PlusCircle, Bell, User, ChevronDown, Home, LogOut, 
-  Globe, Handshake, Search, Users, Building, Settings, FileText
+  Globe, Handshake, Search, Users, Building, Settings, FileText, Crown
 } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import GlobalSearch from './GlobalSearch.jsx';
@@ -15,12 +15,14 @@ export default function DashboardHeader({ profile }) {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
     const [isCommunityMenuOpen, setIsCommunityMenuOpen] = useState(false);
+    const [isOmegaMenuOpen, setIsOmegaMenuOpen] = useState(false);
     const [stats, setStats] = useState({ followersCount: 0, followingCount: 0, connectionsCount: 0 });
     const [hasOrganizationAccess, setHasOrganizationAccess] = useState(false);
     
     const navigate = useNavigate();
     const userMenuRef = useRef(null);
     const communityMenuRef = useRef(null);
+    const omegaMenuRef = useRef(null);
     const mobileMenuRef = useRef(null);
     
     const isOmegaAdmin = isPlatformAdmin(profile?.is_omega_admin);
@@ -82,6 +84,9 @@ export default function DashboardHeader({ profile }) {
             if (communityMenuRef.current && !communityMenuRef.current.contains(event.target)) {
                 setIsCommunityMenuOpen(false);
             }
+            if (omegaMenuRef.current && !omegaMenuRef.current.contains(event.target)) {
+                setIsOmegaMenuOpen(false);
+            }
             if (mobileMenuRef.current && !mobileMenuRef.current.contains(event.target)) {
                 setIsMobileMenuOpen(false);
             }
@@ -96,6 +101,16 @@ export default function DashboardHeader({ profile }) {
         label: 'Fund Portal',
         to: '/profile/grants-portal',
         icon: <FileText size={16} />
+    };
+
+    const omegaAdminItem = {
+        label: 'Admin Panel',
+        icon: <Crown size={16} />,
+        dropdown: [
+            { label: 'Dashboard', to: '/profile/omega-admin', icon: <Home size={14} /> },
+            { label: 'Organizations', to: '/profile/omega-admin/organizations', icon: <Building size={14} /> },
+            { label: 'Analytics', to: '/profile/omega-admin/analytics', icon: <FileText size={14} /> }
+        ]
     };
 
     const mainNavItems = [
@@ -136,7 +151,9 @@ export default function DashboardHeader({ profile }) {
             to: '/profile/my-organization',
             icon: <Building size={16} />,
             hide: isOmegaAdmin
-        }
+        },
+        // Omega Admin Panel (only for omega admins)
+        ...(isOmegaAdmin ? [omegaAdminItem] : [])
     ];
 
     const toggleMobileMenu = () => setIsMobileMenuOpen(!isMobileMenuOpen);
@@ -162,27 +179,45 @@ export default function DashboardHeader({ profile }) {
                             return (
                                 <div key={item.label} className="relative">
                                     {item.dropdown ? (
-                                        <div ref={communityMenuRef}>
+                                        <div ref={item.label === 'Community' ? communityMenuRef : item.label === 'Admin Panel' ? omegaMenuRef : null}>
                                             <button
-                                                onClick={() => setIsCommunityMenuOpen(!isCommunityMenuOpen)}
-                                                className="flex items-center space-x-2 px-3 py-2 text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors"
+                                                onClick={() => {
+                                                    if (item.label === 'Community') {
+                                                        setIsCommunityMenuOpen(!isCommunityMenuOpen);
+                                                        setIsOmegaMenuOpen(false);
+                                                    } else if (item.label === 'Admin Panel') {
+                                                        setIsOmegaMenuOpen(!isOmegaMenuOpen);
+                                                        setIsCommunityMenuOpen(false);
+                                                    }
+                                                }}
+                                                className={`flex items-center space-x-2 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
+                                                    item.label === 'Admin Panel' 
+                                                        ? 'text-purple-600 hover:text-purple-700 hover:bg-purple-50 border border-purple-200' 
+                                                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                                                }`}
                                             >
                                                 {item.icon}
                                                 <span>{item.label}</span>
                                                 <ChevronDown size={14} className="text-slate-400" />
                                             </button>
                                             
-                                            {isCommunityMenuOpen && (
+                                            {((item.label === 'Community' && isCommunityMenuOpen) || 
+                                              (item.label === 'Admin Panel' && isOmegaMenuOpen)) && (
                                                 <div className="absolute top-full left-0 mt-1 w-56 bg-white rounded-md shadow-lg border border-slate-200 py-1 z-50">
                                                     {item.dropdown.map((dropdownItem) => (
                                                         <NavLink
                                                             key={dropdownItem.to}
                                                             to={dropdownItem.to}
-                                                            onClick={() => setIsCommunityMenuOpen(false)}
+                                                            onClick={() => {
+                                                                setIsCommunityMenuOpen(false);
+                                                                setIsOmegaMenuOpen(false);
+                                                            }}
                                                             className={({ isActive }) =>
                                                                 `flex items-center space-x-2 w-full text-left px-4 py-2 text-sm transition-colors ${
                                                                     isActive 
-                                                                        ? 'bg-blue-50 text-blue-600' 
+                                                                        ? item.label === 'Admin Panel' 
+                                                                            ? 'bg-purple-50 text-purple-600' 
+                                                                            : 'bg-blue-50 text-blue-600'
                                                                         : 'text-slate-700 hover:bg-slate-100'
                                                                 }`
                                                             }
@@ -252,14 +287,26 @@ export default function DashboardHeader({ profile }) {
                                 aria-label="Profile Menu"
                             >
                                 {profile?.avatar_url ? (
-                                    <img 
-                                        src={profile.avatar_url} 
-                                        alt={profile.display_name || 'Profile'} 
-                                        className="w-8 h-8 rounded-full object-cover"
-                                    />
+                                    <div className="relative">
+                                        <img 
+                                            src={profile.avatar_url} 
+                                            alt={profile.display_name || 'Profile'} 
+                                            className="w-8 h-8 rounded-full object-cover"
+                                        />
+                                        {isOmegaAdmin && (
+                                            <div className="absolute -top-1 -right-1 w-4 h-4 bg-purple-500 rounded-full flex items-center justify-center">
+                                                <Crown size={10} className="text-white" />
+                                            </div>
+                                        )}
+                                    </div>
                                 ) : (
-                                    <div className="w-8 h-8 bg-slate-300 rounded-full flex items-center justify-center">
+                                    <div className="relative w-8 h-8 bg-slate-300 rounded-full flex items-center justify-center">
                                         <User size={16} className="text-slate-600" />
+                                        {isOmegaAdmin && (
+                                            <div className="absolute -top-1 -right-1 w-4 h-4 bg-purple-500 rounded-full flex items-center justify-center">
+                                                <Crown size={10} className="text-white" />
+                                            </div>
+                                        )}
                                     </div>
                                 )}
                                 <ChevronDown size={14} className="text-slate-400 hidden sm:block" />
@@ -268,9 +315,17 @@ export default function DashboardHeader({ profile }) {
                             {isUserMenuOpen && (
                                 <div className="absolute right-0 mt-2 w-56 bg-white rounded-md shadow-lg border border-slate-200 py-1 z-50">
                                     <div className="px-4 py-3 border-b border-slate-100">
-                                        <p className="text-sm font-semibold text-slate-800 truncate">
-                                            {profile?.full_name || 'User'}
-                                        </p>
+                                        <div className="flex items-center space-x-2">
+                                            <p className="text-sm font-semibold text-slate-800 truncate">
+                                                {profile?.full_name || 'User'}
+                                            </p>
+                                            {isOmegaAdmin && (
+                                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                                                    <Crown size={10} className="mr-1" />
+                                                    Admin
+                                                </span>
+                                            )}
+                                        </div>
                                         <p className="text-xs text-slate-500 truncate">
                                             {profile?.email}
                                         </p>
@@ -290,6 +345,15 @@ export default function DashboardHeader({ profile }) {
                                         >
                                             <User size={14} className="mr-2" /> Profile
                                         </Link>
+                                        {isOmegaAdmin && (
+                                            <Link 
+                                                to="/profile/omega-admin" 
+                                                onClick={() => setIsUserMenuOpen(false)}
+                                                className="flex items-center w-full text-left px-4 py-2 text-sm text-purple-700 hover:bg-purple-50"
+                                            >
+                                                <Crown size={14} className="mr-2" /> Admin Panel
+                                            </Link>
+                                        )}
                                         <Link 
                                             to="/profile/settings" 
                                             onClick={() => setIsUserMenuOpen(false)}
@@ -364,21 +428,35 @@ export default function DashboardHeader({ profile }) {
                         {/* User Info */}
                         <div className="p-4 border-b border-slate-200">
                             <div className="flex items-center space-x-3">
-                                {profile?.avatar_url ? (
-                                    <img 
-                                        src={profile.avatar_url} 
-                                        alt={profile.display_name || 'Profile'} 
-                                        className="w-12 h-12 rounded-full object-cover"
-                                    />
-                                ) : (
-                                    <div className="w-12 h-12 bg-slate-300 rounded-full flex items-center justify-center">
-                                        <User size={20} className="text-slate-600" />
-                                    </div>
-                                )}
+                                <div className="relative">
+                                    {profile?.avatar_url ? (
+                                        <img 
+                                            src={profile.avatar_url} 
+                                            alt={profile.display_name || 'Profile'} 
+                                            className="w-12 h-12 rounded-full object-cover"
+                                        />
+                                    ) : (
+                                        <div className="w-12 h-12 bg-slate-300 rounded-full flex items-center justify-center">
+                                            <User size={20} className="text-slate-600" />
+                                        </div>
+                                    )}
+                                    {isOmegaAdmin && (
+                                        <div className="absolute -top-1 -right-1 w-5 h-5 bg-purple-500 rounded-full flex items-center justify-center">
+                                            <Crown size={12} className="text-white" />
+                                        </div>
+                                    )}
+                                </div>
                                 <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-medium text-slate-900 truncate">
-                                        {profile?.full_name || 'User'}
-                                    </p>
+                                    <div className="flex items-center space-x-2">
+                                        <p className="text-sm font-medium text-slate-900 truncate">
+                                            {profile?.full_name || 'User'}
+                                        </p>
+                                        {isOmegaAdmin && (
+                                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800">
+                                                Admin
+                                            </span>
+                                        )}
+                                    </div>
                                     <p className="text-xs text-slate-500 truncate">
                                         {profile?.email}
                                     </p>
@@ -401,15 +479,26 @@ export default function DashboardHeader({ profile }) {
                                     <div key={item.label}>
                                         {item.dropdown ? (
                                             <>
-                                                <div className="px-3 py-2 text-sm font-medium text-slate-900 bg-slate-50 rounded-lg">
-                                                    {item.label}
+                                                <div className={`px-3 py-2 text-sm font-medium rounded-lg ${
+                                                    item.label === 'Admin Panel' 
+                                                        ? 'text-purple-900 bg-purple-50 border border-purple-200' 
+                                                        : 'text-slate-900 bg-slate-50'
+                                                }`}>
+                                                    <div className="flex items-center space-x-2">
+                                                        {item.icon}
+                                                        <span>{item.label}</span>
+                                                    </div>
                                                 </div>
                                                 {item.dropdown.map((dropdownItem) => (
                                                     <Link
                                                         key={dropdownItem.to}
                                                         to={dropdownItem.to}
                                                         onClick={closeMobileMenu}
-                                                        className="flex items-center space-x-3 w-full px-6 py-2 text-sm text-slate-700 hover:bg-slate-100 rounded-lg"
+                                                        className={`flex items-center space-x-3 w-full px-6 py-2 text-sm rounded-lg ${
+                                                            item.label === 'Admin Panel'
+                                                                ? 'text-purple-700 hover:bg-purple-50'
+                                                                : 'text-slate-700 hover:bg-slate-100'
+                                                        }`}
                                                     >
                                                         {dropdownItem.icon}
                                                         <span>{dropdownItem.label}</span>

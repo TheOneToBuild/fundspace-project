@@ -1,4 +1,4 @@
-// src/components/OmegaAdminManageMembers.jsx - Complete with Super Admin support
+// src/components/OmegaAdminManageMembers.jsx - FIXED: Use unified organizations table
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useOutletContext, Link } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
@@ -99,30 +99,12 @@ export default function OmegaAdminManageMembers() {
             setLoading(true);
             setError('');
             
-            const tableName = orgType === 'nonprofit' ? 'nonprofits' : 'funders';
-            
-            // FIXED: Convert orgId to number for database query
-            const organizationId = parseInt(orgId, 10);
-            
-            if (isNaN(organizationId)) {
-                throw new Error('Invalid organization ID');
-            }
-            
-            // FIXED: Use correct columns based on the schema
-            let selectColumns = 'id, name, slug';
-            
-            if (orgType === 'nonprofit') {
-                // For nonprofits: id, name, tagline, slug, image_url
-                selectColumns += ', tagline, image_url';
-            } else {
-                // For funders: id, name, slug, logo_url (NO tagline column)
-                selectColumns += ', logo_url';
-            }
-            
+            // FIXED: Use unified organizations table
             const { data: orgData, error: orgError } = await supabase
-                .from(tableName)
-                .select(selectColumns)
-                .eq('id', organizationId) // Use converted number
+                .from('organizations')
+                .select('id, name, type, slug, tagline, image_url')
+                .eq('id', parseInt(orgId, 10))
+                .eq('type', orgType)
                 .single();
 
             if (orgError) throw orgError;
@@ -130,7 +112,7 @@ export default function OmegaAdminManageMembers() {
 
             setOrganization({ ...orgData, type: orgType });
 
-            // Fetch organization members - FIXED: Use converted number for organization_id
+            // Fetch organization members
             const { data: memberData, error: memberError } = await supabase
                 .from('organization_memberships')
                 .select(`
@@ -143,7 +125,7 @@ export default function OmegaAdminManageMembers() {
                         is_omega_admin
                     )
                 `)
-                .eq('organization_id', organizationId) // Use converted number
+                .eq('organization_id', parseInt(orgId, 10))
                 .eq('organization_type', orgType)
                 .order('role', { ascending: false })
                 .order('joined_at', { ascending: true });
@@ -175,22 +157,19 @@ export default function OmegaAdminManageMembers() {
                 return;
             }
 
-            // FIXED: Convert orgId to number for database query
-            const organizationId = parseInt(orgId, 10);
-
             const { error: updateError } = await supabase
                 .from('organization_memberships')
                 .update({ role: newRole })
                 .eq('profile_id', member.profile_id)
-                .eq('organization_id', organizationId); // Use converted number
+                .eq('organization_id', parseInt(orgId, 10))
+                .eq('organization_type', orgType);
 
             if (updateError) throw updateError;
 
-            setSuccess(`Successfully updated ${member.profiles.full_name} to ${getRoleDisplayName(newRole)}`);
-            await fetchOrganizationAndMembers();
+            setSuccess(`Successfully updated ${member.profiles.full_name}'s role to ${getRoleDisplayName(newRole)}`);
             
-            // Clear success message after 3 seconds
-            setTimeout(() => setSuccess(''), 3000);
+            // Refresh members list
+            fetchOrganizationAndMembers();
             
         } catch (err) {
             console.error('Error updating member role:', err);
@@ -204,28 +183,19 @@ export default function OmegaAdminManageMembers() {
             setError('');
             setSuccess('');
 
-            // Check permissions before attempting
-            if (!isOmegaAdmin && currentUserRole !== ROLES.SUPER_ADMIN) {
-                setError('You do not have permission to remove members.');
-                return;
-            }
-
-            // FIXED: Convert orgId to number for database query
-            const organizationId = parseInt(orgId, 10);
-
-            const { error: deleteError } = await supabase
+            const { error: removeError } = await supabase
                 .from('organization_memberships')
                 .delete()
                 .eq('profile_id', member.profile_id)
-                .eq('organization_id', organizationId); // Use converted number
+                .eq('organization_id', parseInt(orgId, 10))
+                .eq('organization_type', orgType);
 
-            if (deleteError) throw deleteError;
+            if (removeError) throw removeError;
 
             setSuccess(`Successfully removed ${member.profiles.full_name} from the organization`);
-            await fetchOrganizationAndMembers();
             
-            // Clear success message after 3 seconds
-            setTimeout(() => setSuccess(''), 3000);
+            // Refresh members list
+            fetchOrganizationAndMembers();
             
         } catch (err) {
             console.error('Error removing member:', err);
@@ -252,7 +222,7 @@ export default function OmegaAdminManageMembers() {
         });
     };
 
-    const executeAction = async () => {
+    const handleConfirmAction = async () => {
         const { type, member, newRole } = confirmModal;
         
         if (type === 'remove') {
@@ -266,21 +236,23 @@ export default function OmegaAdminManageMembers() {
 
     // Filter and sort members
     const filteredAndSortedMembers = useMemo(() => {
-        let filtered = members.filter(member => {
-            const matchesSearch = !searchQuery || 
-                member.profiles?.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                member.profiles?.title?.toLowerCase().includes(searchQuery.toLowerCase());
-            
-            const matchesRole = roleFilter === 'all' || 
-                              (roleFilter === 'omega_admin' && member.profiles?.is_omega_admin) ||
-                              (roleFilter === 'super_admin' && member.role === ROLES.SUPER_ADMIN && !member.profiles?.is_omega_admin) ||
-                              (roleFilter === 'admin' && member.role === ROLES.ADMIN) ||
-                              (roleFilter === 'member' && member.role === ROLES.MEMBER);
-            
-            return matchesSearch && matchesRole;
-        });
+        let filtered = members;
 
-        // Sort the filtered results
+        // Apply search filter
+        if (searchQuery) {
+            filtered = filtered.filter(member =>
+                member.profiles?.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                member.profiles?.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                member.role?.toLowerCase().includes(searchQuery.toLowerCase())
+            );
+        }
+
+        // Apply role filter
+        if (roleFilter !== 'all') {
+            filtered = filtered.filter(member => member.role === roleFilter);
+        }
+
+        // Sort members
         filtered.sort((a, b) => {
             let aValue, bValue;
             
@@ -295,12 +267,8 @@ export default function OmegaAdminManageMembers() {
                     break;
                 case 'role':
                 default:
-                    // Custom role sorting: omega_admin > super_admin > admin > member
-                    const roleOrder = {
-                        [ROLES.SUPER_ADMIN]: 3,
-                        [ROLES.ADMIN]: 2,
-                        [ROLES.MEMBER]: 1
-                    };
+                    // Custom role ordering: super_admin > admin > member, omega_admin always first
+                    const roleOrder = { 'super_admin': 3, 'admin': 2, 'member': 1 };
                     aValue = a.profiles?.is_omega_admin ? 4 : roleOrder[a.role] || 0;
                     bValue = b.profiles?.is_omega_admin ? 4 : roleOrder[b.role] || 0;
                     break;
@@ -375,7 +343,7 @@ export default function OmegaAdminManageMembers() {
                     <p className="text-red-600 mb-4">{error}</p>
                     <Link 
                         to="/profile/omega-admin/organizations"
-                        className="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+                        className="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
                     >
                         <ArrowLeft className="w-4 h-4 mr-2" />
                         Back to Organizations
@@ -395,32 +363,30 @@ export default function OmegaAdminManageMembers() {
                             <Star className="w-6 h-6" />
                         </div>
                         <div>
-                            <h1 className="text-2xl font-bold">Manage Organization Members</h1>
+                            <h1 className="text-2xl font-bold">Manage Members</h1>
                             <p className="text-purple-100 mt-1">
-                                {organization?.name} ({organization?.type === 'nonprofit' ? 'Nonprofit' : 'Funder'}) • {members.length} members
+                                {organization?.name} - {members.length} member{members.length !== 1 ? 's' : ''}
                             </p>
                         </div>
                     </div>
-                    <div className="flex items-center space-x-3">
-                        <Link
-                            to={`/profile/omega-admin/organizations/edit/${organization?.type}/${organization?.id}`}
-                            className="inline-flex items-center px-4 py-2 bg-white/20 text-white rounded-lg hover:bg-white/30 transition-colors text-sm font-medium"
-                        >
-                            <Building2 className="w-4 h-4 mr-2" />
-                            Edit Organization
-                        </Link>
-                        <Link
-                            to="/profile/omega-admin/organizations"
-                            className="inline-flex items-center px-4 py-2 bg-white/20 text-white rounded-lg hover:bg-white/30 transition-colors text-sm font-medium"
-                        >
-                            <ArrowLeft className="w-4 h-4 mr-2" />
-                            Back
-                        </Link>
-                    </div>
+                    <Link 
+                        to="/profile/omega-admin/organizations"
+                        className="inline-flex items-center px-4 py-2 bg-white/20 text-white rounded-lg hover:bg-white/30"
+                    >
+                        <ArrowLeft className="w-4 h-4 mr-2" />
+                        Back to Organizations
+                    </Link>
                 </div>
             </div>
 
-            {/* Success/Error Messages */}
+            {/* Messages */}
+            {error && (
+                <div className="p-4 bg-red-50 text-red-700 border border-red-200 rounded-lg flex items-center">
+                    <AlertTriangle className="w-5 h-5 mr-3 flex-shrink-0"/>
+                    <span>{error}</span>
+                </div>
+            )}
+
             {success && (
                 <div className="p-4 bg-green-50 text-green-700 border border-green-200 rounded-lg flex items-center">
                     <CheckCircle className="w-5 h-5 mr-3 flex-shrink-0"/>
@@ -428,185 +394,158 @@ export default function OmegaAdminManageMembers() {
                 </div>
             )}
 
-            {error && (
-                <div className="p-4 bg-red-50 text-red-700 border border-red-200 rounded-lg flex items-center">
-                    <XCircle className="w-5 h-5 mr-3 flex-shrink-0"/>
-                    <span>{error}</span>
-                </div>
-            )}
-
             {/* Filters and Search */}
             <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-                    <div className="flex flex-col sm:flex-row gap-3 flex-1">
-                        {/* Search */}
-                        <div className="relative flex-1 max-w-md">
-                            <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" />
+                <div className="flex flex-col sm:flex-row gap-4">
+                    {/* Search */}
+                    <div className="flex-1">
+                        <div className="relative">
+                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={20} />
                             <input
                                 type="text"
-                                placeholder="Search members by name, email, or title..."
+                                placeholder="Search members by name, title, or role..."
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                className="pl-10 pr-4 py-2 w-full border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
                             />
                         </div>
+                    </div>
 
-                        {/* Role Filter */}
+                    {/* Role Filter */}
+                    <div className="flex items-center space-x-2">
+                        <Filter size={16} className="text-slate-500" />
                         <select
                             value={roleFilter}
                             onChange={(e) => setRoleFilter(e.target.value)}
-                            className="px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                            className="px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
                         >
                             <option value="all">All Roles</option>
-                            <option value="omega_admin">Omega Admins</option>
                             <option value="super_admin">Super Admins</option>
                             <option value="admin">Admins</option>
                             <option value="member">Members</option>
                         </select>
                     </div>
 
-                    {/* Sort Controls */}
+                    {/* Sort Options */}
                     <div className="flex items-center space-x-2">
-                        <span className="text-sm text-slate-600">Sort by:</span>
                         <select
                             value={sortBy}
                             onChange={(e) => setSortBy(e.target.value)}
-                            className="px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                            className="px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
                         >
-                            <option value="role">Role</option>
-                            <option value="name">Name</option>
-                            <option value="joined">Join Date</option>
+                            <option value="role">Sort by Role</option>
+                            <option value="name">Sort by Name</option>
+                            <option value="joined">Sort by Join Date</option>
                         </select>
+                        
                         <button
                             onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
                             className="p-2 border border-slate-300 rounded-lg hover:bg-slate-50"
                         >
-                            {sortOrder === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                            {sortOrder === 'asc' ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                         </button>
                     </div>
-                </div>
-
-                <div className="mt-4 text-sm text-slate-600">
-                    Showing {filteredAndSortedMembers.length} of {members.length} members
                 </div>
             </div>
 
             {/* Members List */}
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                <div className="px-6 py-4 border-b border-slate-200">
-                    <h2 className="text-lg font-semibold text-slate-800">Organization Members</h2>
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200">
+                <div className="p-6 border-b border-slate-200">
+                    <h2 className="text-lg font-semibold text-slate-800">
+                        Members ({filteredAndSortedMembers.length})
+                    </h2>
                 </div>
 
                 {filteredAndSortedMembers.length === 0 ? (
-                    <div className="p-8 text-center text-slate-500">
-                        {searchQuery || roleFilter !== 'all' ? 'No members match your search criteria.' : 'No members found.'}
+                    <div className="p-8 text-center">
+                        <Users className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+                        <p className="text-slate-500">
+                            {searchQuery || roleFilter !== 'all' 
+                                ? 'No members found matching your filters.' 
+                                : 'No members found.'}
+                        </p>
                     </div>
                 ) : (
                     <div className="divide-y divide-slate-200">
                         {filteredAndSortedMembers.map((member) => (
-                            <div key={member.profile_id} className="p-6 hover:bg-slate-50">
+                            <div key={member.id} className="p-6 hover:bg-slate-50">
                                 <div className="flex items-center justify-between">
-                                    {/* Member Info */}
-                                    <div className="flex items-center space-x-4 flex-1">
-                                        <Avatar 
-                                            src={member.profiles?.avatar_url} 
-                                            fullName={member.profiles?.full_name} 
-                                            size="lg" 
-                                        />
-                                        <div className="flex-1 min-w-0">
-                                            <div className="flex items-center space-x-2 mb-1">
-                                                <h3 className="text-lg font-medium text-slate-800 truncate">
+                                    <div className="flex items-center space-x-4">
+                                        {/* Avatar */}
+                                        <div className="relative">
+                                            <Avatar 
+                                                src={member.profiles?.avatar_url} 
+                                                fullName={member.profiles?.full_name} 
+                                                size="lg" 
+                                            />
+                                            {member.profiles?.is_omega_admin && (
+                                                <div className="absolute -top-1 -right-1 w-5 h-5 bg-purple-500 rounded-full flex items-center justify-center">
+                                                    <Crown size={12} className="text-white" />
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Member Info */}
+                                        <div>
+                                            <div className="flex items-center space-x-2">
+                                                <h3 className="font-semibold text-slate-800">
                                                     {member.profiles?.full_name || 'Unknown User'}
                                                 </h3>
-                                                <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getRoleBadgeColor(member.role, member.profiles?.is_omega_admin)}`}>
-                                                    {member.profiles?.is_omega_admin && <Star className="w-3 h-3 mr-1" />}
-                                                    {!member.profiles?.is_omega_admin && member.role === ROLES.SUPER_ADMIN && <Crown className="w-3 h-3 mr-1" />}
-                                                    {!member.profiles?.is_omega_admin && member.role === ROLES.ADMIN && <Shield className="w-3 h-3 mr-1" />}
-                                                    {!member.profiles?.is_omega_admin && member.role === ROLES.MEMBER && <Users className="w-3 h-3 mr-1" />}
+                                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getRoleBadgeColor(member.role, member.profiles?.is_omega_admin)}`}>
                                                     {getRoleDisplayName(member.role, member.profiles?.is_omega_admin)}
                                                 </span>
                                             </div>
                                             {member.profiles?.title && (
-                                                <p className="text-slate-600 truncate">{member.profiles.title}</p>
+                                                <p className="text-sm text-slate-600">{member.profiles.title}</p>
                                             )}
-                                            <p className="text-xs text-slate-400 mt-1">
+                                            <p className="text-xs text-slate-500">
                                                 Joined {new Date(member.joined_at).toLocaleDateString()}
                                             </p>
                                         </div>
                                     </div>
 
-                                    {/* Action Buttons - Show for manageable members */}
-                                    {!member.profiles?.is_omega_admin && currentUserRole && canAccessMemberManagement(currentUserRole, isOmegaAdmin) && (
-                                        <div className="flex items-center space-x-2 ml-4">
-                                            {/* Promote Buttons */}
-                                            {member.role === ROLES.MEMBER && canPromoteToRole(currentUserRole, ROLES.ADMIN, isOmegaAdmin) && (
+                                    {/* Actions */}
+                                    {!member.profiles?.is_omega_admin && (
+                                        <div className="flex items-center space-x-2">
+                                            {/* Role Change Buttons */}
+                                            {member.role !== 'super_admin' && canPromoteToRole(currentUserRole, 'super_admin', isOmegaAdmin) && (
                                                 <button
-                                                    onClick={() => openConfirmModal('promote', member, ROLES.ADMIN)}
-                                                    className="inline-flex items-center px-3 py-1 text-sm bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors"
-                                                    title="Promote to Admin"
+                                                    onClick={() => openConfirmModal('promote', member, 'super_admin')}
+                                                    className="inline-flex items-center px-3 py-1.5 bg-yellow-100 text-yellow-800 text-xs rounded-md hover:bg-yellow-200 transition-colors"
                                                 >
-                                                    <UserPlus className="w-4 h-4 mr-1" />
-                                                    Promote
+                                                    <Crown size={12} className="mr-1" />
+                                                    Make Super Admin
                                                 </button>
                                             )}
                                             
-                                            {member.role === ROLES.ADMIN && (
-                                                <>
-                                                    {canPromoteToRole(currentUserRole, ROLES.SUPER_ADMIN, isOmegaAdmin) && (
-                                                        <button
-                                                            onClick={() => openConfirmModal('promote', member, ROLES.SUPER_ADMIN)}
-                                                            className="inline-flex items-center px-3 py-1 text-sm bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition-colors"
-                                                            title="Promote to Super Admin"
-                                                        >
-                                                            <Crown className="w-4 h-4 mr-1" />
-                                                            Super Admin
-                                                        </button>
-                                                    )}
-                                                    {canDemoteFromRole(currentUserRole, member.role, isOmegaAdmin) && (
-                                                        <button
-                                                            onClick={() => openConfirmModal('demote', member, ROLES.MEMBER)}
-                                                            className="inline-flex items-center px-3 py-1 text-sm bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors"
-                                                            title="Demote to Member"
-                                                        >
-                                                            <UserMinus className="w-4 h-4 mr-1" />
-                                                            Demote
-                                                        </button>
-                                                    )}
-                                                </>
+                                            {member.role !== 'admin' && member.role !== 'super_admin' && canPromoteToRole(currentUserRole, 'admin', isOmegaAdmin) && (
+                                                <button
+                                                    onClick={() => openConfirmModal('promote', member, 'admin')}
+                                                    className="inline-flex items-center px-3 py-1.5 bg-blue-100 text-blue-800 text-xs rounded-md hover:bg-blue-200 transition-colors"
+                                                >
+                                                    <Shield size={12} className="mr-1" />
+                                                    Make Admin
+                                                </button>
                                             )}
                                             
-                                            {member.role === ROLES.SUPER_ADMIN && canDemoteFromRole(currentUserRole, member.role, isOmegaAdmin) && (
+                                            {member.role !== 'member' && canDemoteFromRole(currentUserRole, member.role, isOmegaAdmin) && (
                                                 <button
-                                                    onClick={() => openConfirmModal('demote', member, ROLES.ADMIN)}
-                                                    className="inline-flex items-center px-3 py-1 text-sm bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors"
-                                                    title="Demote to Admin"
+                                                    onClick={() => openConfirmModal('demote', member, 'member')}
+                                                    className="inline-flex items-center px-3 py-1.5 bg-slate-100 text-slate-800 text-xs rounded-md hover:bg-slate-200 transition-colors"
                                                 >
-                                                    <UserMinus className="w-4 h-4 mr-1" />
-                                                    Demote
+                                                    <UserMinus size={12} className="mr-1" />
+                                                    Make Member
                                                 </button>
                                             )}
 
-                                            {/* Remove Button - Available to Super Admins and Omega Admins */}
-                                            {(isOmegaAdmin || currentUserRole === ROLES.SUPER_ADMIN) && (
-                                                <button
-                                                    onClick={() => openConfirmModal('remove', member)}
-                                                    className="inline-flex items-center px-3 py-1 text-sm bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors"
-                                                    title="Remove from Organization"
-                                                >
-                                                    <Trash2 className="w-4 h-4 mr-1" />
-                                                    Remove
-                                                </button>
-                                            )}
-                                        </div>
-                                    )}
-
-                                    {/* Omega Admin indicator (no actions) */}
-                                    {member.profiles?.is_omega_admin && (
-                                        <div className="ml-4">
-                                            <span className="inline-flex items-center px-3 py-1 text-sm bg-purple-100 text-purple-700 rounded-lg">
-                                                <Star className="w-4 h-4 mr-1" />
-                                                Platform Admin
-                                            </span>
+                                            {/* Remove Button */}
+                                            <button
+                                                onClick={() => openConfirmModal('remove', member)}
+                                                className="inline-flex items-center px-3 py-1.5 bg-red-100 text-red-800 text-xs rounded-md hover:bg-red-200 transition-colors"
+                                            >
+                                                <Trash2 size={12} className="mr-1" />
+                                                Remove
+                                            </button>
                                         </div>
                                     )}
                                 </div>
@@ -619,34 +558,23 @@ export default function OmegaAdminManageMembers() {
             {/* Confirmation Modal */}
             {confirmModal.isOpen && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                    <div className="bg-white p-6 rounded-xl shadow-xl max-w-md w-full mx-4">
+                    <div className="bg-white p-6 rounded-lg max-w-md w-full mx-4">
                         <h3 className="text-lg font-semibold text-slate-800 mb-4">
-                            {confirmModal.type === 'remove' && 'Remove Member'}
-                            {confirmModal.type === 'promote' && 'Promote Member'}
-                            {confirmModal.type === 'demote' && 'Demote Member'}
+                            Confirm Action
                         </h3>
                         
-                        <div className="mb-6">
+                        <p className="text-slate-600 mb-6">
                             {confirmModal.type === 'remove' && (
-                                <p className="text-slate-600">
-                                    Are you sure you want to remove <strong>{confirmModal.member?.profiles?.full_name}</strong> from {organization?.name}? 
-                                    This action cannot be undone.
-                                </p>
+                                <>Are you sure you want to remove <strong>{confirmModal.member?.profiles?.full_name}</strong> from this organization?</>
                             )}
                             {confirmModal.type === 'promote' && (
-                                <p className="text-slate-600">
-                                    Are you sure you want to promote <strong>{confirmModal.member?.profiles?.full_name}</strong> to{' '}
-                                    <strong>{getRoleDisplayName(confirmModal.newRole)}</strong>?
-                                </p>
+                                <>Are you sure you want to promote <strong>{confirmModal.member?.profiles?.full_name}</strong> to <strong>{getRoleDisplayName(confirmModal.newRole)}</strong>?</>
                             )}
                             {confirmModal.type === 'demote' && (
-                                <p className="text-slate-600">
-                                    Are you sure you want to demote <strong>{confirmModal.member?.profiles?.full_name}</strong> to{' '}
-                                    <strong>{getRoleDisplayName(confirmModal.newRole)}</strong>?
-                                </p>
+                                <>Are you sure you want to change <strong>{confirmModal.member?.profiles?.full_name}</strong>'s role to <strong>{getRoleDisplayName(confirmModal.newRole)}</strong>?</>
                             )}
-                        </div>
-                        
+                        </p>
+
                         <div className="flex space-x-3">
                             <button
                                 onClick={closeConfirmModal}
@@ -655,18 +583,14 @@ export default function OmegaAdminManageMembers() {
                                 Cancel
                             </button>
                             <button
-                                onClick={executeAction}
-                                className={`flex-1 px-4 py-2 rounded-lg text-white font-medium ${
+                                onClick={handleConfirmAction}
+                                className={`flex-1 px-4 py-2 text-white rounded-lg ${
                                     confirmModal.type === 'remove' 
                                         ? 'bg-red-600 hover:bg-red-700' 
-                                        : confirmModal.type === 'promote'
-                                        ? 'bg-green-600 hover:bg-green-700'
-                                        : 'bg-orange-600 hover:bg-orange-700'
+                                        : 'bg-purple-600 hover:bg-purple-700'
                                 }`}
                             >
-                                {confirmModal.type === 'remove' && 'Remove Member'}
-                                {confirmModal.type === 'promote' && 'Promote'}
-                                {confirmModal.type === 'demote' && 'Demote'}
+                                {confirmModal.type === 'remove' ? 'Remove' : 'Confirm'}
                             </button>
                         </div>
                     </div>

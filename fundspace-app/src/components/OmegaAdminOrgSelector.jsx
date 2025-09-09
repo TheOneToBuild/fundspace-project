@@ -1,34 +1,35 @@
-// src/components/OmegaAdminOrgSelector.jsx - FIXED with correct column names
+// src/components/OmegaAdminOrgSelector.jsx - FIXED: Use unified organizations table
 import React, { useState, useEffect } from 'react';
-import { useOutletContext, Link } from 'react-router-dom';
+import { Link, useOutletContext } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import { 
     Star, 
     Search, 
-    Building2, 
+    Users, 
+    Edit3, 
+    Shield, 
     AlertTriangle,
-    ExternalLink,
-    Eye,
-    Edit,
-    Users,
-    UserCheck
+    Building2,
+    ChevronLeft,
+    ChevronRight
 } from 'lucide-react';
-import { isPlatformAdmin } from '../utils/permissions.js';
+import { isPlatformAdmin, getOrgTypeIcon, getOrgTypeLabel } from '../utils/permissions.js';
+
+const ITEMS_PER_PAGE = 12;
 
 export default function OmegaAdminOrgSelector() {
     const { profile } = useOutletContext();
     const [organizations, setOrganizations] = useState([]);
     const [filteredOrgs, setFilteredOrgs] = useState([]);
-    const [searchQuery, setSearchQuery] = useState('');
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
+    const [searchQuery, setSearchQuery] = useState('');
+    const [memberCounts, setMemberCounts] = useState({});
     const [currentPage, setCurrentPage] = useState(1);
     const [totalOrgs, setTotalOrgs] = useState(0);
-    const [memberCounts, setMemberCounts] = useState({});
     
-    const ITEMS_PER_PAGE = 100;
-
     const isOmegaAdmin = isPlatformAdmin(profile?.is_omega_admin);
+    const totalPages = Math.ceil(totalOrgs / ITEMS_PER_PAGE);
 
     useEffect(() => {
         if (isOmegaAdmin) {
@@ -36,15 +37,16 @@ export default function OmegaAdminOrgSelector() {
         }
     }, [isOmegaAdmin]);
 
+    // Filter organizations based on search query
     useEffect(() => {
-        // Filter organizations based on search query
         let filtered;
         if (!searchQuery.trim()) {
             filtered = organizations;
         } else {
             filtered = organizations.filter(org =>
                 org.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                org.location?.toLowerCase().includes(searchQuery.toLowerCase())
+                org.location?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                org.type?.toLowerCase().includes(searchQuery.toLowerCase())
             );
         }
         
@@ -65,7 +67,8 @@ export default function OmegaAdminOrgSelector() {
         } else {
             filtered = organizations.filter(org =>
                 org.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                org.location?.toLowerCase().includes(searchQuery.toLowerCase())
+                org.location?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                org.type?.toLowerCase().includes(searchQuery.toLowerCase())
             );
         }
         
@@ -79,43 +82,31 @@ export default function OmegaAdminOrgSelector() {
             setLoading(true);
             setError('');
             
-            // FIXED: Use correct column names for each table
-            const [nonprofitsRes, fundersRes] = await Promise.all([
-                supabase.from('nonprofits').select('id, name, location, slug, image_url').order('name'),
-                supabase.from('funders').select('id, name, location, slug, logo_url').order('name')
-            ]);
+            // FIXED: Use unified organizations table
+            const { data: organizations, error: orgsError } = await supabase
+                .from('organizations')
+                .select('id, name, type, location, slug, image_url, tagline')
+                .order('name');
 
-            if (nonprofitsRes.error) throw nonprofitsRes.error;
-            if (fundersRes.error) throw fundersRes.error;
+            if (orgsError) {
+                console.error('Error fetching organizations:', orgsError);
+                throw orgsError;
+            }
 
-            // Combine and mark type - FIXED: Map to consistent imageUrl property
-            const allOrganizations = [
-                ...nonprofitsRes.data.map(org => ({ 
-                    ...org, 
-                    type: 'nonprofit',
-                    imageUrl: org.image_url // Map image_url to imageUrl for nonprofits
-                })),
-                ...fundersRes.data.map(org => ({ 
-                    ...org, 
-                    type: 'funder',
-                    imageUrl: org.logo_url // Map logo_url to imageUrl for funders
-                }))
-            ];
+            // Transform the data to match the expected format
+            const formattedOrgs = (organizations || []).map(org => ({
+                ...org,
+                // Ensure consistent image field names
+                logo_url: org.image_url,
+                // Add type-specific formatting if needed
+                displayType: getOrgTypeLabel(org.type)
+            }));
 
-            // Sort alphabetically
-            allOrganizations.sort((a, b) => a.name.localeCompare(b.name));
-
-            setOrganizations(allOrganizations);
+            setOrganizations(formattedOrgs);
+            await fetchMemberCounts(formattedOrgs);
             
-            // Fetch member counts for each organization
-            await fetchMemberCounts(allOrganizations);
-            
-            // Set initial pagination
-            const initialDisplay = allOrganizations.slice(0, ITEMS_PER_PAGE);
-            setFilteredOrgs(initialDisplay);
-            setTotalOrgs(allOrganizations.length);
         } catch (err) {
-            console.error('Error fetching organizations:', err);
+            console.error('Error in fetchOrganizations:', err);
             setError('Failed to load organizations: ' + err.message);
         } finally {
             setLoading(false);
@@ -186,7 +177,7 @@ export default function OmegaAdminOrgSelector() {
                 </div>
             )}
 
-            {/* Quick Stats - MOVED TO TOP */}
+            {/* Quick Stats */}
             <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
                 <h3 className="text-lg font-semibold text-slate-800 mb-4">Quick Stats</h3>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -209,7 +200,7 @@ export default function OmegaAdminOrgSelector() {
                         <div className="text-sm text-slate-600">Funders</div>
                     </div>
                     <div className="text-center">
-                        <div className="text-2xl font-bold text-slate-600">
+                        <div className="text-2xl font-bold text-orange-600">
                             {Object.values(memberCounts).reduce((sum, count) => sum + count, 0)}
                         </div>
                         <div className="text-sm text-slate-600">Total Members</div>
@@ -217,181 +208,189 @@ export default function OmegaAdminOrgSelector() {
                 </div>
             </div>
 
-            {/* Search */}
+            {/* Search and Filters */}
             <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
-                    <input
-                        type="text"
-                        placeholder="Search organizations by name or location..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                    />
+                <div className="flex flex-col sm:flex-row gap-4">
+                    <div className="flex-1">
+                        <div className="relative">
+                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={20} />
+                            <input
+                                type="text"
+                                placeholder="Search organizations by name, location, or type..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                            />
+                        </div>
+                    </div>
                 </div>
+                
+                {searchQuery && (
+                    <div className="mt-4 text-sm text-slate-600">
+                        Found {totalOrgs} organization{totalOrgs !== 1 ? 's' : ''} matching "{searchQuery}"
+                    </div>
+                )}
             </div>
 
-            {/* Organizations List */}
+            {/* Organizations Grid */}
             <div className="bg-white rounded-xl shadow-sm border border-slate-200">
-                <div className="p-4 border-b border-slate-200 flex items-center justify-between">
-                    <h2 className="font-semibold text-slate-700">
-                        Organizations ({totalOrgs.toLocaleString()})
-                        {searchQuery && (
-                            <span className="text-sm font-normal text-slate-500 ml-2">
-                                - Showing {filteredOrgs.length} of {totalOrgs} results
-                            </span>
+                <div className="p-6 border-b border-slate-200">
+                    <div className="flex items-center justify-between">
+                        <h2 className="text-lg font-semibold text-slate-800">
+                            Organizations {searchQuery ? `(${totalOrgs} results)` : `(${organizations.length} total)`}
+                        </h2>
+                        
+                        {/* Pagination Info */}
+                        {totalPages > 1 && (
+                            <div className="text-sm text-slate-500">
+                                Page {currentPage} of {totalPages}
+                            </div>
                         )}
-                        {!searchQuery && totalOrgs > ITEMS_PER_PAGE && (
-                            <span className="text-sm font-normal text-slate-500 ml-2">
-                                - Page {currentPage} of {Math.ceil(totalOrgs / ITEMS_PER_PAGE)}
-                            </span>
-                        )}
-                    </h2>
+                    </div>
                 </div>
 
-                {loading && (
-                    <div className="p-6 text-center text-slate-500">
-                        Loading organizations...
+                {loading ? (
+                    <div className="p-8 text-center">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto"></div>
+                        <p className="text-slate-500 mt-2">Loading organizations...</p>
                     </div>
-                )}
-
-                {!loading && filteredOrgs.length === 0 && searchQuery && (
-                    <div className="p-6 text-center text-slate-500">
-                        No organizations found matching "{searchQuery}"
-                        <button 
-                            onClick={() => setSearchQuery('')}
-                            className="block mx-auto mt-2 text-blue-600 hover:text-blue-800 text-sm"
-                        >
-                            Clear search to see all organizations
-                        </button>
+                ) : filteredOrgs.length === 0 ? (
+                    <div className="p-8 text-center">
+                        <Building2 className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+                        <p className="text-slate-500">
+                            {searchQuery ? 'No organizations found matching your search.' : 'No organizations found.'}
+                        </p>
                     </div>
-                )}
-
-                {!loading && filteredOrgs.length === 0 && !searchQuery && (
-                    <div className="p-6 text-center text-slate-500">
-                        No organizations found.
-                    </div>
-                )}
-
-                {!loading && filteredOrgs.length > 0 && (
-                    <div className="divide-y divide-slate-200">
-                        {filteredOrgs.map((org) => {
-                            const memberCount = memberCounts[`${org.type}-${org.id}`] || 0;
-                            
-                            return (
-                                <div key={`${org.type}-${org.id}`} className="p-4 hover:bg-slate-50 transition-colors">
-                                    <div className="flex items-center justify-between gap-4">
-                                        <div className="flex items-center space-x-4 min-w-0 flex-1">
-                                            <div className="w-12 h-12 bg-slate-100 rounded-lg flex items-center justify-center overflow-hidden flex-shrink-0">
-                                                {org.imageUrl ? (
-                                                    <img 
-                                                        src={org.imageUrl} 
-                                                        alt={`${org.name} logo`}
-                                                        className="w-full h-full object-cover"
-                                                        onError={(e) => {
-                                                            e.target.style.display = 'none';
-                                                            e.target.nextSibling.style.display = 'block';
-                                                        }}
-                                                    />
-                                                ) : null}
-                                                <Building2 
-                                                    className={`w-6 h-6 text-slate-500 ${org.imageUrl ? 'hidden' : 'block'}`}
+                ) : (
+                    <>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-6">
+                            {filteredOrgs.map((org) => (
+                                <div key={`${org.type}-${org.id}`} className="bg-slate-50 rounded-lg p-4 border border-slate-200 hover:shadow-md transition-shadow">
+                                    <div className="flex items-start space-x-4">
+                                        {/* Organization Image */}
+                                        <div className="w-12 h-12 rounded-lg overflow-hidden bg-slate-200 flex-shrink-0">
+                                            {org.image_url || org.logo_url ? (
+                                                <img 
+                                                    src={org.image_url || org.logo_url} 
+                                                    alt={org.name}
+                                                    className="w-full h-full object-cover"
                                                 />
-                                            </div>
-                                            <div className="min-w-0 flex-1">
-                                                <h3 className="font-semibold text-slate-800 mb-1 truncate" title={org.name}>
-                                                    {org.name}
-                                                </h3>
-                                                <div className="flex items-center space-x-3 text-sm text-slate-500">
-                                                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium flex-shrink-0 ${
-                                                        org.type === 'nonprofit' 
-                                                            ? 'bg-blue-100 text-blue-800' 
-                                                            : 'bg-green-100 text-green-800'
-                                                    }`}>
-                                                        {org.type === 'nonprofit' ? 'Nonprofit' : 'Funder'}
-                                                    </span>
-                                                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-600 flex-shrink-0">
-                                                        <Users className="w-3 h-3 mr-1" />
-                                                        {memberCount} member{memberCount !== 1 ? 's' : ''}
-                                                    </span>
-                                                    {org.location && (
-                                                        <span className="truncate">{org.location}</span>
-                                                    )}
+                                            ) : (
+                                                <div className="w-full h-full flex items-center justify-center text-slate-400">
+                                                    <Building2 size={24} />
                                                 </div>
-                                            </div>
+                                            )}
                                         </div>
                                         
-                                        <div className="flex items-center space-x-2 flex-shrink-0">
-                                            {/* Manage Members Button - Primary Action */}
-                                            <Link
-                                                to={`/profile/omega-admin/organizations/members/${org.type}/${org.id}`}
-                                                className="inline-flex items-center px-3 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 transition-colors whitespace-nowrap"
-                                            >
-                                                <UserCheck className="w-4 h-4 mr-2" />
-                                                Manage Members
-                                            </Link>
+                                        {/* Organization Info */}
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center space-x-2 mb-1">
+                                                <h3 className="font-semibold text-slate-800 truncate">
+                                                    {org.name}
+                                                </h3>
+                                                <span className="text-lg">{getOrgTypeIcon(org.type)}</span>
+                                            </div>
                                             
-                                            {/* Edit Organization Button */}
-                                            <Link
-                                                to={`/profile/omega-admin/organizations/edit/${org.type}/${org.id}`}
-                                                className="inline-flex items-center px-3 py-2 bg-slate-600 text-white rounded-lg text-sm font-medium hover:bg-slate-700 transition-colors whitespace-nowrap"
-                                            >
-                                                <Edit className="w-4 h-4 mr-2" />
-                                                Edit Details
-                                            </Link>
+                                            <p className="text-xs text-purple-600 font-medium mb-1">
+                                                {getOrgTypeLabel(org.type)}
+                                            </p>
                                             
-                                            {/* View Profile Button */}
-                                            {org.slug ? (
-                                                <a
-                                                    href={`/${org.type === 'nonprofit' ? 'nonprofits' : 'funders'}/${org.slug}`}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="inline-flex items-center px-3 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 bg-white hover:bg-slate-50 transition-colors whitespace-nowrap"
-                                                >
-                                                    <Eye className="w-4 h-4 mr-2" />
-                                                    View Profile
-                                                    <ExternalLink className="w-3 h-3 ml-1" />
-                                                </a>
-                                            ) : (
-                                                <span className="inline-flex items-center px-3 py-2 border border-slate-300 rounded-lg text-sm text-slate-400 bg-slate-50 cursor-not-allowed whitespace-nowrap">
-                                                    <Eye className="w-4 h-4 mr-2" />
-                                                    No Profile
-                                                </span>
+                                            {org.tagline && (
+                                                <p className="text-sm text-slate-600 mb-2 line-clamp-2">
+                                                    {org.tagline}
+                                                </p>
                                             )}
+                                            
+                                            {org.location && (
+                                                <p className="text-xs text-slate-500 mb-2">
+                                                    📍 {org.location}
+                                                </p>
+                                            )}
+                                            
+                                            <div className="flex items-center space-x-4 text-xs text-slate-500 mb-3">
+                                                <span className="flex items-center">
+                                                    <Users size={12} className="mr-1" />
+                                                    {memberCounts[`${org.type}-${org.id}`] || 0} members
+                                                </span>
+                                            </div>
+                                            
+                                            {/* Action Buttons */}
+                                            <div className="flex space-x-2">
+                                                <Link
+                                                    to={`/profile/omega-admin/organizations/edit/${org.type}/${org.id}`}
+                                                    className="flex items-center px-3 py-1.5 bg-purple-600 text-white text-xs rounded-md hover:bg-purple-700 transition-colors"
+                                                >
+                                                    <Edit3 size={12} className="mr-1" />
+                                                    Edit
+                                                </Link>
+                                                <Link
+                                                    to={`/profile/omega-admin/organizations/members/${org.type}/${org.id}`}
+                                                    className="flex items-center px-3 py-1.5 bg-slate-600 text-white text-xs rounded-md hover:bg-slate-700 transition-colors"
+                                                >
+                                                    <Shield size={12} className="mr-1" />
+                                                    Members
+                                                </Link>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
-                            );
-                        })}
-                    </div>
-                )}
-
-                {/* Pagination */}
-                {!loading && !searchQuery && totalOrgs > ITEMS_PER_PAGE && (
-                    <div className="p-4 border-t border-slate-200 flex items-center justify-between">
-                        <div className="text-sm text-slate-500">
-                            Showing {((currentPage - 1) * ITEMS_PER_PAGE) + 1} to {Math.min(currentPage * ITEMS_PER_PAGE, totalOrgs)} of {totalOrgs.toLocaleString()} organizations
+                            ))}
                         </div>
-                        <div className="flex items-center space-x-2">
-                            <button
-                                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                                disabled={currentPage === 1}
-                                className="px-3 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 bg-white hover:bg-slate-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                Previous
-                            </button>
-                            <span className="px-3 py-2 text-sm text-slate-700">
-                                Page {currentPage} of {Math.ceil(totalOrgs / ITEMS_PER_PAGE)}
-                            </span>
-                            <button
-                                onClick={() => setCurrentPage(prev => Math.min(prev + 1, Math.ceil(totalOrgs / ITEMS_PER_PAGE)))}
-                                disabled={currentPage === Math.ceil(totalOrgs / ITEMS_PER_PAGE)}
-                                className="px-3 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 bg-white hover:bg-slate-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                Next
-                            </button>
-                        </div>
-                    </div>
+                        
+                        {/* Pagination */}
+                        {totalPages > 1 && (
+                            <div className="flex items-center justify-center space-x-2 p-6 border-t border-slate-200">
+                                <button
+                                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                                    disabled={currentPage === 1}
+                                    className="flex items-center px-3 py-2 text-sm border border-slate-300 rounded-md hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    <ChevronLeft size={16} className="mr-1" />
+                                    Previous
+                                </button>
+                                
+                                <div className="flex items-center space-x-1">
+                                    {[...Array(totalPages)].map((_, index) => {
+                                        const page = index + 1;
+                                        if (
+                                            page === 1 ||
+                                            page === totalPages ||
+                                            (page >= currentPage - 1 && page <= currentPage + 1)
+                                        ) {
+                                            return (
+                                                <button
+                                                    key={page}
+                                                    onClick={() => setCurrentPage(page)}
+                                                    className={`px-3 py-2 text-sm rounded-md ${
+                                                        page === currentPage
+                                                            ? 'bg-purple-600 text-white'
+                                                            : 'border border-slate-300 hover:bg-slate-50'
+                                                    }`}
+                                                >
+                                                    {page}
+                                                </button>
+                                            );
+                                        } else if (
+                                            page === currentPage - 2 ||
+                                            page === currentPage + 2
+                                        ) {
+                                            return <span key={page} className="px-2 text-slate-400">...</span>;
+                                        }
+                                        return null;
+                                    })}
+                                </div>
+                                
+                                <button
+                                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                                    disabled={currentPage === totalPages}
+                                    className="flex items-center px-3 py-2 text-sm border border-slate-300 rounded-md hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    Next
+                                    <ChevronRight size={16} className="ml-1" />
+                                </button>
+                            </div>
+                        )}
+                    </>
                 )}
             </div>
         </div>

@@ -78,11 +78,6 @@ export default function AccountDeletionSettings({ session }) {
         .delete()
         .eq('user_id', session.user.id);
 
-      // Delete profile views where user was the viewer
-      await supabase
-        .from('profile_views')
-        .delete()
-        .eq('viewer_id', session.user.id);
 
       // Step 2: Delete the profile (this will cascade due to foreign key)
       const { error: profileError } = await supabase

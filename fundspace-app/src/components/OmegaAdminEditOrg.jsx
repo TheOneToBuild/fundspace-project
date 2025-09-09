@@ -1,21 +1,27 @@
-// src/components/OmegaAdminEditOrg.jsx
+// src/components/OmegaAdminEditOrg.jsx - FIXED: Use unified organizations table
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate, Link, useOutletContext } from 'react-router-dom';
+import { useParams, useOutletContext, Link } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import { 
     Star, 
     AlertTriangle, 
-    Save, 
     ArrowLeft,
-    ExternalLink,
-    Eye
+    Save,
+    Upload,
+    X,
+    Plus,
+    MapPin,
+    Globe,
+    Mail,
+    Calendar,
+    Users,
+    DollarSign
 } from 'lucide-react';
 import { isPlatformAdmin } from '../utils/permissions.js';
 
 export default function OmegaAdminEditOrg() {
     const { profile } = useOutletContext();
     const { orgType, orgId } = useParams();
-    const navigate = useNavigate();
     
     const [organization, setOrganization] = useState({});
     const [loading, setLoading] = useState(true);
@@ -24,26 +30,12 @@ export default function OmegaAdminEditOrg() {
     const [message, setMessage] = useState('');
     const [allCategories, setAllCategories] = useState([]);
     const [selectedCategoryIds, setSelectedCategoryIds] = useState([]);
-    const [allFunderTypes, setAllFunderTypes] = useState([]);
+    const [allLocations, setAllLocations] = useState([]);
+    const [selectedLocationIds, setSelectedLocationIds] = useState([]);
     const [grantTypes, setGrantTypes] = useState([]);
     const [notablePrograms, setNotablePrograms] = useState([]);
-    const [selectedLocationIds, setSelectedLocationIds] = useState([]);
-
-    const isOmegaAdmin = isPlatformAdmin(profile?.is_omega_admin);
     
-    // Define Bay Area counties for funders
-    const BAY_AREA_COUNTIES = [
-        { id: 'alameda', name: 'Alameda County' },
-        { id: 'contra_costa', name: 'Contra Costa County' },
-        { id: 'marin', name: 'Marin County' },
-        { id: 'napa', name: 'Napa County' },
-        { id: 'san_francisco', name: 'San Francisco County' },
-        { id: 'san_mateo', name: 'San Mateo County' },
-        { id: 'santa_clara', name: 'Santa Clara County' },
-        { id: 'solano', name: 'Solano County' },
-        { id: 'sonoma', name: 'Sonoma County' },
-        { id: 'all_bay_area', name: 'All Bay Area Counties' }
-    ];
+    const isOmegaAdmin = isPlatformAdmin(profile?.is_omega_admin);
 
     useEffect(() => {
         if (isOmegaAdmin && orgType && orgId) {
@@ -56,44 +48,40 @@ export default function OmegaAdminEditOrg() {
             setLoading(true);
             setError('');
             
-            const tableName = orgType === 'nonprofit' ? 'nonprofits' : 'funders';
-            const categoryJoinTable = orgType === 'nonprofit' ? 'nonprofit_categories' : 'funder_categories';
-            const locationJoinTable = orgType === 'funder' ? 'funder_funding_locations' : null;
-            
-            // Build comprehensive query
-            let query = `*, ${categoryJoinTable}(categories(id, name))`;
-            if (orgType === 'funder') {
-                query += `, ${locationJoinTable}(locations(id, name))`;
-            }
-            
+            // FIXED: Use unified organizations table
             const { data, error: fetchError } = await supabase
-                .from(tableName)
-                .select(query)
-                .eq('id', orgId)
+                .from('organizations')
+                .select(`
+                    *,
+                    organization_categories(categories(id, name)),
+                    organization_funding_locations(locations(id, name))
+                `)
+                .eq('id', parseInt(orgId, 10))
+                .eq('type', orgType)
                 .single();
 
             if (fetchError) throw fetchError;
             if (!data) throw new Error('Organization not found');
 
-            // Fetch all categories and funder types for dropdowns
-            const [categoriesRes, funderTypesRes] = await Promise.all([
+            // Fetch all categories and locations for dropdowns
+            const [categoriesRes, locationsRes] = await Promise.all([
                 supabase.from('categories').select('id, name').order('name'),
-                orgType === 'funder' ? supabase.from('funder_types').select('id, name').order('name') : Promise.resolve({ data: [] })
+                supabase.from('locations').select('id, name').order('name')
             ]);
             
             if (categoriesRes.data) setAllCategories(categoriesRes.data);
-            if (funderTypesRes.data) setAllFunderTypes(funderTypesRes.data);
+            if (locationsRes.data) setAllLocations(locationsRes.data);
 
             setOrganization(data);
             
             // Set categories
-            if (data[categoryJoinTable]) {
-                setSelectedCategoryIds(data[categoryJoinTable].map(item => item.categories.id));
+            if (data.organization_categories) {
+                setSelectedCategoryIds(data.organization_categories.map(item => item.categories.id));
             }
             
             // Set locations (for funders)
-            if (orgType === 'funder' && data[locationJoinTable]) {
-                setSelectedLocationIds(data[locationJoinTable].map(item => item.locations.id));
+            if (orgType === 'funder' && data.organization_funding_locations) {
+                setSelectedLocationIds(data.organization_funding_locations.map(item => item.locations.id));
             }
             
             // Set grant types (for funders)
@@ -131,103 +119,105 @@ export default function OmegaAdminEditOrg() {
             setError('');
             setMessage('');
 
-            const tableName = orgType === 'nonprofit' ? 'nonprofits' : 'funders';
-            
-            // Prepare update data
-            const updateData = { ...organization };
-            
-            // Handle grant types for funders
-            if (orgType === 'funder') {
-                updateData.grant_types = grantTypes;
-            }
-            
-            // Handle notable programs for nonprofits
-            if (orgType === 'nonprofit') {
-                updateData.notable_programs = notablePrograms;
-            }
-            
+            // FIXED: Use unified organizations table
             const { error: updateError } = await supabase
-                .from(tableName)
-                .update(updateData)
-                .eq('id', orgId);
+                .from('organizations')
+                .update({
+                    name: organization.name,
+                    tagline: organization.tagline,
+                    description: organization.description,
+                    website: organization.website,
+                    location: organization.location,
+                    contact_email: organization.contact_email,
+                    image_url: organization.image_url,
+                    annual_budget: organization.annual_budget,
+                    staff_count: organization.staff_count,
+                    year_founded: organization.year_founded,
+                    // Type-specific fields
+                    ...(orgType === 'funder' && {
+                        grant_types: grantTypes,
+                        funding_areas: organization.funding_areas
+                    }),
+                    ...(orgType === 'nonprofit' && {
+                        notable_programs: notablePrograms,
+                        mission: organization.mission
+                    })
+                })
+                .eq('id', parseInt(orgId, 10))
+                .eq('type', orgType);
 
             if (updateError) throw updateError;
 
             // Update categories
-            await updateCategories();
-            
-            // Update locations (for funders only)
-            if (orgType === 'funder') {
-                await updateLocations();
+            if (selectedCategoryIds.length > 0) {
+                // Delete existing categories
+                await supabase
+                    .from('organization_categories')
+                    .delete()
+                    .eq('organization_id', parseInt(orgId, 10));
+
+                // Insert new categories
+                const categoryInserts = selectedCategoryIds.map(categoryId => ({
+                    organization_id: parseInt(orgId, 10),
+                    category_id: categoryId
+                }));
+
+                await supabase
+                    .from('organization_categories')
+                    .insert(categoryInserts);
+            }
+
+            // Update funding locations (for funders)
+            if (orgType === 'funder' && selectedLocationIds.length > 0) {
+                // Delete existing locations
+                await supabase
+                    .from('organization_funding_locations')
+                    .delete()
+                    .eq('organization_id', parseInt(orgId, 10));
+
+                // Insert new locations
+                const locationInserts = selectedLocationIds.map(locationId => ({
+                    organization_id: parseInt(orgId, 10),
+                    location_id: locationId
+                }));
+
+                await supabase
+                    .from('organization_funding_locations')
+                    .insert(locationInserts);
             }
 
             setMessage('Organization updated successfully!');
-            setTimeout(() => setMessage(''), 3000);
+            
         } catch (err) {
-            console.error('Error updating organization:', err);
-            setError('Failed to update organization: ' + err.message);
+            console.error('Error saving organization:', err);
+            setError('Failed to save changes: ' + err.message);
         } finally {
             setSaving(false);
         }
-    };
-
-    // Helper function to update categories
-    const updateCategories = async () => {
-        const categoryJoinTable = orgType === 'nonprofit' ? 'nonprofit_categories' : 'funder_categories';
-        const orgIdColumn = orgType === 'nonprofit' ? 'nonprofit_id' : 'funder_id';
-        
-        // Delete existing categories
-        await supabase.from(categoryJoinTable).delete().eq(orgIdColumn, orgId);
-        
-        // Insert new categories
-        if (selectedCategoryIds.length > 0) {
-            const categoryInserts = selectedCategoryIds.map(categoryId => ({
-                [orgIdColumn]: orgId,
-                category_id: categoryId
-            }));
-            await supabase.from(categoryJoinTable).insert(categoryInserts);
-        }
-    };
-
-    // Helper function to update locations (funders only)
-    const updateLocations = async () => {
-        if (orgType !== 'funder') return;
-        
-        // Delete existing locations
-        await supabase.from('funder_funding_locations').delete().eq('funder_id', orgId);
-        
-        // Insert new locations
-        if (selectedLocationIds.length > 0) {
-            const locationInserts = selectedLocationIds.map(locationId => ({
-                funder_id: orgId,
-                location_id: locationId
-            }));
-            await supabase.from('funder_funding_locations').insert(locationInserts);
-        }
-    };
-
-    const handleGrantTypeChange = (index, value) => {
-        const newGrantTypes = [...grantTypes];
-        newGrantTypes[index] = value;
-        setGrantTypes(newGrantTypes);
     };
 
     const addGrantType = () => {
         setGrantTypes([...grantTypes, '']);
     };
 
+    const updateGrantType = (index, value) => {
+        const updated = [...grantTypes];
+        updated[index] = value;
+        setGrantTypes(updated);
+    };
+
     const removeGrantType = (index) => {
         setGrantTypes(grantTypes.filter((_, i) => i !== index));
     };
 
-    const handleNotableProgramChange = (index, field, value) => {
-        const newPrograms = [...notablePrograms];
-        newPrograms[index] = { ...newPrograms[index], [field]: value };
-        setNotablePrograms(newPrograms);
+    const addNotableProgram = () => {
+        setNotablePrograms([...notablePrograms, '']);
     };
 
-    const addNotableProgram = () => {
-        setNotablePrograms([...notablePrograms, { name: '', description: '' }]);
+    const updateNotableProgram = (index, value) => {
+        const updated = [...notablePrograms];
+        updated[index] = value;
+        setNotablePrograms(updated);
     };
 
     const removeNotableProgram = (index) => {
@@ -293,7 +283,7 @@ export default function OmegaAdminEditOrg() {
                     <p className="text-red-600 mb-4">{error}</p>
                     <Link 
                         to="/profile/omega-admin/organizations"
-                        className="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+                        className="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
                     >
                         <ArrowLeft className="w-4 h-4 mr-2" />
                         Back to Organizations
@@ -315,40 +305,21 @@ export default function OmegaAdminEditOrg() {
                         <div>
                             <h1 className="text-2xl font-bold">Edit Organization</h1>
                             <p className="text-purple-100 mt-1">
-                                {organization.name} ({orgType === 'nonprofit' ? 'Nonprofit' : 'Funder'})
+                                {organization.name} - {orgType.charAt(0).toUpperCase() + orgType.slice(1)}
                             </p>
                         </div>
                     </div>
-                    <div className="flex items-center space-x-3">
-                        {organization.slug && (
-                            <Link
-                                to={`/${orgType === 'nonprofit' ? 'nonprofits' : 'funders'}/${organization.slug}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center px-4 py-2 bg-white/20 text-white rounded-lg hover:bg-white/30 transition-colors text-sm font-medium"
-                            >
-                                <Eye className="w-4 h-4 mr-2" />
-                                View Profile
-                                <ExternalLink className="w-3 h-3 ml-1" />
-                            </Link>
-                        )}
-                        <Link
-                            to="/profile/omega-admin/organizations"
-                            className="inline-flex items-center px-4 py-2 bg-white/20 text-white rounded-lg hover:bg-white/30 transition-colors text-sm font-medium"
-                        >
-                            <ArrowLeft className="w-4 h-4 mr-2" />
-                            Back
-                        </Link>
-                    </div>
+                    <Link 
+                        to="/profile/omega-admin/organizations"
+                        className="inline-flex items-center px-4 py-2 bg-white/20 text-white rounded-lg hover:bg-white/30"
+                    >
+                        <ArrowLeft className="w-4 h-4 mr-2" />
+                        Back to Organizations
+                    </Link>
                 </div>
             </div>
 
-            {message && (
-                <div className="p-4 bg-green-50 text-green-700 border border-green-200 rounded-lg">
-                    {message}
-                </div>
-            )}
-
+            {/* Messages */}
             {error && (
                 <div className="p-4 bg-red-50 text-red-700 border border-red-200 rounded-lg flex items-center">
                     <AlertTriangle className="w-5 h-5 mr-3 flex-shrink-0"/>
@@ -356,427 +327,343 @@ export default function OmegaAdminEditOrg() {
                 </div>
             )}
 
+            {message && (
+                <div className="p-4 bg-green-50 text-green-700 border border-green-200 rounded-lg">
+                    {message}
+                </div>
+            )}
+
             {/* Edit Form */}
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                <form onSubmit={handleSaveChanges} className="space-y-6">
-                    {/* Basic Information */}
-                    <div>
-                        <h3 className="text-lg font-semibold text-slate-800 mb-4">Basic Information</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <label htmlFor="name" className="block text-sm font-medium text-slate-700 mb-1">
-                                    Organization Name *
-                                </label>
-                                <input
-                                    type="text"
-                                    id="name"
-                                    name="name"
-                                    required
-                                    value={organization.name || ''}
-                                    onChange={handleInputChange}
-                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                                />
-                            </div>
-                            
-                            {organization.hasOwnProperty('tagline') && (
-                                <div>
-                                    <label htmlFor="tagline" className="block text-sm font-medium text-slate-700 mb-1">
-                                        Tagline
-                                    </label>
-                                    <input
-                                        type="text"
-                                        id="tagline"
-                                        name="tagline"
-                                        value={organization.tagline || ''}
-                                        onChange={handleInputChange}
-                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                                    />
-                                </div>
-                            )}
-                            
-                            <div>
-                                <label htmlFor="website" className="block text-sm font-medium text-slate-700 mb-1">
-                                    Website
-                                </label>
+            <form onSubmit={handleSaveChanges} className="space-y-6">
+                {/* Basic Information */}
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                    <h2 className="text-lg font-semibold text-slate-800 mb-4">Basic Information</h2>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-2">
+                                Organization Name *
+                            </label>
+                            <input
+                                type="text"
+                                name="name"
+                                value={organization.name || ''}
+                                onChange={handleInputChange}
+                                required
+                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-2">
+                                Tagline
+                            </label>
+                            <input
+                                type="text"
+                                name="tagline"
+                                value={organization.tagline || ''}
+                                onChange={handleInputChange}
+                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                            />
+                        </div>
+
+                        <div className="md:col-span-2">
+                            <label className="block text-sm font-medium text-slate-700 mb-2">
+                                Description
+                            </label>
+                            <textarea
+                                name="description"
+                                value={organization.description || ''}
+                                onChange={handleInputChange}
+                                rows={4}
+                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-2">
+                                Website
+                            </label>
+                            <div className="relative">
+                                <Globe className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={18} />
                                 <input
                                     type="url"
-                                    id="website"
                                     name="website"
                                     value={organization.website || ''}
                                     onChange={handleInputChange}
-                                    placeholder="https://..."
-                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                    className="w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
                                 />
                             </div>
-                            
-                            <div>
-                                <label htmlFor="location" className="block text-sm font-medium text-slate-700 mb-1">
-                                    Location
-                                </label>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-2">
+                                Contact Email
+                            </label>
+                            <div className="relative">
+                                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={18} />
+                                <input
+                                    type="email"
+                                    name="contact_email"
+                                    value={organization.contact_email || ''}
+                                    onChange={handleInputChange}
+                                    className="w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                                />
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-2">
+                                Location
+                            </label>
+                            <div className="relative">
+                                <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={18} />
                                 <input
                                     type="text"
-                                    id="location"
                                     name="location"
                                     value={organization.location || ''}
                                     onChange={handleInputChange}
-                                    placeholder="City, State"
-                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                    className="w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
                                 />
                             </div>
-                            
-                            {organization.hasOwnProperty('contact_email') && (
-                                <div>
-                                    <label htmlFor="contact_email" className="block text-sm font-medium text-slate-700 mb-1">
-                                        Contact Email
-                                    </label>
-                                    <input
-                                        type="email"
-                                        id="contact_email"
-                                        name="contact_email"
-                                        value={organization.contact_email || ''}
-                                        onChange={handleInputChange}
-                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                                    />
-                                </div>
-                            )}
-                            
-                            <div>
-                                <label htmlFor="slug" className="block text-sm font-medium text-slate-700 mb-1">
-                                    URL Slug
-                                </label>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-2">
+                                Image URL
+                            </label>
+                            <input
+                                type="url"
+                                name="image_url"
+                                value={organization.image_url || ''}
+                                onChange={handleInputChange}
+                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                            />
+                        </div>
+                    </div>
+                </div>
+
+                {/* Organization Details */}
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                    <h2 className="text-lg font-semibold text-slate-800 mb-4">Organization Details</h2>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-2">
+                                Annual Budget
+                            </label>
+                            <div className="relative">
+                                <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={18} />
                                 <input
                                     type="text"
-                                    id="slug"
-                                    name="slug"
-                                    value={organization.slug || ''}
+                                    name="annual_budget"
+                                    value={organization.annual_budget || ''}
                                     onChange={handleInputChange}
-                                    placeholder="organization-name"
-                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                    className="w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
                                 />
-                                <p className="text-xs text-slate-500 mt-1">
-                                    Used in the public profile URL: /{orgType}s/{organization.slug || 'organization-name'}
-                                </p>
                             </div>
                         </div>
-                    </div>
 
-                    {/* Description */}
-                    <div>
-                        <label htmlFor="description" className="block text-sm font-medium text-slate-700 mb-1">
-                            Description
-                        </label>
-                        <textarea
-                            id="description"
-                            name="description"
-                            rows={4}
-                            value={organization.description || ''}
-                            onChange={handleInputChange}
-                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                            placeholder="Describe the organization's mission and activities..."
-                        />
-                    </div>
-
-                    {/* Categories/Focus Areas */}
-                    <div>
-                        <h3 className="text-lg font-semibold text-slate-800 mb-4">Focus Areas</h3>
-                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 max-h-48 overflow-y-auto border border-slate-300 rounded-lg p-4">
-                            {allCategories.map(category => (
-                                <label key={category.id} className="flex items-center space-x-2 cursor-pointer">
-                                    <input
-                                        type="checkbox"
-                                        checked={selectedCategoryIds.includes(category.id)}
-                                        onChange={(e) => {
-                                            if (e.target.checked) {
-                                                setSelectedCategoryIds([...selectedCategoryIds, category.id]);
-                                            } else {
-                                                setSelectedCategoryIds(selectedCategoryIds.filter(id => id !== category.id));
-                                            }
-                                        }}
-                                        className="rounded border-slate-300"
-                                    />
-                                    <span className="text-sm text-slate-700">{category.name}</span>
-                                </label>
-                            ))}
-                        </div>
-                    </div>
-
-                    {/* Nonprofit-specific fields */}
-                    {orgType === 'nonprofit' && (
                         <div>
-                            <h3 className="text-lg font-semibold text-slate-800 mb-4">Nonprofit Details</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                <div>
-                                    <label htmlFor="budget" className="block text-sm font-medium text-slate-700 mb-1">
-                                        Annual Budget
-                                    </label>
-                                    <input
-                                        type="text"
-                                        id="budget"
-                                        name="budget"
-                                        value={organization.budget || ''}
-                                        onChange={handleInputChange}
-                                        placeholder="e.g., $500K - $1M"
-                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                                    />
-                                </div>
-                                
-                                <div>
-                                    <label htmlFor="staff_count" className="block text-sm font-medium text-slate-700 mb-1">
-                                        Staff Count
-                                    </label>
-                                    <input
-                                        type="number"
-                                        id="staff_count"
-                                        name="staff_count"
-                                        value={organization.staff_count || ''}
-                                        onChange={handleInputChange}
-                                        min="0"
-                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                                    />
-                                </div>
-                                
-                                <div>
-                                    <label htmlFor="year_founded" className="block text-sm font-medium text-slate-700 mb-1">
-                                        Year Founded
-                                    </label>
-                                    <input
-                                        type="number"
-                                        id="year_founded"
-                                        name="year_founded"
-                                        value={organization.year_founded || ''}
-                                        onChange={handleInputChange}
-                                        min="1800"
-                                        max={new Date().getFullYear()}
-                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                                    />
-                                </div>
+                            <label className="block text-sm font-medium text-slate-700 mb-2">
+                                Staff Count
+                            </label>
+                            <div className="relative">
+                                <Users className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={18} />
+                                <input
+                                    type="number"
+                                    name="staff_count"
+                                    value={organization.staff_count || ''}
+                                    onChange={handleInputChange}
+                                    className="w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                                />
                             </div>
-                            
-                            <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                    <label htmlFor="ein" className="block text-sm font-medium text-slate-700 mb-1">
-                                        EIN (Tax ID)
-                                    </label>
-                                    <input
-                                        type="text"
-                                        id="ein"
-                                        name="ein"
-                                        value={organization.ein || ''}
-                                        onChange={handleInputChange}
-                                        placeholder="XX-XXXXXXX"
-                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                                    />
-                                </div>
-                                
-                                <div>
-                                    <label htmlFor="impact_metric" className="block text-sm font-medium text-slate-700 mb-1">
-                                        Key Impact Metric
-                                    </label>
-                                    <input
-                                        type="text"
-                                        id="impact_metric"
-                                        name="impact_metric"
-                                        value={organization.impact_metric || ''}
-                                        onChange={handleInputChange}
-                                        placeholder="e.g., Served 500+ families in 2023"
-                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                                    />
-                                </div>
-                            </div>
+                        </div>
 
-                            {/* Notable Programs */}
-                            <div className="mt-4">
-                                <label className="block text-sm font-medium text-slate-700 mb-2">
-                                    Notable Programs & Initiatives
-                                </label>
-                                {notablePrograms.map((program, index) => (
-                                    <div key={index} className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3 p-3 border border-slate-200 rounded-lg">
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-2">
+                                Year Founded
+                            </label>
+                            <div className="relative">
+                                <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={18} />
+                                <input
+                                    type="number"
+                                    name="year_founded"
+                                    value={organization.year_founded || ''}
+                                    onChange={handleInputChange}
+                                    className="w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                                />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Categories */}
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                    <h2 className="text-lg font-semibold text-slate-800 mb-4">Categories</h2>
+                    
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                        {allCategories.map((category) => (
+                            <label key={category.id} className="flex items-center space-x-2 p-2 rounded-lg hover:bg-slate-50">
+                                <input
+                                    type="checkbox"
+                                    checked={selectedCategoryIds.includes(category.id)}
+                                    onChange={(e) => {
+                                        if (e.target.checked) {
+                                            setSelectedCategoryIds([...selectedCategoryIds, category.id]);
+                                        } else {
+                                            setSelectedCategoryIds(selectedCategoryIds.filter(id => id !== category.id));
+                                        }
+                                    }}
+                                    className="rounded border-slate-300 text-purple-600 focus:ring-purple-500"
+                                />
+                                <span className="text-sm text-slate-700">{category.name}</span>
+                            </label>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Funder-specific fields */}
+                {orgType === 'funder' && (
+                    <>
+                        {/* Funding Locations */}
+                        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                            <h2 className="text-lg font-semibold text-slate-800 mb-4">Funding Locations</h2>
+                            
+                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                                {allLocations.map((location) => (
+                                    <label key={location.id} className="flex items-center space-x-2 p-2 rounded-lg hover:bg-slate-50">
                                         <input
-                                            type="text"
-                                            placeholder="Program name"
-                                            value={program.name || ''}
-                                            onChange={(e) => handleNotableProgramChange(index, 'name', e.target.value)}
-                                            className="px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                            type="checkbox"
+                                            checked={selectedLocationIds.includes(location.id)}
+                                            onChange={(e) => {
+                                                if (e.target.checked) {
+                                                    setSelectedLocationIds([...selectedLocationIds, location.id]);
+                                                } else {
+                                                    setSelectedLocationIds(selectedLocationIds.filter(id => id !== location.id));
+                                                }
+                                            }}
+                                            className="rounded border-slate-300 text-purple-600 focus:ring-purple-500"
                                         />
-                                        <div className="flex gap-2">
-                                            <input
-                                                type="text"
-                                                placeholder="Brief description"
-                                                value={program.description || ''}
-                                                onChange={(e) => handleNotableProgramChange(index, 'description', e.target.value)}
-                                                className="flex-1 px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                                            />
-                                            <button
-                                                type="button"
-                                                onClick={() => removeNotableProgram(index)}
-                                                className="px-3 py-2 text-red-600 hover:bg-red-50 border border-red-300 rounded-lg"
-                                            >
-                                                Remove
-                                            </button>
-                                        </div>
-                                    </div>
+                                        <span className="text-sm text-slate-700">{location.name}</span>
+                                    </label>
                                 ))}
+                            </div>
+                        </div>
+
+                        {/* Grant Types */}
+                        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                            <div className="flex items-center justify-between mb-4">
+                                <h2 className="text-lg font-semibold text-slate-800">Grant Types</h2>
                                 <button
                                     type="button"
-                                    onClick={addNotableProgram}
-                                    className="px-4 py-2 text-purple-600 hover:bg-purple-50 border border-purple-300 rounded-lg"
+                                    onClick={addGrantType}
+                                    className="flex items-center px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
                                 >
-                                    + Add Program
+                                    <Plus size={16} className="mr-1" />
+                                    Add Grant Type
                                 </button>
                             </div>
-                        </div>
-                    )}
-
-                    {/* Funder-specific fields */}
-                    {orgType === 'funder' && (
-                        <div>
-                            <h3 className="text-lg font-semibold text-slate-800 mb-4">Funder Details</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                    <label htmlFor="total_funding_annually" className="block text-sm font-medium text-slate-700 mb-1">
-                                        Total Annual Funding
-                                    </label>
-                                    <input
-                                        type="text"
-                                        id="total_funding_annually"
-                                        name="total_funding_annually"
-                                        value={organization.total_funding_annually || ''}
-                                        onChange={handleInputChange}
-                                        placeholder="e.g., $1M - $5M"
-                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                                    />
-                                </div>
-                                
-                                <div>
-                                    <label htmlFor="average_grant_size" className="block text-sm font-medium text-slate-700 mb-1">
-                                        Average Grant Size
-                                    </label>
-                                    <input
-                                        type="text"
-                                        id="average_grant_size"
-                                        name="average_grant_size"
-                                        value={organization.average_grant_size || ''}
-                                        onChange={handleInputChange}
-                                        placeholder="e.g., $50K - $100K"
-                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                                    />
-                                </div>
-                            </div>
-
-                            {/* Funder Type */}
-                            <div className="mt-4">
-                                <label htmlFor="funder_type_id" className="block text-sm font-medium text-slate-700 mb-1">
-                                    Funder Type
-                                </label>
-                                <select
-                                    id="funder_type_id"
-                                    name="funder_type_id"
-                                    value={organization.funder_type_id || ''}
-                                    onChange={handleInputChange}
-                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                                >
-                                    <option value="">Select funder type...</option>
-                                    {allFunderTypes.map(type => (
-                                        <option key={type.id} value={type.id}>{type.name}</option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            {/* Grant Types */}
-                            <div className="mt-4">
-                                <label className="block text-sm font-medium text-slate-700 mb-2">
-                                    Grant Types Offered
-                                </label>
+                            
+                            <div className="space-y-3">
                                 {grantTypes.map((grantType, index) => (
-                                    <div key={index} className="flex gap-2 mb-2">
+                                    <div key={index} className="flex items-center space-x-3">
                                         <input
                                             type="text"
-                                            placeholder="e.g., Operating Support, Capital Projects"
                                             value={grantType}
-                                            onChange={(e) => handleGrantTypeChange(index, e.target.value)}
-                                            className="flex-1 px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                            onChange={(e) => updateGrantType(index, e.target.value)}
+                                            placeholder="Enter grant type"
+                                            className="flex-1 px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
                                         />
                                         <button
                                             type="button"
                                             onClick={() => removeGrantType(index)}
-                                            className="px-3 py-2 text-red-600 hover:bg-red-50 border border-red-300 rounded-lg"
+                                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
                                         >
-                                            Remove
+                                            <X size={16} />
                                         </button>
                                     </div>
                                 ))}
-                                <button
-                                    type="button"
-                                    onClick={addGrantType}
-                                    className="px-4 py-2 text-purple-600 hover:bg-purple-50 border border-purple-300 rounded-lg"
-                                >
-                                    + Add Grant Type
-                                </button>
-                            </div>
-
-                            {/* Geographic Scope */}
-                            <div className="mt-4">
-                                <label className="block text-sm font-medium text-slate-700 mb-2">
-                                    Geographic Funding Scope
-                                </label>
-                                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 max-h-48 overflow-y-auto border border-slate-300 rounded-lg p-4">
-                                    {BAY_AREA_COUNTIES.map(county => (
-                                        <label key={county.id} className="flex items-center space-x-2 cursor-pointer">
-                                            <input
-                                                type="checkbox"
-                                                checked={selectedLocationIds.includes(county.id)}
-                                                onChange={(e) => {
-                                                    if (e.target.checked) {
-                                                        setSelectedLocationIds([...selectedLocationIds, county.id]);
-                                                    } else {
-                                                        setSelectedLocationIds(selectedLocationIds.filter(id => id !== county.id));
-                                                    }
-                                                }}
-                                                className="rounded border-slate-300"
-                                            />
-                                            <span className="text-sm text-slate-700">{county.name}</span>
-                                        </label>
-                                    ))}
-                                </div>
-                            </div>
-
-                            {/* Application Process Summary */}
-                            <div className="mt-4">
-                                <label htmlFor="application_process_summary" className="block text-sm font-medium text-slate-700 mb-1">
-                                    Application Process Summary
-                                </label>
-                                <textarea
-                                    id="application_process_summary"
-                                    name="application_process_summary"
-                                    rows={3}
-                                    value={organization.application_process_summary || ''}
-                                    onChange={handleInputChange}
-                                    placeholder="Describe your application process, deadlines, and requirements..."
-                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                                />
                             </div>
                         </div>
-                    )}
+                    </>
+                )}
 
-                    {/* Save Button */}
-                    <div className="flex items-center justify-end space-x-3 pt-6 border-t border-slate-200">
-                        <Link
-                            to="/profile/omega-admin/organizations"
-                            className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 transition-colors"
-                        >
-                            Cancel
-                        </Link>
-                        <button
-                            type="submit"
-                            disabled={saving}
-                            className="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            <Save className="w-4 h-4 mr-2" />
-                            {saving ? 'Saving...' : 'Save Changes'}
-                        </button>
-                    </div>
-                </form>
-            </div>
+                {/* Nonprofit-specific fields */}
+                {orgType === 'nonprofit' && (
+                    <>
+                        {/* Mission */}
+                        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                            <h2 className="text-lg font-semibold text-slate-800 mb-4">Mission</h2>
+                            <textarea
+                                name="mission"
+                                value={organization.mission || ''}
+                                onChange={handleInputChange}
+                                rows={4}
+                                placeholder="Enter your organization's mission statement"
+                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                            />
+                        </div>
+
+                        {/* Notable Programs */}
+                        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                            <div className="flex items-center justify-between mb-4">
+                                <h2 className="text-lg font-semibold text-slate-800">Notable Programs</h2>
+                                <button
+                                    type="button"
+                                    onClick={addNotableProgram}
+                                    className="flex items-center px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+                                >
+                                    <Plus size={16} className="mr-1" />
+                                    Add Program
+                                </button>
+                            </div>
+                            
+                            <div className="space-y-3">
+                                {notablePrograms.map((program, index) => (
+                                    <div key={index} className="flex items-center space-x-3">
+                                        <input
+                                            type="text"
+                                            value={program}
+                                            onChange={(e) => updateNotableProgram(index, e.target.value)}
+                                            placeholder="Enter program name"
+                                            className="flex-1 px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => removeNotableProgram(index)}
+                                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
+                                        >
+                                            <X size={16} />
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </>
+                )}
+
+                {/* Save Button */}
+                <div className="flex justify-end">
+                    <button
+                        type="submit"
+                        disabled={saving}
+                        className="flex items-center px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        {saving ? (
+                            <>
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                                Saving...
+                            </>
+                        ) : (
+                            <>
+                                <Save size={16} className="mr-2" />
+                                Save Changes
+                            </>
+                        )}
+                    </button>
+                </div>
+            </form>
         </div>
     );
 }

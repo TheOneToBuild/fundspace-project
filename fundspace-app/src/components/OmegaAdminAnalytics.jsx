@@ -1,4 +1,4 @@
-// src/components/OmegaAdminAnalytics.jsx
+// src/components/OmegaAdminAnalytics.jsx - FIXED: Use unified organizations table
 import React, { useState, useEffect } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
@@ -20,7 +20,14 @@ export default function OmegaAdminAnalytics() {
         userGrowth: [],
         organizationStats: {
             nonprofits: 0,
-            funders: 0
+            funders: 0,
+            foundations: 0,
+            education: 0,
+            healthcare: 0,
+            government: 0,
+            religious: 0,
+            forprofit: 0,
+            total: 0
         },
         membershipStats: {
             super_admins: 0,
@@ -46,23 +53,79 @@ export default function OmegaAdminAnalytics() {
     const fetchAnalytics = async () => {
         try {
             setLoading(true);
+            setError('');
             
-            // Fetch organization breakdown
-            const [nonprofitsRes, fundersRes] = await Promise.all([
-                supabase.from('nonprofits').select('id', { count: 'exact', head: true }),
-                supabase.from('funders').select('id', { count: 'exact', head: true })
-            ]);
+            // FIXED: Fetch organization breakdown from unified organizations table
+            const { data: organizationsData, error: orgsError } = await supabase
+                .from('organizations')
+                .select('type');
+
+            if (orgsError) {
+                console.error('Error fetching organizations:', orgsError);
+                throw orgsError;
+            }
+
+            // Count organizations by type
+            const orgStats = (organizationsData || []).reduce((acc, org) => {
+                acc[org.type] = (acc[org.type] || 0) + 1;
+                acc.total += 1;
+                return acc;
+            }, {
+                nonprofits: 0,
+                funders: 0,
+                foundations: 0,
+                education: 0,
+                healthcare: 0,
+                government: 0,
+                religious: 0,
+                forprofit: 0,
+                total: 0
+            });
+
+            // Map 'nonprofit' to 'nonprofits' for display consistency
+            if (orgStats.nonprofit) {
+                orgStats.nonprofits = orgStats.nonprofit;
+                delete orgStats.nonprofit;
+            }
+
+            // Map 'funder' to 'funders' for display consistency  
+            if (orgStats.funder) {
+                orgStats.funders = orgStats.funder;
+                delete orgStats.funder;
+            }
 
             // Fetch membership role breakdown
-            const { data: membershipData } = await supabase
+            const { data: membershipData, error: membershipError } = await supabase
                 .from('organization_memberships')
                 .select('role');
 
+            if (membershipError) {
+                console.error('Error fetching memberships:', membershipError);
+            }
+
             // Count roles
-            const roleStats = membershipData?.reduce((acc, membership) => {
+            const roleStats = (membershipData || []).reduce((acc, membership) => {
                 acc[membership.role] = (acc[membership.role] || 0) + 1;
                 return acc;
-            }, {});
+            }, {
+                super_admins: 0,
+                admins: 0,
+                members: 0
+            });
+
+            // Map role names for consistency
+            if (roleStats.super_admin) {
+                roleStats.super_admins = roleStats.super_admin;
+                delete roleStats.super_admin;
+            }
+            if (roleStats.admin) {
+                roleStats.admins = roleStats.admin;
+                delete roleStats.admin;
+            }
+            if (roleStats.member) {
+                roleStats.members = roleStats.member;
+                delete roleStats.member;
+            }
 
             // Fetch grant statistics
             const [grantsRes, activeGrantsRes] = await Promise.all([
@@ -70,16 +133,16 @@ export default function OmegaAdminAnalytics() {
                 supabase.from('grants').select('id', { count: 'exact', head: true }).gt('deadline', new Date().toISOString())
             ]);
 
+            if (grantsRes.error) {
+                console.error('Error fetching grants:', grantsRes.error);
+            }
+            if (activeGrantsRes.error) {
+                console.error('Error fetching active grants:', activeGrantsRes.error);
+            }
+
             setAnalytics({
-                organizationStats: {
-                    nonprofits: nonprofitsRes.count || 0,
-                    funders: fundersRes.count || 0
-                },
-                membershipStats: {
-                    super_admins: roleStats?.super_admin || 0,
-                    admins: roleStats?.admin || 0,
-                    members: roleStats?.member || 0
-                },
+                organizationStats: orgStats,
+                membershipStats: roleStats,
                 grantStats: {
                     total: grantsRes.count || 0,
                     activeDeadlines: activeGrantsRes.count || 0
@@ -88,7 +151,7 @@ export default function OmegaAdminAnalytics() {
 
         } catch (err) {
             console.error('Error fetching analytics:', err);
-            setError('Failed to load analytics data');
+            setError('Failed to load analytics data: ' + err.message);
         } finally {
             setLoading(false);
         }
@@ -161,11 +224,51 @@ export default function OmegaAdminAnalytics() {
                                 {loading ? '...' : analytics.organizationStats.funders.toLocaleString()}
                             </span>
                         </div>
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center">
+                                <div className="w-4 h-4 bg-purple-500 rounded mr-3"></div>
+                                <span className="text-slate-600">Foundations</span>
+                            </div>
+                            <span className="font-semibold text-slate-800">
+                                {loading ? '...' : analytics.organizationStats.foundations.toLocaleString()}
+                            </span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center">
+                                <div className="w-4 h-4 bg-orange-500 rounded mr-3"></div>
+                                <span className="text-slate-600">Education</span>
+                            </div>
+                            <span className="font-semibold text-slate-800">
+                                {loading ? '...' : analytics.organizationStats.education.toLocaleString()}
+                            </span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center">
+                                <div className="w-4 h-4 bg-red-500 rounded mr-3"></div>
+                                <span className="text-slate-600">Healthcare</span>
+                            </div>
+                            <span className="font-semibold text-slate-800">
+                                {loading ? '...' : analytics.organizationStats.healthcare.toLocaleString()}
+                            </span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center">
+                                <div className="w-4 h-4 bg-gray-500 rounded mr-3"></div>
+                                <span className="text-slate-600">Other</span>
+                            </div>
+                            <span className="font-semibold text-slate-800">
+                                {loading ? '...' : (
+                                    analytics.organizationStats.government + 
+                                    analytics.organizationStats.religious + 
+                                    analytics.organizationStats.forprofit
+                                ).toLocaleString()}
+                            </span>
+                        </div>
                         <div className="pt-2 border-t border-slate-200">
                             <div className="flex items-center justify-between">
                                 <span className="font-medium text-slate-700">Total Organizations</span>
                                 <span className="font-bold text-lg text-slate-800">
-                                    {loading ? '...' : (analytics.organizationStats.nonprofits + analytics.organizationStats.funders).toLocaleString()}
+                                    {loading ? '...' : analytics.organizationStats.total.toLocaleString()}
                                 </span>
                             </div>
                         </div>

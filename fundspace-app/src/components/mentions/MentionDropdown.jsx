@@ -1,4 +1,4 @@
-// src/components/mentions/MentionDropdown.jsx - FIXED VERSION with Updated Schema
+// src/components/mentions/MentionDropdown.jsx - Complete Fixed Version
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../supabaseClient';
 
@@ -51,7 +51,7 @@ export default function MentionDropdown({
           console.error('Error searching organizations:', orgsError);
         }
 
-        console.log('🔍 MentionDropdown: Search results:', {
+        console.log('MentionDropdown: Search results:', {
           query,
           profiles: profiles?.length || 0,
           organizations: organizations?.length || 0,
@@ -110,7 +110,7 @@ export default function MentionDropdown({
 
         const allResults = [...userResults, ...orgResults];
         
-        console.log('🔍 MentionDropdown: Formatted results:', allResults.map(r => ({
+        console.log('MentionDropdown: Formatted results:', allResults.map(r => ({
           id: r.id,
           name: r.name,
           type: r.type,
@@ -133,6 +133,8 @@ export default function MentionDropdown({
 
   // Handle keyboard navigation
   useEffect(() => {
+    if (onKeyDown) return; // Use external handler if provided
+    
     const handleKeyDown = (e) => {
       if (!suggestions.length) return;
 
@@ -162,17 +164,24 @@ export default function MentionDropdown({
       }
     };
 
-    if (onKeyDown) {
-      // Use external key handler if provided
-      return;
-    }
-
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [suggestions, currentSelectedIndex, onClose, onKeyDown]);
 
+  // Handle click outside to close
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        onClose && onClose();
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [onClose]);
+
   const handleSelect = (suggestion) => {
-    console.log('🎯 MentionDropdown: Selected mention:', suggestion);
+    console.log('MentionDropdown: Selected mention:', suggestion);
     
     onSelect && onSelect({
       id: suggestion.id,
@@ -186,7 +195,7 @@ export default function MentionDropdown({
   };
 
   // Don't show if no query or query too short
-  if (!query || query.length < 1) {
+  if (!query || query.length < 2) {
     return null;
   }
 
@@ -238,13 +247,11 @@ export default function MentionDropdown({
         backgroundColor: '#f8f9fa'
       }}>
         {loading ? (
-          <span>🔍 Searching...</span>
+          <span>Searching...</span>
         ) : suggestions.length > 0 ? (
-          <span>💬 {suggestions.length} result{suggestions.length !== 1 ? 's' : ''} for "{query}"</span>
-        ) : query.length >= 2 ? (
-          <span>😔 No results for "{query}"</span>
+          <span>{suggestions.length} result{suggestions.length !== 1 ? 's' : ''} for "{query}"</span>
         ) : (
-          <span>✏️ Type to search users and organizations</span>
+          <span>No results for "{query}"</span>
         )}
       </div>
 
@@ -261,7 +268,7 @@ export default function MentionDropdown({
       )}
 
       {/* No results state */}
-      {!loading && query.length >= 2 && suggestions.length === 0 && (
+      {!loading && suggestions.length === 0 && (
         <div style={{
           padding: '16px',
           textAlign: 'center',

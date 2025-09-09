@@ -1,166 +1,67 @@
-// src/components/post/MentionHoverCard.jsx
+// src/components/post/MentionHoverCard.jsx - Production version without debug logs
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../../supabaseClient';
 import { useNavigate } from 'react-router-dom';
-import Avatar from '../Avatar';
+import { supabase } from '../../supabaseClient';
+import Avatar from '../Avatar.jsx';
 
-export default function MentionHoverCard({ mention, position }) {
+export default function MentionHoverCard({ mention, onClose }) {
+    const navigate = useNavigate();
     const [entityData, setEntityData] = useState(null);
     const [loading, setLoading] = useState(true);
-    const navigate = useNavigate();
 
     useEffect(() => {
         const fetchEntityData = async () => {
-            if (!mention) return;
-            setLoading(true);
+            if (!mention?.id || !mention?.entityType) {
+                setLoading(false);
+                return;
+            }
 
             try {
-                let data = null, error = null;
+                let data = null;
+                let error = null;
 
                 if (mention.entityType === 'user') {
-                    console.log(`🔍 Fetching user data for:`, mention.id);
-                    ({ data, error } = await supabase
+                    const result = await supabase
                         .from('profiles')
-                        .select('id, full_name, avatar_url, title, organization_name')
+                        .select('id, full_name, title, avatar_url, organization_name')
                         .eq('id', mention.id)
-                        .single());
+                        .single();
                     
-                    // Standardize user data structure  
-                    if (data) {
-                        // Use organization_name for the subtitle instead of title
-                        data.title = data.organization_name || 'User Profile';
-                    }
+                    data = result.data;
+                    error = result.error;
                 } else if (mention.entityType === 'organization') {
-                    console.log(`🔍 Fetching organization data for:`, mention.id);
+                    const [orgType, orgId] = mention.id.split('-');
                     
-                    // Handle different mention ID formats for backward compatibility
-                    let orgType, orgId;
-                    
-                    if (mention.id.includes('-')) {
-                        // Format: "orgType-orgId" (e.g., "foundation-57")
-                        const parts = mention.id.split('-');
-                        if (parts.length === 2) {
-                            orgType = parts[0];
-                            orgId = parseInt(parts[1]);
-                        }
-                    } else {
-                        // Fallback: might be just an ID or slug - try to find in organizations table
-                        console.log('🔄 Trying fallback lookup for mention ID:', mention.id);
-                        
-                        // Try to find by slug first
-                        const { data: orgBySlug } = await supabase
-                            .from('organizations')
-                            .select('id, type, slug')
-                            .eq('slug', mention.id)
-                            .single();
-                            
-                        if (orgBySlug) {
-                            orgType = orgBySlug.type;
-                            orgId = orgBySlug.id;
-                            console.log('✅ Found organization by slug:', { orgType, orgId });
-                        } else {
-                            // Try to find by ID if it's numeric
-                            const numericId = parseInt(mention.id);
-                            if (!isNaN(numericId)) {
-                                const { data: orgById } = await supabase
-                                    .from('organizations')
-                                    .select('id, type, slug')
-                                    .eq('id', numericId)
-                                    .single();
-                                    
-                                if (orgById) {
-                                    orgType = orgById.type;
-                                    orgId = orgById.id;
-                                    console.log('✅ Found organization by ID:', { orgType, orgId });
-                                }
-                            }
-                        }
-                    }
-                    
-                    // If we still don't have valid org data, fail gracefully
-                    if (!orgType || !orgId || isNaN(orgId)) {
-                        console.error('❌ Could not parse organization mention ID:', mention.id);
+                    if (!orgId) {
                         setEntityData(null);
                         setLoading(false);
                         return;
                     }
+
+                    const result = await supabase
+                        .from('organizations')
+                        .select('id, name, type, tagline, image_url, slug')
+                        .eq('id', parseInt(orgId))
+                        .eq('type', orgType)
+                        .single();
                     
-                    // Validate organization type - support all database organization types
-                    const validOrgTypes = ['nonprofit', 'funder', 'foundation', 'education', 'healthcare', 'government', 'religious', 'forprofit'];
-                    if (!validOrgTypes.includes(orgType)) {
-                        console.error('❌ Invalid organization type:', orgType);
-                        setEntityData(null);
-                        setLoading(false);
-                        return;
-                    }
-                    
-                    console.log(`🏢 Fetching ${orgType} data for ID:`, orgId);
-                    
-                    // Map organization type to correct table name
-                    let tableName;
-                    if (orgType === 'nonprofit') {
-                        tableName = 'nonprofits';
-                    } else if (orgType === 'funder') {
-                        tableName = 'funders';
-                    } else {
-                        // All other organization types (foundation, education, etc.) are in the 'organizations' table
-                        tableName = 'organizations';
-                    }
-                    
-                    ({ data, error } = await supabase
-                        .from(tableName)
-                        .select('id, name, description, image_url, slug, type, location')
-                        .eq('id', orgId)
-                        .single());
-                    
-                    // Standardize the data structure for consistent display
+                    data = result.data;
+                    error = result.error;
+
                     if (data) {
-                        data.full_name = data.name;
-                        data.avatar_url = data.image_url; // Fixed: use image_url not logo_url
-                        
-                        // Create a better subtitle with organization type and location
-                        const getOrgTypeLabel = (type) => {
-                            const typeLabels = {
-                                'nonprofit': 'Nonprofit',
-                                'funder': 'Funder', 
-                                'foundation': 'Foundation',
-                                'education': 'Education',
-                                'healthcare': 'Healthcare',
-                                'government': 'Government',
-                                'religious': 'Religious',
-                                'forprofit': 'For-Profit'
-                            };
-                            return typeLabels[type] || 'Organization';
-                        };
-                        
-                        const orgTypeLabel = getOrgTypeLabel(data.type || orgType);
-                        const location = data.location;
-                        
-                        // Combine org type and location for the subtitle
-                        if (location) {
-                            data.title = `${orgTypeLabel} • ${location}`;
-                        } else {
-                            data.title = orgTypeLabel;
-                        }
-                        
-                        // Store organization type and original ID for navigation
                         data.orgType = orgType;
                         data.orgId = orgId;
                     }
                 }
 
                 if (error) {
-                    console.error(`❌ Error fetching ${mention.entityType} hover card data:`, error);
                     setEntityData(null);
                 } else if (data) {
-                    console.log(`✅ Successfully fetched ${mention.entityType} data:`, data);
                     setEntityData(data);
                 } else {
-                    console.warn(`⚠️ No data found for ${mention.entityType}:`, mention.id);
                     setEntityData(null);
                 }
             } catch (err) {
-                console.error(`💥 Exception fetching ${mention.entityType} data:`, err);
                 setEntityData(null);
             }
             
@@ -172,30 +73,19 @@ export default function MentionHoverCard({ mention, position }) {
 
     const getOrganizationSlug = async (orgType, orgId) => {
         try {
-            let tableName;
-            if (orgType === 'nonprofit') {
-                tableName = 'nonprofits';
-            } else if (orgType === 'funder') {
-                tableName = 'funders';
-            } else {
-                // All other organization types are in the 'organizations' table
-                tableName = 'organizations';
-            }
-            
             const { data, error } = await supabase
-                .from(tableName)
+                .from('organizations')
                 .select('slug')
                 .eq('id', parseInt(orgId))
+                .eq('type', orgType)
                 .single();
 
             if (error) {
-                console.error(`Error fetching ${orgType} slug:`, error);
                 return null;
             }
 
             return data?.slug;
         } catch (error) {
-            console.error(`Exception fetching ${orgType} slug:`, error);
             return null;
         }
     };
@@ -205,95 +95,14 @@ export default function MentionHoverCard({ mention, position }) {
 
         try {
             if (mention.entityType === 'user') {
-                console.log(`🔗 Navigating to user profile:`, mention.id);
                 navigate(`/profile/members/${mention.id}`);
             } else if (mention.entityType === 'organization') {
-                console.log(`🔗 Attempting to navigate to organization:`, mention.id);
+                const [orgType, orgId] = mention.id.split('-');
                 
-                // Use the same logic as data fetching for consistency
-                let orgType, orgId;
-                
-                if (mention.id.includes('-')) {
-                    // Format: "orgType-orgId" (e.g., "foundation-57")
-                    const parts = mention.id.split('-');
-                    if (parts.length === 2) {
-                        orgType = parts[0];
-                        orgId = parseInt(parts[1]);
-                    }
-                } else {
-                    // Fallback: use entityData if we have it from successful data fetch
-                    if (entityData?.orgType && entityData?.orgId) {
-                        orgType = entityData.orgType;
-                        orgId = entityData.orgId;
-                        console.log('🔄 Using entityData for navigation:', { orgType, orgId });
-                    } else {
-                        // Try to find organization info by slug/ID
-                        console.log('🔄 Attempting fallback lookup for navigation:', mention.id);
-                        
-                        // Try to find by slug first
-                        const { data: orgBySlug } = await supabase
-                            .from('organizations')
-                            .select('id, type, slug')
-                            .eq('slug', mention.id)
-                            .single();
-                            
-                        if (orgBySlug) {
-                            orgType = orgBySlug.type;
-                            orgId = orgBySlug.id;
-                            console.log('✅ Found organization by slug for navigation:', { orgType, orgId });
-                        } else {
-                            // Try by numeric ID
-                            const numericId = parseInt(mention.id);
-                            if (!isNaN(numericId)) {
-                                const { data: orgById } = await supabase
-                                    .from('organizations')
-                                    .select('id, type, slug')
-                                    .eq('id', numericId)
-                                    .single();
-                                    
-                                if (orgById) {
-                                    orgType = orgById.type;
-                                    orgId = orgById.id;
-                                    console.log('✅ Found organization by ID for navigation:', { orgType, orgId });
-                                }
-                            }
-                        }
-                    }
-                }
-                
-                // If we still don't have valid org data, show error but don't block navigation
-                if (!orgType || !orgId) {
-                    console.error('❌ Cannot determine organization type/ID for navigation:', mention.id);
-                    // Try a generic fallback navigation
-                    navigate(`/organizations/${mention.id}`);
+                if (!orgId) {
                     return;
                 }
-                
-                const validOrgTypes = ['nonprofit', 'funder', 'foundation', 'education', 'healthcare', 'government', 'religious', 'forprofit'];
-                if (!validOrgTypes.includes(orgType)) {
-                    console.error('❌ Invalid organization type for navigation:', orgType);
-                    // Try generic fallback
-                    navigate(`/organizations/${mention.id}`);
-                    return;
-                }
-                
-                console.log(`🔗 Navigating to ${orgType} profile:`, orgId);
-                
-                // Try to use the slug if we already have it from the fetched data
-                if (entityData?.slug) {
-                    console.log(`✨ Using cached slug for navigation:`, entityData.slug);
-                    if (orgType === 'nonprofit') {
-                        navigate(`/nonprofits/${entityData.slug}`);
-                    } else if (orgType === 'funder') {
-                        navigate(`/funders/${entityData.slug}`);
-                    } else {
-                        // For other organization types (foundation, education, etc.)
-                        navigate(`/organizations/${entityData.slug}`);
-                    }
-                    return;
-                }
-                
-                // Otherwise, get the organization slug from the database
+
                 const slug = await getOrganizationSlug(orgType, orgId);
                 
                 if (slug) {
@@ -302,52 +111,61 @@ export default function MentionHoverCard({ mention, position }) {
                     } else if (orgType === 'funder') {
                         navigate(`/funders/${slug}`);
                     } else {
-                        // For other organization types
                         navigate(`/organizations/${slug}`);
                     }
                 } else {
-                    console.error(`Could not find slug for ${orgType} with ID ${orgId}`);
-                    // Fallback: try direct navigation with ID
-                    let fallbackPath;
-                    if (orgType === 'nonprofit') {
-                        fallbackPath = `/nonprofits/${orgId}`;
-                    } else if (orgType === 'funder') {
-                        fallbackPath = `/funders/${orgId}`;
-                    } else {
-                        fallbackPath = `/organizations/${orgId}`;
-                    }
-                    console.log(`🔄 Trying fallback navigation: ${fallbackPath}`);
+                    const fallbackPath = orgType === 'nonprofit' 
+                        ? `/nonprofits/${orgId}` 
+                        : orgType === 'funder'
+                        ? `/funders/${orgId}`
+                        : `/organizations/${orgId}`;
                     navigate(fallbackPath);
                 }
             }
+            
+            if (onClose) onClose();
         } catch (error) {
-            console.error('💥 Error navigating from hover card:', error);
-            // Final fallback - try to navigate anyway
+            // Silent fallback
             if (mention.entityType === 'organization') {
                 navigate(`/organizations/${mention.id}`);
             }
         }
     };
 
-    if (!position) return null;
+    if (loading) {
+        return (
+            <div className="w-64 p-4 bg-white rounded-lg shadow-lg border border-slate-200">
+                <div className="animate-pulse">
+                    <div className="flex items-center mb-3">
+                        <div className="w-12 h-12 bg-slate-200 rounded-full"></div>
+                        <div className="ml-3 flex-1">
+                            <div className="h-4 bg-slate-200 rounded w-3/4 mb-2"></div>
+                            <div className="h-3 bg-slate-200 rounded w-1/2"></div>
+                        </div>
+                    </div>
+                    <div className="h-8 bg-slate-200 rounded w-full"></div>
+                </div>
+            </div>
+        );
+    }
 
     return (
-        <div
-            className="absolute z-20 bg-white rounded-lg shadow-xl border border-slate-200 w-80 p-4 animate-fade-in-fast"
-            style={{ top: position.top, left: position.left }}
-            onClick={e => e.stopPropagation()} // Prevent card from disappearing if clicked
-        >
-            {loading ? (
-                <div className="flex items-center justify-center h-24">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                </div>
-            ) : entityData ? (
+        <div className="w-64 p-4 bg-white rounded-lg shadow-lg border border-slate-200">
+            {entityData ? (
                 <div className="flex flex-col">
                     <div className="flex items-center mb-3">
-                        <Avatar src={entityData.avatar_url} fullName={entityData.full_name} size="lg" />
+                        <Avatar 
+                            src={entityData.avatar_url || entityData.image_url} 
+                            fullName={entityData.full_name || entityData.name} 
+                            size="lg" 
+                        />
                         <div className="ml-3 overflow-hidden">
-                            <p className="font-bold text-slate-800 truncate">{entityData.full_name}</p>
-                            <p className="text-sm text-slate-500 truncate">{entityData.title || (mention.entityType === 'user' ? 'User Profile' : 'Organization')}</p>
+                            <p className="font-bold text-slate-800 truncate">
+                                {entityData.full_name || entityData.name}
+                            </p>
+                            <p className="text-sm text-slate-500 truncate">
+                                {entityData.title || entityData.tagline || (mention.entityType === 'user' ? 'User Profile' : 'Organization')}
+                            </p>
                         </div>
                     </div>
                     <button

@@ -174,7 +174,6 @@ const NotificationItem = ({ notification, onClick, onViewPost, currentUserId, on
     const getOrganizationDetailsAndNavigate = async (orgPostId) => {
         try {
             console.log('🔍 Fetching organization details for post ID:', orgPostId);
-            
             // Query the organization_posts table to get org info
             const { data: orgPost, error } = await supabase
                 .from('organization_posts')
@@ -193,17 +192,17 @@ const NotificationItem = ({ notification, onClick, onViewPost, currentUserId, on
             }
 
             const { organization_id, organization_type } = orgPost;
-            
-            // Query the appropriate organization table for the slug
-            const tableName = organization_type === 'nonprofit' ? 'nonprofits' : 'funders';
+
+            // Query the unified organizations table for the slug
             const { data: orgData, error: orgError } = await supabase
-                .from(tableName)
+                .from('organizations')
                 .select('slug, name')
                 .eq('id', organization_id)
+                .eq('type', organization_type)
                 .single();
 
             if (orgError || !orgData?.slug) {
-                console.error(`❌ Error fetching ${organization_type} details:`, orgError);
+                console.error(`❌ Error fetching organization details:`, orgError);
                 return false;
             }
 
@@ -211,7 +210,7 @@ const NotificationItem = ({ notification, onClick, onViewPost, currentUserId, on
             const orgPath = organization_type === 'nonprofit' 
                 ? `/nonprofits/${orgData.slug}` 
                 : `/funders/${orgData.slug}`;
-            
+
             console.log('🎯 Navigating to organization:', orgPath);
             navigate(orgPath);
             return true;
