@@ -1,4 +1,4 @@
-// src/components/omega-admin/OmegaAdminUsers.jsx - Working Version
+// src/components/omega-admin/OmegaAdminUsers.jsx - Complete Working Version
 import React, { useState, useEffect } from 'react';
 import { useOutletContext, useSearchParams, Link } from 'react-router-dom';
 import { supabase } from '../../supabaseClient';
@@ -35,6 +35,7 @@ export default function OmegaAdminUsers() {
     const [searchQuery, setSearchQuery] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
     const [totalUsers, setTotalUsers] = useState(0);
+    const [openDropdown, setOpenDropdown] = useState(null);
     const [stats, setStats] = useState({
         total: 0,
         activeUsers: 0,
@@ -55,6 +56,18 @@ export default function OmegaAdminUsers() {
         applyFilters();
     }, [users, filter, searchQuery, currentPage]);
 
+    // Close dropdown when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (openDropdown && !event.target.closest('.dropdown-container')) {
+                setOpenDropdown(null);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [openDropdown]);
+
     const fetchUsers = async () => {
         try {
             setLoading(true);
@@ -69,7 +82,6 @@ export default function OmegaAdminUsers() {
                     avatar_url,
                     title,
                     organization_name,
-                    role,
                     location,
                     is_omega_admin,
                     bio,
@@ -113,7 +125,6 @@ export default function OmegaAdminUsers() {
                 user.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
                 user.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
                 user.organization_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                user.role?.toLowerCase().includes(searchQuery.toLowerCase()) ||
                 user.location?.toLowerCase().includes(searchQuery.toLowerCase())
             );
         }
@@ -148,6 +159,49 @@ export default function OmegaAdminUsers() {
         if (currentPage > 1 && startIndex >= filtered.length) {
             setCurrentPage(1);
         }
+    };
+
+    const handleToggleOmegaAdmin = async (user) => {
+        try {
+            const { error } = await supabase
+                .from('profiles')
+                .update({ is_omega_admin: !user.is_omega_admin })
+                .eq('id', user.id);
+
+            if (error) throw error;
+
+            // Refresh users list
+            fetchUsers();
+            setOpenDropdown(null);
+        } catch (err) {
+            console.error('Error updating omega admin status:', err);
+            setError('Failed to update admin status: ' + err.message);
+        }
+    };
+
+    const handleToggleOnboarding = async (user) => {
+        try {
+            const { error } = await supabase
+                .from('profiles')
+                .update({ onboarding_completed: !user.onboarding_completed })
+                .eq('id', user.id);
+
+            if (error) throw error;
+
+            // Refresh users list
+            fetchUsers();
+            setOpenDropdown(null);
+        } catch (err) {
+            console.error('Error updating onboarding status:', err);
+            setError('Failed to update onboarding status: ' + err.message);
+        }
+    };
+
+    const handleViewUserActivity = (user) => {
+        // For now, just close dropdown. Could implement activity log viewer
+        console.log('View activity for user:', user.id);
+        setOpenDropdown(null);
+        // Could navigate to /profile/omega-admin/users/${user.id}/activity
     };
 
     const getFilterTitle = () => {
@@ -203,24 +257,30 @@ export default function OmegaAdminUsers() {
 
     return (
         <div className="space-y-6">
-            {/* Header */}
-            <div className="bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl p-6 text-white">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <div className="flex items-center mb-2">
-                            <Users className="w-8 h-8 mr-3" />
-                            <h1 className="text-3xl font-bold">{getFilterTitle()}</h1>
+            {/* Banner matches OmegaAdminDashboard */}
+            <div className="relative rounded-2xl overflow-hidden" style={{backgroundImage: 'url(https://images.unsplash.com/photo-1552039431-11d2a516d0d4?q=80&w=1740&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D)', backgroundSize: 'cover', backgroundPosition: 'center'}}>
+                <div className="absolute inset-0 bg-black/30"></div>
+                <div className="relative px-8 py-12 lg:px-12 lg:py-16">
+                    <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                            <div className="flex items-center mb-4">
+                                <h1 className="text-4xl lg:text-5xl font-bold text-white">{getFilterTitle()}</h1>
+                            </div>
+                            <p className="text-xl text-white/90 mb-2">{getFilterDescription()}</p>
                         </div>
-                        <p className="text-purple-100">{getFilterDescription()}</p>
+                        <Link 
+                            to="/profile/omega-admin"
+                            className="inline-flex items-center px-4 py-2 bg-white/20 text-white rounded-lg hover:bg-white/30 transition-colors"
+                        >
+                            <ArrowLeft className="w-4 h-4 mr-2" />
+                            Back to Dashboard
+                        </Link>
                     </div>
-                    <Link 
-                        to="/profile/omega-admin"
-                        className="inline-flex items-center px-4 py-2 bg-white/20 text-white rounded-lg hover:bg-white/30 transition-colors"
-                    >
-                        <ArrowLeft className="w-4 h-4 mr-2" />
-                        Back to Dashboard
-                    </Link>
                 </div>
+                {/* Decorative elements */}
+                <div className="absolute top-4 right-4 w-20 h-20 bg-white/5 rounded-full"></div>
+                <div className="absolute bottom-8 right-24 w-12 h-12 bg-white/10 rounded-full"></div>
+                <div className="absolute top-1/2 right-8 w-6 h-6 bg-white/15 rounded-full"></div>
             </div>
 
             {error && (
@@ -401,10 +461,10 @@ export default function OmegaAdminUsers() {
                                                             {user.location}
                                                         </span>
                                                     )}
-                                                    {user.role && (
+                                                    {user.organization_name && (
                                                         <span className="flex items-center">
                                                             <Users size={12} className="mr-1" />
-                                                            {user.role}
+                                                            {user.organization_name}
                                                         </span>
                                                     )}
                                                     <span className="flex items-center">
@@ -416,7 +476,7 @@ export default function OmegaAdminUsers() {
                                         </div>
 
                                         {/* Actions */}
-                                        <div className="flex items-center space-x-2">
+                                        <div className="flex items-center space-x-2 relative">
                                             <Link
                                                 to={`/profile/members/${user.id}`}
                                                 className="inline-flex items-center px-3 py-1.5 bg-slate-100 text-slate-700 text-xs rounded-md hover:bg-slate-200 transition-colors"
@@ -425,9 +485,50 @@ export default function OmegaAdminUsers() {
                                                 View Profile
                                             </Link>
                                             
-                                            <button className="inline-flex items-center px-3 py-1.5 bg-slate-100 text-slate-700 text-xs rounded-md hover:bg-slate-200 transition-colors">
-                                                <MoreVertical size={12} />
-                                            </button>
+                                            {/* Admin Actions Dropdown */}
+                                            <div className="relative dropdown-container">
+                                                <button 
+                                                    onClick={() => setOpenDropdown(openDropdown === user.id ? null : user.id)}
+                                                    className="inline-flex items-center px-3 py-1.5 bg-slate-100 text-slate-700 text-xs rounded-md hover:bg-slate-200 transition-colors"
+                                                >
+                                                    <MoreVertical size={12} />
+                                                </button>
+                                                
+                                                {/* Dropdown Menu */}
+                                                {openDropdown === user.id && (
+                                                    <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-slate-200 rounded-lg shadow-lg z-10">
+                                                        <div className="py-1">
+                                                            <button
+                                                                onClick={() => handleToggleOmegaAdmin(user)}
+                                                                className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center"
+                                                            >
+                                                                <Crown size={14} className="mr-2" />
+                                                                {user.is_omega_admin ? 'Remove Omega Admin' : 'Make Omega Admin'}
+                                                            </button>
+                                                            
+                                                            {!user.onboarding_completed && (
+                                                                <button
+                                                                    onClick={() => handleCompleteOnboarding(user)}
+                                                                    className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center"
+                                                                >
+                                                                    <CheckCircle size={14} className="mr-2" />
+                                                                    Complete Onboarding
+                                                                </button>
+                                                            )}
+                                                            
+                                                            <div className="border-t border-slate-200 my-1"></div>
+                                                            
+                                                            <button
+                                                                onClick={() => handleDeleteUser(user)}
+                                                                className="w-full px-4 py-2 text-left text-sm text-red-700 hover:bg-red-50 flex items-center"
+                                                            >
+                                                                <AlertTriangle size={14} className="mr-2" />
+                                                                Delete User
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
                                 </div>

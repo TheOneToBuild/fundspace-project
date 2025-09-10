@@ -1,4 +1,4 @@
-// src/components/OmegaAdminDashboard.jsx - REDESIGNED: Modern Community Dashboard with Clickable Metrics
+// src/components/OmegaAdminDashboard.jsx - COMPLETE: Dashboard with all analytics components
 import React, { useState, useEffect } from 'react';
 import { useOutletContext, Link } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
@@ -29,7 +29,8 @@ import {
     Sparkles,
     GraduationCap,
     Stethoscope,
-    Church
+    Church,
+    Edit
 } from 'lucide-react';
 import { isPlatformAdmin } from '../utils/permissions.js';
 
@@ -51,6 +52,15 @@ export default function OmegaAdminDashboard() {
             forprofit: 0,
             international: 0
         },
+        membershipStats: {
+            super_admins: 0,
+            admins: 0,
+            members: 0
+        },
+        grantStats: {
+            total: 0,
+            activeDeadlines: 0
+        },
         recentActivity: []
     });
     const [loading, setLoading] = useState(true);
@@ -70,10 +80,12 @@ export default function OmegaAdminDashboard() {
             setError('');
             
             // Fetch platform statistics using unified organizations table
-            const [usersRes, organizationsRes, grantsRes] = await Promise.all([
+            const [usersRes, organizationsRes, grantsRes, membershipRes, activeGrantsRes] = await Promise.all([
                 supabase.from('profiles').select('id', { count: 'exact', head: true }),
                 supabase.from('organizations').select('type'),
-                supabase.from('grants').select('id', { count: 'exact', head: true })
+                supabase.from('grants').select('id', { count: 'exact', head: true }),
+                supabase.from('organization_memberships').select('role'),
+                supabase.from('grants').select('id', { count: 'exact', head: true }).gt('deadline', new Date().toISOString())
             ]);
 
             if (usersRes.error || organizationsRes.error || grantsRes.error) {
@@ -97,6 +109,18 @@ export default function OmegaAdminDashboard() {
                 international: 0
             });
 
+            // Count membership roles
+            const roleStats = (membershipRes.data || []).reduce((acc, membership) => {
+                const role = membership.role === 'super_admin' ? 'super_admins' : 
+                           membership.role === 'admin' ? 'admins' : 'members';
+                acc[role] = (acc[role] || 0) + 1;
+                return acc;
+            }, {
+                super_admins: 0,
+                admins: 0,
+                members: 0
+            });
+
             setStats({
                 totalUsers: usersRes.count || 0,
                 totalOrganizations: organizationsRes.data?.length || 0,
@@ -104,6 +128,11 @@ export default function OmegaAdminDashboard() {
                 activeToday: Math.floor((usersRes.count || 0) * 0.15), // Simulated active users
                 newThisWeek: Math.floor((usersRes.count || 0) * 0.05), // Simulated new users
                 organizationsByType: orgsByType,
+                membershipStats: roleStats,
+                grantStats: {
+                    total: grantsRes.count || 0,
+                    activeDeadlines: activeGrantsRes.count || 0
+                },
                 recentActivity: []
             });
 
@@ -157,25 +186,28 @@ export default function OmegaAdminDashboard() {
 
     return (
         <div className="space-y-8">
-            {/* Header with Quick Actions */}
-            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between">
-                <div>
-                    <div className="flex items-center mb-2">
-                        <Crown className="w-8 h-8 text-purple-600 mr-3" />
-                        <h1 className="text-3xl font-bold text-slate-900">Community Hub</h1>
+            {/* Welcome Banner with Unsplash Image */}
+            <div className="relative rounded-2xl overflow-hidden" style={{backgroundImage: 'url(https://images.unsplash.com/photo-1554107136-57b138ea99df?q=80&w=1740&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D)', backgroundSize: 'cover', backgroundPosition: 'center'}}>
+                <div className="absolute inset-0 bg-black/30"></div>
+                <div className="relative px-8 py-12 lg:px-12 lg:py-16">
+                    <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                            <div className="flex items-center mb-4">
+                                <Crown className="w-10 h-10 text-white mr-4" />
+                                <h1 className="text-4xl lg:text-5xl font-bold text-white">Community Hub</h1>
+                            </div>
+                            <p className="text-xl text-white/90 mb-2">Welcome to your platform command center</p>
+                            <p className="text-white/80 max-w-2xl">
+                                Monitor community growth, manage organizations, and oversee grant opportunities across your platform ecosystem.
+                            </p>
+                        </div>
+                        {/* Removed Users icon from banner */}
                     </div>
-                    <p className="text-slate-600">Monitor and manage your platform community</p>
                 </div>
-                <div className="flex items-center space-x-3 mt-4 lg:mt-0">
-                    <button className="inline-flex items-center px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors">
-                        <Filter className="w-4 h-4 mr-2" />
-                        Filters
-                    </button>
-                    <button className="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors">
-                        <Settings className="w-4 h-4 mr-2" />
-                        Admin Tools
-                    </button>
-                </div>
+                {/* Decorative elements */}
+                <div className="absolute top-4 right-4 w-20 h-20 bg-white/5 rounded-full"></div>
+                <div className="absolute bottom-8 right-24 w-12 h-12 bg-white/10 rounded-full"></div>
+                <div className="absolute top-1/2 right-8 w-6 h-6 bg-white/15 rounded-full"></div>
             </div>
 
             {error && (
@@ -294,12 +326,16 @@ export default function OmegaAdminDashboard() {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 {/* Community Overview */}
                 <div className="lg:col-span-2 space-y-6">
-                    {/* Organization Distribution - Updated Taxonomy */}
+                    {/* Organization Distribution with Embedded Management */}
                     <div className="bg-white p-6 rounded-xl border border-slate-200">
                         <div className="flex items-center justify-between mb-6">
                             <h3 className="text-lg font-semibold text-slate-900">Community Composition</h3>
-                            <Link to="/profile/omega-admin/analytics" className="text-purple-600 hover:text-purple-700 text-sm font-medium">
-                                View Details →
+                            <Link 
+                                to="/profile/omega-admin/organizations" 
+                                className="inline-flex items-center px-4 py-2 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition-colors text-sm font-medium"
+                            >
+                                <Edit className="w-4 h-4 mr-2" />
+                                Manage All Organizations
                             </Link>
                         </div>
                         
@@ -434,34 +470,88 @@ export default function OmegaAdminDashboard() {
                         </div>
                     </div>
 
-                    {/* Quick Actions */}
+                    {/* Role Distribution Analytics */}
                     <div className="bg-white p-6 rounded-xl border border-slate-200">
-                        <h3 className="text-lg font-semibold text-slate-900 mb-4">Platform Management</h3>
-                        
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="flex items-center justify-between mb-6">
+                            <h3 className="text-lg font-semibold text-slate-900">Role Distribution</h3>
                             <Link 
-                                to="/profile/omega-admin/organizations"
-                                className="group p-4 border border-slate-200 rounded-lg hover:border-purple-200 hover:bg-purple-50 transition-all"
+                                to="/profile/omega-admin/users" 
+                                className="text-purple-600 hover:text-purple-700 text-sm font-medium"
                             >
-                                <div className="flex items-center justify-between mb-2">
-                                    <Building2 className="w-6 h-6 text-purple-600" />
-                                    <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-purple-600" />
+                                View All Users →
+                            </Link>
+                        </div>
+                        
+                        <div className="grid grid-cols-3 gap-4">
+                            <Link 
+                                to="/profile/omega-admin/users?filter=omega_admins"
+                                className="group p-4 bg-purple-50 rounded-lg border border-purple-100 hover:border-purple-200 hover:bg-purple-100 transition-all cursor-pointer text-center"
+                            >
+                                <div className="text-2xl font-bold text-purple-700 mb-1">
+                                    {loading ? '...' : stats.membershipStats.super_admins}
                                 </div>
-                                <h4 className="font-medium text-slate-900 mb-1">Manage Organizations</h4>
-                                <p className="text-sm text-slate-600">Edit, moderate, and oversee all organizations</p>
+                                <div className="text-sm font-medium text-purple-600">Super Admins</div>
                             </Link>
                             
-                            <Link 
-                                to="/profile/omega-admin/analytics"
-                                className="group p-4 border border-slate-200 rounded-lg hover:border-blue-200 hover:bg-blue-50 transition-all"
-                            >
-                                <div className="flex items-center justify-between mb-2">
-                                    <BarChart3 className="w-6 h-6 text-blue-600" />
-                                    <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-blue-600" />
+                            <div className="p-4 bg-green-50 rounded-lg border border-green-100 text-center">
+                                <div className="text-2xl font-bold text-green-700 mb-1">
+                                    {loading ? '...' : stats.membershipStats.admins}
                                 </div>
-                                <h4 className="font-medium text-slate-900 mb-1">Analytics Dashboard</h4>
-                                <p className="text-sm text-slate-600">Deep insights and platform metrics</p>
+                                <div className="text-sm font-medium text-green-600">Admins</div>
+                            </div>
+                            
+                            <div className="p-4 bg-blue-50 rounded-lg border border-blue-100 text-center">
+                                <div className="text-2xl font-bold text-blue-700 mb-1">
+                                    {loading ? '...' : stats.membershipStats.members}
+                                </div>
+                                <div className="text-sm font-medium text-blue-600">Members</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Grant Analytics */}
+                    <div className="bg-white p-6 rounded-xl border border-slate-200">
+                        <div className="flex items-center justify-between mb-6">
+                            <h3 className="text-lg font-semibold text-slate-900">Grant Platform Analytics</h3>
+                            <Link 
+                                to="/profile/omega-admin/grants" 
+                                className="text-purple-600 hover:text-purple-700 text-sm font-medium"
+                            >
+                                Manage Grants →
                             </Link>
+                        </div>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <div className="text-center p-4 bg-blue-50 rounded-lg">
+                                <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                                    <FileCheck className="w-6 h-6 text-blue-600" />
+                                </div>
+                                <p className="text-2xl font-bold text-blue-700 mb-1">
+                                    {loading ? '...' : stats.grantStats.total.toLocaleString()}
+                                </p>
+                                <p className="text-sm font-medium text-blue-600">Total Grants</p>
+                            </div>
+                            
+                            <div className="text-center p-4 bg-green-50 rounded-lg">
+                                <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                                    <TrendingUp className="w-6 h-6 text-green-600" />
+                                </div>
+                                <p className="text-2xl font-bold text-green-700 mb-1">
+                                    {loading ? '...' : stats.grantStats.activeDeadlines.toLocaleString()}
+                                </p>
+                                <p className="text-sm font-medium text-green-600">Active Grants</p>
+                            </div>
+                            
+                            <div className="text-center p-4 bg-purple-50 rounded-lg">
+                                <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                                    <BarChart3 className="w-6 h-6 text-purple-600" />
+                                </div>
+                                <p className="text-2xl font-bold text-purple-700 mb-1">
+                                    {loading ? '...' : stats.grantStats.total > 0 ? 
+                                        Math.round((stats.grantStats.activeDeadlines / stats.grantStats.total) * 100) + '%' : '0%'}
+                                </p>
+                                <p className="text-sm font-medium text-purple-600">Active Rate</p>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -510,7 +600,7 @@ export default function OmegaAdminDashboard() {
                         </div>
                     </div>
 
-                    {/* Recent Activity Placeholder */}
+                    {/* Recent Activity */}
                     <div className="bg-white p-6 rounded-xl border border-slate-200">
                         <h3 className="font-semibold text-slate-900 mb-4">Live Activity</h3>
                         
@@ -556,10 +646,13 @@ export default function OmegaAdminDashboard() {
                         <h3 className="font-semibold text-slate-900 mb-4">Quick Tools</h3>
                         
                         <div className="space-y-2">
-                            <button className="w-full flex items-center px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 rounded-lg transition-colors">
+                            <Link 
+                                to="/profile/omega-admin/users"
+                                className="w-full flex items-center px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 rounded-lg transition-colors"
+                            >
                                 <Search className="w-4 h-4 mr-3 text-slate-500" />
                                 Search Users
-                            </button>
+                            </Link>
                             
                             <button className="w-full flex items-center px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 rounded-lg transition-colors">
                                 <Shield className="w-4 h-4 mr-3 text-slate-500" />

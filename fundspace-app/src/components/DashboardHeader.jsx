@@ -109,7 +109,8 @@ export default function DashboardHeader({ profile }) {
         dropdown: [
             { label: 'Dashboard', to: '/profile/omega-admin', icon: <Home size={14} /> },
             { label: 'Organizations', to: '/profile/omega-admin/organizations', icon: <Building size={14} /> },
-            { label: 'Analytics', to: '/profile/omega-admin/analytics', icon: <FileText size={14} /> }
+            { label: 'Users', to: '/profile/omega-admin/users', icon: <FileText size={14} /> },
+            { label: 'Grants', to: '/profile/omega-admin/grants', icon: <FileText size={14} /> }
         ]
     };
 

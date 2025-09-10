@@ -42,6 +42,7 @@ export default function OmegaAdminGrants() {
         expired: 0,
         totalValue: 0
     });
+    const [dropdownOpen, setDropdownOpen] = useState(null);
 
     const isOmegaAdmin = isPlatformAdmin(profile?.is_omega_admin);
     const totalPages = Math.ceil(totalGrants / ITEMS_PER_PAGE);
@@ -67,8 +68,7 @@ export default function OmegaAdminGrants() {
                 .select(`
                     *,
                     organizations(id, name, type, image_url)
-                `)
-                .order('created_at', { ascending: false });
+                `);
 
             if (grantsError) throw grantsError;
 
@@ -84,8 +84,8 @@ export default function OmegaAdminGrants() {
                 grant.deadline && new Date(grant.deadline) <= now
             ) || [];
 
-            const totalValue = grantsData?.reduce((sum, grant) => {
-                const amount = grant.amount || 0;
+            const totalValue = activeGrants?.reduce((sum, grant) => {
+                const amount = grant.max_funding_amount || 0;
                 return sum + (typeof amount === 'string' ? parseFloat(amount.replace(/[^0-9.-]+/g, '')) : amount);
             }, 0) || 0;
 
@@ -115,7 +115,7 @@ export default function OmegaAdminGrants() {
                 grant.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
                 grant.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
                 grant.organizations?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                grant.location?.toLowerCase().includes(searchQuery.toLowerCase())
+                grant.grant_type?.toLowerCase().includes(searchQuery.toLowerCase())
             );
         }
 
@@ -214,24 +214,31 @@ export default function OmegaAdminGrants() {
 
     return (
         <div className="space-y-6">
-            {/* Header */}
-            <div className="bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl p-6 text-white">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <div className="flex items-center mb-2">
-                            <FileCheck className="w-8 h-8 mr-3" />
-                            <h1 className="text-3xl font-bold">Grant Management</h1>
+            {/* Banner matches OmegaAdminUsers */}
+            <div className="relative rounded-2xl overflow-hidden" style={{backgroundImage: 'url(https://images.unsplash.com/photo-1576478015047-73879da665da?q=80&w=1326&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D)', backgroundSize: 'cover', backgroundPosition: 'center'}}>
+                <div className="absolute inset-0 bg-black/30"></div>
+                <div className="relative px-8 py-12 lg:px-12 lg:py-16">
+                    <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                            <div className="flex items-center mb-4">
+                                <FileCheck className="w-10 h-10 mr-3 text-white" />
+                                <h1 className="text-4xl lg:text-5xl font-bold text-white">Grant Management</h1>
+                            </div>
+                            <p className="text-xl text-white/90 mb-2">Monitor and manage all platform grant opportunities</p>
                         </div>
-                        <p className="text-purple-100">Monitor and manage all platform grant opportunities</p>
+                        <Link 
+                            to="/profile/omega-admin"
+                            className="inline-flex items-center px-4 py-2 bg-white/20 text-white rounded-lg hover:bg-white/30 transition-colors"
+                        >
+                            <ArrowLeft className="w-4 h-4 mr-2" />
+                            Back to Dashboard
+                        </Link>
                     </div>
-                    <Link 
-                        to="/profile/omega-admin"
-                        className="inline-flex items-center px-4 py-2 bg-white/20 text-white rounded-lg hover:bg-white/30 transition-colors"
-                    >
-                        <ArrowLeft className="w-4 h-4 mr-2" />
-                        Back to Dashboard
-                    </Link>
                 </div>
+                {/* Decorative elements */}
+                <div className="absolute top-4 right-4 w-20 h-20 bg-white/5 rounded-full"></div>
+                <div className="absolute bottom-8 right-24 w-12 h-12 bg-white/10 rounded-full"></div>
+                <div className="absolute top-1/2 right-8 w-6 h-6 bg-white/15 rounded-full"></div>
             </div>
 
             {error && (
@@ -245,7 +252,12 @@ export default function OmegaAdminGrants() {
 
             {/* Stats Cards */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                <div className="bg-white p-6 rounded-xl border border-slate-200">
+                {/* Total Grants - clickable */}
+                <button
+                    type="button"
+                    onClick={() => setStatusFilter('all')}
+                    className={`bg-white p-6 rounded-xl border transition-all focus:outline-none ${statusFilter === 'all' ? 'border-blue-400 shadow-md' : 'border-slate-200 hover:border-blue-300'}`}
+                >
                     <div className="flex items-center justify-between mb-2">
                         <FileCheck className="w-8 h-8 text-blue-600" />
                         <div className="text-2xl font-bold text-slate-900">
@@ -253,9 +265,14 @@ export default function OmegaAdminGrants() {
                         </div>
                     </div>
                     <p className="text-sm font-medium text-slate-600">Total Grants</p>
-                </div>
+                </button>
 
-                <div className="bg-white p-6 rounded-xl border border-slate-200">
+                {/* Active Grants - clickable */}
+                <button
+                    type="button"
+                    onClick={() => setStatusFilter('active')}
+                    className={`bg-white p-6 rounded-xl border transition-all focus:outline-none ${statusFilter === 'active' ? 'border-green-400 shadow-md' : 'border-slate-200 hover:border-green-300'}`}
+                >
                     <div className="flex items-center justify-between mb-2">
                         <TrendingUp className="w-8 h-8 text-green-600" />
                         <div className="text-2xl font-bold text-slate-900">
@@ -263,9 +280,14 @@ export default function OmegaAdminGrants() {
                         </div>
                     </div>
                     <p className="text-sm font-medium text-slate-600">Active Grants</p>
-                </div>
+                </button>
 
-                <div className="bg-white p-6 rounded-xl border border-slate-200">
+                {/* Expired Grants - clickable */}
+                <button
+                    type="button"
+                    onClick={() => setStatusFilter('expired')}
+                    className={`bg-white p-6 rounded-xl border transition-all focus:outline-none ${statusFilter === 'expired' ? 'border-red-400 shadow-md' : 'border-slate-200 hover:border-red-300'}`}
+                >
                     <div className="flex items-center justify-between mb-2">
                         <Clock className="w-8 h-8 text-red-600" />
                         <div className="text-2xl font-bold text-slate-900">
@@ -273,8 +295,9 @@ export default function OmegaAdminGrants() {
                         </div>
                     </div>
                     <p className="text-sm font-medium text-slate-600">Expired Grants</p>
-                </div>
+                </button>
 
+                {/* Total Value - not clickable */}
                 <div className="bg-white p-6 rounded-xl border border-slate-200">
                     <div className="flex items-center justify-between mb-2">
                         <DollarSign className="w-8 h-8 text-purple-600" />
@@ -408,7 +431,7 @@ export default function OmegaAdminGrants() {
                                                                 <div className="flex items-center space-x-6 text-xs text-slate-500">
                                                                     <span className="flex items-center">
                                                                         <DollarSign size={12} className="mr-1" />
-                                                                        {formatAmount(grant.amount)}
+                                                                        {formatAmount(grant.max_funding_amount)}
                                                                     </span>
                                                                     
                                                                     {grant.deadline && (
@@ -418,16 +441,16 @@ export default function OmegaAdminGrants() {
                                                                         </span>
                                                                     )}
                                                                     
-                                                                    {grant.location && (
+                                                                    {grant.grant_type && (
                                                                         <span className="flex items-center">
-                                                                            <MapPin size={12} className="mr-1" />
-                                                                            {grant.location}
+                                                                            <Star size={12} className="mr-1" />
+                                                                            {grant.grant_type}
                                                                         </span>
                                                                     )}
                                                                     
                                                                     <span className="flex items-center">
                                                                         <Clock size={12} className="mr-1" />
-                                                                        Posted {new Date(grant.created_at).toLocaleDateString()}
+                                                                        Added {grant.date_added ? new Date(grant.date_added).toLocaleDateString() : 'Unknown'}
                                                                     </span>
                                                                 </div>
                                                             </div>
@@ -438,17 +461,48 @@ export default function OmegaAdminGrants() {
 
                                             {/* Actions */}
                                             <div className="flex items-center space-x-2 ml-4">
-                                                <Link
-                                                    to={`/grants/${grant.id}`}
-                                                    className="inline-flex items-center px-3 py-1.5 bg-slate-100 text-slate-700 text-xs rounded-md hover:bg-slate-200 transition-colors"
-                                                >
-                                                    <Eye size={12} className="mr-1" />
-                                                    View Grant
-                                                </Link>
+                                                {grant.application_url ? (
+                                                    <a
+                                                        href={grant.application_url}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="inline-flex items-center px-3 py-1.5 bg-slate-100 text-slate-700 text-xs rounded-md hover:bg-slate-200 transition-colors"
+                                                    >
+                                                        <Eye size={12} className="mr-1" />
+                                                        View Grant
+                                                    </a>
+                                                ) : (
+                                                    <span className="inline-flex items-center px-3 py-1.5 bg-gray-100 text-gray-500 text-xs rounded-md cursor-not-allowed">
+                                                        <Eye size={12} className="mr-1" />
+                                                        No Link Available
+                                                    </span>
+                                                )}
                                                 
-                                                <button className="inline-flex items-center px-3 py-1.5 bg-slate-100 text-slate-700 text-xs rounded-md hover:bg-slate-200 transition-colors">
-                                                    <MoreVertical size={12} />
-                                                </button>
+                                                <div className="relative">
+                                                    <button 
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setDropdownOpen(dropdownOpen === grant.id ? null : grant.id);
+                                                        }}
+                                                        className="inline-flex items-center px-3 py-1.5 bg-slate-100 text-slate-700 text-xs rounded-md hover:bg-slate-200 transition-colors"
+                                                    >
+                                                        <MoreVertical size={12} />
+                                                    </button>
+                                                    
+                                                    {dropdownOpen === grant.id && (
+                                                        <div className="absolute right-0 top-full mt-1 w-32 bg-white rounded-md shadow-lg border border-slate-200 z-10">
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    handleDeleteGrant(grant.id);
+                                                                }}
+                                                                className="w-full px-3 py-2 text-left text-xs text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                                                            >
+                                                                Delete Grant
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
