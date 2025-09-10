@@ -35,7 +35,7 @@ export default function MemberProfilePage() {
     // Set the light beige background color
     useEffect(() => {
         setPageBgColor('bg-[#faf7f4]');
-        return () => setPageBgColor('bg-white');
+        return () => setPageBgColor('bg-transparent');
     }, [setPageBgColor]);
 
     // Expose refresh function globally for organization changes

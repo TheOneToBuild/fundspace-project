@@ -105,10 +105,16 @@ const PublicRoute = ({ children }) => {
 
 const AppLayout = () => {
   const { session, profile, notifications, unreadCount, markNotificationsAsRead, handleClearAllNotifications, handleViewPost, refreshProfile } = useOutletContext();
-  const [pageBgColor, setPageBgColor] = useState('bg-white');
+  const [pageBgColor, setPageBgColor] = useState('bg-transparent');
+  const location = useLocation();
+
+  // Reset background color to transparent when route changes
+  useEffect(() => {
+    setPageBgColor('bg-transparent');
+  }, [location.pathname]);
 
   return (
-    <LayoutContext.Provider value={{ setPageBgColor }}>
+    <LayoutContext.Provider value={{ setPageBgColor, pageBgColor }}>
       <div className={`min-h-screen ${pageBgColor} font-sans text-slate-800 flex flex-col`}>
         {session && profile ? (
           <DashboardHeader

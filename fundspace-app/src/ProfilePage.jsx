@@ -36,10 +36,10 @@ export default function ProfilePage() {
 
     const { trendingGrants, savedGrants, posts, isDetailModalOpen, selectedGrant, dataLoading, error, communityMembers, impactMetrics, stories, activeTab, totalPosts, totalFollowers, totalFollowing, suggestedConnections } = appState;
 
-    useEffect(() => {
-        setPageBgColor('bg-[#faf7f4]');
-        return () => setPageBgColor('bg-[#faf7f4]');
-    }, [setPageBgColor]);
+   useEffect(() => {
+    setPageBgColor('bg-[#faf7f4]');
+    return () => setPageBgColor('bg-transparent'); // Changed from 'bg-white'
+}, [setPageBgColor]);
 
     const fetchPageData = useCallback(async (userId) => {
         if (!userId) return;
