@@ -203,7 +203,7 @@ const RoadmapPage = () => {
   const { setPageBgColor } = useContext(LayoutContext);
   useEffect(() => {
     setPageBgColor('bg-gradient-to-br from-slate-50 via-blue-50 to-purple-50');
-    return () => setPageBgColor('bg-white');
+    return () => setPageBgColor('bg-transparent');
   }, [setPageBgColor]);
 
   return (

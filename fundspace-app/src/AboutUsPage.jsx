@@ -61,7 +61,7 @@ const ValueCard = ({ icon:Icon, title, text, bgColor }) => (
 // --- Page ---
 const AboutUsPage = () => {
   const { setPageBgColor } = useContext(LayoutContext);
-  useEffect(()=>{ setPageBgColor('bg-white'); return ()=> setPageBgColor('bg-white'); },[setPageBgColor]);
+  useEffect(()=>{ setPageBgColor('bg-white'); return ()=> setPageBgColor('bg-transparent'); },[setPageBgColor]);
 
   return (
     <div className="min-h-screen bg-white">

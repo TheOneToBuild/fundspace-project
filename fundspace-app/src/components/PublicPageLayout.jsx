@@ -20,7 +20,7 @@ export default function PublicPageLayout({ children, bgColor }) {
     }
     
     // When the component unmounts, reset the background to the default white
-    return () => setPageBgColor('bg-white');
+    return () => setPageBgColor('bg-transparent');
   }, [bgColor, setPageBgColor]);
 
   // This component doesn't render any of its own HTML, it just wraps

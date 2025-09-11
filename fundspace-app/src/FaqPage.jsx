@@ -2,6 +2,7 @@
 
 import React, { useEffect, useContext, useState } from 'react';
 import { motion } from 'framer-motion';
+import PublicPageLayout from './components/PublicPageLayout.jsx';
 import {
   HelpCircle, Users, Shield, Search, MessageSquare, Sparkles, ArrowRight, CheckCircle2, BarChart3, Target, Layers, Filter, FileText, Bot
 } from './components/Icons.jsx';
@@ -111,80 +112,82 @@ const FaqPage = () => {
   const { setPageBgColor } = useContext(LayoutContext);
   useEffect(() => {
     setPageBgColor('bg-gradient-to-br from-slate-50 via-blue-50 to-purple-50');
-    return () => setPageBgColor('bg-white');
+    return () => setPageBgColor('bg-transparent');
   }, [setPageBgColor]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-purple-50">
-      {/* HERO */}
-      <Section className="pt-32 md:pt-40 pb-32 bg-[#f9f6f4] overflow-hidden">
-        <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute -top-24 -left-32 w-[520px] h-[520px] bg-gradient-to-tr from-blue-300 via-indigo-300 to-violet-300 blur-3xl opacity-25" />
-          <div className="absolute bottom-0 right-0 w-[480px] h-[480px] bg-gradient-to-tr from-emerald-300 via-teal-300 to-sky-300 blur-3xl opacity-25" />
-        </div>
-        <div className="relative max-w-4xl mx-auto px-6 text-center">
-          <div className="w-20 h-20 mx-auto mb-8 bg-white rounded-3xl flex items-center justify-center border border-blue-200 shadow-lg">
-            <HelpCircle className="h-10 w-10 text-blue-600" />
+    <PublicPageLayout bgColor="bg-[#faf7f4]">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-purple-50">
+        {/* HERO */}
+        <Section className="pt-32 md:pt-40 pb-32 bg-[#f9f6f4] overflow-hidden">
+          <div className="absolute inset-0 pointer-events-none">
+            <div className="absolute -top-24 -left-32 w-[520px] h-[520px] bg-gradient-to-tr from-blue-300 via-indigo-300 to-violet-300 blur-3xl opacity-25" />
+            <div className="absolute bottom-0 right-0 w-[480px] h-[480px] bg-gradient-to-tr from-emerald-300 via-teal-300 to-sky-300 blur-3xl opacity-25" />
           </div>
-          <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight mb-4">
-            <span className="text-slate-900">Fundspace FAQ</span>
-          </h1>
-          <p className="text-lg md:text-xl text-slate-700 mb-8 max-w-2xl mx-auto leading-relaxed">
-            Everything you need to know about using Fundspace to unlock capital, build capacity, and scale your impact. Can’t find your answer? <a href="/contact" className="text-blue-600 font-semibold hover:underline">Contact us</a>.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <a href="/grants" className="inline-flex items-center justify-center px-8 py-4 rounded-2xl font-semibold bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:shadow-xl transition-all">Browse Grants <Search className="ml-2 h-5 w-5" /></a>
-            <a href="/login?view=signup" className="inline-flex items-center justify-center px-8 py-4 rounded-2xl font-semibold bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 shadow-sm transition-all">Create Free Account <ArrowRight className="ml-2 h-5 w-5" /></a>
+          <div className="relative max-w-4xl mx-auto px-6 text-center">
+            <div className="w-20 h-20 mx-auto mb-8 bg-white rounded-3xl flex items-center justify-center border border-blue-200 shadow-lg">
+              <HelpCircle className="h-10 w-10 text-blue-600" />
+            </div>
+            <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight mb-4">
+              <span className="text-slate-900">Fundspace FAQ</span>
+            </h1>
+            <p className="text-lg md:text-xl text-slate-700 mb-8 max-w-2xl mx-auto leading-relaxed">
+              Everything you need to know about using Fundspace to unlock capital, build capacity, and scale your impact. Can’t find your answer? <a href="/contact" className="text-blue-600 font-semibold hover:underline">Contact us</a>.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <a href="/grants" className="inline-flex items-center justify-center px-8 py-4 rounded-2xl font-semibold bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:shadow-xl transition-all">Browse Grants <Search className="ml-2 h-5 w-5" /></a>
+              <a href="/login?view=signup" className="inline-flex items-center justify-center px-8 py-4 rounded-2xl font-semibold bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 shadow-sm transition-all">Create Free Account <ArrowRight className="ml-2 h-5 w-5" /></a>
+            </div>
           </div>
-        </div>
-      </Section>
+        </Section>
 
-      {/* HOW IT WORKS / WORKFLOW */}
-      <Section className="bg-white pt-24 pb-32 md:pt-36 md:pb-40">
-        <div className="max-w-6xl mx-auto px-6 lg:px-12 text-center mb-16">
-          <span className="inline-flex items-center uppercase tracking-wide text-[11px] font-semibold px-4 py-1.5 rounded-full shadow-sm bg-blue-100 text-blue-700">HOW FUNDSPACE WORKS</span>
-          <h2 className="mt-6 text-4xl md:text-5xl font-black tracking-tight text-slate-900 leading-tight">From Discovery to Impact</h2>
-          <p className="mt-6 text-lg md:text-xl text-slate-600 max-w-3xl mx-auto leading-relaxed">A connected workflow that takes you from your first search to a resilient, multi-year funding engine.</p>
-        </div>
-        <div className="max-w-5xl mx-auto px-6 grid md:grid-cols-2 lg:grid-cols-4 gap-8">
-          {WORKFLOW.map((step, i) => (
-            <FaqCard key={i} icon={step.icon} color={step.color} question={step.title} answer={step.text} />
-          ))}
-        </div>
-      </Section>
-
-      {/* FAQ CARDS */}
-      <Section className="bg-[#f9f6f4] pt-24 pb-32 md:pt-36 md:pb-40">
-        <div className="max-w-6xl mx-auto px-6 lg:px-12 text-center mb-16">
-          <span className="inline-flex items-center uppercase tracking-wide text-[11px] font-semibold px-4 py-1.5 rounded-full shadow-sm bg-purple-100 text-purple-700">FREQUENTLY ASKED</span>
-          <h2 className="mt-6 text-4xl md:text-5xl font-black tracking-tight text-slate-900 leading-tight">Your Questions, Answered</h2>
-        </div>
-        <div className="max-w-5xl mx-auto px-6 grid md:grid-cols-2 lg:grid-cols-3 gap-10">
-          {FAQS.map((faq, i) => (
-            <FaqCard key={i} icon={faq.icon} color={faq.color} question={faq.question} answer={faq.answer} />
-          ))}
-        </div>
-      </Section>
-
-      {/* FINAL CTA */}
-      <Section className="bg-gradient-to-br from-blue-50 via-indigo-50 to-violet-50 py-32 md:py-44 overflow-hidden">
-        <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute -top-10 -left-24 w-[420px] h-[420px] bg-gradient-to-tr from-blue-200 via-indigo-200 to-violet-200 blur-3xl opacity-35" />
-          <div className="absolute bottom-0 right-0 w-[520px] h-[520px] bg-gradient-to-tr from-emerald-200 via-teal-200 to-sky-200 blur-3xl opacity-40" />
-        </div>
-        <div className="relative max-w-4xl mx-auto px-6 text-center">
-          <div className="w-20 h-20 mx-auto mb-10 bg-white rounded-3xl flex items-center justify-center border border-slate-200 shadow-lg">
-            <Sparkles className="h-10 w-10 text-indigo-600" />
+        {/* HOW IT WORKS / WORKFLOW */}
+        <Section className="bg-white pt-24 pb-32 md:pt-36 md:pb-40">
+          <div className="max-w-6xl mx-auto px-6 lg:px-12 text-center mb-16">
+            <span className="inline-flex items-center uppercase tracking-wide text-[11px] font-semibold px-4 py-1.5 rounded-full shadow-sm bg-blue-100 text-blue-700">HOW FUNDSPACE WORKS</span>
+            <h2 className="mt-6 text-4xl md:text-5xl font-black tracking-tight text-slate-900 leading-tight">From Discovery to Impact</h2>
+            <p className="mt-6 text-lg md:text-xl text-slate-600 max-w-3xl mx-auto leading-relaxed">A connected workflow that takes you from your first search to a resilient, multi-year funding engine.</p>
           </div>
-          <h2 className="text-4xl md:text-5xl font-black tracking-tight text-slate-900 mb-6 leading-[1.05]">Still Have Questions?</h2>
-          <p className="text-lg md:text-xl text-slate-700 max-w-2xl mx-auto leading-relaxed mb-12">Our team is here to help. Whether you’re a nonprofit looking for funding or a funder wanting to maximize your impact, we’d love to connect.</p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <a href="/contact" className="inline-flex items-center justify-center px-8 py-4 rounded-2xl font-semibold bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:shadow-xl transition-all">Contact Us <MessageSquare className="ml-2 h-5 w-5" /></a>
-            <a href="/submit-grant" className="inline-flex items-center justify-center px-8 py-4 rounded-2xl font-semibold bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 shadow-sm transition-all">Submit a Grant <CheckCircle2 className="ml-2 h-5 w-5" /></a>
+          <div className="max-w-5xl mx-auto px-6 grid md:grid-cols-2 lg:grid-cols-4 gap-8">
+            {WORKFLOW.map((step, i) => (
+              <FaqCard key={i} icon={step.icon} color={step.color} question={step.title} answer={step.text} />
+            ))}
           </div>
-        </div>
-      </Section>
-    </div>
+        </Section>
+
+        {/* FAQ CARDS */}
+        <Section className="bg-[#f9f6f4] pt-24 pb-32 md:pt-36 md:pb-40">
+          <div className="max-w-6xl mx-auto px-6 lg:px-12 text-center mb-16">
+            <span className="inline-flex items-center uppercase tracking-wide text-[11px] font-semibold px-4 py-1.5 rounded-full shadow-sm bg-purple-100 text-purple-700">FREQUENTLY ASKED</span>
+            <h2 className="mt-6 text-4xl md:text-5xl font-black tracking-tight text-slate-900 leading-tight">Your Questions, Answered</h2>
+          </div>
+          <div className="max-w-5xl mx-auto px-6 grid md:grid-cols-2 lg:grid-cols-3 gap-10">
+            {FAQS.map((faq, i) => (
+              <FaqCard key={i} icon={faq.icon} color={faq.color} question={faq.question} answer={faq.answer} />
+            ))}
+          </div>
+        </Section>
+
+        {/* FINAL CTA */}
+        <Section className="bg-gradient-to-br from-blue-50 via-indigo-50 to-violet-50 py-32 md:py-44 overflow-hidden">
+          <div className="absolute inset-0 pointer-events-none">
+            <div className="absolute -top-10 -left-24 w-[420px] h-[420px] bg-gradient-to-tr from-blue-200 via-indigo-200 to-violet-200 blur-3xl opacity-35" />
+            <div className="absolute bottom-0 right-0 w-[520px] h-[520px] bg-gradient-to-tr from-emerald-200 via-teal-200 to-sky-200 blur-3xl opacity-40" />
+          </div>
+          <div className="relative max-w-4xl mx-auto px-6 text-center">
+            <div className="w-20 h-20 mx-auto mb-10 bg-white rounded-3xl flex items-center justify-center border border-slate-200 shadow-lg">
+              <Sparkles className="h-10 w-10 text-indigo-600" />
+            </div>
+            <h2 className="text-4xl md:text-5xl font-black tracking-tight text-slate-900 mb-6 leading-[1.05]">Still Have Questions?</h2>
+            <p className="text-lg md:text-xl text-slate-700 max-w-2xl mx-auto leading-relaxed mb-12">Our team is here to help. Whether you’re a nonprofit looking for funding or a funder wanting to maximize your impact, we’d love to connect.</p>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <a href="/contact" className="inline-flex items-center justify-center px-8 py-4 rounded-2xl font-semibold bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:shadow-xl transition-all">Contact Us <MessageSquare className="ml-2 h-5 w-5" /></a>
+              <a href="/submit-grant" className="inline-flex items-center justify-center px-8 py-4 rounded-2xl font-semibold bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 shadow-sm transition-all">Submit a Grant <CheckCircle2 className="ml-2 h-5 w-5" /></a>
+            </div>
+          </div>
+        </Section>
+      </div>
+    </PublicPageLayout>
   );
 };
 

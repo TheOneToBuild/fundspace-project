@@ -2,9 +2,10 @@
 import React, { useState, useEffect, useCallback, useContext, useMemo } from 'react';
 import { supabase } from './supabaseClient';
 import { Outlet, useOutletContext } from 'react-router-dom';
-import ProfileLayout from './components/ProfileLayout.jsx';
+import PublicPageLayout from './components/PublicPageLayout.jsx';
 import GrantDetailModal from './GrantDetailModal.jsx';
 import { LayoutContext } from './App.jsx';
+import Footer from './components/Footer.jsx';
 
 export default function ProfilePage() {
     const appContext = useOutletContext();
@@ -36,10 +37,10 @@ export default function ProfilePage() {
 
     const { trendingGrants, savedGrants, posts, isDetailModalOpen, selectedGrant, dataLoading, error, communityMembers, impactMetrics, stories, activeTab, totalPosts, totalFollowers, totalFollowing, suggestedConnections } = appState;
 
-   useEffect(() => {
-    setPageBgColor('bg-[#faf7f4]');
-    return () => setPageBgColor('bg-transparent'); // Changed from 'bg-white'
-}, [setPageBgColor]);
+    useEffect(() => {
+        setPageBgColor('bg-[#faf7f4]');
+        return () => setPageBgColor('bg-transparent');
+    }, [setPageBgColor]);
 
     const fetchPageData = useCallback(async (userId) => {
         if (!userId) return;
@@ -360,7 +361,7 @@ export default function ProfilePage() {
     // FIXED: Let ProtectedRoute handle authentication, simplified loading states
     if (loading || !profile) {
         return (
-            <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20 flex items-center justify-center">
+            <div className="min-h-screen bg-[#faf7f4] flex items-center justify-center">
                 <div className="text-center">
                     <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
                     <p className="text-slate-600">Loading your community hub...</p>
@@ -371,7 +372,7 @@ export default function ProfilePage() {
 
     if (error) {
         return (
-            <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20 flex items-center justify-center">
+            <div className="min-h-screen bg-[#faf7f4] flex items-center justify-center">
                 <div className="text-center bg-white/80 backdrop-blur-sm p-8 rounded-xl shadow-sm border border-red-200">
                     <p className="text-red-600 mb-4">{error}</p>
                     <button onClick={() => fetchPageData(session.user.id)} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
@@ -383,31 +384,21 @@ export default function ProfilePage() {
     }
 
     return (
-        <div className="pb-16">
-            <ProfileLayout
-                profile={profile}
-                user={session?.user}
-                savedGrants={savedGrants}
-                trendingGrants={trendingGrants}
-                handleTrendingGrantClick={handleTrendingGrantClick}
-                notifications={notifications}
-                unreadCount={unreadCount}
-                onNotificationPanelToggle={markNotificationsAsRead}
-                isLoading={dataLoading}
-            >
+        <PublicPageLayout bgColor="bg-[#faf7f4]">
+            <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 min-h-screen flex flex-col">
                 <Outlet context={outletContext} />
-            </ProfileLayout>
-            {isDetailModalOpen && selectedGrant && (
-                <GrantDetailModal
-                    grant={selectedGrant}
-                    isOpen={isDetailModalOpen}
-                    onClose={closeDetail}
-                    session={session}
-                    isSaved={savedGrants.some(g => g.id === selectedGrant.id)}
-                    onSave={handleSaveGrant}
-                    onUnsave={handleUnsaveGrant}
-                />
-            )}
-        </div>
+                {isDetailModalOpen && selectedGrant && (
+                    <GrantDetailModal
+                        grant={selectedGrant}
+                        isOpen={isDetailModalOpen}
+                        onClose={closeDetail}
+                        session={session}
+                        isSaved={savedGrants.some(g => g.id === selectedGrant.id)}
+                        onSave={handleSaveGrant}
+                        onUnsave={handleUnsaveGrant}
+                    />
+                )}
+            </div>
+        </PublicPageLayout>
     );
 }

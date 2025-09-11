@@ -4,6 +4,7 @@ import { useOutletContext, Link } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import { Users, UserCheck, UserX, ArrowLeft, Clock, Building, MapPin } from 'lucide-react';
 import Avatar from './Avatar';
+import PublicPageLayout from './PublicPageLayout.jsx';
 import { 
     removeConnection, 
     acceptConnectionRequest, 
@@ -56,20 +57,16 @@ export default function ConnectionsPage() {
 
     const handleDisconnect = async (connectionId, userId) => {
         if (actionInProgress.has(userId)) return;
-        
         if (!window.confirm('Are you sure you want to disconnect? This will remove the professional connection between you.')) {
             return;
         }
-
         setActionInProgress(prev => new Set(prev).add(userId));
-
         try {
             const result = await removeConnection(currentUserProfile.id, userId);
-            
             if (result.success) {
                 // Remove from local state
                 setConnections(prev => prev.filter(conn => conn.user.id !== userId));
-            } 
+            }
         } catch (error) {
             console.error('Error in handleDisconnect:', error);
         } finally {
@@ -227,128 +224,132 @@ export default function ConnectionsPage() {
     };
 
     return (
-        <div className="space-y-6">
-            {/* Header */}
-            <div className="flex items-center space-x-4">
-                <Link 
-                    to="/profile" 
-                    className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
-                    title="Back to Profile"
-                >
-                    <ArrowLeft size={20} className="text-slate-600" />
-                </Link>
-                <div>
-                    <h1 className="text-2xl font-bold text-slate-900">Professional Connections</h1>
-                    <p className="text-slate-600">
-                        Manage your professional network and connection requests
-                    </p>
-                </div>
-            </div>
+        <PublicPageLayout bgColor="bg-[#faf7f4]">
+            <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 min-h-screen flex flex-col">
+                <div className="space-y-6">
+                    {/* Header */}
+                    <div className="flex items-center space-x-4">
+                        <Link 
+                            to="/profile" 
+                            className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                            title="Back to Profile"
+                        >
+                            <ArrowLeft size={20} className="text-slate-600" />
+                        </Link>
+                        <div>
+                            <h1 className="text-2xl font-bold text-slate-900">Professional Connections</h1>
+                            <p className="text-slate-600">
+                                Manage your professional network and connection requests
+                            </p>
+                        </div>
+                    </div>
 
-            {/* Tabs */}
-            <div className="border-b border-slate-200">
-                <nav className="flex space-x-8">
-                    <button
-                        onClick={() => setActiveTab('connections')}
-                        className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
-                            activeTab === 'connections'
-                                ? 'border-green-500 text-green-600'
-                                : 'border-transparent text-slate-500 hover:text-slate-700'
-                        }`}
-                    >
-                        My Connections ({connections.length})
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('requests')}
-                        className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors relative ${
-                            activeTab === 'requests'
-                                ? 'border-blue-500 text-blue-600'
-                                : 'border-transparent text-slate-500 hover:text-slate-700'
-                        }`}
-                    >
-                        Pending Requests ({pendingRequests.length})
-                        {pendingRequests.length > 0 && (
-                            <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-                        )}
-                    </button>
-                </nav>
-            </div>
+                    {/* Tabs */}
+                    <div className="border-b border-slate-200">
+                        <nav className="flex space-x-8">
+                            <button
+                                onClick={() => setActiveTab('connections')}
+                                className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
+                                    activeTab === 'connections'
+                                        ? 'border-green-500 text-green-600'
+                                        : 'border-transparent text-slate-500 hover:text-slate-700'
+                                }`}
+                            >
+                                My Connections ({connections.length})
+                            </button>
+                            <button
+                                onClick={() => setActiveTab('requests')}
+                                className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors relative ${
+                                    activeTab === 'requests'
+                                        ? 'border-blue-500 text-blue-600'
+                                        : 'border-transparent text-slate-500 hover:text-slate-700'
+                                }`}
+                            >
+                                Pending Requests ({pendingRequests.length})
+                                {pendingRequests.length > 0 && (
+                                    <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+                                )}
+                            </button>
+                        </nav>
+                    </div>
 
-            {/* Content */}
-            {loading ? (
-                <div className="text-center py-12">
-                    <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
-                    <p className="text-slate-600 mt-2">Loading your connections...</p>
-                </div>
-            ) : (
-                <>
-                    {/* Connections Tab */}
-                    {activeTab === 'connections' && (
-                        <div className="space-y-4">
-                            {connections.length > 0 ? (
-                                connections.map(connection => (
-                                    <ConnectionCard 
-                                        key={connection.id} 
-                                        connection={connection} 
-                                        type="connection"
-                                    />
-                                ))
-                            ) : (
-                                <div className="text-center py-12">
-                                    <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                                        <Users className="w-8 h-8 text-slate-400" />
-                                    </div>
-                                    <h3 className="text-lg font-medium text-slate-900 mb-2">No connections yet</h3>
-                                    <p className="text-slate-600 max-w-md mx-auto mb-4">
-                                        Start building your professional network by connecting with colleagues, 
-                                        team members, and other professionals in your field.
-                                    </p>
-                                    <Link 
-                                        to="/profile/members"
-                                        className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                                    >
-                                        <Users className="w-4 h-4 mr-2" />
-                                        Discover Professionals
-                                    </Link>
+                    {/* Content */}
+                    {loading ? (
+                        <div className="text-center py-12">
+                            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
+                            <p className="text-slate-600 mt-2">Loading your connections...</p>
+                        </div>
+                    ) : (
+                        <>
+                            {/* Connections Tab */}
+                            {activeTab === 'connections' && (
+                                <div className="space-y-4">
+                                    {connections.length > 0 ? (
+                                        connections.map(connection => (
+                                            <ConnectionCard 
+                                                key={connection.id} 
+                                                connection={connection} 
+                                                type="connection"
+                                            />
+                                        ))
+                                    ) : (
+                                        <div className="text-center py-12">
+                                            <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                                <Users className="w-8 h-8 text-slate-400" />
+                                            </div>
+                                            <h3 className="text-lg font-medium text-slate-900 mb-2">No connections yet</h3>
+                                            <p className="text-slate-600 max-w-md mx-auto mb-4">
+                                                Start building your professional network by connecting with colleagues, 
+                                                team members, and other professionals in your field.
+                                            </p>
+                                            <Link 
+                                                to="/profile/members"
+                                                className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                                            >
+                                                <Users className="w-4 h-4 mr-2" />
+                                                Discover Professionals
+                                            </Link>
+                                        </div>
+                                    )}
                                 </div>
                             )}
-                        </div>
-                    )}
 
-                    {/* Pending Requests Tab */}
-                    {activeTab === 'requests' && (
-                        <div className="space-y-4">
-                            {pendingRequests.length > 0 ? (
-                                <>
-                                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                                        <p className="text-blue-800 text-sm">
-                                            <strong>{pendingRequests.length}</strong> people want to connect with you professionally. 
-                                            Review and respond to their requests below.
-                                        </p>
-                                    </div>
-                                    {pendingRequests.map(request => (
-                                        <ConnectionCard 
-                                            key={request.id} 
-                                            connection={request} 
-                                            type="request"
-                                        />
-                                    ))}
-                                </>
-                            ) : (
-                                <div className="text-center py-12">
-                                    <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                                        <Clock className="w-8 h-8 text-slate-400" />
-                                    </div>
-                                    <h3 className="text-lg font-medium text-slate-900 mb-2">No pending requests</h3>
-                                    <p className="text-slate-600 max-w-md mx-auto">
-                                        When people send you connection requests, they'll appear here for you to accept or decline.
-                                    </p>
+                            {/* Pending Requests Tab */}
+                            {activeTab === 'requests' && (
+                                <div className="space-y-4">
+                                    {pendingRequests.length > 0 ? (
+                                        <>
+                                            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                                                <p className="text-blue-800 text-sm">
+                                                    <strong>{pendingRequests.length}</strong> people want to connect with you professionally. 
+                                                    Review and respond to their requests below.
+                                                </p>
+                                            </div>
+                                            {pendingRequests.map(request => (
+                                                <ConnectionCard 
+                                                    key={request.id} 
+                                                    connection={request} 
+                                                    type="request"
+                                                />
+                                            ))}
+                                        </>
+                                    ) : (
+                                        <div className="text-center py-12">
+                                            <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                                <Clock className="w-8 h-8 text-slate-400" />
+                                            </div>
+                                            <h3 className="text-lg font-medium text-slate-900 mb-2">No pending requests</h3>
+                                            <p className="text-slate-600 max-w-md mx-auto">
+                                                When people send you connection requests, they'll appear here for you to accept or decline.
+                                            </p>
+                                        </div>
+                                    )}
                                 </div>
                             )}
-                        </div>
+                        </>
                     )}
-                </>
-            )}
-        </div>
+                </div>
+            </div>
+        </PublicPageLayout>
     );
 }
