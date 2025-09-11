@@ -1,48 +1,21 @@
-// src/components/Footer.jsx - COMPLETE FILE WITH TRANSPARENT BACKGROUND
-import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { supabase } from '../supabaseClient';
-import footerLogoImage from '../assets/fundspace-logo2.png';
-import { Facebook, Twitter, Linkedin, Youtube, Instagram } from './Icons.jsx';
+// src/components/Footer.jsx - Updated with more top spacing
+import React, { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Facebook, Twitter, Linkedin, Instagram, Youtube } from 'lucide-react';
+import footerLogoImage from '../assets/fundspace-logo.png';
 
 export default function Footer() {
-  const [session, setSession] = useState(null);
-  const [profile, setProfile] = useState(null);
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      if (session?.user) {
-        supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', session.user.id)
-          .single()
-          .then(({ data }) => setProfile(data));
-      } else {
-        setProfile(null);
-      }
-    });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, newSession) => {
-      setSession(newSession);
-      if (newSession?.user) {
-        supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', newSession.user.id)
-          .single()
-          .then(({ data }) => setProfile(data));
-      } else {
-        setProfile(null);
-      }
-    });
-    return () => subscription.unsubscribe();
-  }, []);
+  const navigate = useNavigate();
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmitGrantClick = (e) => {
-    if (!session || !profile) {
-      e.preventDefault();
-      window.location.href = '/login';
-    }
+  const handleSubmitGrantClick = async (e) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    navigate('/submit-grant');
+    setIsSubmitting(false);
   };
 
   const productLinks = [
@@ -73,8 +46,8 @@ export default function Footer() {
   ];
 
   return (
-    // ✅ UPDATED: Changed from bg-white to bg-transparent and removed border-t to eliminate separation line
-    <footer className="bg-transparent py-8 mt-auto">
+    // UPDATED: Increased top margin to mt-32 for double the spacing
+    <footer className="bg-transparent py-8 mt-32">
       <div className="container mx-auto px-6">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
           <div>
@@ -114,7 +87,7 @@ export default function Footer() {
             </ul>
           </div>
         </div>
-  <div className="pt-8 flex flex-col sm:flex-row justify-between items-center">
+        <div className="pt-8 flex flex-col sm:flex-row justify-between items-center">
           <p className="text-base text-slate-500 mb-4 sm:mb-0">&copy; {new Date().getFullYear()} Fundspace. All rights reserved.</p>
           <div className="flex space-x-4 text-slate-500">
             <a href="#" aria-label="Facebook" className="hover:text-blue-600 transition-colors"><Facebook size={18} /></a>

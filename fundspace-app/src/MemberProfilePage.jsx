@@ -1,7 +1,7 @@
-// MemberProfilePage.jsx - Updated with Experience tab
-import React, { useState, useEffect, useContext } from 'react';
+// MemberProfilePage.jsx - Updated to use PublicPageLayout
+import React, { useState, useEffect } from 'react';
 import { useParams, useOutletContext } from 'react-router-dom';
-import { LayoutContext } from './App.jsx';
+import PublicPageLayout from './components/PublicPageLayout.jsx';
 import { useMemberProfile } from './hooks/useMemberProfile';
 import MemberProfileHeader from './components/member-profile/MemberProfileHeader';
 import MemberProfileActivity from './components/member-profile/MemberProfileActivity';
@@ -12,7 +12,6 @@ import MemberProfileExperience from './components/member-profile/MemberProfileEx
 export default function MemberProfilePage() {
     const { memberId, profileId } = useParams();
     const { profile: currentUserProfile } = useOutletContext();
-    const { setPageBgColor } = useContext(LayoutContext);
     
     const memberIdToUse = memberId || profileId;
     
@@ -29,96 +28,99 @@ export default function MemberProfilePage() {
         refreshMemberData
     } = useMemberProfile(memberIdToUse, currentUserProfile);
 
-    // Tab state management - Updated with 4 tabs now
+    // Tab state management
     const [activeTab, setActiveTab] = useState('activity');
 
-    // Set the light beige background color
-    useEffect(() => {
-        setPageBgColor('bg-[#faf7f4]');
-        return () => setPageBgColor('bg-transparent');
-    }, [setPageBgColor]);
+    // REMOVED: Direct LayoutContext usage - now using PublicPageLayout
+    // useEffect(() => {
+    //     setPageBgColor('bg-[#faf7f4]');
+    //     return () => setPageBgColor('bg-transparent');
+    // }, [setPageBgColor]);
 
     // Expose refresh function globally for organization changes
     useEffect(() => {
-        window.refreshMemberProfileData = refreshMemberData;
+        window.refreshMemberProfile = refreshMemberData;
         return () => {
-            delete window.refreshMemberProfileData;
+            delete window.refreshMemberProfile;
         };
     }, [refreshMemberData]);
 
-    // Handle tab changes from header stats clicks
-    const handleTabChange = (tabName) => {
-        setActiveTab(tabName);
-    };
-
     if (loading) {
         return (
-            <div className="min-h-screen">
-                <div className="text-center p-10">
-                    <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                    <p className="text-slate-600 mt-2">Loading profile...</p>
+            <PublicPageLayout bgColor="bg-[#faf7f4]">
+                <div className="min-h-screen flex items-center justify-center">
+                    <div className="text-center">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                        <p className="text-slate-600">Loading profile...</p>
+                    </div>
                 </div>
-            </div>
+            </PublicPageLayout>
         );
     }
 
     if (error) {
         return (
-            <div className="min-h-screen">
-                <div className="text-center p-10">
-                    <div className="text-red-500 text-lg font-medium mb-2">Error</div>
-                    <p className="text-slate-600">{error}</p>
+            <PublicPageLayout bgColor="bg-[#faf7f4]">
+                <div className="min-h-screen flex items-center justify-center">
+                    <div className="text-center bg-white/80 backdrop-blur-sm p-8 rounded-xl shadow-sm border border-red-200">
+                        <p className="text-red-600 mb-4">{error}</p>
+                        <button 
+                            onClick={() => window.location.reload()} 
+                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                        >
+                            Retry
+                        </button>
+                    </div>
                 </div>
-            </div>
+            </PublicPageLayout>
         );
     }
 
     if (!member) {
         return (
-            <div className="min-h-screen">
-                <div className="text-center p-10">
-                    <div className="text-slate-500 text-lg font-medium mb-2">Member Not Found</div>
-                    <p className="text-slate-600">The member you're looking for doesn't exist.</p>
+            <PublicPageLayout bgColor="bg-[#faf7f4]">
+                <div className="min-h-screen flex items-center justify-center">
+                    <div className="text-center">
+                        <p className="text-slate-600">Member not found</p>
+                    </div>
                 </div>
-            </div>
+            </PublicPageLayout>
         );
     }
 
-    // Render tab content
-    const renderTabContent = () => {
+    const renderActiveTab = () => {
         switch (activeTab) {
             case 'activity':
                 return (
                     <MemberProfileActivity 
                         member={member}
                         posts={posts}
-                        loading={false}
+                        isCurrentUser={isCurrentUser}
+                        currentUserProfile={currentUserProfile}
+                        refreshData={refreshMemberData}
                     />
                 );
             case 'experience':
                 return (
                     <MemberProfileExperience 
                         member={member}
-                        loading={false}
-                        currentUserId={currentUserProfile?.id}
                         isCurrentUser={isCurrentUser}
+                        refreshData={refreshMemberData}
                     />
                 );
             case 'photos':
                 return (
                     <MemberProfilePhotos 
                         member={member}
-                        posts={posts}
-                        loading={false}
+                        isCurrentUser={isCurrentUser}
                     />
                 );
-            case 'connections':
+            case 'network':
                 return (
                     <MemberProfileConnections 
                         member={member}
-                        loading={false}
-                        currentUserId={currentUserProfile?.id}
                         isCurrentUser={isCurrentUser}
+                        currentUserProfile={currentUserProfile}
                     />
                 );
             default:
@@ -127,23 +129,24 @@ export default function MemberProfilePage() {
     };
 
     return (
-        <div className="min-h-screen">
-            <MemberProfileHeader 
-                member={member}
-                isFollowing={isFollowing}
-                onFollow={handleFollow}
-                onUnfollow={handleUnfollow}
-                isCurrentUser={isCurrentUser}
-                followingInProgress={followingInProgress}
-                currentUserId={currentUserProfile?.id}
-                onTabChange={handleTabChange}
-                activeTab={activeTab}
-            />
-            
-            {/* Tab Content */}
-            <div className="pb-8">
-                {renderTabContent()}
+        <PublicPageLayout bgColor="bg-[#faf7f4]">
+            <div className="min-h-screen">
+                <MemberProfileHeader
+                    member={member}
+                    isFollowing={isFollowing}
+                    followingInProgress={followingInProgress}
+                    onFollow={handleFollow}
+                    onUnfollow={handleUnfollow}
+                    isCurrentUser={isCurrentUser}
+                    activeTab={activeTab}
+                    onTabChange={setActiveTab}
+                    currentUserProfile={currentUserProfile}
+                />
+                
+                <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                    {renderActiveTab()}
+                </div>
             </div>
-        </div>
+        </PublicPageLayout>
     );
 }

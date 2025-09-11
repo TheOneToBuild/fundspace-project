@@ -1,16 +1,13 @@
 // src/ProfilePage.jsx - FIXED VERSION
-import React, { useState, useEffect, useCallback, useContext, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from './supabaseClient';
 import { Outlet, useOutletContext } from 'react-router-dom';
 import PublicPageLayout from './components/PublicPageLayout.jsx';
 import GrantDetailModal from './GrantDetailModal.jsx';
-import { LayoutContext } from './App.jsx';
-import Footer from './components/Footer.jsx';
 
 export default function ProfilePage() {
     const appContext = useOutletContext();
     const { session, profile, loading, notifications, unreadCount, markNotificationsAsRead, refreshProfile } = appContext;
-    const { setPageBgColor } = useContext(LayoutContext);
 
     const [appState, setAppState] = useState({
         trendingGrants: [],
@@ -37,10 +34,11 @@ export default function ProfilePage() {
 
     const { trendingGrants, savedGrants, posts, isDetailModalOpen, selectedGrant, dataLoading, error, communityMembers, impactMetrics, stories, activeTab, totalPosts, totalFollowers, totalFollowing, suggestedConnections } = appState;
 
-    useEffect(() => {
-        setPageBgColor('bg-[#faf7f4]');
-        return () => setPageBgColor('bg-transparent');
-    }, [setPageBgColor]);
+    // REMOVED: LayoutContext usage that was conflicting with PublicPageLayout
+    // useEffect(() => {
+    //     setPageBgColor('bg-[#faf7f4]');
+    //     return () => setPageBgColor('bg-transparent');
+    // }, [setPageBgColor]);
 
     const fetchPageData = useCallback(async (userId) => {
         if (!userId) return;
@@ -96,10 +94,8 @@ export default function ProfilePage() {
                 return { data: postsWithReactions, error: null };
             };
 
-            // FIXED: Separate queries to avoid complex joins that cause 400 errors
             const fetchSavedGrants = async () => {
                 try {
-                    // Step 1: Get saved grants IDs
                     const { data: savedGrantsData, error: savedError } = await supabase
                         .from('saved_grants')
                         .select('id, grant_id, created_at')
@@ -111,7 +107,6 @@ export default function ProfilePage() {
                     const grantIds = savedGrantsData.map(sg => sg.grant_id);
                     if (grantIds.length === 0) return [];
 
-                    // Step 2: Get grants data
                     const { data: grantsData, error: grantsError } = await supabase
                         .from('grants')
                         .select('*')
@@ -119,7 +114,6 @@ export default function ProfilePage() {
 
                     if (grantsError || !grantsData) return [];
 
-                    // Step 3: Get organizations data
                     const orgIds = [...new Set(grantsData.map(g => g.organization_id).filter(Boolean))];
                     let orgsData = [];
                     if (orgIds.length > 0) {
@@ -130,7 +124,6 @@ export default function ProfilePage() {
                         orgsData = organizationsData || [];
                     }
 
-                    // Step 4: Combine data
                     return savedGrantsData.map(savedGrant => {
                         const grantData = grantsData.find(g => g.id === savedGrant.grant_id);
                         if (!grantData) return null;
@@ -231,12 +224,10 @@ export default function ProfilePage() {
                     .eq('following_id', userId);
             }
             
-            // Dispatch custom event for real-time UI updates
             window.dispatchEvent(new CustomEvent('followUpdate', {
                 detail: { action, followerId: session.user.id, followingId: userId }
             }));
             
-            // Refresh the page data to update UI
             fetchPageData(session.user.id);
             
         } catch (error) {
@@ -258,8 +249,6 @@ export default function ProfilePage() {
 
     const handleCreateStory = useCallback(() => {}, []);
 
-    // FIXED: Removed the problematic auth redirect logic
-    // The ProtectedRoute wrapper in App.jsx now handles authentication
     useEffect(() => {
         if (session?.user?.id) {
             fetchPageData(session.user.id);
@@ -298,7 +287,6 @@ export default function ProfilePage() {
             .single();
 
         if (data) {
-            // Get organization data separately
             let orgData = null;
             if (data.organization_id) {
                 const { data: organizationData } = await supabase
@@ -358,7 +346,6 @@ export default function ProfilePage() {
         socialStats: { totalPosts, totalFollowers, totalFollowing }
     }), [appContext, profile, posts, handleNewPost, handleDeletePost, savedGrants, session, handleSaveGrant, handleUnsaveGrant, openDetail, activeTab, handleTabChange, impactMetrics, stories, handleStoryClick, handleCreateStory, communityMembers, suggestedConnections, handleFollowUser, handleUnfollowUser, totalPosts, totalFollowers, totalFollowing]);
 
-    // FIXED: Let ProtectedRoute handle authentication, simplified loading states
     if (loading || !profile) {
         return (
             <div className="min-h-screen bg-[#faf7f4] flex items-center justify-center">

@@ -108,9 +108,37 @@ const AppLayout = () => {
   const [pageBgColor, setPageBgColor] = useState('bg-transparent');
   const location = useLocation();
 
-  // Reset background color to transparent when route changes
+  // Only reset background color for routes that don't use PublicPageLayout
   useEffect(() => {
-    setPageBgColor('bg-transparent');
+    // Routes that use PublicPageLayout and should keep their custom backgrounds
+    const publicPageLayoutRoutes = [
+      '/profile',
+      '/profile/connections', 
+      '/profile/hello-community',
+      '/profile/settings',
+      '/profile/followers',
+      '/profile/following',
+      '/profile/grants',
+      '/profile/organizations',
+      '/profile/my-organization',
+      '/profile/notifications',
+      '/profile/members', // Now includes member profiles since they use PublicPageLayout too
+      '/organizations',
+      '/grants',
+      '/faq',
+      '/roadmap',
+      '/about',
+      '/contact'
+    ];
+    
+    const shouldKeepBackground = publicPageLayoutRoutes.some(route => 
+      location.pathname === route || location.pathname.startsWith(route + '/')
+    );
+    
+    // Only reset background for routes that don't use PublicPageLayout
+    if (!shouldKeepBackground) {
+      setPageBgColor('bg-transparent');
+    }
   }, [location.pathname]);
 
   return (

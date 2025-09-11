@@ -1,4 +1,4 @@
-// src/components/PublicPageLayout.jsx
+// src/components/PublicPageLayout.jsx - FIXED: No cleanup to prevent background flashing
 import React, { useEffect, useContext } from 'react';
 import { LayoutContext } from '../App.jsx';
 
@@ -19,8 +19,8 @@ export default function PublicPageLayout({ children, bgColor }) {
       setPageBgColor(bgColor);
     }
     
-    // When the component unmounts, reset the background to the default white
-    return () => setPageBgColor('bg-transparent');
+    // REMOVED: The cleanup function that was causing background flashing
+    // return () => setPageBgColor('bg-transparent');
   }, [bgColor, setPageBgColor]);
 
   // This component doesn't render any of its own HTML, it just wraps
