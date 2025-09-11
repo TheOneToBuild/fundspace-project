@@ -4,6 +4,7 @@ import ScrollToTop from './components/ScrollToTop.jsx';
 import { supabase } from './supabaseClient';
 import { clearAllNotifications, markAllAsRead } from './utils/notificationCleanup';
 import HomePage from './HomePage.jsx';
+import CommunityHub from './components/CommunityHub.jsx';
 import OmegaAdminUsers from './components/omega-admin/OmegaAdminUsers.jsx';
 import OmegaAdminGrants from './components/omega-admin/OmegaAdminGrants.jsx';
 import GrantsPageContent from './GrantsPageContent.jsx';
@@ -374,6 +375,7 @@ export default function App() {
               <Route path="omega-admin/organizations" element={<OmegaAdminOrgSelector />} />
               <Route path="omega-admin/organizations/edit/:orgType/:orgId" element={<OmegaAdminEditOrg />} />
               <Route path="omega-admin/organizations/members/:orgType/:orgId" element={<OmegaAdminManageMembers />} />
+                <Route path="community-hub" element={<CommunityHub />} />
                 <Route path="omega-admin/users" element={<OmegaAdminUsers />} />
   <Route path="omega-admin/grants" element={<OmegaAdminGrants />} />
               <Route path="notifications" element={<NotificationsPage />} />

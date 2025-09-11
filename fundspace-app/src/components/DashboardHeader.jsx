@@ -132,7 +132,10 @@ export default function DashboardHeader({ profile }) {
             icon: <Globe size={16} />,
             dropdown: [
                 { label: 'Hello World', to: '/profile/hello-world', icon: <Globe size={14} /> },
-                { label: 'Hello Community', to: '/profile/hello-community', icon: <Handshake size={14} /> }
+                    { label: 'Hello Community', to: '/profile/hello-community', icon: <Handshake size={14} /> },
+                    { label: 'Community hub', to: '/profile/community-hub', icon: <Handshake size={14} /> }
+
+
             ]
         },
         // Grants Portal (conditionally)
