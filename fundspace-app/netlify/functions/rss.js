@@ -38,7 +38,7 @@ export const handler = async (event) => {
 
     const { data, error } = await query
       .order('pub_date', { ascending: false })
-      .limit(6);
+      .limit(9);
     // --- END UPDATED LOGIC ---
 
     if (error) throw error;

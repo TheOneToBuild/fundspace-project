@@ -5,8 +5,8 @@ import PropTypes from 'prop-types';
 
 const NewsCard = ({ title, timeAgo, image, url, category }) => (
     <div
-        className="w-80 h-80 bg-white rounded-xl overflow-hidden hover:shadow-lg transition-all duration-200 cursor-pointer group relative"
-        onClick={() => url && window.open(url, '_blank')}
+        className="w-64 h-80 bg-white rounded-xl overflow-hidden shadow-lg group cursor-pointer relative"
+        onClick={() => url && window.open(url, '_blank', 'noopener,noreferrer')}
     >
         {image ? (
             <img
@@ -19,7 +19,11 @@ const NewsCard = ({ title, timeAgo, image, url, category }) => (
                 <Globe size={32} className="text-slate-400" />
             </div>
         )}
+        
+        {/* Dark Gradient Overlay */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
+        
+        {/* Source Tag - Top Left */}
         <div className="absolute top-3 left-3">
             <div className="flex items-center space-x-2">
                 <span className="bg-white/20 backdrop-blur-sm text-white text-xs font-medium px-2 py-1 rounded-full border border-white/30">
@@ -31,11 +35,15 @@ const NewsCard = ({ title, timeAgo, image, url, category }) => (
                 </div>
             </div>
         </div>
+        
+        {/* Title Overlay - Bottom */}
         <div className="absolute bottom-0 left-0 right-0 p-4">
             <h3 className="font-bold text-white text-lg leading-tight line-clamp-3 group-hover:text-blue-200 transition-colors">
                 {title}
             </h3>
         </div>
+        
+        {/* Hover Overlay */}
         <div className="absolute inset-0 bg-blue-600/0 group-hover:bg-blue-600/10 transition-colors duration-200"></div>
     </div>
 );
@@ -52,7 +60,11 @@ const NewsCarousel = ({ news }) => {
     const scrollNews = (direction) => {
         const container = document.getElementById('dashboard-news-scroll');
         if (container) {
-            container.scrollBy({ left: direction === 'left' ? -320 : 320, behavior: 'smooth' });
+            const scrollAmount = 280; // Width of card (256px) + gap (24px)
+            container.scrollBy({ 
+                left: direction === 'left' ? -scrollAmount : scrollAmount, 
+                behavior: 'smooth' 
+            });
         }
     };
 
@@ -60,7 +72,7 @@ const NewsCarousel = ({ news }) => {
 
     return (
         <div>
-            <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center justify-between mb-4">
                 <h2 className="text-xl font-bold text-slate-800">Trending World News</h2>
                 <div className="flex space-x-2">
                     <button
@@ -77,16 +89,21 @@ const NewsCarousel = ({ news }) => {
                     </button>
                 </div>
             </div>
-            <div id="dashboard-news-scroll" className="flex space-x-4 overflow-x-auto scrollbar-hide pb-4">
+            <div 
+                id="dashboard-news-scroll" 
+                className="flex space-x-6 overflow-x-auto scrollbar-hide pb-4 w-full"
+                style={{ scrollBehavior: 'smooth' }}
+            >
                 {news.map(item => (
-                    <NewsCard
-                        key={item.id}
-                        title={item.title}
-                        timeAgo={item.timeAgo}
-                        image={item.image}
-                        url={item.url}
-                        category={item.category}
-                    />
+                    <div key={item.id} className="flex-shrink-0">
+                        <NewsCard
+                            title={item.title}
+                            timeAgo={item.timeAgo}
+                            image={item.image}
+                            url={item.url}
+                            category={item.category}
+                        />
+                    </div>
                 ))}
             </div>
         </div>
