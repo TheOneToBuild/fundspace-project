@@ -1,9 +1,9 @@
-// src/components/DashboardHeader.jsx - REDESIGNED: Integrated horizontal navigation with Omega Admin
+// src/components/DashboardHeader.jsx - Updated to remove separate Discover link
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { 
   Menu, X, PlusCircle, Bell, User, ChevronDown, Home, LogOut, 
-  Globe, Handshake, Search, Users, Building, Settings, FileText, Crown
+  Globe, Handshake, Users, Building, Settings, FileText, Crown, MapPin
 } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import GlobalSearch from './GlobalSearch.jsx';
@@ -96,7 +96,6 @@ export default function DashboardHeader({ profile }) {
     }, []);
 
     // Navigation items
-    // Build nav items in desired order
     const grantsPortalItem = {
         label: 'Fund Portal',
         to: '/profile/grants-portal',
@@ -132,18 +131,16 @@ export default function DashboardHeader({ profile }) {
             icon: <Globe size={16} />,
             dropdown: [
                 { label: 'Hello World', to: '/profile/hello-world', icon: <Globe size={14} /> },
-                    { label: 'Hello Community', to: '/profile/hello-community', icon: <Handshake size={14} /> },
-                    { label: 'Community hub', to: '/profile/community-hub', icon: <Handshake size={14} /> }
-
-
+                { label: 'Hello Community', to: '/profile/hello-community', icon: <Handshake size={14} /> },
+                { label: 'Community hub', to: '/profile/community-hub', icon: <Handshake size={14} /> }
             ]
         },
         // Grants Portal (conditionally)
         ...(isOmegaAdmin || hasOrganizationAccess ? [grantsPortalItem] : []),
         {
             label: 'Discover',
-            to: '/profile/members',
-            icon: <Search size={16} />
+            to: '/profile/discover',
+            icon: <MapPin size={16} />
         },
         {
             label: 'Connections',
@@ -398,14 +395,7 @@ export default function DashboardHeader({ profile }) {
 
                 {/* Mobile Search Bar */}
                 <div className="md:hidden border-t border-slate-200 p-4">
-                    <div className="relative">
-                        <Search size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" />
-                        <input
-                            type="text"
-                            placeholder="Search"
-                            className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        />
-                    </div>
+                    <GlobalSearch />
                 </div>
             </header>
 
@@ -517,11 +507,6 @@ export default function DashboardHeader({ profile }) {
                                             >
                                                 {item.icon}
                                                 <span>{item.label}</span>
-                                                {item.badge && item.badge > 0 && (
-                                                    <span className="ml-auto text-xs bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full font-semibold">
-                                                        {item.badge}
-                                                    </span>
-                                                )}
                                             </Link>
                                         )}
                                     </div>

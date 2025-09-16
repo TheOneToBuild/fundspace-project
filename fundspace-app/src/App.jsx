@@ -8,6 +8,7 @@ import CommunityHub from './components/CommunityHub.jsx';
 import OmegaAdminUsers from './components/omega-admin/OmegaAdminUsers.jsx';
 import OmegaAdminGrants from './components/omega-admin/OmegaAdminGrants.jsx';
 import GrantsPageContent from './GrantsPageContent.jsx';
+import CommunityDiscoverPage from './components/discover/CommunityDiscoverPage.jsx';
 import ExploreOrganizations from './ExploreOrganizations.jsx';
 import SpotlightLandingPage from './SpotlightLandingPage.jsx';
 import CountySpotlightPage from './CountySpotlightPage.jsx';
@@ -23,7 +24,6 @@ import SubmitGrantPage from './SubmitGrantPage.jsx';
 import LoginPage from './LoginPage.jsx';
 import ProfilePage from './ProfilePage.jsx';
 import SettingsPage from './SettingsPage.jsx';
-import ExploreMembersPage from './ExploreMembersPage.jsx';
 import MemberProfilePage from './MemberProfilePage.jsx';
 import HomeDashboard from './components/HomeDashboard.jsx';
 import HelloWorldChannel from './components/HelloWorldChannel.jsx';
@@ -116,6 +116,7 @@ const AppLayout = () => {
       '/profile',
       '/profile/connections', 
       '/profile/hello-community',
+      '/profile/discover',
       '/profile/settings',
       '/profile/followers',
       '/profile/following',
@@ -363,9 +364,9 @@ export default function App() {
               <Route path="hello-world" element={<HelloWorldChannel />} />
               <Route path="grants" element={<GrantsPageContent hideHero={true} isProfileView={true} />} />
               <Route path="organizations" element={<ExploreOrganizations isProfileView={true} />} />
-              <Route path="members" element={<ExploreMembersPage />} />
               <Route path="grants-portal" element={<GrantsPortalPage />} />
               <Route path="hello-community" element={<HelloCommunityRoute />} />
+              <Route path="discover" element={<CommunityDiscoverPage />} />
               <Route path="settings" element={<SettingsPage />} />
               <Route path="followers" element={<FollowersPage />} />
               <Route path="following" element={<FollowingPage />} />
@@ -375,9 +376,9 @@ export default function App() {
               <Route path="omega-admin/organizations" element={<OmegaAdminOrgSelector />} />
               <Route path="omega-admin/organizations/edit/:orgType/:orgId" element={<OmegaAdminEditOrg />} />
               <Route path="omega-admin/organizations/members/:orgType/:orgId" element={<OmegaAdminManageMembers />} />
-                <Route path="community-hub" element={<CommunityHub />} />
-                <Route path="omega-admin/users" element={<OmegaAdminUsers />} />
-  <Route path="omega-admin/grants" element={<OmegaAdminGrants />} />
+              <Route path="community-hub" element={<CommunityHub />} />
+              <Route path="omega-admin/users" element={<OmegaAdminUsers />} />
+              <Route path="omega-admin/grants" element={<OmegaAdminGrants />} />
               <Route path="notifications" element={<NotificationsPage />} />
               <Route path="members/:profileId" element={<MemberProfilePage />} />
             </Route>

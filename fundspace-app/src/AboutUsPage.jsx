@@ -8,7 +8,7 @@ import { LayoutContext } from './App.jsx';
 
 // --- Data (lightweight + story forward) ---
 const ADVISORY = [
-    { name: 'Advisory Member', title: 'To be announced', imageUrl: 'https://media.licdn.com/dms/image/v2/D5603AQFJnKCpiXgEvA/profile-displayphoto-shrink_800_800/profile-displayphoto-shrink_800_800/0/1714823893508?e=1759968000&v=beta&t=alffzwY7ieN0BbxXshwwOcN_KczfJGL59CjCIGoW5Xk', linkedinUrl: 'https://www.linkedin.com/in/linda-prieto/' },
+    { name: 'Advisory Member', title: 'Chief Program & Advancement Officer, Silicon Valley Social Venture Fund', imageUrl: 'https://media.licdn.com/dms/image/v2/D5603AQFJnKCpiXgEvA/profile-displayphoto-shrink_800_800/profile-displayphoto-shrink_800_800/0/1714823893508?e=1759968000&v=beta&t=alffzwY7ieN0BbxXshwwOcN_KczfJGL59CjCIGoW5Xk', linkedinUrl: 'https://www.linkedin.com/in/linda-prieto/' },
     { name: 'Advisory Member', title: 'Director of Community Partnerships, Silicon Valley Community Foundation', imageUrl: 'https://www.hfsv.org/wp-content/uploads/2023/11/mauricio-palma-2023.jpg', linkedinUrl: 'https://www.linkedin.com/in/mauricio-palma-b2ba587/' },
   { name: 'Advisory Member', title: 'Director of Contracts & Compliance, San Francisco International Airport', imageUrl: 'https://media.licdn.com/dms/image/v2/C5603AQFAMGYFJIyhzA/profile-displayphoto-shrink_800_800/profile-displayphoto-shrink_800_800/0/1600903357926?e=1759968000&v=beta&t=MLY11lUsP_16_m1_rt7RZXUaMGWISzuVx5BUGofPKpQ', linkedinUrl: 'https://www.linkedin.com/in/yenpang/' },
   { name: 'Advisory Member', title: 'To be announced', imageUrl: 'https://triadessay.com/wp-content/uploads/2025/01/2025010118415912.png', linkedinUrl: null },

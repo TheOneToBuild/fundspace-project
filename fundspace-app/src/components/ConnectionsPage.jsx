@@ -1,8 +1,8 @@
-// src/components/ConnectionsPage.jsx
+// src/components/ConnectionsPage.jsx - Enhanced with Discover functionality
 import React, { useState, useEffect } from 'react';
 import { useOutletContext, Link } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
-import { Users, UserCheck, UserX, ArrowLeft, Clock, Building, MapPin } from 'lucide-react';
+import { Users, UserCheck, UserX, ArrowLeft, Clock, Building, MapPin, Search, Filter } from 'lucide-react';
 import Avatar from './Avatar';
 import PublicPageLayout from './PublicPageLayout.jsx';
 import { 
@@ -17,9 +17,13 @@ export default function ConnectionsPage() {
     const { profile: currentUserProfile } = useOutletContext();
     const [connections, setConnections] = useState([]);
     const [pendingRequests, setPendingRequests] = useState([]);
+    const [discoveredMembers, setDiscoveredMembers] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [discoverLoading, setDiscoverLoading] = useState(false);
     const [actionInProgress, setActionInProgress] = useState(new Set());
-    const [activeTab, setActiveTab] = useState('connections'); // 'connections' or 'requests'
+    const [activeTab, setActiveTab] = useState('connections'); // 'connections', 'requests', 'discover'
+    const [searchQuery, setSearchQuery] = useState('');
+    const [filterType, setFilterType] = useState('all'); // 'all', 'nonprofit', 'foundation', 'education', 'government'
 
     useEffect(() => {
         if (currentUserProfile?.id) {
@@ -27,6 +31,12 @@ export default function ConnectionsPage() {
             fetchPendingRequests();
         }
     }, [currentUserProfile?.id]);
+
+    useEffect(() => {
+        if (activeTab === 'discover') {
+            fetchDiscoverMembers();
+        }
+    }, [activeTab, searchQuery, filterType]);
 
     const fetchConnections = async () => {
         try {
@@ -55,6 +65,96 @@ export default function ConnectionsPage() {
         }
     };
 
+    const fetchDiscoverMembers = async () => {
+        try {
+            setDiscoverLoading(true);
+            
+            // Get IDs of users already connected or with pending requests
+            const connectedUserIds = new Set([
+                ...connections.map(c => c.user.id),
+                ...pendingRequests.map(r => r.requester_profile.id)
+            ]);
+
+            let query = supabase
+                .from('profiles')
+                .select(`
+                    id,
+                    full_name,
+                    title,
+                    avatar_url,
+                    location,
+                    organization_name,
+                    organization_type,
+                    role,
+                    created_at
+                `)
+                .neq('id', currentUserProfile.id)
+                .limit(20);
+
+            // Only filter out connected users if we have any
+            if (connectedUserIds.size > 0) {
+                query = query.not('id', 'in', `(${Array.from(connectedUserIds).join(',')})`);
+            }
+
+            // Apply search filter
+            if (searchQuery.trim()) {
+                query = query.or(`full_name.ilike.%${searchQuery}%,organization_name.ilike.%${searchQuery}%,title.ilike.%${searchQuery}%`);
+            }
+
+            // Apply type filter based on organization_type patterns
+            if (filterType !== 'all') {
+                if (filterType === 'nonprofit') {
+                    query = query.ilike('organization_type', 'nonprofit%');
+                } else if (filterType === 'foundation') {
+                    query = query.ilike('organization_type', 'foundation%');
+                } else if (filterType === 'education') {
+                    query = query.ilike('organization_type', 'education%');
+                } else if (filterType === 'government') {
+                    query = query.ilike('organization_type', 'government%');
+                }
+            }
+
+            const { data, error } = await query.order('created_at', { ascending: false });
+            
+            if (!error) {
+                setDiscoveredMembers(data || []);
+            }
+        } catch (error) {
+            console.error('❌ Error in fetchDiscoverMembers:', error);
+        } finally {
+            setDiscoverLoading(false);
+        }
+    };
+
+    const handleSendConnectionRequest = async (userId) => {
+        if (actionInProgress.has(userId)) return;
+
+        setActionInProgress(prev => new Set(prev).add(userId));
+
+        try {
+            const { error } = await supabase
+                .from('user_connections')
+                .insert({
+                    requester_id: currentUserProfile.id,
+                    recipient_id: userId,
+                    status: 'pending'
+                });
+
+            if (!error) {
+                // Remove from discovered members
+                setDiscoveredMembers(prev => prev.filter(member => member.id !== userId));
+            }
+        } catch (error) {
+            console.error('Error sending connection request:', error);
+        } finally {
+            setActionInProgress(prev => {
+                const newSet = new Set(prev);
+                newSet.delete(userId);
+                return newSet;
+            });
+        }
+    };
+
     const handleDisconnect = async (connectionId, userId) => {
         if (actionInProgress.has(userId)) return;
         if (!window.confirm('Are you sure you want to disconnect? This will remove the professional connection between you.')) {
@@ -64,7 +164,6 @@ export default function ConnectionsPage() {
         try {
             const result = await removeConnection(currentUserProfile.id, userId);
             if (result.success) {
-                // Remove from local state
                 setConnections(prev => prev.filter(conn => conn.user.id !== userId));
             }
         } catch (error) {
@@ -87,9 +186,7 @@ export default function ConnectionsPage() {
             const result = await acceptConnectionRequest(currentUserProfile.id, userId);
             
             if (result.success) {
-                // Remove from pending requests
                 setPendingRequests(prev => prev.filter(req => req.requester_profile.id !== userId));
-                // Refresh connections list
                 await fetchConnections();
             } 
         } catch (error) {
@@ -112,7 +209,6 @@ export default function ConnectionsPage() {
             const result = await declineConnectionRequest(currentUserProfile.id, userId);
             
             if (result.success) {
-                // Remove from pending requests
                 setPendingRequests(prev => prev.filter(req => req.requester_profile.id !== userId));
             } 
         } catch (error) {
@@ -174,6 +270,13 @@ export default function ConnectionsPage() {
                                 </p>
                             )}
 
+                            {user.location && (
+                                <p className="text-sm text-slate-500 mt-1 flex items-center">
+                                    <MapPin className="w-3 h-3 mr-1" />
+                                    {user.location}
+                                </p>
+                            )}
+
                             <div className="flex items-center text-xs text-slate-400 mt-2">
                                 <Clock className="w-3 h-3 mr-1" />
                                 {type === 'connection' 
@@ -223,6 +326,80 @@ export default function ConnectionsPage() {
         );
     };
 
+    const DiscoverCard = ({ member }) => {
+        const isActionInProgress = actionInProgress.has(member.id);
+
+        return (
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 hover:shadow-md transition-shadow">
+                <div className="flex items-start justify-between">
+                    <div className="flex items-start space-x-4 flex-grow">
+                        <Avatar 
+                            src={member.avatar_url} 
+                            fullName={member.full_name} 
+                            size="lg" 
+                        />
+                        <div className="flex-grow min-w-0">
+                            <Link 
+                                to={`/profile/members/${member.id}`}
+                                className="text-lg font-semibold text-slate-900 hover:text-blue-600 transition-colors block"
+                            >
+                                {member.full_name}
+                            </Link>
+                            
+                            {member.title && (
+                                <p className="text-sm text-slate-600 mt-1 flex items-center">
+                                    <Building className="w-3 h-3 mr-1" />
+                                    {member.title}
+                                </p>
+                            )}
+                            
+                            {member.organization_name && (
+                                <p className="text-sm text-slate-500 mt-1">
+                                    {member.organization_name}
+                                </p>
+                            )}
+
+                            {member.location && (
+                                <p className="text-sm text-slate-500 mt-1 flex items-center">
+                                    <MapPin className="w-3 h-3 mr-1" />
+                                    {member.location}
+                                </p>
+                            )}
+
+                            {member.organization_type && (
+                                <span className={`inline-block mt-2 px-2 py-1 text-xs font-medium rounded-full ${
+                                    member.organization_type?.startsWith('nonprofit') ? 'bg-green-100 text-green-800' :
+                                    member.organization_type?.startsWith('foundation') ? 'bg-blue-100 text-blue-800' :
+                                    member.organization_type?.startsWith('education') ? 'bg-purple-100 text-purple-800' :
+                                    member.organization_type?.startsWith('government') ? 'bg-gray-100 text-gray-800' :
+                                    'bg-slate-100 text-slate-800'
+                                }`}>
+                                    {member.organization_type?.startsWith('nonprofit') ? 'Nonprofit' :
+                                     member.organization_type?.startsWith('foundation') ? 'Foundation' :
+                                     member.organization_type?.startsWith('education') ? 'Education' :
+                                     member.organization_type?.startsWith('government') ? 'Government' :
+                                     member.organization_type}
+                                </span>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Connect Button */}
+                    <div className="flex-shrink-0 ml-4">
+                        <button
+                            onClick={() => handleSendConnectionRequest(member.id)}
+                            disabled={isActionInProgress}
+                            className="inline-flex items-center px-3 py-2 text-sm font-medium bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            <Users className="w-4 h-4 mr-1" />
+                            {isActionInProgress ? 'Connecting...' : 'Connect'}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
     return (
         <PublicPageLayout bgColor="bg-[#faf7f4]">
             <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 min-h-screen flex flex-col">
@@ -237,9 +414,9 @@ export default function ConnectionsPage() {
                             <ArrowLeft size={20} className="text-slate-600" />
                         </Link>
                         <div>
-                            <h1 className="text-2xl font-bold text-slate-900">Professional Connections</h1>
+                            <h1 className="text-2xl font-bold text-slate-900">Connections & Discovery</h1>
                             <p className="text-slate-600">
-                                Manage your professional network and connection requests
+                                Manage your professional network and discover new connections
                             </p>
                         </div>
                     </div>
@@ -270,11 +447,57 @@ export default function ConnectionsPage() {
                                     <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full"></span>
                                 )}
                             </button>
+                            <button
+                                onClick={() => setActiveTab('discover')}
+                                className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
+                                    activeTab === 'discover'
+                                        ? 'border-purple-500 text-purple-600'
+                                        : 'border-transparent text-slate-500 hover:text-slate-700'
+                                }`}
+                            >
+                                Discover People
+                            </button>
                         </nav>
                     </div>
 
+                    {/* Discover Tab Filters */}
+                    {activeTab === 'discover' && (
+                        <div className="bg-white rounded-lg border border-slate-200 p-4">
+                            <div className="flex flex-col sm:flex-row gap-4">
+                                {/* Search */}
+                                <div className="flex-1">
+                                    <div className="relative">
+                                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
+                                        <input
+                                            type="text"
+                                            placeholder="Search by name, organization, or title..."
+                                            value={searchQuery}
+                                            onChange={(e) => setSearchQuery(e.target.value)}
+                                            className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                        />
+                                    </div>
+                                </div>
+                                
+                                {/* Filter */}
+                                <div className="sm:w-48">
+                                    <select
+                                        value={filterType}
+                                        onChange={(e) => setFilterType(e.target.value)}
+                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    >
+                                        <option value="all">All Types</option>
+                                        <option value="nonprofit">Nonprofits</option>
+                                        <option value="foundation">Foundations</option>
+                                        <option value="education">Education</option>
+                                        <option value="government">Government</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     {/* Content */}
-                    {loading ? (
+                    {loading && activeTab !== 'discover' ? (
                         <div className="text-center py-12">
                             <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
                             <p className="text-slate-600 mt-2">Loading your connections...</p>
@@ -302,13 +525,13 @@ export default function ConnectionsPage() {
                                                 Start building your professional network by connecting with colleagues, 
                                                 team members, and other professionals in your field.
                                             </p>
-                                            <Link 
-                                                to="/profile/members"
+                                            <button 
+                                                onClick={() => setActiveTab('discover')}
                                                 className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
                                             >
                                                 <Users className="w-4 h-4 mr-2" />
-                                                Discover Professionals
-                                            </Link>
+                                                Discover People
+                                            </button>
                                         </div>
                                     )}
                                 </div>
@@ -341,6 +564,48 @@ export default function ConnectionsPage() {
                                             <h3 className="text-lg font-medium text-slate-900 mb-2">No pending requests</h3>
                                             <p className="text-slate-600 max-w-md mx-auto">
                                                 When people send you connection requests, they'll appear here for you to accept or decline.
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Discover Tab */}
+                            {activeTab === 'discover' && (
+                                <div className="space-y-4">
+                                    {discoverLoading ? (
+                                        <div className="text-center py-12">
+                                            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+                                            <p className="text-slate-600 mt-2">Finding people for you to connect with...</p>
+                                        </div>
+                                    ) : discoveredMembers.length > 0 ? (
+                                        <>
+                                            <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                                                <p className="text-purple-800 text-sm">
+                                                    Found <strong>{discoveredMembers.length}</strong> professionals you might want to connect with. 
+                                                    Use the search and filter options above to refine your results.
+                                                </p>
+                                            </div>
+                                            {discoveredMembers.map(member => (
+                                                <DiscoverCard 
+                                                    key={member.id} 
+                                                    member={member}
+                                                />
+                                            ))}
+                                        </>
+                                    ) : (
+                                        <div className="text-center py-12">
+                                            <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                                <Search className="w-8 h-8 text-slate-400" />
+                                            </div>
+                                            <h3 className="text-lg font-medium text-slate-900 mb-2">
+                                                {searchQuery || filterType !== 'all' ? 'No matches found' : 'No new people to discover'}
+                                            </h3>
+                                            <p className="text-slate-600 max-w-md mx-auto">
+                                                {searchQuery || filterType !== 'all' 
+                                                    ? 'Try adjusting your search terms or filters to find more people.'
+                                                    : 'All available professionals are either already connected with you or have pending requests.'
+                                                }
                                             </p>
                                         </div>
                                     )}
