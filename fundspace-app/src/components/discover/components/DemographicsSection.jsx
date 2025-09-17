@@ -1,65 +1,88 @@
 // src/components/discover/components/DemographicsSection.jsx
 import React from 'react';
-import { Users, Globe, TrendingUp } from 'lucide-react';
+import { useAnimatedCounter, formatNumber } from '../hooks/useAnimatedCounter.js';
 
-export default function DemographicsSection({ demographics }) {
+export default function DemographicsSection({ demographics, isVisible }) {
     if (!demographics) return null;
 
-    return (
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
-            <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
-                <Users className="w-5 h-5 text-blue-600" />
-                Community Demographics & Challenges
-            </h3>
-            
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                <div className="text-center p-3 bg-slate-50 rounded-lg">
-                    <p className="text-xs text-slate-500 uppercase tracking-wide">Population</p>
-                    <p className="text-lg font-semibold text-slate-900">{demographics.population}</p>
-                </div>
-                <div className="text-center p-3 bg-slate-50 rounded-lg">
-                    <p className="text-xs text-slate-500 uppercase tracking-wide">Median Income</p>
-                    <p className="text-lg font-semibold text-green-600">{demographics.medianIncome}</p>
-                </div>
-                <div className="text-center p-3 bg-slate-50 rounded-lg">
-                    <p className="text-xs text-slate-500 uppercase tracking-wide">Poverty Rate</p>
-                    <p className="text-lg font-semibold text-orange-600">{demographics.povertyRate}</p>
-                </div>
-                <div className="text-center p-3 bg-slate-50 rounded-lg">
-                    <p className="text-xs text-slate-500 uppercase tracking-wide">Unemployment</p>
-                    <p className="text-lg font-semibold text-red-600">{demographics.unemploymentRate}</p>
-                </div>
-            </div>
+    const demographicMetrics = [
+        {
+            label: 'Population',
+            value: demographics.population,
+            progress: 78,
+            color: 'from-blue-400 to-blue-600',
+            bgColor: 'from-blue-50 to-blue-100',
+            icon: '👥'
+        },
+        {
+            label: 'Median Income',
+            value: demographics.medianIncome,
+            progress: 64,
+            color: 'from-emerald-400 to-emerald-600',
+            bgColor: 'from-emerald-50 to-emerald-100',
+            icon: '💵'
+        },
+        {
+            label: 'Poverty Rate',
+            value: demographics.povertyRate,
+            progress: 32,
+            color: 'from-amber-400 to-orange-500',
+            bgColor: 'from-amber-50 to-orange-100',
+            icon: '📊'
+        },
+        {
+            label: 'Unemployment',
+            value: demographics.unemploymentRate,
+            progress: 28,
+            color: 'from-red-400 to-red-600',
+            bgColor: 'from-red-50 to-red-100',
+            icon: '📉'
+        }
+    ];
 
-            <div className="flex flex-col md:flex-row gap-6">
-                <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                        <Globe className="w-4 h-4 text-purple-600" />
-                        <span className="text-sm font-medium text-slate-700">Diversity Index</span>
-                    </div>
-                    <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${
-                        demographics.diversityIndex === 'Very High' ? 'bg-green-100 text-green-800' :
-                        demographics.diversityIndex === 'High' ? 'bg-blue-100 text-blue-800' :
-                        'bg-yellow-100 text-yellow-800'
-                    }`}>
-                        {demographics.diversityIndex}
-                    </span>
-                </div>
+    return (
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
+            {demographicMetrics.map((metric, index) => {
+                const animatedValue = useAnimatedCounter(
+                    isVisible ? parseFloat(metric.value.replace(/[^0-9.]/g, '')) : 0, 
+                    2500
+                );
+                const animatedProgress = useAnimatedCounter(isVisible ? metric.progress : 0, 2000);
                 
-                <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                        <TrendingUp className="w-4 h-4 text-orange-600" />
-                        <span className="text-sm font-medium text-slate-700">Key Challenges</span>
+                return (
+                    <div 
+                        key={index} 
+                        className={`bg-gradient-to-br ${metric.bgColor} rounded-3xl p-6 border border-white/60 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 relative overflow-hidden group`}
+                        style={{
+                            animation: isVisible ? `slideInUp 0.6s ease-out ${index * 0.15}s both` : 'none'
+                        }}
+                    >
+                        <div className="absolute top-2 right-2 text-4xl opacity-20">{metric.icon}</div>
+                        <div className="absolute -bottom-6 -right-6 w-16 h-16 bg-white/30 rounded-full blur-xl" />
+                        
+                        <div className="relative z-10">
+                            <p className="text-xs text-slate-600 uppercase tracking-widest font-bold mb-3">{metric.label}</p>
+                            <p className="text-3xl font-bold text-slate-800 mb-4">
+                                {formatNumber(animatedValue, metric.value)}
+                            </p>
+                            
+                            <div className="relative">
+                                <div className="w-full bg-white/60 rounded-full h-3 shadow-inner">
+                                    <div 
+                                        className={`bg-gradient-to-r ${metric.color} h-3 rounded-full shadow-lg transition-all duration-1000 ease-out relative overflow-hidden`}
+                                        style={{ width: `${animatedProgress}%` }}
+                                    >
+                                        <div className="absolute inset-0 bg-white/30 rounded-full animate-pulse" />
+                                    </div>
+                                </div>
+                                <p className="text-xs text-slate-600 mt-2 font-medium">
+                                    {Math.round(animatedProgress)}% of benchmark
+                                </p>
+                            </div>
+                        </div>
                     </div>
-                    <div className="flex flex-wrap gap-1">
-                        {demographics.majorChallenges.map((challenge, index) => (
-                            <span key={index} className="px-2 py-1 bg-orange-50 text-orange-700 text-xs rounded-full">
-                                {challenge}
-                            </span>
-                        ))}
-                    </div>
-                </div>
-            </div>
+                );
+            })}
         </div>
     );
 }

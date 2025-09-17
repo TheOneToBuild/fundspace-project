@@ -2,7 +2,6 @@
 import React, { useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import PublicPageLayout from '../PublicPageLayout.jsx';
-import LocationSelector from './components/LocationSelector.jsx';
 import ContentSection from './components/ContentSection.jsx';
 import { useLocationData } from './hooks/useLocationData.js';
 
@@ -18,18 +17,13 @@ export default function CommunityDiscoverPage() {
     return (
         <PublicPageLayout bgColor="bg-[#faf7f4]">
             <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 min-h-screen">
-                <LocationSelector 
-                    viewType={viewType}
-                    setViewType={setViewType}
-                    selectedLocation={selectedLocation}
-                    setSelectedLocation={setSelectedLocation}
-                    searchQuery={searchQuery}
-                    setSearchQuery={setSearchQuery}
-                />
-                
                 <ContentSection 
                     selectedLocation={selectedLocation}
                     viewType={viewType}
+                    setViewType={setViewType}
+                    setSelectedLocation={setSelectedLocation}
+                    searchQuery={searchQuery}
+                    setSearchQuery={setSearchQuery}
                     locationData={locationData}
                     loading={loading}
                     activeTab={activeTab}
