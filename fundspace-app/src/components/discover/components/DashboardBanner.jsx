@@ -1,8 +1,10 @@
 // src/components/discover/components/DashboardBanner.jsx
 import React from 'react';
-import { ChevronDown, BarChart3, Building, DollarSign, MessageSquare, MapPin } from 'lucide-react';
+import { ChevronDown, BarChart3, Building, DollarSign, MessageSquare, MapPin, Users } from 'lucide-react';
 import { BAY_AREA_COUNTIES, MAJOR_CITIES } from '../data/locationData.js';
 import { COMMUNITY_IMAGES, DEFAULT_COMMUNITY_IMAGE } from '../data/communityImages.js';
+import { useDashboardStats } from '../hooks/useDashboardStats.js';
+import AnimatedCounter from '../../AnimatedCounter.jsx';
 
 export default function DashboardBanner({ 
     selectedLocation,
@@ -16,6 +18,9 @@ export default function DashboardBanner({
     setSearchQuery,
     isVisible 
 }) {
+    // Fetch live dashboard statistics
+    const dashboardStats = useDashboardStats(selectedLocation);
+
     // Determine if current selection is a county or city
     const isCountySelected = selectedLocation === 'bay-area' || Object.keys(BAY_AREA_COUNTIES).includes(selectedLocation);
     const selectedCounty = isCountySelected ? 
@@ -44,12 +49,57 @@ export default function DashboardBanner({
 
     const tabs = [
         { id: 'overview', label: 'Overview', count: null, icon: BarChart3 },
-        { id: 'organizations', label: 'Organizations', count: '12', icon: Building },
-        { id: 'grants', label: 'Grants', count: '12', icon: DollarSign },
-        { id: 'posts', label: 'Posts', count: '11', icon: MessageSquare }
+        { id: 'organizations', label: 'Organizations', count: dashboardStats.totalOrganizations, icon: Building },
+        { id: 'grants', label: 'Grants', count: 'Live', icon: DollarSign },
+        { id: 'posts', label: 'Posts', count: 'Soon', icon: MessageSquare }
     ];
 
     const communityImage = COMMUNITY_IMAGES[selectedLocation] || DEFAULT_COMMUNITY_IMAGE;
+
+    // Helper function to format monetary values
+    const formatMonetaryValue = (value) => {
+        if (value >= 1000000000) return `$${(value / 1000000000).toFixed(1)}B`;
+        if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
+        if (value >= 1000) return `$${(value / 1000).toFixed(0)}K`;
+        return `$${value.toLocaleString()}`;
+    };
+
+    // Helper function to format regular numbers
+    const formatRegularValue = (value) => {
+        return value.toLocaleString();
+    };
+
+    // Prepare metrics data with live stats
+    const metricsData = [
+        { 
+            label: 'Total Funding', 
+            value: dashboardStats.totalFunding,
+            change: dashboardStats.changes.funding, 
+            color: 'text-emerald-600',
+            isMoney: true
+        },
+        { 
+            label: 'Total Active Funds', 
+            value: dashboardStats.totalActiveFunds, 
+            change: dashboardStats.changes.activeFunds, 
+            color: 'text-purple-600',
+            isMoney: true
+        },
+        { 
+            label: 'Total Organizations', 
+            value: dashboardStats.totalOrganizations, 
+            change: dashboardStats.changes.organizations, 
+            color: 'text-blue-600',
+            isMoney: false
+        },
+        { 
+            label: 'Total Champions', 
+            value: dashboardStats.totalChampions, 
+            change: dashboardStats.changes.champions, 
+            color: 'text-orange-600',
+            isMoney: false
+        }
+    ];
 
     return (
         <div 
@@ -159,8 +209,10 @@ export default function DashboardBanner({
                             {/* Quick Stats Pills */}
                             <div className="flex items-center gap-4 mt-4">
                                 <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 rounded-full">
-                                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
-                                    <span className="text-xs font-medium text-blue-700">Live Data</span>
+                                    <div className={`w-2 h-2 rounded-full ${dashboardStats.loading ? 'bg-yellow-500 animate-pulse' : 'bg-blue-500 animate-pulse'}`} />
+                                    <span className="text-xs font-medium text-blue-700">
+                                        {dashboardStats.loading ? 'Loading...' : 'Live Data'}
+                                    </span>
                                 </div>
                                 <div className="flex items-center gap-2 px-3 py-1.5 bg-green-50 rounded-full">
                                     <div className="w-2 h-2 bg-green-500 rounded-full" />
@@ -210,33 +262,41 @@ export default function DashboardBanner({
                 {/* Bottom Section - Key Metrics Summary */}
                 <div className="mt-8 pt-6 border-t border-slate-100">
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                        {[
-                            { label: 'Total Funding', value: '$2.4M', change: '+8%', color: 'text-emerald-600' },
-                            { label: 'Active Organizations', value: '12', change: '+14%', color: 'text-blue-600' },
-                            { label: 'Community Posts', value: '11', change: '+25%', color: 'text-purple-600' },
-                            { label: 'Success Rate', value: '89%', change: '+3%', color: 'text-orange-600' }
-                        ].map((metric, index) => (
-                            <div 
-                                key={index}
-                                className="text-center group"
-                                style={{
-                                    animation: isVisible ? `slideInUp 0.4s ease-out ${0.1 + (index * 0.1)}s both` : 'none'
-                                }}
-                            >
-                                <div className="relative">
-                                    <p className="text-2xl font-bold text-slate-900 mb-1 group-hover:scale-110 transition-transform duration-200">
-                                        {metric.value}
-                                    </p>
-                                    <p className="text-xs text-slate-600 uppercase tracking-wide font-medium mb-2">
-                                        {metric.label}
-                                    </p>
-                                    <div className={`inline-flex items-center gap-1 px-2 py-1 rounded-full bg-slate-50 ${metric.color} text-xs font-medium`}>
-                                        <span>↗</span>
-                                        {metric.change}
+                        {metricsData.map((metric, index) => {
+                            return (
+                                <div 
+                                    key={index}
+                                    className="text-center group"
+                                    style={{
+                                        animation: isVisible ? `slideInUp 0.4s ease-out ${0.1 + (index * 0.1)}s both` : 'none'
+                                    }}
+                                >
+                                    <div className="relative">
+                                        <div className="text-2xl font-bold mb-1 group-hover:scale-110 transition-transform duration-200 text-slate-900">
+                                            {dashboardStats.loading ? (
+                                                '...'
+                                            ) : (
+                                                <AnimatedCounter 
+                                                    targetValue={metric.value}
+                                                    duration={metric.isMoney ? 2000 : 1800}
+                                                    formatValue={metric.isMoney ? formatMonetaryValue : formatRegularValue}
+                                                    className="text-2xl font-bold"
+                                                />
+                                            )}
+                                        </div>
+                                        <p className="text-xs text-slate-600 uppercase tracking-wide font-medium mb-2">
+                                            {metric.label}
+                                        </p>
+                                        {metric.change !== '+0%' && !dashboardStats.loading && (
+                                            <div className={`inline-flex items-center gap-1 px-2 py-1 rounded-full bg-slate-50 ${metric.color} text-xs font-medium`}>
+                                                <span>↗</span>
+                                                {metric.change}
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 </div>
             </div>

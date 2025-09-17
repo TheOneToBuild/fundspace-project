@@ -5,8 +5,6 @@ import { MapPin, Building, DollarSign, MessageSquare, BarChart3, ArrowUpRight, C
 import { BAY_AREA_COUNTIES } from '../data/locationData.js';
 import StatsCards from './StatsCards.jsx';
 import DemographicsSection from './DemographicsSection.jsx';
-import InsightsCards from './InsightsCards.jsx';
-import QuickActionsPanel from './QuickActionsPanel.jsx';
 import DashboardBanner from './DashboardBanner.jsx';
 import OrganizationCard from './OrganizationCard.jsx';
 import GrantCard from './GrantCard.jsx';
@@ -75,8 +73,6 @@ const AnimationStyles = () => {
     return null;
 };
 
-// Header Component - REMOVED (replaced by DashboardBanner)
-
 // Overview Grid Component
 const OverviewGrid = ({ locationData, setActiveTab, isVisible }) => {
     const sections = [
@@ -87,108 +83,103 @@ const OverviewGrid = ({ locationData, setActiveTab, isVisible }) => {
             gradient: 'from-blue-400 to-blue-600',
             data: locationData?.organizations || [
                 { id: 1, name: 'Bay Area Legal Aid', type: 'Legal Services', image_url: null },
-                { id: 2, name: 'San Francisco Bay Restoration Authority', type: 'Environmental', image_url: null },
-                { id: 3, name: 'Silicon Valley Social Venture Fund', type: 'Fundraising', image_url: null }
-            ],
-            linkAction: () => setActiveTab('organizations'),
-            type: 'organizations'
+                { id: 2, name: 'Silicon Valley Community Foundation', type: 'Foundation', image_url: null },
+                { id: 3, name: 'Oakland Museum of California', type: 'Arts & Culture', image_url: null }
+            ]
         },
         {
-            title: 'Recent Grants',
-            subtitle: 'Latest funding opportunities',
+            title: 'Active Grants',
+            subtitle: 'Available funding opportunities',
             icon: DollarSign,
             gradient: 'from-emerald-400 to-emerald-600',
-            data: [
-                { title: 'Community Grants & Investment Program', amount: '$1,000-$40,000', deadline: '3 days left', urgent: true },
-                { title: 'Joint Institute for Wood Products Innovation Grant', amount: '$5,000-$450,000', deadline: '1 week left', urgent: false },
-                { title: 'Household Hazardous Waste Grant', amount: '$500,000', deadline: '2 weeks left', urgent: false }
-            ],
-            linkAction: () => setActiveTab('grants'),
-            type: 'grants'
+            data: locationData?.grants || [
+                { id: 1, title: 'Youth Education Initiative', amount: '$50,000', deadline: '2024-12-15' },
+                { id: 2, title: 'Community Health Program', amount: '$25,000', deadline: '2024-11-30' },
+                { id: 3, title: 'Environmental Conservation', amount: '$75,000', deadline: '2025-01-15' }
+            ]
+        },
+        {
+            title: 'Recent Posts',
+            subtitle: 'Community updates',
+            icon: MessageSquare,
+            gradient: 'from-purple-400 to-purple-600',
+            data: locationData?.posts || [
+                { id: 1, content: 'Excited to announce our new partnership!', author: 'Bay Area Foundation', date: '2024-10-15' },
+                { id: 2, content: 'Join us for our annual community gathering', author: 'Oakland Museum', date: '2024-10-14' },
+                { id: 3, content: 'Thank you for your continued support', author: 'Legal Aid Society', date: '2024-10-13' }
+            ]
         }
     ];
 
     return (
-        <div className="grid md:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
             {sections.map((section, sectionIndex) => (
                 <div 
-                    key={sectionIndex}
-                    className="bg-white rounded-3xl shadow-lg border border-slate-200 p-8"
+                    key={sectionIndex} 
+                    className="bg-white rounded-3xl shadow-lg border border-slate-200 p-6 hover:shadow-xl transition-all duration-300 hover:-translate-y-1"
                     style={{
-                        animation: isVisible ? `slideInUp 0.6s ease-out ${1.0 + (sectionIndex * 0.2)}s both` : 'none'
+                        animation: isVisible ? `slideInUp 0.6s ease-out ${sectionIndex * 0.2}s both` : 'none'
                     }}
                 >
-                    <div className="flex items-center justify-between mb-8">
-                        <div className="flex items-center gap-4">
-                            <div className={`w-12 h-12 bg-gradient-to-br ${section.gradient} rounded-2xl flex items-center justify-center`}>
-                                <section.icon className="w-6 h-6 text-white" />
-                            </div>
-                            <div>
-                                <h3 className="text-xl font-bold text-slate-900">{section.title}</h3>
-                                <p className="text-sm text-slate-600">{section.subtitle}</p>
-                            </div>
+                    <div className="flex items-center gap-4 mb-6">
+                        <div className={`w-12 h-12 bg-gradient-to-br ${section.gradient} rounded-2xl flex items-center justify-center shadow-lg`}>
+                            <section.icon className="w-6 h-6 text-white" />
                         </div>
-                        <Link 
-                            to="#"
-                            onClick={section.linkAction}
-                            className="flex items-center gap-2 text-blue-600 hover:text-blue-700 text-sm font-semibold group"
-                        >
-                            View all
-                            <ArrowUpRight className="w-4 h-4 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
-                        </Link>
+                        <div>
+                            <h3 className="font-bold text-slate-900 text-lg">{section.title}</h3>
+                            <p className="text-sm text-slate-600">{section.subtitle}</p>
+                        </div>
                     </div>
                     
                     <div className="space-y-4">
-                        {section.data.slice(0, 3).map((item, itemIndex) => (
-                            <div 
-                                key={itemIndex}
-                                className="flex items-center gap-5 p-5 rounded-2xl hover:bg-slate-50 transition-all duration-300 group cursor-pointer"
-                                style={{
-                                    animation: isVisible ? `slideInRight 0.4s ease-out ${1.2 + (sectionIndex * 0.2) + (itemIndex * 0.1)}s both` : 'none'
-                                }}
-                            >
-                                {section.type === 'organizations' ? (
-                                    <>
-                                        <div className="relative">
-                                            <div className="w-14 h-14 bg-gradient-to-br from-slate-100 to-slate-200 rounded-2xl flex items-center justify-center">
-                                                {item.image_url ? (
-                                                    <img src={item.image_url} alt={item.name} className="w-full h-full object-cover rounded-2xl" />
-                                                ) : (
-                                                    <Building className="w-7 h-7 text-slate-500" />
-                                                )}
-                                            </div>
-                                            <div className={`absolute -top-1 -right-1 w-6 h-6 rounded-full flex items-center justify-center ${
-                                                itemIndex === 0 ? 'bg-gradient-to-r from-yellow-400 to-orange-400' : 
-                                                itemIndex === 1 ? 'bg-gradient-to-r from-emerald-400 to-teal-400' : 
-                                                'bg-gradient-to-r from-blue-400 to-indigo-400'
+                        {section.data.slice(0, 3).map((item, index) => (
+                            <div key={item.id} className="group">
+                                {section.title === 'Top Organizations' && (
+                                    <div className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 transition-colors cursor-pointer">
+                                        <div className="w-10 h-10 bg-gradient-to-br from-slate-100 to-slate-200 rounded-xl flex items-center justify-center">
+                                            <Building className="w-5 h-5 text-slate-600" />
+                                        </div>
+                                        <div className="flex-1">
+                                            <p className="font-semibold text-slate-900 text-sm group-hover:text-blue-600 transition-colors">
+                                                {item.name}
+                                            </p>
+                                            <p className="text-xs text-slate-600">{item.type}</p>
+                                        </div>
+                                        <ArrowUpRight className="w-4 h-4 text-slate-400 group-hover:text-blue-500 transition-colors" />
+                                    </div>
+                                )}
+                                
+                                {section.title === 'Active Grants' && (
+                                    <div className="p-3 rounded-xl border border-slate-100 hover:border-emerald-200 hover:bg-emerald-50/50 transition-all cursor-pointer group">
+                                        <div className="flex items-start justify-between mb-2">
+                                            <p className="font-semibold text-slate-900 text-sm group-hover:text-emerald-700 transition-colors line-clamp-1">
+                                                {item.title}
+                                            </p>
+                                            <span className="text-xs font-bold text-emerald-600 bg-emerald-100 px-2 py-1 rounded-full">
+                                                {item.amount}
+                                            </span>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <Clock className="w-3 h-3 text-slate-400" />
+                                            <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                                                new Date(item.deadline) < new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) 
+                                                    ? 'text-red-700 bg-red-50' 
+                                                    : 'text-orange-700 bg-orange-50'
                                             }`}>
-                                                <Star className="w-3 h-3 text-white" />
-                                            </div>
+                                                {item.deadline}
+                                            </span>
                                         </div>
-                                        <div className="flex-1 min-w-0">
-                                            <p className="font-semibold text-slate-900 truncate group-hover:text-blue-600 transition-colors text-lg">{item.name}</p>
-                                            <p className="text-sm text-slate-600">{item.type}</p>
-                                        </div>
-                                        <ArrowUpRight className="w-5 h-5 text-slate-400 group-hover:text-blue-600 transition-colors" />
-                                    </>
-                                ) : (
-                                    <div className="flex-1">
-                                        <div className="flex items-start justify-between mb-3">
-                                            <h4 className="font-semibold text-slate-900 group-hover:text-blue-600 transition-colors line-clamp-2 text-base flex-1">{item.title}</h4>
-                                            <ArrowUpRight className="w-5 h-5 text-slate-400 group-hover:text-blue-600 transition-colors flex-shrink-0 ml-3" />
-                                        </div>
-                                        <div className="flex items-center justify-between">
-                                            <span className="text-base font-bold text-emerald-600">{item.amount}</span>
-                                            <div className="flex items-center gap-2">
-                                                <Clock className="w-4 h-4 text-slate-400" />
-                                                <span className={`text-sm font-medium px-3 py-1 rounded-full ${
-                                                    item.urgent 
-                                                        ? 'text-red-700 bg-red-50' 
-                                                        : 'text-orange-700 bg-orange-50'
-                                                }`}>
-                                                    {item.deadline}
-                                                </span>
-                                            </div>
+                                    </div>
+                                )}
+                                
+                                {section.title === 'Recent Posts' && (
+                                    <div className="p-3 rounded-xl hover:bg-purple-50/50 transition-colors cursor-pointer group">
+                                        <p className="text-sm text-slate-700 mb-2 line-clamp-2 group-hover:text-purple-700 transition-colors">
+                                            {item.content}
+                                        </p>
+                                        <div className="flex items-center justify-between text-xs text-slate-500">
+                                            <span>{item.author}</span>
+                                            <span>{item.date}</span>
                                         </div>
                                     </div>
                                 )}
@@ -218,8 +209,6 @@ const TabContent = ({ activeTab, locationData, isVisible }) => {
             <div className="space-y-8">
                 <DemographicsSection demographics={locationData?.demographics} isVisible={isVisible} />
                 <StatsCards stats={locationData?.stats} isVisible={isVisible} />
-                <InsightsCards isVisible={isVisible} />
-                <QuickActionsPanel isVisible={isVisible} />
                 <OverviewGrid locationData={locationData} setActiveTab={() => {}} isVisible={isVisible} />
             </div>
         );
@@ -250,7 +239,7 @@ const TabContent = ({ activeTab, locationData, isVisible }) => {
                                 icon={Building}
                                 title="No organizations found"
                                 description="There are no organizations in this area yet."
-                                bgColor="from-slate-100 to-slate-200"
+                                bgColor="from-blue-100 to-blue-200"
                             />
                         )}
                     </>
@@ -369,39 +358,33 @@ export default function ContentSection({
     const locationName = selectedLocation === 'bay-area' 
         ? 'Bay Area Communities'
         : viewType === 'counties' 
-            ? BAY_AREA_COUNTIES[selectedLocation]?.name 
+            ? BAY_AREA_COUNTIES[selectedLocation]?.name || selectedLocation
             : selectedLocation;
 
     return (
         <>
             <AnimationStyles />
-            <div className="space-y-8">
-                <DashboardBanner 
-                    selectedLocation={selectedLocation}
-                    locationName={locationName}
-                    activeTab={activeTab}
-                    setActiveTab={setActiveTab}
-                    viewType={viewType}
-                    setViewType={setViewType}
-                    setSelectedLocation={setSelectedLocation}
-                    searchQuery={searchQuery}
-                    setSearchQuery={setSearchQuery}
-                    isVisible={isVisible}
-                />
+            
+            {/* Dashboard Banner */}
+            <DashboardBanner 
+                selectedLocation={selectedLocation}
+                locationName={locationName}
+                activeTab={activeTab}
+                setActiveTab={setActiveTab}
+                viewType={viewType}
+                setViewType={setViewType}
+                setSelectedLocation={setSelectedLocation}
+                searchQuery={searchQuery}
+                setSearchQuery={setSearchQuery}
+                isVisible={isVisible}
+            />
 
-                {loading ? (
-                    <div className="bg-gradient-to-br from-slate-50 to-slate-100 rounded-3xl shadow-lg border border-slate-200 p-16 text-center">
-                        <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-blue-400 border-t-transparent mb-6"></div>
-                        <p className="text-slate-600 text-lg">Loading community data...</p>
-                    </div>
-                ) : (
-                    <TabContent 
-                        activeTab={activeTab}
-                        locationData={locationData}
-                        isVisible={isVisible}
-                    />
-                )}
-            </div>
+            {/* Tab Content */}
+            <TabContent 
+                activeTab={activeTab} 
+                locationData={locationData} 
+                isVisible={isVisible} 
+            />
         </>
     );
 }
