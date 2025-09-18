@@ -207,7 +207,12 @@ const TabContent = ({ activeTab, locationData, isVisible }) => {
     if (activeTab === 'overview') {
         return (
             <div className="space-y-8">
-                <DemographicsSection demographics={locationData?.demographics} isVisible={isVisible} />
+                {locationData?.demographics && (
+                    <DemographicsSection 
+                        demographics={locationData.demographics} 
+                        isVisible={isVisible} 
+                    />
+                )}
                 <StatsCards stats={locationData?.stats} isVisible={isVisible} />
                 <OverviewGrid locationData={locationData} setActiveTab={() => {}} isVisible={isVisible} />
             </div>
