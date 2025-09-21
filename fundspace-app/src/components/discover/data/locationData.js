@@ -1,5 +1,3 @@
-// src/components/discover/data/locationData.js
-
 export const BAY_AREA_COUNTIES = {
     'alameda': { name: 'Alameda County', color: 'blue' },
     'contra-costa': { name: 'Contra Costa County', color: 'green' },
@@ -33,13 +31,13 @@ export const MAJOR_CITIES = {
         'Woodside', 'Colma', 'Brisbane', 'East Palo Alto'
     ],
     'contra-costa': [
-        'Concord', 'Richmond', 'Antioch', 'Walnut Creek', 'Fremont', 'Pittsburg', 
+        'Concord', 'Richmond', 'Antioch', 'Walnut Creek', 'Pittsburg', 
         'San Ramon', 'Brentwood', 'Oakley', 'Martinez', 'Pleasant Hill', 
         'Danville', 'El Cerrito', 'Hercules', 'Pinole', 'Clayton', 'Orinda', 
         'Lafayette', 'Moraga', 'San Pablo'
     ],
     'marin': [
-        'San Rafael', 'Novato', 'Mill Valley', 'Petaluma', 'Sausalito', 
+        'San Rafael', 'Novato', 'Mill Valley', 'Sausalito', 
         'Tiburon', 'Corte Madera', 'Larkspur', 'San Anselmo', 'Fairfax', 
         'Ross', 'Belvedere', 'Kentfield'
     ],

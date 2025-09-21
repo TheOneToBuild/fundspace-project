@@ -1,4 +1,3 @@
-// src/components/discover/hooks/useAnimatedCounter.js
 import { useState, useEffect } from 'react';
 
 export function useAnimatedCounter(end, duration = 2000, start = 0) {
@@ -10,7 +9,6 @@ export function useAnimatedCounter(end, duration = 2000, start = 0) {
         let startTime;
         let animationId;
         
-        // Extract numeric value from string
         let endValue;
         if (typeof end === 'string') {
             endValue = parseFloat(end.replace(/[^0-9.]/g, ''));
@@ -22,7 +20,6 @@ export function useAnimatedCounter(end, duration = 2000, start = 0) {
             if (!startTime) startTime = timestamp;
             const progress = Math.min((timestamp - startTime) / duration, 1);
             
-            // Smooth easing function
             const easeOutQuart = 1 - Math.pow(1 - progress, 4);
             const currentValue = start + (endValue - start) * easeOutQuart;
             

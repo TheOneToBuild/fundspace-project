@@ -1,4 +1,3 @@
-// src/components/discover/hooks/useDashboardStats.js
 import { useState, useEffect } from 'react';
 import { supabase } from '../../../supabaseClient';
 import { BAY_AREA_COUNTIES, MAJOR_CITIES } from '../data/locationData.js';
@@ -94,14 +93,11 @@ async function fetchTotalOrganizations(locationFilters) {
 
         if (locationFilters.type !== 'bay-area') {
             try {
-                // --- CORRECTED QUERY BLOCK ---
-                // We must tell Supabase to apply the filter to the 'locations' foreign table.
                 const orFilter = locationFilters.counties.map(loc => `name.ilike.%${loc}%`).join(',');
                 const { data: fundingLocationOrgs } = await supabase
                     .from('organization_funding_locations')
                     .select(`organization_id, locations!inner(name)`)
                     .or(orFilter, { foreignTable: 'locations' });
-                // --- END OF CORRECTED BLOCK ---
 
                 const directOrgs = new Set((data || []).map(org => org.id));
                 const fundingOrgs = new Set((fundingLocationOrgs || []).map(item => item.organization_id));
@@ -119,8 +115,30 @@ async function fetchTotalOrganizations(locationFilters) {
     }
 }
 
-// Other functions (fetchTotalFunding, fetchTotalActiveFunds, etc.) remain the same
-// but are included here for completeness of the file.
+const parseFundingAmount = (text) => {
+    if (!text) return 0;
+    const clean = text.toLowerCase().replace(/[,$]/g, '');
+    const mMatch = clean.match(/(\d+(?:\.\d+)?)\s*m/);
+    if (mMatch) return parseFloat(mMatch[1]) * 1000000;
+    const kMatch = clean.match(/(\d+(?:\.\d+)?)\s*k/);
+    if (kMatch) return parseFloat(kMatch[1]) * 1000;
+    const numMatch = clean.match(/(\d+)/);
+    if (numMatch) return parseFloat(numMatch[1]);
+    return 0;
+};
+
+const filterGrantsByLocation = (grants, locationFilters) => {
+    if (locationFilters.type === 'bay-area') return grants;
+    
+    return grants.filter(grant => {
+        const org = grant.organizations;
+        if (!org) return false;
+        const orgLoc = org.location || '';
+        const directMatch = locationFilters.counties.some(c => orgLoc.toLowerCase().includes(c.toLowerCase())) || locationFilters.cities.some(c => orgLoc.toLowerCase().includes(c.toLowerCase()));
+        const fundingLocMatch = org.organization_funding_locations?.some(loc => locationFilters.counties.some(c => loc.locations?.name?.toLowerCase().includes(c.toLowerCase())) || locationFilters.cities.some(c => loc.locations?.name?.toLowerCase().includes(c.toLowerCase())));
+        return directMatch || fundingLocMatch;
+    });
+};
 
 async function fetchTotalFunding(locationFilters) {
     try {
@@ -129,17 +147,7 @@ async function fetchTotalFunding(locationFilters) {
             .select(`max_funding_amount, funding_amount_text, organizations!inner(id, location, organization_funding_locations(locations(name)))`);
         if (error) throw error;
 
-        let filteredGrants = allGrants || [];
-        if (locationFilters.type !== 'bay-area') {
-            filteredGrants = allGrants.filter(grant => {
-                const org = grant.organizations;
-                if (!org) return false;
-                const orgLoc = org.location || '';
-                const directMatch = locationFilters.counties.some(c => orgLoc.toLowerCase().includes(c.toLowerCase())) || locationFilters.cities.some(c => orgLoc.toLowerCase().includes(c.toLowerCase()));
-                const fundingLocMatch = org.organization_funding_locations?.some(loc => locationFilters.counties.some(c => loc.locations?.name?.toLowerCase().includes(c.toLowerCase())) || locationFilters.cities.some(c => loc.locations?.name?.toLowerCase().includes(c.toLowerCase())));
-                return directMatch || fundingLocMatch;
-            });
-        }
+        const filteredGrants = filterGrantsByLocation(allGrants || [], locationFilters);
         
         let totalFunding = filteredGrants.reduce((sum, grant) => {
             if (grant.max_funding_amount) return sum + grant.max_funding_amount;
@@ -155,18 +163,6 @@ async function fetchTotalFunding(locationFilters) {
     }
 }
 
-function parseFundingAmount(text) {
-    if (!text) return 0;
-    const clean = text.toLowerCase().replace(/[,$]/g, '');
-    const mMatch = clean.match(/(\d+(?:\.\d+)?)\s*m/);
-    if (mMatch) return parseFloat(mMatch[1]) * 1000000;
-    const kMatch = clean.match(/(\d+(?:\.\d+)?)\s*k/);
-    if (kMatch) return parseFloat(kMatch[1]) * 1000;
-    const numMatch = clean.match(/(\d+)/);
-    if (numMatch) return parseFloat(numMatch[1]);
-    return 0;
-}
-
 async function fetchTotalActiveFunds(locationFilters) {
     try {
         const currentDate = new Date().toISOString();
@@ -176,17 +172,7 @@ async function fetchTotalActiveFunds(locationFilters) {
             .gte('deadline', currentDate);
         if (error) throw error;
         
-        let filteredGrants = allActive || [];
-        if (locationFilters.type !== 'bay-area') {
-             filteredGrants = allActive.filter(grant => {
-                const org = grant.organizations;
-                if (!org) return false;
-                const orgLoc = org.location || '';
-                const directMatch = locationFilters.counties.some(c => orgLoc.toLowerCase().includes(c.toLowerCase())) || locationFilters.cities.some(c => orgLoc.toLowerCase().includes(c.toLowerCase()));
-                const fundingLocMatch = org.organization_funding_locations?.some(loc => locationFilters.counties.some(c => loc.locations?.name?.toLowerCase().includes(c.toLowerCase())) || locationFilters.cities.some(c => loc.locations?.name?.toLowerCase().includes(c.toLowerCase())));
-                return directMatch || fundingLocMatch;
-            });
-        }
+        const filteredGrants = filterGrantsByLocation(allActive || [], locationFilters);
 
         let totalActive = filteredGrants.reduce((sum, grant) => {
             if (grant.max_funding_amount) return sum + grant.max_funding_amount;

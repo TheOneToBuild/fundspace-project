@@ -3,31 +3,31 @@
 
 export const COMMUNITY_IMAGES = {
     // Bay Area Counties
-    'bay-area': 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=150&h=150&fit=crop&crop=center', // Golden Gate Bridge
-    'san-francisco': 'https://images.unsplash.com/photo-1449824913935-59a10b8d2000?w=150&h=150&fit=crop&crop=center', // SF skyline
-    'alameda': 'https://images.unsplash.com/photo-1518837695005-2083093ee35b?w=150&h=150&fit=crop&crop=center', // Bay waters
-    'contra-costa': 'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=150&h=150&fit=crop&crop=center', // Rolling hills
-    'marin': 'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=150&h=150&fit=crop&crop=center', // Redwood forest
+    'bay-area': 'https://images.unsplash.com/photo-1560062306-8508a3c6028e?q=80&w=1374&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D', // Golden Gate Bridge
+    'san-francisco': 'https://images.unsplash.com/photo-1521464302861-ce943915d1c3?q=80&w=1742&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D', // SF skyline
+    'alameda': 'https://www.baaqmd.gov/~/media/dotgov/images/county-images/alameda-jpg.jpg?la=en&h=312&w=816&hash=A53B795709959FCE584F7F96AF2E6AF4', // Bay waters
+    'contra-costa': 'https://www.contracosta.ca.gov/ImageRepository/Document?documentID=80881', // Rolling hills
+    'marin': 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTWjbSqlY4r9w5bE98ekHu5puiDw21bdLxRZw&usqp=CAU', // Redwood forest
     'napa': 'https://images.unsplash.com/photo-1543418219-44e30b057fea?w=150&h=150&fit=crop&crop=center', // Vineyard landscape
-    'san-mateo': 'https://images.unsplash.com/photo-1519904981063-b0cf448d479e?w=150&h=150&fit=crop&crop=center', // Coastal landscape
-    'santa-clara': 'https://images.unsplash.com/photo-1496568816309-51d7c20e3b21?w=150&h=150&fit=crop&crop=center', // Modern buildings/tech
+    'san-mateo': 'https://www.paloaltoonline.com/wp-content/uploads/2024/02/GettyImages-1146088526-scaled.jpg', // Coastal landscape
+    'santa-clara': 'https://gilroydispatch.com/wp-content/uploads/sites/17/2024/06/santa-clara-county-neighborhood.jpg', // Modern buildings/tech
     'solano': 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=150&h=150&fit=crop&crop=center', // Agricultural fields
-    'sonoma': 'https://images.unsplash.com/photo-1510076857177-7470076d4098?w=150&h=150&fit=crop&crop=center', // Wine country
+    'sonoma': 'https://d1sve9khgp0cw0.cloudfront.net/wp-content/uploads/2022/06/parks_Sonoma_Coast_State_Park_Shell_Beach_Sonoma_County_004-1-1200x797.jpeg', // Wine country
 
     // San Francisco County Cities
-    'San Francisco': 'https://images.unsplash.com/photo-1449824913935-59a10b8d2000?w=150&h=150&fit=crop&crop=center',
+    'San Francisco': 'https://cdn.britannica.com/51/178051-050-3B786A55/San-Francisco.jpg',
 
     // Alameda County Cities
-    'Oakland': 'https://images.unsplash.com/photo-1518837695005-2083093ee35b?w=150&h=150&fit=crop&crop=center',
-    'Fremont': 'https://images.unsplash.com/photo-1506197603052-3cc9c3a201bd?w=150&h=150&fit=crop&crop=center',
-    'Hayward': 'https://images.unsplash.com/photo-1518837695005-2083093ee35b?w=150&h=150&fit=crop&crop=center',
-    'Berkeley': 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=center',
-    'Alameda': 'https://images.unsplash.com/photo-1518837695005-2083093ee35b?w=150&h=150&fit=crop&crop=center',
-    'San Leandro': 'https://images.unsplash.com/photo-1518837695005-2083093ee35b?w=150&h=150&fit=crop&crop=center',
-    'Livermore': 'https://images.unsplash.com/photo-1506197603052-3cc9c3a201bd?w=150&h=150&fit=crop&crop=center',
-    'Pleasanton': 'https://images.unsplash.com/photo-1506197603052-3cc9c3a201bd?w=150&h=150&fit=crop&crop=center',
-    'Union City': 'https://images.unsplash.com/photo-1518837695005-2083093ee35b?w=150&h=150&fit=crop&crop=center',
-    'Newark': 'https://images.unsplash.com/photo-1518837695005-2083093ee35b?w=150&h=150&fit=crop&crop=center',
+    'Oakland': 'https://drupal-prod.visitcalifornia.com/sites/default/files/styles/opengraph_1200x630/public/vc_spotlightoakland_hero_oakland_rf_895763984_1280x640.jpg.webp?itok=RZQuBaXi',
+    'Fremont': 'https://www.sterlingorganization.com/wp-content/uploads/2023/01/46848-Mission-Blvd-Fremont-CA-46.jpg',
+    'Hayward': 'https://cdn.homeandmoney.com/wp-content/uploads/2023/06/16122930/Hayward-ca-AdobeStock_316947848.webp',
+    'Berkeley': 'https://images.squarespace-cdn.com/content/v1/58727f33b3db2b7cc845c62a/1726623216348-5Q5NDX0FISFSC1UPL9H4/things+to+do+in+berkeley+ca+2.jpg',
+    'Alameda': 'https://media.california.com/media/_versions/articles/alameda__5000x3333___v1222x580.jpg',
+    'San Leandro': 'https://us1-photo.nextdoor.com/post_photos/d5/5e/d55eb44336c325b90cdd0d2492cc3897.jpg',
+    'Livermore': 'https://imagescdn.homes.com/i2/Tf5IMHtDpm2mGImjpnbTlw60kNca5Zim_PfMyFDQ1eQ/117/downtown-livermore-livermore-ca.jpg?p=1',
+    'Pleasanton': 'https://www.cityofpleasantonca.gov/wp-content/uploads/2023/08/visit-pleasanton.jpg',
+    'Union City': 'https://imagescdn.homes.com/i2/YzRxbgddcsdcT72BhPL7jGhfRUojFB1b7EypNEMB6P0/102/downtown-union-city-union-city-ca.jpg?p=1',
+    'Newark': 'https://us1-photo.nextdoor.com/post_photos/d9/73/d973447aafbcf2c0840519a3ec2dc30e.jpg',
 
     // Santa Clara County Cities
     'San Jose': 'https://images.unsplash.com/photo-1496568816309-51d7c20e3b21?w=150&h=150&fit=crop&crop=center',
@@ -42,16 +42,16 @@ export const COMMUNITY_IMAGES = {
     'Los Gatos': 'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=150&h=150&fit=crop&crop=center',
 
     // San Mateo County Cities
-    'Daly City': 'https://images.unsplash.com/photo-1519904981063-b0cf448d479e?w=150&h=150&fit=crop&crop=center',
-    'San Mateo': 'https://images.unsplash.com/photo-1519904981063-b0cf448d479e?w=150&h=150&fit=crop&crop=center',
-    'Redwood City': 'https://images.unsplash.com/photo-1519904981063-b0cf448d479e?w=150&h=150&fit=crop&crop=center',
-    'Burlingame': 'https://images.unsplash.com/photo-1519904981063-b0cf448d479e?w=150&h=150&fit=crop&crop=center',
-    'Millbrae': 'https://images.unsplash.com/photo-1519904981063-b0cf448d479e?w=150&h=150&fit=crop&crop=center',
-    'San Bruno': 'https://images.unsplash.com/photo-1519904981063-b0cf448d479e?w=150&h=150&fit=crop&crop=center',
-    'Pacifica': 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=150&h=150&fit=crop&crop=center',
-    'Foster City': 'https://images.unsplash.com/photo-1519904981063-b0cf448d479e?w=150&h=150&fit=crop&crop=center',
-    'Belmont': 'https://images.unsplash.com/photo-1519904981063-b0cf448d479e?w=150&h=150&fit=crop&crop=center',
-    'San Carlos': 'https://images.unsplash.com/photo-1519904981063-b0cf448d479e?w=150&h=150&fit=crop&crop=center',
+    'Daly City': 'https://content.r9cdn.net/rimg/dimg/60/51/bcdf5d4f-city-22322-1699cbb5530.jpg?width=1366&height=768&xhint=1829&yhint=1084&crop=true',
+    'San Mateo': 'https://drupal-prod.visitcalifornia.com/sites/default/files/styles/fluid_1920/public/2022-06/VC_San-Mateo-County_Half-Moon-Bay_gty-595073410-RF_1280x640.jpg.webp?itok=s_Wc4F0E',
+    'Redwood City': 'https://assets.simpleviewinc.com/simpleview/image/upload/c_limit,h_1200,q_75,w_1200/v1/clients/sanmateoca/1503_RWC_Downtown_RWC_Sign_001_62ea8b9a-f2b9-46bc-819b-c5d85ece3942.jpg',
+    'Burlingame': 'https://upload.wikimedia.org/wikipedia/commons/b/b1/BBB2.jpg',
+    'Millbrae': 'https://content.r9cdn.net/rimg/dimg/de/fd/8ba38a79-city-32172-169e9225cba.jpg?width=1366&height=768&xhint=2656&yhint=1630&crop=truehttps://content.r9cdn.net/rimg/dimg/de/fd/8ba38a79-city-32172-169e9225cba.jpg?width=1366&height=768&xhint=2656&yhint=1630&crop=true',
+    'San Bruno': 'https://res.cloudinary.com/simpleview/image/upload/v1530229644/clients/sanmateoca/8ca82399_436b_4670_8e4d_66d4f4f3b371_d3c44ec7-a16a-4c14-b3ed-d8b8ebd8bcce.jpg',
+    'Pacifica': 'https://drupal-prod.visitcalifornia.com/sites/default/files/styles/fluid_1920/public/2022-08/VC_Pacifica_gty-1285134301-RF_1280x640.jpg.webp?itok=o6TAO9cB',
+    'Foster City': 'https://andthewest.stanford.edu/wp-content/uploads/2018/12/foster-city-_-ken-sheppardson-_-flickr-cc-1189390836_91048b027e_o-1200px_1.jpg',
+    'Belmont': 'https://www.belmont.gov/home/showpublishedimage/15356/638042773340370000',
+    'San Carlos': 'https://content.r9cdn.net/rimg/dimg/cd/ef/3e7837cb-city-17093-1712acb4a6d.jpg?width=1366&height=768&xhint=2189&yhint=1046&crop=true',
 
     // Contra Costa County Cities
     'Concord': 'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=150&h=150&fit=crop&crop=center',
