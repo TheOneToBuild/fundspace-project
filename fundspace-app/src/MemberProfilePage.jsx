@@ -1,4 +1,4 @@
-// MemberProfilePage.jsx - Updated to use PublicPageLayout
+// MemberProfilePage.jsx - Updated to use PublicPageLayout with debugging
 import React, { useState, useEffect } from 'react';
 import { useParams, useOutletContext } from 'react-router-dom';
 import PublicPageLayout from './components/PublicPageLayout.jsx';
@@ -31,12 +31,6 @@ export default function MemberProfilePage() {
     // Tab state management
     const [activeTab, setActiveTab] = useState('activity');
 
-    // REMOVED: Direct LayoutContext usage - now using PublicPageLayout
-    // useEffect(() => {
-    //     setPageBgColor('bg-[#faf7f4]');
-    //     return () => setPageBgColor('bg-transparent');
-    // }, [setPageBgColor]);
-
     // Expose refresh function globally for organization changes
     useEffect(() => {
         window.refreshMemberProfile = refreshMemberData;
@@ -44,6 +38,10 @@ export default function MemberProfilePage() {
             delete window.refreshMemberProfile;
         };
     }, [refreshMemberData]);
+
+    const handleTabChange = (newTab) => {
+        setActiveTab(newTab);
+    };
 
     if (loading) {
         return (
@@ -95,6 +93,7 @@ export default function MemberProfilePage() {
                     <MemberProfileActivity 
                         member={member}
                         posts={posts}
+                        loading={loading}
                         isCurrentUser={isCurrentUser}
                         currentUserProfile={currentUserProfile}
                         refreshData={refreshMemberData}
@@ -104,6 +103,8 @@ export default function MemberProfilePage() {
                 return (
                     <MemberProfileExperience 
                         member={member}
+                        loading={loading}
+                        currentUserId={currentUserProfile?.id}
                         isCurrentUser={isCurrentUser}
                         refreshData={refreshMemberData}
                     />
@@ -112,13 +113,17 @@ export default function MemberProfilePage() {
                 return (
                     <MemberProfilePhotos 
                         member={member}
+                        posts={posts}
+                        loading={loading}
                         isCurrentUser={isCurrentUser}
                     />
                 );
-            case 'network':
+            case 'connections':
                 return (
                     <MemberProfileConnections 
                         member={member}
+                        loading={loading}
+                        currentUserId={currentUserProfile?.id}
                         isCurrentUser={isCurrentUser}
                         currentUserProfile={currentUserProfile}
                     />
@@ -139,7 +144,8 @@ export default function MemberProfilePage() {
                     onUnfollow={handleUnfollow}
                     isCurrentUser={isCurrentUser}
                     activeTab={activeTab}
-                    onTabChange={setActiveTab}
+                    onTabChange={handleTabChange}
+                    currentUserId={currentUserProfile?.id}
                     currentUserProfile={currentUserProfile}
                 />
                 

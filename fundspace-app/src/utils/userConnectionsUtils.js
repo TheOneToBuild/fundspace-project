@@ -1,13 +1,99 @@
+// src/utils/userConnectionsUtils.js - Fixed connection notification creation
 import { supabase } from '../supabaseClient';
+
+export const getConnectionStatus = async (userId1, userId2) => {
+  try {
+    if (!userId1 || !userId2) {
+      return { status: 'none', isRequester: false };
+    }
+
+    // FIXED: Use two separate queries instead of complex OR with AND
+    const [query1, query2] = await Promise.all([
+      supabase
+        .from('user_connections')
+        .select('status, requester_id, recipient_id')
+        .eq('requester_id', userId1)
+        .eq('recipient_id', userId2)
+        .maybeSingle(),
+      supabase
+        .from('user_connections')
+        .select('status, requester_id, recipient_id')
+        .eq('requester_id', userId2)
+        .eq('recipient_id', userId1)
+        .maybeSingle()
+    ]);
+
+    if (query1.error || query2.error) {
+      return { status: 'none', isRequester: false, error: query1.error?.message || query2.error?.message };
+    }
+
+    const data = query1.data || query2.data;
+
+    if (!data) {
+      return { status: 'none', isRequester: false };
+    }
+
+    return {
+      status: data.status,
+      isRequester: data.requester_id === userId1
+    };
+  } catch (error) {
+    return { status: 'none', isRequester: false, error: error.message };
+  }
+};
+
+export const getMutualConnectionsCount = async (userId1, userId2) => {
+  try {
+    // Try RPC function first (if it exists)
+    const { data: rpcData, error: rpcError } = await supabase
+      .rpc('get_mutual_connections', {
+        user1_id: userId1,
+        user2_id: userId2
+      });
+
+    if (!rpcError) {
+      return { count: rpcData || 0 };
+    }
+
+    // Fallback to manual calculation if RPC doesn't exist
+    const { data: mutualData } = await supabase
+      .from('user_connections')
+      .select('requester_id, recipient_id')
+      .eq('status', 'accepted');
+
+    if (!mutualData) return { count: 0 };
+
+    const user1Ids = new Set();
+    const user2Ids = new Set();
+
+    mutualData.forEach(conn => {
+      if (conn.requester_id === userId1) user1Ids.add(conn.recipient_id);
+      if (conn.recipient_id === userId1) user1Ids.add(conn.requester_id);
+      if (conn.requester_id === userId2) user2Ids.add(conn.recipient_id);
+      if (conn.recipient_id === userId2) user2Ids.add(conn.requester_id);
+    });
+
+    const mutual = [...user1Ids].filter(id => user2Ids.has(id));
+    return { count: mutual.length };
+  } catch (error) {
+    return { count: 0, error: error.message };
+  }
+};
 
 export const sendConnectionRequest = async (requesterId, recipientId) => {
   try {
+    console.log('🚀 Starting sendConnectionRequest:', { requesterId, recipientId });
+
     if (!requesterId || !recipientId) {
+      console.log('❌ Missing IDs');
       return { success: false, error: 'Both requester and recipient IDs are required' };
     }
     if (requesterId === recipientId) {
+      console.log('❌ Same user');
       return { success: false, error: 'Cannot connect to yourself' };
     }
+
+    console.log('🔍 Checking for existing connections...');
 
     // FIXED: Use two separate queries instead of complex OR with AND
     const [query1, query2] = await Promise.all([
@@ -25,13 +111,17 @@ export const sendConnectionRequest = async (requesterId, recipientId) => {
         .maybeSingle()
     ]);
 
+    console.log('📊 Query results:', { query1: query1.data, query2: query2.data });
+
     if (query1.error || query2.error) {
+      console.log('❌ Query error:', query1.error?.message || query2.error?.message);
       return { success: false, error: query1.error?.message || query2.error?.message };
     }
 
     const existingConnection = query1.data || query2.data;
 
     if (existingConnection) {
+      console.log('🔄 Found existing connection:', existingConnection);
       switch (existingConnection.status) {
         case 'accepted':
           return { success: false, error: 'Already connected' };
@@ -48,6 +138,7 @@ export const sendConnectionRequest = async (requesterId, recipientId) => {
     let connectionId;
 
     if (existingConnection && existingConnection.status === 'declined') {
+      console.log('🔄 Updating declined connection to pending...');
       result = await supabase
         .from('user_connections')
         .update({
@@ -59,6 +150,7 @@ export const sendConnectionRequest = async (requesterId, recipientId) => {
         .single();
       connectionId = existingConnection.id;
     } else {
+      console.log('➕ Creating new connection...');
       result = await supabase
         .from('user_connections')
         .insert({
@@ -71,13 +163,20 @@ export const sendConnectionRequest = async (requesterId, recipientId) => {
       connectionId = result.data?.id;
     }
 
+    console.log('💾 Connection result:', { result: result.data, error: result.error, connectionId });
+
     if (result.error) {
+      console.log('❌ Connection creation/update failed:', result.error);
       return { success: false, error: result.error.message };
     }
 
-    await createConnectionNotification(requesterId, recipientId, 'connection_request', connectionId);
+    console.log('🔔 About to create notification...');
+    const notificationResult = await createConnectionNotification(requesterId, recipientId, 'connection_request', connectionId);
+    console.log('📩 Notification result:', notificationResult);
+
     return { success: true };
   } catch (error) {
+    console.log('💥 Exception in sendConnectionRequest:', error);
     return { success: false, error: error.message };
   }
 };
@@ -100,6 +199,7 @@ export const acceptConnectionRequest = async (currentUserId, requesterId) => {
       return { success: false, error: error.message };
     }
 
+    // FIXED: Create notification directly instead of using RPC
     await createConnectionNotification(currentUserId, requesterId, 'connection_accepted', data.id);
     return { success: true };
   } catch (error) {
@@ -154,47 +254,6 @@ export const removeConnection = async (currentUserId, otherUserId) => {
   }
 };
 
-export const getConnectionStatus = async (userId1, userId2) => {
-  try {
-    if (!userId1 || !userId2) {
-      return { status: 'none', isRequester: false };
-    }
-
-    // FIXED: Use two separate queries instead of complex OR with AND
-    const [query1, query2] = await Promise.all([
-      supabase
-        .from('user_connections')
-        .select('status, requester_id, recipient_id')
-        .eq('requester_id', userId1)
-        .eq('recipient_id', userId2)
-        .maybeSingle(),
-      supabase
-        .from('user_connections')
-        .select('status, requester_id, recipient_id')
-        .eq('requester_id', userId2)
-        .eq('recipient_id', userId1)
-        .maybeSingle()
-    ]);
-
-    if (query1.error || query2.error) {
-      return { status: 'none', isRequester: false, error: query1.error?.message || query2.error?.message };
-    }
-
-    const data = query1.data || query2.data;
-
-    if (!data) {
-      return { status: 'none', isRequester: false };
-    }
-
-    return {
-      status: data.status,
-      isRequester: data.requester_id === userId1
-    };
-  } catch (error) {
-    return { status: 'none', isRequester: false, error: error.message };
-  }
-};
-
 export const withdrawConnectionRequest = async (requesterId, recipientId) => {
   try {
     if (!requesterId || !recipientId) {
@@ -226,30 +285,13 @@ export const withdrawConnectionRequest = async (requesterId, recipientId) => {
   }
 };
 
-export const getMutualConnectionsCount = async (userId1, userId2) => {
-  try {
-    const { data, error } = await supabase
-      .rpc('get_mutual_connections', {
-        user1_id: userId1,
-        user2_id: userId2
-      });
-
-    if (error) {
-      return { count: 0, error: error.message };
-    }
-    return { count: data || 0 };
-  } catch (error) {
-    return { count: 0, error: error.message };
-  }
-};
-
 export const getUserConnections = async (userId, limit = 50) => {
   try {
     const { data: connectionsData, error: connectionsError } = await supabase
       .from('user_connections')
-      .select('id, status, created_at, requester_id, recipient_id')
-      .or(`requester_id.eq.${userId},recipient_id.eq.${userId}`)
+      .select('id, requester_id, recipient_id, created_at')
       .eq('status', 'accepted')
+      .or(`requester_id.eq.${userId},recipient_id.eq.${userId}`)
       .order('created_at', { ascending: false })
       .limit(limit);
 
@@ -261,9 +303,9 @@ export const getUserConnections = async (userId, limit = 50) => {
       return { connections: [] };
     }
 
-    const otherUserIds = connectionsData.map(conn => {
-      return conn.requester_id === userId ? conn.recipient_id : conn.requester_id;
-    });
+    const otherUserIds = connectionsData.map(conn => 
+      conn.requester_id === userId ? conn.recipient_id : conn.requester_id
+    );
 
     const { data: profilesData, error: profilesError } = await supabase
       .from('profiles')
@@ -275,13 +317,12 @@ export const getUserConnections = async (userId, limit = 50) => {
     }
 
     const profilesMap = {};
-    profilesData.forEach(profile => {
+    profilesData?.forEach(profile => {
       profilesMap[profile.id] = profile;
     });
 
     const formattedConnections = connectionsData.map(conn => {
-      const isRequester = conn.requester_id === userId;
-      const otherUserId = isRequester ? conn.recipient_id : conn.requester_id;
+      const otherUserId = conn.requester_id === userId ? conn.recipient_id : conn.requester_id;
       const otherUser = profilesMap[otherUserId];
       
       return {
@@ -357,26 +398,46 @@ export const getPendingConnectionRequests = async (userId) => {
   }
 };
 
+// FIXED: Direct database insert instead of RPC call
 const createConnectionNotification = async (actorId, recipientId, type, connectionId = null) => {
   try {
+    console.log(`🔔 Creating notification:`, { actorId, recipientId, type, connectionId });
+
     if (actorId === recipientId) {
+      console.log('⚠️ Skipping notification: actor and recipient are the same');
       return { success: true };
     }
 
+    const notificationData = {
+      user_id: recipientId,
+      actor_id: actorId,
+      type: type,
+      is_read: false
+    };
+
+    // Only add connection_id if it's provided
+    if (connectionId) {
+      notificationData.connection_id = connectionId;
+    }
+
+    console.log('📝 Notification data to insert:', notificationData);
+
     const { data, error } = await supabase
-      .rpc('create_connection_notification', {
-        p_recipient_id: recipientId,
-        p_actor_id: actorId,
-        p_notification_type: type,
-        p_connection_id: connectionId
-      });
+      .from('notifications')
+      .insert(notificationData)
+      .select('id')
+      .single();
 
     if (error) {
+      console.error('❌ Error creating connection notification:', error);
+      console.error('🔍 Error details:', error.message, error.code, error.details);
       return { success: false, error: error.message };
     }
 
-    return { success: true, notificationId: data };
+    console.log(`✅ Successfully created ${type} notification for user ${recipientId}`, data);
+    return { success: true, notificationId: data.id };
   } catch (error) {
+    console.error('💥 Exception in createConnectionNotification:', error);
     return { success: false, error: error.message };
   }
 };

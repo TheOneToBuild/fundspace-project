@@ -1,4 +1,4 @@
-// src/components/ConnectionsPage.jsx - Enhanced with Discover functionality
+// src/components/ConnectionsPage.jsx - Enhanced with Discover functionality - FIXED NAVIGATION
 import React, { useState, useEffect } from 'react';
 import { useOutletContext, Link } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
@@ -10,7 +10,8 @@ import {
     acceptConnectionRequest, 
     declineConnectionRequest,
     getPendingConnectionRequests,
-    getUserConnections
+    getUserConnections,
+    sendConnectionRequest  // ADDED THIS IMPORT
 } from '../utils/userConnectionsUtils';
 
 export default function ConnectionsPage() {
@@ -69,11 +70,22 @@ export default function ConnectionsPage() {
         try {
             setDiscoverLoading(true);
             
-            // Get IDs of users already connected or with pending requests
+            // Get IDs of users already connected or with pending requests (both sent and received)
             const connectedUserIds = new Set([
                 ...connections.map(c => c.user.id),
                 ...pendingRequests.map(r => r.requester_profile.id)
             ]);
+
+            // Also get pending requests that the current user has sent
+            const { data: sentRequests } = await supabase
+                .from('user_connections')
+                .select('recipient_id')
+                .eq('requester_id', currentUserProfile.id)
+                .eq('status', 'pending');
+
+            if (sentRequests) {
+                sentRequests.forEach(req => connectedUserIds.add(req.recipient_id));
+            }
 
             let query = supabase
                 .from('profiles')
@@ -85,15 +97,15 @@ export default function ConnectionsPage() {
                     location,
                     organization_name,
                     organization_type,
-                    role,
-                    created_at
+                    role
                 `)
                 .neq('id', currentUserProfile.id)
                 .limit(20);
 
-            // Only filter out connected users if we have any
+            // FIXED: Only filter out connected users if we have any
             if (connectedUserIds.size > 0) {
-                query = query.not('id', 'in', `(${Array.from(connectedUserIds).join(',')})`);
+                const userIdArray = Array.from(connectedUserIds);
+                query = query.not('id', 'in', `(${userIdArray.map(id => `"${id}"`).join(',')})`);
             }
 
             // Apply search filter
@@ -114,10 +126,12 @@ export default function ConnectionsPage() {
                 }
             }
 
-            const { data, error } = await query.order('created_at', { ascending: false });
+            const { data, error } = await query.order('updated_at', { ascending: false });
             
             if (!error) {
                 setDiscoveredMembers(data || []);
+            } else {
+                console.error('Error fetching discover members:', error);
             }
         } catch (error) {
             console.error('❌ Error in fetchDiscoverMembers:', error);
@@ -126,26 +140,30 @@ export default function ConnectionsPage() {
         }
     };
 
+    // FIXED: Use the notification-enabled sendConnectionRequest function
     const handleSendConnectionRequest = async (userId) => {
         if (actionInProgress.has(userId)) return;
 
+        console.log('🚀 ConnectionsPage: Sending connection request to:', userId);
         setActionInProgress(prev => new Set(prev).add(userId));
 
         try {
-            const { error } = await supabase
-                .from('user_connections')
-                .insert({
-                    requester_id: currentUserProfile.id,
-                    recipient_id: userId,
-                    status: 'pending'
-                });
-
-            if (!error) {
-                // Remove from discovered members
+            const result = await sendConnectionRequest(currentUserProfile.id, userId);
+            
+            if (result.success) {
+                console.log('✅ Connection request sent successfully');
+                // Remove from discovered members immediately
                 setDiscoveredMembers(prev => prev.filter(member => member.id !== userId));
+                // Refresh pending requests to show the new request
+                await fetchPendingRequests();
+                // Refresh connections data to update exclusion list
+                await fetchConnections();
+            } else {
+                console.error('❌ Connection request failed:', result.error);
+                // Show error message to user (you could add a toast notification here)
             }
         } catch (error) {
-            console.error('Error sending connection request:', error);
+            console.error('💥 Error sending connection request:', error);
         } finally {
             setActionInProgress(prev => {
                 const newSet = new Set(prev);

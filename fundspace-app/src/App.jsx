@@ -357,7 +357,6 @@ export default function App() {
             <Route path="faq" element={<FaqPage />} />
             <Route path="submit-grant" element={<SubmitGrantPage />} />
             <Route path="roadmap" element={<RoadmapPage />} />
-            <Route path="profile/:profileId" element={<MemberProfilePage />} />
             <Route path="organizations/:slug" element={<OrganizationProfilePage />} />
             <Route path="profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>}>
               <Route index element={<HomeDashboard />} />
@@ -380,6 +379,8 @@ export default function App() {
               <Route path="omega-admin/users" element={<OmegaAdminUsers />} />
               <Route path="omega-admin/grants" element={<OmegaAdminGrants />} />
               <Route path="notifications" element={<NotificationsPage />} />
+              {/* FIXED: Add redirect for bare /members path and keep the parameterized route */}
+              <Route path="members" element={<Navigate to="/profile/connections" replace />} />
               <Route path="members/:profileId" element={<MemberProfilePage />} />
             </Route>
             <Route path="/onboarding" element={<ProtectedRoute><OnboardingWizard /></ProtectedRoute>} />

@@ -1,4 +1,4 @@
-// src/components/DashboardHeader.jsx - Updated to remove separate Discover link
+// src/components/DashboardHeader.jsx - Updated with notification indicator
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { 
@@ -18,6 +18,7 @@ export default function DashboardHeader({ profile }) {
     const [isOmegaMenuOpen, setIsOmegaMenuOpen] = useState(false);
     const [stats, setStats] = useState({ followersCount: 0, followingCount: 0, connectionsCount: 0 });
     const [hasOrganizationAccess, setHasOrganizationAccess] = useState(false);
+    const [unreadNotifications, setUnreadNotifications] = useState(0);
     
     const navigate = useNavigate();
     const userMenuRef = useRef(null);
@@ -33,8 +34,8 @@ export default function DashboardHeader({ profile }) {
         
         try {
             const [followersRes, followingRes, connectionsRes] = await Promise.all([
-                supabase.from('followers').select('id').eq('following_id', profile.id),
-                supabase.from('followers').select('id').eq('follower_id', profile.id),
+                supabase.from('user_follows').select('id').eq('following_id', profile.id),
+                supabase.from('user_follows').select('id').eq('follower_id', profile.id),
                 supabase.from('user_connections').select('id').or(`requester_id.eq.${profile.id},recipient_id.eq.${profile.id}`).eq('status', 'accepted')
             ]);
 
@@ -45,6 +46,25 @@ export default function DashboardHeader({ profile }) {
             });
         } catch (error) {
             console.error('Error fetching profile stats:', error);
+        }
+    }, [profile?.id]);
+
+    // Fetch notification stats
+    const fetchNotificationStats = useCallback(async () => {
+        if (!profile?.id) return;
+        
+        try {
+            const { count, error } = await supabase
+                .from('notifications')
+                .select('id', { count: 'exact', head: true })
+                .eq('user_id', profile.id)
+                .eq('is_read', false);
+            
+            if (!error) {
+                setUnreadNotifications(count || 0);
+            }
+        } catch (error) {
+            console.error('Error fetching notification stats:', error);
         }
     }, [profile?.id]);
 
@@ -67,8 +87,33 @@ export default function DashboardHeader({ profile }) {
 
     useEffect(() => {
         fetchProfileStats();
+        fetchNotificationStats();
         checkOrganizationAccess();
-    }, [fetchProfileStats, checkOrganizationAccess]);
+    }, [fetchProfileStats, fetchNotificationStats, checkOrganizationAccess]);
+
+    // Set up real-time subscription for notifications
+    useEffect(() => {
+        if (!profile?.id) return;
+
+        const channel = supabase
+            .channel('notifications-count')
+            .on('postgres_changes', 
+                { 
+                    event: '*', 
+                    schema: 'public', 
+                    table: 'notifications',
+                    filter: `user_id=eq.${profile.id}`
+                }, 
+                () => {
+                    fetchNotificationStats();
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [profile?.id, fetchNotificationStats]);
 
     const handleLogout = async () => {
         await supabase.auth.signOut();
@@ -271,13 +316,18 @@ export default function DashboardHeader({ profile }) {
                             <span className="sm:hidden">Submit</span>
                         </Link>
 
-                        {/* Notifications */}
+                        {/* Notifications with indicator */}
                         <Link 
                             to="/profile/notifications"
                             className="p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors relative"
                             aria-label="Notifications"
                         >
                             <Bell size={20} />
+                            {unreadNotifications > 0 && (
+                                <div className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-red-500 text-white text-xs font-medium rounded-full flex items-center justify-center">
+                                    {unreadNotifications > 99 ? '99+' : unreadNotifications}
+                                </div>
+                            )}
                         </Link>
 
                         {/* Profile Dropdown */}
@@ -526,10 +576,15 @@ export default function DashboardHeader({ profile }) {
                                 <Link 
                                     to="/profile/notifications"
                                     onClick={closeMobileMenu}
-                                    className="flex items-center space-x-3 w-full px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 rounded-lg"
+                                    className="flex items-center space-x-3 w-full px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 rounded-lg relative"
                                 >
                                     <Bell size={16} />
                                     <span>Notifications</span>
+                                    {unreadNotifications > 0 && (
+                                        <div className="ml-auto min-w-[18px] h-[18px] bg-red-500 text-white text-xs font-medium rounded-full flex items-center justify-center">
+                                            {unreadNotifications > 99 ? '99+' : unreadNotifications}
+                                        </div>
+                                    )}
                                 </Link>
                                 
                                 <Link 
