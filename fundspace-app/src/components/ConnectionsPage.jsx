@@ -1,5 +1,5 @@
-// src/components/ConnectionsPage.jsx - Enhanced with Discover functionality - FIXED NAVIGATION
-import React, { useState, useEffect } from 'react';
+// src/components/ConnectionsPage.jsx - Enhanced with bidirectional pending requests
+import React, { useState, useEffect, useCallback } from 'react';
 import { useOutletContext, Link } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import { Users, UserCheck, UserX, ArrowLeft, Clock, Building, MapPin, Search, Filter } from 'lucide-react';
@@ -11,7 +11,8 @@ import {
     declineConnectionRequest,
     getPendingConnectionRequests,
     getUserConnections,
-    sendConnectionRequest  // ADDED THIS IMPORT
+    sendConnectionRequest,
+    withdrawConnectionRequest
 } from '../utils/userConnectionsUtils';
 
 export default function ConnectionsPage() {
@@ -22,24 +23,12 @@ export default function ConnectionsPage() {
     const [loading, setLoading] = useState(true);
     const [discoverLoading, setDiscoverLoading] = useState(false);
     const [actionInProgress, setActionInProgress] = useState(new Set());
-    const [activeTab, setActiveTab] = useState('connections'); // 'connections', 'requests', 'discover'
+    const [activeTab, setActiveTab] = useState('connections');
     const [searchQuery, setSearchQuery] = useState('');
-    const [filterType, setFilterType] = useState('all'); // 'all', 'nonprofit', 'foundation', 'education', 'government'
+    const [filterType, setFilterType] = useState('all');
 
-    useEffect(() => {
-        if (currentUserProfile?.id) {
-            fetchConnections();
-            fetchPendingRequests();
-        }
-    }, [currentUserProfile?.id]);
-
-    useEffect(() => {
-        if (activeTab === 'discover') {
-            fetchDiscoverMembers();
-        }
-    }, [activeTab, searchQuery, filterType]);
-
-    const fetchConnections = async () => {
+    // Memoize functions to prevent unnecessary re-renders
+    const fetchConnections = useCallback(async () => {
         try {
             const result = await getUserConnections(currentUserProfile.id, 100);
             
@@ -47,33 +36,107 @@ export default function ConnectionsPage() {
                 setConnections(result.connections || []);
             } 
         } catch (error) {
-            console.error('❌ Error in fetchConnections:', error);
+            console.error('Error in fetchConnections:', error);
         }
-    };
+    }, [currentUserProfile.id]);
 
-    const fetchPendingRequests = async () => {
+    const fetchPendingRequests = useCallback(async () => {
         try {
             setLoading(true);
-            const result = await getPendingConnectionRequests(currentUserProfile.id);
             
-            if (!result.error) {
-                setPendingRequests(result.requests || []);
-            } 
+            // Get incoming requests (people who want to connect with you)
+            const { data: incomingData, error: incomingError } = await supabase
+                .from('user_connections')
+                .select('id, created_at, requester_id')
+                .eq('recipient_id', currentUserProfile.id)
+                .eq('status', 'pending')
+                .order('created_at', { ascending: false });
+
+            // Get outgoing requests (people you want to connect with)
+            const { data: outgoingData, error: outgoingError } = await supabase
+                .from('user_connections')
+                .select('id, created_at, recipient_id')
+                .eq('requester_id', currentUserProfile.id)
+                .eq('status', 'pending')
+                .order('created_at', { ascending: false });
+
+            if (incomingError || outgoingError) {
+                console.error('Error fetching requests:', incomingError || outgoingError);
+                return;
+            }
+
+            // Get user profiles separately
+            const allUserIds = [
+                ...(incomingData || []).map(req => req.requester_id),
+                ...(outgoingData || []).map(req => req.recipient_id)
+            ];
+
+            let profilesData = [];
+            if (allUserIds.length > 0) {
+                const { data: profiles, error: profilesError } = await supabase
+                    .from('profiles')
+                    .select('id, full_name, avatar_url, title, organization_name')
+                    .in('id', allUserIds);
+
+                if (!profilesError) {
+                    profilesData = profiles || [];
+                }
+            }
+
+            // Create profiles map
+            const profilesMap = {};
+            profilesData.forEach(profile => {
+                profilesMap[profile.id] = profile;
+            });
+
+            // Combine and format the requests
+            const formattedRequests = [
+                // Incoming requests
+                ...(incomingData || []).map(req => ({
+                    id: req.id,
+                    created_at: req.created_at,
+                    type: 'incoming',
+                    user_profile: profilesMap[req.requester_id] || {
+                        id: req.requester_id,
+                        full_name: 'Unknown User',
+                        avatar_url: null,
+                        title: null,
+                        organization_name: null
+                    },
+                    isIncoming: true
+                })),
+                // Outgoing requests
+                ...(outgoingData || []).map(req => ({
+                    id: req.id,
+                    created_at: req.created_at,
+                    type: 'outgoing',
+                    user_profile: profilesMap[req.recipient_id] || {
+                        id: req.recipient_id,
+                        full_name: 'Unknown User',
+                        avatar_url: null,
+                        title: null,
+                        organization_name: null
+                    },
+                    isIncoming: false
+                }))
+            ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+            setPendingRequests(formattedRequests);
         } catch (error) {
-            console.error('❌ Error in fetchPendingRequests:', error);
+            console.error('Error in fetchPendingRequests:', error);
         } finally {
             setLoading(false);
         }
-    };
+    }, [currentUserProfile.id]);
 
-    const fetchDiscoverMembers = async () => {
+    const fetchDiscoverMembers = useCallback(async () => {
         try {
             setDiscoverLoading(true);
             
             // Get IDs of users already connected or with pending requests (both sent and received)
             const connectedUserIds = new Set([
                 ...connections.map(c => c.user.id),
-                ...pendingRequests.map(r => r.requester_profile.id)
+                ...pendingRequests.map(r => r.user_profile.id)
             ]);
 
             // Also get pending requests that the current user has sent
@@ -102,7 +165,7 @@ export default function ConnectionsPage() {
                 .neq('id', currentUserProfile.id)
                 .limit(20);
 
-            // FIXED: Only filter out connected users if we have any
+            // Only filter out connected users if we have any
             if (connectedUserIds.size > 0) {
                 const userIdArray = Array.from(connectedUserIds);
                 query = query.not('id', 'in', `(${userIdArray.map(id => `"${id}"`).join(',')})`);
@@ -134,36 +197,44 @@ export default function ConnectionsPage() {
                 console.error('Error fetching discover members:', error);
             }
         } catch (error) {
-            console.error('❌ Error in fetchDiscoverMembers:', error);
+            console.error('Error in fetchDiscoverMembers:', error);
         } finally {
             setDiscoverLoading(false);
         }
-    };
+    }, [currentUserProfile.id, connections, pendingRequests, searchQuery, filterType]);
 
-    // FIXED: Use the notification-enabled sendConnectionRequest function
-    const handleSendConnectionRequest = async (userId) => {
+    // Initial data fetch
+    useEffect(() => {
+        if (currentUserProfile?.id) {
+            fetchConnections();
+            fetchPendingRequests();
+        }
+    }, [currentUserProfile?.id, fetchConnections, fetchPendingRequests]);
+
+    // Discover tab fetch
+    useEffect(() => {
+        if (activeTab === 'discover') {
+            fetchDiscoverMembers();
+        }
+    }, [activeTab, fetchDiscoverMembers]);
+
+    const handleSendConnectionRequest = useCallback(async (userId) => {
         if (actionInProgress.has(userId)) return;
 
-        console.log('🚀 ConnectionsPage: Sending connection request to:', userId);
         setActionInProgress(prev => new Set(prev).add(userId));
 
         try {
             const result = await sendConnectionRequest(currentUserProfile.id, userId);
             
             if (result.success) {
-                console.log('✅ Connection request sent successfully');
-                // Remove from discovered members immediately
                 setDiscoveredMembers(prev => prev.filter(member => member.id !== userId));
-                // Refresh pending requests to show the new request
                 await fetchPendingRequests();
-                // Refresh connections data to update exclusion list
                 await fetchConnections();
             } else {
-                console.error('❌ Connection request failed:', result.error);
-                // Show error message to user (you could add a toast notification here)
+                console.error('Connection request failed:', result.error);
             }
         } catch (error) {
-            console.error('💥 Error sending connection request:', error);
+            console.error('Error sending connection request:', error);
         } finally {
             setActionInProgress(prev => {
                 const newSet = new Set(prev);
@@ -171,9 +242,9 @@ export default function ConnectionsPage() {
                 return newSet;
             });
         }
-    };
+    }, [actionInProgress, currentUserProfile.id, fetchPendingRequests, fetchConnections]);
 
-    const handleDisconnect = async (connectionId, userId) => {
+    const handleDisconnect = useCallback(async (connectionId, userId) => {
         if (actionInProgress.has(userId)) return;
         if (!window.confirm('Are you sure you want to disconnect? This will remove the professional connection between you.')) {
             return;
@@ -193,9 +264,9 @@ export default function ConnectionsPage() {
                 return newSet;
             });
         }
-    };
+    }, [actionInProgress, currentUserProfile.id]);
 
-    const handleAcceptRequest = async (requestId, userId) => {
+    const handleAcceptRequest = useCallback(async (requestId, userId) => {
         if (actionInProgress.has(userId)) return;
 
         setActionInProgress(prev => new Set(prev).add(userId));
@@ -204,7 +275,7 @@ export default function ConnectionsPage() {
             const result = await acceptConnectionRequest(currentUserProfile.id, userId);
             
             if (result.success) {
-                setPendingRequests(prev => prev.filter(req => req.requester_profile.id !== userId));
+                setPendingRequests(prev => prev.filter(req => req.id !== requestId));
                 await fetchConnections();
             } 
         } catch (error) {
@@ -216,9 +287,9 @@ export default function ConnectionsPage() {
                 return newSet;
             });
         }
-    };
+    }, [actionInProgress, currentUserProfile.id, fetchConnections]);
 
-    const handleDeclineRequest = async (requestId, userId) => {
+    const handleDeclineRequest = useCallback(async (requestId, userId) => {
         if (actionInProgress.has(userId)) return;
 
         setActionInProgress(prev => new Set(prev).add(userId));
@@ -227,7 +298,7 @@ export default function ConnectionsPage() {
             const result = await declineConnectionRequest(currentUserProfile.id, userId);
             
             if (result.success) {
-                setPendingRequests(prev => prev.filter(req => req.requester_profile.id !== userId));
+                setPendingRequests(prev => prev.filter(req => req.id !== requestId));
             } 
         } catch (error) {
             console.error('Error in handleDeclineRequest:', error);
@@ -238,9 +309,33 @@ export default function ConnectionsPage() {
                 return newSet;
             });
         }
-    };
+    }, [actionInProgress, currentUserProfile.id]);
 
-    const formatDate = (dateString) => {
+    // New handler for withdrawing outgoing requests
+    const handleWithdrawRequest = useCallback(async (requestId, userId) => {
+        if (actionInProgress.has(userId)) return;
+
+        setActionInProgress(prev => new Set(prev).add(userId));
+
+        try {
+            const result = await withdrawConnectionRequest(currentUserProfile.id, userId);
+            
+            if (result.success) {
+                setPendingRequests(prev => prev.filter(req => req.id !== requestId));
+                await fetchDiscoverMembers(); // Refresh discover to show this user again
+            }
+        } catch (error) {
+            console.error('Error withdrawing request:', error);
+        } finally {
+            setActionInProgress(prev => {
+                const newSet = new Set(prev);
+                newSet.delete(userId);
+                return newSet;
+            });
+        }
+    }, [actionInProgress, currentUserProfile.id, fetchDiscoverMembers]);
+
+    const formatDate = useCallback((dateString) => {
         const date = new Date(dateString);
         const now = new Date();
         const diffTime = Math.abs(now - date);
@@ -251,12 +346,29 @@ export default function ConnectionsPage() {
         if (diffDays < 30) return `${Math.ceil(diffDays / 7)} weeks ago`;
         if (diffDays < 365) return `${Math.ceil(diffDays / 30)} months ago`;
         return date.toLocaleDateString();
-    };
+    }, []);
 
-    const ConnectionCard = ({ connection, type = 'connection' }) => {
-        const user = type === 'connection' ? connection.user : connection.requester_profile;
-        const connectionDate = type === 'connection' ? connection.connected_at : connection.created_at;
-        const isActionInProgress = actionInProgress.has(user.id);
+    // Enhanced ConnectionCard to handle both incoming and outgoing requests
+    const ConnectionCard = useCallback(({ connection, type = 'connection' }) => {
+        let user, connectionDate, isActionInProgress;
+        
+        if (type === 'connection') {
+            user = connection.user;
+            connectionDate = connection.connected_at;
+            isActionInProgress = actionInProgress.has(user?.id);
+        } else if (type === 'request') {
+            user = connection.user_profile;
+            connectionDate = connection.created_at;
+            isActionInProgress = actionInProgress.has(user?.id);
+        }
+
+        if (!user) {
+            return (
+                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                    <p className="text-red-500">Error: User data not found</p>
+                </div>
+            );
+        }
 
         return (
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 hover:shadow-md transition-shadow">
@@ -299,9 +411,24 @@ export default function ConnectionsPage() {
                                 <Clock className="w-3 h-3 mr-1" />
                                 {type === 'connection' 
                                     ? `Connected ${formatDate(connectionDate)}`
-                                    : `Requested ${formatDate(connectionDate)}`
+                                    : type === 'request' && connection.isIncoming
+                                    ? `Requested ${formatDate(connectionDate)}`
+                                    : `You requested ${formatDate(connectionDate)}`
                                 }
                             </div>
+
+                            {/* Show request type indicator */}
+                            {type === 'request' && (
+                                <div className="mt-2">
+                                    <span className={`inline-flex items-center px-2 py-1 text-xs font-medium rounded-full ${
+                                        connection.isIncoming 
+                                            ? 'bg-blue-100 text-blue-800' 
+                                            : 'bg-amber-100 text-amber-800'
+                                    }`}>
+                                        {connection.isIncoming ? 'Wants to connect' : 'Pending approval'}
+                                    </span>
+                                </div>
+                            )}
                         </div>
                     </div>
 
@@ -318,7 +445,8 @@ export default function ConnectionsPage() {
                                 <UserX className="w-4 h-4 mr-1 hidden group-hover:block" />
                                 {isActionInProgress ? 'Disconnecting...' : 'Connected'}
                             </button>
-                        ) : (
+                        ) : connection.isIncoming ? (
+                            // Incoming request - show Accept/Decline buttons
                             <div className="flex gap-2">
                                 <button
                                     onClick={() => handleAcceptRequest(connection.id, user.id)}
@@ -337,14 +465,24 @@ export default function ConnectionsPage() {
                                     {isActionInProgress ? 'Declining...' : 'Decline'}
                                 </button>
                             </div>
+                        ) : (
+                            // Outgoing request - show Withdraw button
+                            <button
+                                onClick={() => handleWithdrawRequest(connection.id, user.id)}
+                                disabled={isActionInProgress}
+                                className="inline-flex items-center px-3 py-2 text-sm font-medium bg-amber-100 text-amber-700 rounded-lg hover:bg-amber-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                <UserX className="w-4 h-4 mr-1" />
+                                {isActionInProgress ? 'Withdrawing...' : 'Withdraw'}
+                            </button>
                         )}
                     </div>
                 </div>
             </div>
         );
-    };
+    }, [actionInProgress, formatDate, handleDisconnect, handleAcceptRequest, handleDeclineRequest, handleWithdrawRequest]);
 
-    const DiscoverCard = ({ member }) => {
+    const DiscoverCard = useCallback(({ member }) => {
         const isActionInProgress = actionInProgress.has(member.id);
 
         return (
@@ -416,7 +554,7 @@ export default function ConnectionsPage() {
                 </div>
             </div>
         );
-    };
+    }, [actionInProgress, handleSendConnectionRequest]);
 
     return (
         <PublicPageLayout bgColor="bg-[#faf7f4]">
@@ -461,7 +599,7 @@ export default function ConnectionsPage() {
                                 }`}
                             >
                                 Pending Requests ({pendingRequests.length})
-                                {pendingRequests.length > 0 && (
+                                {pendingRequests.filter(r => r.isIncoming).length > 0 && (
                                     <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full"></span>
                                 )}
                             </button>
@@ -559,21 +697,13 @@ export default function ConnectionsPage() {
                             {activeTab === 'requests' && (
                                 <div className="space-y-4">
                                     {pendingRequests.length > 0 ? (
-                                        <>
-                                            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                                                <p className="text-blue-800 text-sm">
-                                                    <strong>{pendingRequests.length}</strong> people want to connect with you professionally. 
-                                                    Review and respond to their requests below.
-                                                </p>
-                                            </div>
-                                            {pendingRequests.map(request => (
-                                                <ConnectionCard 
-                                                    key={request.id} 
-                                                    connection={request} 
-                                                    type="request"
-                                                />
-                                            ))}
-                                        </>
+                                        pendingRequests.map(request => (
+                                            <ConnectionCard 
+                                                key={request.id} 
+                                                connection={request} 
+                                                type="request"
+                                            />
+                                        ))
                                     ) : (
                                         <div className="text-center py-12">
                                             <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -581,7 +711,7 @@ export default function ConnectionsPage() {
                                             </div>
                                             <h3 className="text-lg font-medium text-slate-900 mb-2">No pending requests</h3>
                                             <p className="text-slate-600 max-w-md mx-auto">
-                                                When people send you connection requests, they'll appear here for you to accept or decline.
+                                                You don't have any pending connection requests at the moment.
                                             </p>
                                         </div>
                                     )}

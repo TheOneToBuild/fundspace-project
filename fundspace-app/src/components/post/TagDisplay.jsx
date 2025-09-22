@@ -17,11 +17,14 @@ export default function TagDisplay({ tags }) {
 
     return (
         <div className="flex flex-wrap gap-2 mb-3">
-            {parsedTags.map(tag => (
-                <div key={tag.id} className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border ${tag.color || 'bg-gray-100 text-gray-800 border-gray-200'}`}>
+            {parsedTags.map((tag, index) => (
+                <div 
+                    key={tag.id || `tag-${index}`}
+                    className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border ${tag.color || 'bg-gray-100 text-gray-800 border-gray-200'}`}
+                >
                     <span>{tag.label}</span>
                 </div>
             ))}
         </div>
     );
-};
+}

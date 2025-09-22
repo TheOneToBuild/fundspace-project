@@ -1,4 +1,4 @@
-// src/components/post/ImageViewer.jsx
+// src/components/post/ImageViewer.jsx - Fixed white dots issue
 import React, { useState, useEffect } from 'react';
 import { ThumbsUp, MessageSquare, Share2, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -62,7 +62,7 @@ export default function ImageViewer({
         }
     };
 
-    // Process content to properly render mentions
+    // FIXED: Process content to properly render mentions and remove white dots
     const processContentForDisplay = (htmlContent) => {
         if (!htmlContent) return '';
         
@@ -78,12 +78,28 @@ export default function ImageViewer({
             if ((hasDataType || hasDataId) && !hasMentionClass) {
                 span.classList.add('mention');
             }
+            
+            // CRITICAL FIX: Clean up any extra whitespace or invisible characters
+            if (span.textContent) {
+                span.textContent = span.textContent.trim();
+            }
         });
         
-        return tempDiv.innerHTML;
+        // CRITICAL FIX: Clean the entire content to remove problematic whitespace
+        let cleanedHTML = tempDiv.innerHTML;
+        
+        // Remove zero-width spaces and other problematic characters that cause white dots
+        cleanedHTML = cleanedHTML
+            .replace(/\u200B/g, '') // Remove zero-width spaces
+            .replace(/\u00A0/g, ' ') // Replace non-breaking spaces with regular spaces
+            .replace(/\u2002/g, ' ') // Replace en spaces
+            .replace(/\u2003/g, ' ') // Replace em spaces
+            .replace(/\s+/g, ' ')    // Normalize multiple spaces to single space
+            .trim();                 // Remove leading/trailing whitespace
+        
+        return cleanedHTML;
     };
 
-    // Handle mention clicks
     const handleMentionClick = async (e) => {
         const target = e.target;
         
@@ -95,47 +111,41 @@ export default function ImageViewer({
             
             const mentionId = target.dataset.id;
             const mentionType = target.dataset.type;
+            const mentionLabel = target.dataset.label;
 
             if (!mentionId || !mentionType) {
-                console.warn('Missing mention data for click navigation');
+                console.warn('⚠️ ImageViewer: Incomplete mention data:', { mentionId, mentionType, mentionLabel });
                 return;
             }
 
-            // Close the image viewer first
-            onClose();
+            console.log('🔍 ImageViewer: Processing mention click:', { mentionId, mentionType, mentionLabel });
 
             try {
-                // Navigate based on mention type
                 if (mentionType === 'user') {
-                    console.log(`👤 Navigating to user profile: /profile/members/${mentionId}`);
+                    console.log('👤 ImageViewer: Navigating to user profile:', mentionId);
                     navigate(`/profile/members/${mentionId}`);
                 } else if (mentionType === 'organization') {
-                    const [orgType, orgId] = mentionId.split('-');
+                    console.log('🏢 ImageViewer: Processing organization mention:', mentionId);
                     
-                    if (!orgId) {
-                        console.warn('⚠️ Invalid organization ID format:', mentionId);
-                        return;
-                    }
-
-                    console.log(`🏢 Organization navigation:`, { mentionId, orgType, orgId });
-
-                    // Get the organization slug from the database
-                    const slug = await getOrganizationSlug(orgType, orgId);
-                    
-                    if (slug) {
-                        if (orgType === 'nonprofit') {
-                            console.log(`🏛️ Navigating to nonprofit: /nonprofits/${slug}`);
-                            navigate(`/nonprofits/${slug}`);
-                        } else if (orgType === 'funder') {
-                            console.log(`💰 Navigating to funder: /funders/${slug}`);
-                            navigate(`/funders/${slug}`);
+                    if (mentionId.includes('-')) {
+                        const [orgType, orgId] = mentionId.split('-');
+                        console.log('🔄 ImageViewer: Old format detected:', { orgType, orgId });
+                        
+                        if (orgId) {
+                            const slug = await getOrganizationSlug(orgType, orgId);
+                            if (slug) {
+                                console.log('✅ ImageViewer: Found slug, navigating:', slug);
+                                navigate(`/organizations/${slug}`);
+                            } else {
+                                console.warn('⚠️ ImageViewer: No slug found, trying fallback navigation');
+                                const fallbackPath = orgType === 'nonprofit' ? `/nonprofits/${orgId}` : `/funders/${orgId}`;
+                                console.log(`🔄 Trying fallback navigation: ${fallbackPath}`);
+                                navigate(fallbackPath);
+                            }
                         }
                     } else {
-                        console.error(`❌ Could not find slug for ${orgType} with ID ${orgId}`);
-                        // Fallback: try to navigate anyway (might show "not found" page)
-                        const fallbackPath = orgType === 'nonprofit' ? `/nonprofits/${orgId}` : `/funders/${orgId}`;
-                        console.log(`🔄 Trying fallback navigation: ${fallbackPath}`);
-                        navigate(fallbackPath);
+                        console.log('✨ New format detected, navigating to slug:', mentionId);
+                        navigate(`/organizations/${mentionId}`);
                     }
                 }
             } catch (error) {
@@ -144,22 +154,24 @@ export default function ImageViewer({
         }
     };
 
+    const nextImage = () => {
+        setCurrentIndex(prev => (prev + 1) % images.length);
+    };
+
+    const prevImage = () => {
+        setCurrentIndex(prev => (prev - 1 + images.length) % images.length);
+    };
+
+    const currentReaction = selectedReaction ? reactions.find(r => r.type === selectedReaction) : null;
+
     if (!isOpen) return null;
 
-    const nextImage = () => images.length > 1 && setCurrentIndex((p) => (p + 1) % images.length);
-    const prevImage = () => images.length > 1 && setCurrentIndex((p) => (p - 1 + images.length) % images.length);
-    const handleBackdropClick = (e) => (e.target === e.currentTarget) && onClose();
-    const handleReaction = async (type) => { await onReaction(type); setShowReactionPanel(false); };
-    
-    const currentReaction = reactions.find(r => r.type === selectedReaction);
-
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-80 z-50 flex items-center justify-center p-6" onClick={handleBackdropClick}>
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-7xl max-h-[90vh] overflow-hidden flex" onClick={e => e.stopPropagation()}>
-                {/* Image Panel */}
-                {showImageSection && (
-                    <div className="flex-[2] bg-gradient-to-br from-rose-50 via-orange-50 to-yellow-50 relative flex items-center justify-center">
-                        <img src={images[currentIndex]} alt={`Post content ${currentIndex + 1}`} className="max-w-full max-h-full object-contain" />
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
+            <div className="max-w-7xl mx-auto flex bg-white rounded-lg overflow-hidden shadow-2xl" style={{ maxHeight: '90vh', width: '90vw' }}>
+                {showImageSection && images.length > 0 && (
+                    <div className="flex-1 bg-black flex items-center justify-center relative">
+                        <img src={images[currentIndex]} alt={`Image ${currentIndex + 1}`} className="max-w-full max-h-full object-contain" />
                         <button onClick={onClose} className="absolute top-4 right-4 bg-white/80 hover:bg-white text-black rounded-full p-2 z-10 shadow-lg"><X size={20} /></button>
                         {images.length > 1 && <>
                             <button onClick={prevImage} className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white text-black rounded-full p-2 z-10 shadow-lg"><ChevronLeft size={20} /></button>
@@ -177,10 +189,32 @@ export default function ImageViewer({
                     </div>
                     {post.content && (
                         <div className="px-6 py-4 border-b">
+                            <style>
+                                {`
+                                .image-viewer-content .mention {
+                                    background-color: #e0e7ff;
+                                    color: #3730a3;
+                                    padding: 1px 4px;
+                                    border-radius: 4px;
+                                    font-weight: 500;
+                                    text-decoration: none;
+                                    cursor: pointer;
+                                    transition: all 0.2s ease;
+                                }
+                                .image-viewer-content .mention:hover {
+                                    background-color: #c7d2fe;
+                                    text-decoration: underline;
+                                }
+                                .image-viewer-content p {
+                                    margin: 0;
+                                    line-height: 1.4;
+                                }
+                                `}
+                            </style>
                             <div 
-                                className="text-gray-800 leading-relaxed text-base"
+                                className="text-gray-800 leading-relaxed text-base image-viewer-content"
                                 onClick={handleMentionClick}
-                                dangerouslySetInnerHTML={{ 
+                                dangerouslySetInnerHTML={{
                                     __html: processContentForDisplay(post.content) 
                                 }}
                             />
@@ -210,18 +244,30 @@ export default function ImageViewer({
                                 {currentReaction ? <currentReaction.Icon size={20} /> : <ThumbsUp size={20} />}
                                 <span className="font-medium text-sm">{currentReaction ? currentReaction.label : 'Like'}</span>
                             </button>
-                            {showReactionPanel && <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-white rounded-lg shadow-lg border p-2 flex space-x-1">
-                                {reactions.map(({ type, Icon, color, label }) => <button key={type} onClick={() => handleReaction(type)} className={`p-2 rounded-full hover:scale-110 ${color}`} title={label}><Icon size={16} className="text-white" /></button>)}
-                            </div>}
+                            {showReactionPanel && (
+                                <div className="absolute bottom-full left-0 mb-2 bg-white rounded-lg shadow-lg border p-2 flex space-x-1 z-10">
+                                    {reactions.map(reaction => (
+                                        <button key={reaction.type} onClick={() => { onReaction(reaction.type); setShowReactionPanel(false); }} className={`p-2 rounded-lg hover:bg-gray-100 ${reaction.color}`}>
+                                            <reaction.Icon size={24} className="text-white" />
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
                         </div>
-                        <button className="flex-1 flex items-center justify-center space-x-2 text-gray-600 hover:bg-gray-100 py-3 px-4 rounded-lg"><MessageSquare size={20} /><span className="font-medium text-sm">Comment</span></button>
-                        <button className="flex-1 flex items-center justify-center space-x-2 text-gray-600 hover:bg-gray-100 py-3 px-4 rounded-lg"><Share2 size={20} /><span className="font-medium text-sm">Share</span></button>
+                        <button className="flex items-center justify-center space-x-2 py-3 px-4 rounded-lg hover:bg-gray-100 text-gray-600">
+                            <MessageSquare size={20} />
+                            <span className="font-medium text-sm">Comment</span>
+                        </button>
+                        <button className="flex items-center justify-center space-x-2 py-3 px-4 rounded-lg hover:bg-gray-100 text-gray-600">
+                            <Share2 size={20} />
+                            <span className="font-medium text-sm">Share</span>
+                        </button>
                     </div>
-                    <div className="p-6 flex-1 overflow-y-auto">
-                        <CommentSection post={post} currentUserProfile={currentUserProfile} onCommentAdded={onCommentAdded} onCommentDeleted={onCommentDeleted} compact={true} />
+                    <div className="flex-1 overflow-y-auto">
+                        <CommentSection post={post} currentUserProfile={currentUserProfile} onCommentAdded={onCommentAdded} onCommentDeleted={onCommentDeleted} showCommentForm={true} />
                     </div>
                 </div>
             </div>
         </div>
     );
-};
+}

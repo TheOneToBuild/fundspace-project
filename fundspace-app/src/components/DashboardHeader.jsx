@@ -34,8 +34,8 @@ export default function DashboardHeader({ profile }) {
         
         try {
             const [followersRes, followingRes, connectionsRes] = await Promise.all([
-                supabase.from('user_follows').select('id').eq('following_id', profile.id),
-                supabase.from('user_follows').select('id').eq('follower_id', profile.id),
+                supabase.from('followers').select('id').eq('following_id', profile.id),
+                supabase.from('followers').select('id').eq('follower_id', profile.id),
                 supabase.from('user_connections').select('id').or(`requester_id.eq.${profile.id},recipient_id.eq.${profile.id}`).eq('status', 'accepted')
             ]);
 

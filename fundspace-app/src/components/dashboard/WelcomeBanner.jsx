@@ -43,7 +43,8 @@ const WelcomeBanner = ({ profile, organizationInfo }) => {
             textColor: 'text-white',
             dateColor: 'text-white/80',
             orgColor: 'text-white/90',
-            buttonStyle: 'bg-white/20 hover:bg-white/30 text-white backdrop-blur-sm border border-white/20'
+            buttonStyle: 'bg-white/20 hover:bg-white/30 text-white backdrop-blur-sm border border-white/20',
+            comingSoonStyle: 'bg-white/10 text-white/60 backdrop-blur-sm border border-white/10 cursor-not-allowed'
         },
         light: {
             backgroundImage: "url('https://cdn.pixabay.com/photo/2022/06/01/02/54/yosemite-7234655_1280.jpg')",
@@ -51,7 +52,8 @@ const WelcomeBanner = ({ profile, organizationInfo }) => {
             textColor: 'text-white',
             dateColor: 'text-white/80',
             orgColor: 'text-white/90',
-            buttonStyle: 'bg-white/20 hover:bg-white/30 text-white backdrop-blur-sm border border-white/20'
+            buttonStyle: 'bg-white/20 hover:bg-white/30 text-white backdrop-blur-sm border border-white/20',
+            comingSoonStyle: 'bg-white/10 text-white/60 backdrop-blur-sm border border-white/10 cursor-not-allowed'
         }
     };
 
@@ -91,14 +93,15 @@ const WelcomeBanner = ({ profile, organizationInfo }) => {
         {
             icon: Calendar,
             label: 'Events',
-            color: currentTheme.buttonStyle,
-            action: () => navigate('/events')
+            color: currentTheme.comingSoonStyle,
+            isComingSoon: true,
+            action: () => {} // No action for coming soon
         },
         {
             icon: Bell,
             label: 'Notifications',
             color: currentTheme.buttonStyle,
-            action: () => navigate('/notifications')
+            action: () => navigate('/profile/notifications')
         }
     ];
 
@@ -195,14 +198,25 @@ const WelcomeBanner = ({ profile, organizationInfo }) => {
                                 {/* Quick action buttons */}
                                 <div className="flex gap-3 flex-wrap">
                                     {quickActions.map((action, index) => (
-                                        <button
-                                            key={index}
-                                            onClick={action.action}
-                                            className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 hover:scale-105 flex items-center gap-2 text-sm ${action.color}`}
-                                        >
-                                            <action.icon size={16} />
-                                            {action.label}
-                                        </button>
+                                        <div key={index} className="relative">
+                                            <button
+                                                onClick={action.action}
+                                                disabled={action.isComingSoon}
+                                                className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
+                                                    action.isComingSoon 
+                                                        ? action.color 
+                                                        : `${action.color} hover:scale-105`
+                                                } flex items-center gap-2 text-sm`}
+                                            >
+                                                <action.icon size={16} />
+                                                {action.label}
+                                            </button>
+                                            {action.isComingSoon && (
+                                                <span className="absolute -top-2 -right-2 bg-yellow-400 text-yellow-900 text-xs font-bold px-2 py-0.5 rounded-full text-[10px]">
+                                                    SOON
+                                                </span>
+                                            )}
+                                        </div>
                                     ))}
                                 </div>
                             </div>

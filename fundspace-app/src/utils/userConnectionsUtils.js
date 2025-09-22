@@ -1,4 +1,4 @@
-// src/utils/userConnectionsUtils.js - Fixed connection notification creation
+// src/utils/userConnectionsUtils.js - Clean version without debugging
 import { supabase } from '../supabaseClient';
 
 export const getConnectionStatus = async (userId1, userId2) => {
@@ -7,7 +7,6 @@ export const getConnectionStatus = async (userId1, userId2) => {
       return { status: 'none', isRequester: false };
     }
 
-    // FIXED: Use two separate queries instead of complex OR with AND
     const [query1, query2] = await Promise.all([
       supabase
         .from('user_connections')
@@ -82,20 +81,13 @@ export const getMutualConnectionsCount = async (userId1, userId2) => {
 
 export const sendConnectionRequest = async (requesterId, recipientId) => {
   try {
-    console.log('🚀 Starting sendConnectionRequest:', { requesterId, recipientId });
-
     if (!requesterId || !recipientId) {
-      console.log('❌ Missing IDs');
       return { success: false, error: 'Both requester and recipient IDs are required' };
     }
     if (requesterId === recipientId) {
-      console.log('❌ Same user');
       return { success: false, error: 'Cannot connect to yourself' };
     }
 
-    console.log('🔍 Checking for existing connections...');
-
-    // FIXED: Use two separate queries instead of complex OR with AND
     const [query1, query2] = await Promise.all([
       supabase
         .from('user_connections')
@@ -111,17 +103,13 @@ export const sendConnectionRequest = async (requesterId, recipientId) => {
         .maybeSingle()
     ]);
 
-    console.log('📊 Query results:', { query1: query1.data, query2: query2.data });
-
     if (query1.error || query2.error) {
-      console.log('❌ Query error:', query1.error?.message || query2.error?.message);
       return { success: false, error: query1.error?.message || query2.error?.message };
     }
 
     const existingConnection = query1.data || query2.data;
 
     if (existingConnection) {
-      console.log('🔄 Found existing connection:', existingConnection);
       switch (existingConnection.status) {
         case 'accepted':
           return { success: false, error: 'Already connected' };
@@ -138,7 +126,6 @@ export const sendConnectionRequest = async (requesterId, recipientId) => {
     let connectionId;
 
     if (existingConnection && existingConnection.status === 'declined') {
-      console.log('🔄 Updating declined connection to pending...');
       result = await supabase
         .from('user_connections')
         .update({
@@ -150,7 +137,6 @@ export const sendConnectionRequest = async (requesterId, recipientId) => {
         .single();
       connectionId = existingConnection.id;
     } else {
-      console.log('➕ Creating new connection...');
       result = await supabase
         .from('user_connections')
         .insert({
@@ -163,20 +149,13 @@ export const sendConnectionRequest = async (requesterId, recipientId) => {
       connectionId = result.data?.id;
     }
 
-    console.log('💾 Connection result:', { result: result.data, error: result.error, connectionId });
-
     if (result.error) {
-      console.log('❌ Connection creation/update failed:', result.error);
       return { success: false, error: result.error.message };
     }
 
-    console.log('🔔 About to create notification...');
-    const notificationResult = await createConnectionNotification(requesterId, recipientId, 'connection_request', connectionId);
-    console.log('📩 Notification result:', notificationResult);
-
+    await createConnectionNotification(requesterId, recipientId, 'connection_request', connectionId);
     return { success: true };
   } catch (error) {
-    console.log('💥 Exception in sendConnectionRequest:', error);
     return { success: false, error: error.message };
   }
 };
@@ -199,7 +178,6 @@ export const acceptConnectionRequest = async (currentUserId, requesterId) => {
       return { success: false, error: error.message };
     }
 
-    // FIXED: Create notification directly instead of using RPC
     await createConnectionNotification(currentUserId, requesterId, 'connection_accepted', data.id);
     return { success: true };
   } catch (error) {
@@ -230,7 +208,6 @@ export const declineConnectionRequest = async (currentUserId, requesterId) => {
 
 export const removeConnection = async (currentUserId, otherUserId) => {
   try {
-    // FIXED: Use two separate delete operations
     const [delete1, delete2] = await Promise.all([
       supabase
         .from('user_connections')
@@ -398,13 +375,9 @@ export const getPendingConnectionRequests = async (userId) => {
   }
 };
 
-// FIXED: Direct database insert instead of RPC call
 const createConnectionNotification = async (actorId, recipientId, type, connectionId = null) => {
   try {
-    console.log(`🔔 Creating notification:`, { actorId, recipientId, type, connectionId });
-
     if (actorId === recipientId) {
-      console.log('⚠️ Skipping notification: actor and recipient are the same');
       return { success: true };
     }
 
@@ -415,12 +388,9 @@ const createConnectionNotification = async (actorId, recipientId, type, connecti
       is_read: false
     };
 
-    // Only add connection_id if it's provided
     if (connectionId) {
       notificationData.connection_id = connectionId;
     }
-
-    console.log('📝 Notification data to insert:', notificationData);
 
     const { data, error } = await supabase
       .from('notifications')
@@ -429,15 +399,11 @@ const createConnectionNotification = async (actorId, recipientId, type, connecti
       .single();
 
     if (error) {
-      console.error('❌ Error creating connection notification:', error);
-      console.error('🔍 Error details:', error.message, error.code, error.details);
       return { success: false, error: error.message };
     }
 
-    console.log(`✅ Successfully created ${type} notification for user ${recipientId}`, data);
     return { success: true, notificationId: data.id };
   } catch (error) {
-    console.error('💥 Exception in createConnectionNotification:', error);
     return { success: false, error: error.message };
   }
 };

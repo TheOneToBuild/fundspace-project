@@ -1,4 +1,4 @@
-// src/components/post/PostBody.jsx - Fixed Organization Mention Navigation
+// src/components/post/PostBody.jsx - Fixed Organization Mention Navigation & White Dots
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../supabaseClient';
@@ -60,52 +60,37 @@ export default function PostBody({ content, images, tags, onImageClick }) {
             const mentionLabel = target.dataset.label;
 
             if (!mentionId || !mentionType) {
-                console.warn('⚠️ Missing mention data for click navigation');
+                console.warn('⚠️ PostBody: Incomplete mention data:', { mentionId, mentionType, mentionLabel });
                 return;
             }
 
-            console.log(`🔗 PostBody: Navigating to mention:`, {
-                mentionId,
-                mentionType,
-                mentionLabel
-            });
+            console.log('🔍 PostBody: Processing mention click:', { mentionId, mentionType, mentionLabel });
 
             try {
-                // Navigate based on mention type
                 if (mentionType === 'user') {
-                    console.log(`👤 Navigating to user profile: /profile/members/${mentionId}`);
+                    console.log('👤 PostBody: Navigating to user profile:', mentionId);
                     navigate(`/profile/members/${mentionId}`);
                 } else if (mentionType === 'organization') {
-                    console.log('🏢 Organization mention ID:', mentionId);
+                    console.log('🏢 PostBody: Processing organization mention:', mentionId);
                     
-                    // Check if mentionId is in old format (type-id)
-                    if (mentionId.includes('-') && /^\w+-\d+$/.test(mentionId)) {
-                        // Old format: type-id, extract the ID and look up the slug
+                    // Check if mentionId contains a dash (old format: type-id)
+                    if (mentionId.includes('-')) {
                         const [orgType, orgId] = mentionId.split('-');
-                        console.log('📄 Old format detected, looking up slug for:', { orgType, orgId });
+                        console.log('🔄 PostBody: Old format detected:', { orgType, orgId });
                         
-                        try {
-                            // Get the organization slug from the database
+                        if (orgId) {
                             const slug = await getOrganizationSlug(orgType, orgId);
-                            
                             if (slug) {
-                                if (orgType === 'nonprofit') {
-                                    console.log(`🏛️ Navigating to nonprofit: /nonprofits/${slug}`);
-                                    navigate(`/nonprofits/${slug}`);
-                                } else if (orgType === 'funder') {
-                                    console.log(`💰 Navigating to funder: /funders/${slug}`);
-                                    navigate(`/funders/${slug}`);
-                                }
+                                console.log('✅ PostBody: Found slug, navigating:', slug);
+                                navigate(`/organizations/${slug}`);
                             } else {
-                                console.error(`❌ Could not find slug for ${orgType} with ID ${orgId}`);
-                                // Fallback: try to navigate anyway (might show "not found" page)
-                                const fallbackPath = orgType === 'nonprofit' ? 
-                                    `/nonprofits/${orgId}` : `/funders/${orgId}`;
+                                console.warn('⚠️ PostBody: No slug found, trying fallback navigation');
+                                const fallbackPath = orgType === 'nonprofit' ? `/nonprofits/${orgId}` : `/funders/${orgId}`;
                                 console.log(`🔄 Trying fallback navigation: ${fallbackPath}`);
                                 navigate(fallbackPath);
                             }
-                        } catch (error) {
-                            console.error('💥 Error during organization navigation:', error);
+                        } else {
+                            console.error('❌ PostBody: Invalid orgId in mention:', mentionId);
                         }
                     } else {
                         // New format: slug, navigate directly to organization page using slug
@@ -119,10 +104,10 @@ export default function PostBody({ content, images, tags, onImageClick }) {
         }
     };
 
+    // FIXED: processContentForDisplay function with white dots removal
     const processContentForDisplay = (htmlContent) => {
         if (!htmlContent) return '';
         
-        // Create a temporary div to parse and modify HTML
         const tempDiv = document.createElement('div');
         tempDiv.innerHTML = htmlContent;
         
@@ -138,20 +123,36 @@ export default function PostBody({ content, images, tags, onImageClick }) {
             if ((hasDataType || hasDataId) && !hasMentionClass) {
                 span.classList.add('mention');
             }
+            
+            // CRITICAL FIX: Clean up any extra whitespace or invisible characters
+            if (span.textContent) {
+                span.textContent = span.textContent.trim();
+            }
         });
         
-        return tempDiv.innerHTML;
+        // CRITICAL FIX: Clean the entire content to remove problematic whitespace
+        let cleanedHTML = tempDiv.innerHTML;
+        
+        // Remove zero-width spaces and other problematic characters that cause white dots
+        cleanedHTML = cleanedHTML
+            .replace(/\u200B/g, '') // Remove zero-width spaces
+            .replace(/\u00A0/g, ' ') // Replace non-breaking spaces with regular spaces
+            .replace(/\u2002/g, ' ') // Replace en spaces
+            .replace(/\u2003/g, ' ') // Replace em spaces
+            .replace(/\s+/g, ' ')    // Normalize multiple spaces to single space
+            .trim();                 // Remove leading/trailing whitespace
+        
+        return cleanedHTML;
     };
 
     const showHoverCard = (mention, position) => {
-        // Clear any existing timeout
+        setHoveredMention(mention);
+        setHoverPosition(position);
+        
         if (hideTimeoutRef.current) {
             clearTimeout(hideTimeoutRef.current);
             hideTimeoutRef.current = null;
         }
-
-        setHoveredMention(mention);
-        setHoverPosition(position);
     };
 
     const hideHoverCard = () => {
@@ -160,7 +161,7 @@ export default function PostBody({ content, images, tags, onImageClick }) {
                 setHoveredMention(null);
                 setHoverPosition(null);
             }
-        }, 100);
+        }, 300);
     };
 
     const forceHideHoverCard = () => {
@@ -170,10 +171,9 @@ export default function PostBody({ content, images, tags, onImageClick }) {
         }
         setHoveredMention(null);
         setHoverPosition(null);
-        isHoveringRef.current = false;
     };
 
-    // Enhanced hover implementation
+    // Handle hover events for mentions
     useEffect(() => {
         const currentPostBodyRef = postBodyRef.current;
         if (!currentPostBodyRef) return;
@@ -182,46 +182,44 @@ export default function PostBody({ content, images, tags, onImageClick }) {
             const target = e.target;
             
             // Check if we're over a mention
-            if (target.tagName === 'SPAN' && 
-                (target.classList.contains('mention') || target.dataset.type)) {
-                
-                isHoveringRef.current = true;
-                
+            if (target.tagName === 'SPAN' && target.classList.contains('mention')) {
                 const mentionId = target.dataset.id;
-                const mentionLabel = target.dataset.label;
                 const mentionType = target.dataset.type;
-
-                if (!mentionId || !mentionType) return;
-
-                // Only update if this is a different mention
-                const isSameMention = hoveredMention && 
-                    hoveredMention.id === mentionId && 
-                    hoveredMention.entityType === mentionType;
-
-                if (!isSameMention) {
-                    const mention = {
-                        id: mentionId,
-                        displayName: mentionLabel,
-                        entityType: mentionType
-                    };
-
-                    const rect = target.getBoundingClientRect();
-                    const position = {
-                        top: rect.bottom + window.scrollY + 8,
-                        left: rect.left + window.scrollX
-                    };
-
-                    showHoverCard(mention, position);
-                }
-            } else {
-                // Not over a mention
-                isHoveringRef.current = false;
+                const mentionLabel = target.dataset.label;
                 
-                // Check if we're over the hover card itself
-                const isOverHoverCard = target.closest('.mention-hover-card-wrapper');
-                
-                if (!isOverHoverCard) {
-                    hideHoverCard();
+                if (mentionId && mentionType) {
+                    isHoveringRef.current = true;
+                    
+                    // Check if this is the same mention we're already hovering
+                    const isSameMention = hoveredMention && 
+                        hoveredMention.id === mentionId && 
+                        hoveredMention.entityType === mentionType;
+                    
+                    if (!isSameMention) {
+                        const mention = {
+                            id: mentionId,
+                            displayName: mentionLabel,
+                            entityType: mentionType
+                        };
+
+                        const rect = target.getBoundingClientRect();
+                        const position = {
+                            top: rect.bottom + window.scrollY + 8,
+                            left: rect.left + window.scrollX
+                        };
+
+                        showHoverCard(mention, position);
+                    }
+                } else {
+                    // Not over a mention
+                    isHoveringRef.current = false;
+                    
+                    // Check if we're over the hover card itself
+                    const isOverHoverCard = target.closest('.mention-hover-card-wrapper');
+                    
+                    if (!isOverHoverCard) {
+                        hideHoverCard();
+                    }
                 }
             }
         };
