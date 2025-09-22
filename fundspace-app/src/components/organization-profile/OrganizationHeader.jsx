@@ -1,4 +1,4 @@
-// src/components/organization-profile/OrganizationHeader.jsx - Updated with Edit Button at Top
+// src/components/organization-profile/OrganizationHeader.jsx - Updated with Banner Positioning
 
 import React from 'react';
 import { Heart, MapPin, ExternalLink, CheckCircle, Users, Sparkles, Edit3 } from 'lucide-react';
@@ -46,6 +46,9 @@ const OrganizationHeader = ({
       navigate(currentUrl.pathname + currentUrl.search);
     }
   };
+
+  // Get banner position from organization data
+  const bannerPosition = organization.banner_position || { x: 50, y: 50 };
 
   // Organization type configurations
   const getTypeInfo = (type) => {
@@ -162,6 +165,9 @@ const OrganizationHeader = ({
                 src={organization.banner_image_url} 
                 alt={`${organization.name} banner`}
                 className="w-full h-full object-cover"
+                style={{
+                  objectPosition: `${bannerPosition.x}% ${bannerPosition.y}%`
+                }}
               />
             ) : (
               // Default gradient banner if no image

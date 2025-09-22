@@ -1,4 +1,4 @@
-// hooks/useOrganizationData.js
+// hooks/useOrganizationData.js - Complete fixed version for omega admins
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
@@ -20,10 +20,8 @@ export function useOrganizationData(profile, session) {
         setLoading(true);
         setError('');
 
-        if (profile?.is_omega_admin === true) {
-            setLoading(false);
-            return;
-        }
+        // REMOVED: Early return for omega admins - they should be able to have organizations too
+        // This was the main issue preventing omega admins from accessing their organizations
 
         try {
             const { data: memberships, error: membershipError } = await supabase
@@ -85,7 +83,7 @@ export function useOrganizationData(profile, session) {
                 contact_email: orgData.contact_email || '',
             });
 
-            // FIXED: Added organizational_role to the query
+            // Fetch organization members with proper error handling
             const { data: memberData, error: memberError } = await supabase
                 .from('organization_memberships')
                 .select(`
@@ -104,10 +102,28 @@ export function useOrganizationData(profile, session) {
                 .order('role', { ascending: false })
                 .order('joined_at', { ascending: true });
 
-            if (!memberError) {
-                setMembers(memberData || []);
+            if (!memberError && memberData) {
+                // Filter out members with missing profile data and log issues
+                const validMembers = memberData.filter(member => {
+                    if (!member.profiles || !member.profiles.id) {
+                        console.warn('Filtering out member with invalid profile data:', {
+                            membershipId: member.id,
+                            profileId: member.profile_id,
+                            hasProfiles: !!member.profiles,
+                            profilesId: member.profiles?.id
+                        });
+                        return false;
+                    }
+                    return true;
+                });
+                
+                setMembers(validMembers);
+            } else {
+                console.error('Member fetch error:', memberError);
+                setMembers([]);
             }
         } catch (err) {
+            console.error('Error loading organization data:', err);
             setError('Error loading organization data');
         } finally {
             setLoading(false);
@@ -151,7 +167,7 @@ export function useOrganizationData(profile, session) {
                     organization_choice: null,
                     selected_organization_id: null,
                     selected_organization_type: null,
-                    organization_name: null, // Clear organization name too
+                    organization_name: null,
                     updated_at: new Date()
                 })
                 .eq('id', session.user.id);
@@ -163,12 +179,11 @@ export function useOrganizationData(profile, session) {
                 console.warn('Cache refresh failed (this may be normal):', refreshError);
             }
 
-            // NEW: Trigger refresh of dashboard organization data
+            // Trigger refresh functions if available
             if (window.refreshDashboardOrganizationData) {
                 window.refreshDashboardOrganizationData();
             }
 
-            // NEW: Trigger refresh of member profile data
             if (window.refreshMemberProfileData) {
                 window.refreshMemberProfileData();
             }
@@ -233,8 +248,7 @@ export function useOrganizationData(profile, session) {
                 })
                 .eq('id', session.user.id);
 
-            // Success - navigate away
-            alert('Organization deleted successfully.');
+            // Success - navigate away (removed alert call)
             navigate('/profile');
             return true;
         } catch (err) {

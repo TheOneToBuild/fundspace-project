@@ -1,8 +1,8 @@
-// src/components/organization-profile/EditableOrganizationHeader.jsx - Updated with Edit Section Button
+// src/components/organization-profile/EditableOrganizationHeader.jsx - Complete Updated Version
 import React, { useState } from 'react';
 import { 
   Eye, AlertTriangle, X, ArrowLeft, Edit3, Save, MapPin, ExternalLink, 
-  CheckCircle, Sparkles, Calendar
+  CheckCircle, Sparkles, Calendar, Users
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../supabaseClient.js';
@@ -47,6 +47,21 @@ const EditableOrganizationHeader = ({
   );
 
   if (!organization) return null;
+
+  // Navigation handlers
+  const handleBackToDashboard = () => {
+    navigate('/dashboard');
+  };
+
+  const handleViewLive = () => {
+    if (organization.slug) {
+      navigate(`/organizations/${organization.slug}`);
+    } else {
+      const currentUrl = new URL(window.location);
+      currentUrl.searchParams.delete('edit');
+      navigate(currentUrl.pathname + currentUrl.search);
+    }
+  };
 
   // Organization type configuration
   const getTypeInfo = (type) => {
@@ -101,11 +116,28 @@ const EditableOrganizationHeader = ({
     Briefcase: '💼', Target: '🎯', Camera: '📷'
   };
 
-  // Handle image uploads (both file and URL)
+  // Handle image uploads and banner position updates
   const handleImageSave = async (imageData, imageType, uploadType) => {
     try {
       setError('');
       setSaving(true);
+      
+      // Handle banner position updates separately
+      if (imageType === 'banner_position' && uploadType === 'update') {
+        const { error: updateError } = await supabase
+          .from('organizations')
+          .update({ banner_position: imageData.banner_position })
+          .eq('id', organization.id);
+
+        if (updateError) throw updateError;
+
+        // Call the onUpdate callback to refresh organization data
+        if (onUpdate) {
+          await onUpdate({ ...organization, banner_position: imageData.banner_position });
+        }
+
+        return true;
+      }
       
       let imageUrl = imageData;
       
@@ -164,7 +196,7 @@ const EditableOrganizationHeader = ({
       return true;
     } catch (err) {
       console.error('Error saving image:', err);
-      setError('Failed to save image: ' + err.message);
+      setError('Failed to save: ' + err.message);
       return false;
     } finally {
       setSaving(false);
@@ -186,12 +218,12 @@ const EditableOrganizationHeader = ({
       if (editData.year_founded !== organization.year_founded) {
         updateData.year_founded = editData.year_founded ? parseInt(editData.year_founded) : null;
       }
-
+      
       if (Object.keys(updateData).length === 0) {
         setIsEditingBasicInfo(false);
-        return true;
+        return;
       }
-
+      
       const { error: updateError } = await supabase
         .from('organizations')
         .update(updateData)
@@ -199,77 +231,48 @@ const EditableOrganizationHeader = ({
 
       if (updateError) throw updateError;
 
-      // Call the onUpdate callback to refresh organization data
       if (onUpdate) {
         await onUpdate({ ...organization, ...updateData });
       }
 
       setIsEditingBasicInfo(false);
-      return true;
     } catch (err) {
-      console.error('Error updating organization:', err);
-      setError('Failed to save changes: ' + err.message);
-      return false;
+      console.error('Error updating basic info:', err);
+      setError('Failed to update organization details: ' + err.message);
     } finally {
       setSaving(false);
     }
   };
 
-  // Handle view live button
-  const handleViewLive = () => {
-    if (organization.slug) {
-      navigate(`/organizations/${organization.slug}`);
-    } else {
-      // Remove edit parameter from current URL
-      const currentUrl = new URL(window.location);
-      currentUrl.searchParams.delete('edit');
-      navigate(currentUrl.pathname + currentUrl.search);
-    }
-  };
-
-  // Handle back to dashboard
-  const handleBackToDashboard = () => {
-    navigate('/profile/my-organization');
-  };
-
-  // Reset edit data when starting to edit
-  const startEditing = () => {
-    setEditData({
-      name: organization?.name || '',
-      location: organization?.location || '',
-      website: organization?.website || '',
-      year_founded: organization?.year_founded || ''
-    });
-    setIsEditingBasicInfo(true);
-  };
-
   return (
-    <div className="bg-white border-b border-slate-200">
-      {/* Edit Mode Header */}
-      <div className="bg-blue-600 text-white px-8 py-3">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="font-semibold">Editing Mode</span>
-            <span className="text-blue-200 text-sm">Make changes to your organization profile</span>
-          </div>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={handleBackToDashboard}
-              className="flex items-center gap-2 bg-white bg-opacity-20 hover:bg-opacity-30 px-4 py-2 rounded-lg transition-colors"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              Back to Dashboard
-            </button>
-            <button
-              onClick={handleViewLive}
-              className="flex items-center gap-2 bg-white bg-opacity-20 hover:bg-opacity-30 px-4 py-2 rounded-lg transition-colors"
-            >
-              <Eye className="w-4 h-4" />
-              View Live
-            </button>
+    <div className="relative">
+      {/* Edit Button Header - Only show if user can edit */}
+      {canEdit && (
+        <div className="bg-blue-600 text-white px-8 py-3">
+          <div className="max-w-7xl mx-auto flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="font-semibold">Editing Mode</span>
+              <span className="text-blue-200 text-sm">Make changes to your organization profile</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleBackToDashboard}
+                className="flex items-center gap-2 bg-white bg-opacity-20 hover:bg-opacity-30 px-4 py-2 rounded-lg transition-colors"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                Back to Dashboard
+              </button>
+              <button
+                onClick={handleViewLive}
+                className="flex items-center gap-2 bg-white bg-opacity-20 hover:bg-opacity-30 px-4 py-2 rounded-lg transition-colors"
+              >
+                <Eye className="w-4 h-4" />
+                View Live
+              </button>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Error message */}
       {error && (
@@ -300,164 +303,118 @@ const EditableOrganizationHeader = ({
 
       <div className="max-w-7xl mx-auto px-8">
         <div className="flex items-start gap-6 pb-6">
-          {/* Logo Section */}
-          <LogoEditSection
-            organization={organization}
-            canEdit={canEdit}
-            onSave={handleImageSave}
-            saving={saving}
-            uploading={uploading}
-          />
-          
-          {/* Organization Info */}
-          <div className="flex-1 py-4">
-            {/* Type Badge and Year Founded */}
-            <div className="flex items-center gap-3 mb-2">
-              <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gradient-to-r ${typeInfo.gradient} text-white`}>
-                <Sparkles className="w-4 h-4 mr-2" />
-                {typeInfo.label}
-              </span>
-              {organization.year_founded && (
-                <span className="text-slate-500 font-medium text-sm">
-                  Since {organization.year_founded}
-                </span>
-              )}
-            </div>
-            
-            {/* Organization Name and Verification */}
-            <div className="flex items-center gap-3 mb-3">
-              <h1 className="text-4xl font-bold text-slate-900">{organization.name}</h1>
-              {canEdit && (
-                <button
-                  onClick={startEditing}
-                  className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
-                >
-                  <Edit3 className="w-4 h-4" />
-                  Edit Section
-                </button>
-              )}
-              {organization.isVerified && (
-                <CheckCircle className="w-7 h-7 text-blue-500" />
-              )}
-            </div>
-            
-            {/* Location and Website */}
-            <div className="flex items-center gap-3 mb-4 flex-wrap">
-              {organization.location ? (
-                <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium bg-blue-100 text-blue-800 border border-blue-200">
-                  <MapPin className="w-4 h-4" />
-                  {organization.location}
-                </span>
-              ) : (
-                canEdit && (
-                  <button
-                    onClick={startEditing}
-                    className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium bg-slate-100 text-slate-600 border border-slate-200 hover:bg-slate-200"
-                  >
-                    <MapPin className="w-4 h-4" />
-                    Add location
-                  </button>
-                )
-              )}
-
-              {organization.website ? (
-                <a 
-                  href={organization.website} 
-                  target="_blank" 
-                  rel="noopener noreferrer" 
-                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium bg-purple-100 text-purple-800 border border-purple-200 hover:bg-purple-200 transition-colors"
-                >
-                  <ExternalLink className="w-4 h-4" />
-                  Website
-                </a>
-              ) : (
-                canEdit && (
-                  <button
-                    onClick={startEditing}
-                    className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium bg-slate-100 text-slate-600 border border-slate-200 hover:bg-slate-200"
-                  >
-                    <ExternalLink className="w-4 h-4" />
-                    Add website
-                  </button>
-                )
-              )}
-
-              {!organization.year_founded && canEdit && (
-                <button
-                  onClick={startEditing}
-                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium bg-slate-100 text-slate-600 border border-slate-200 hover:bg-slate-200"
-                >
-                  <Calendar className="w-4 h-4" />
-                  Add year founded
-                </button>
-              )}
-            </div>
-
-            {/* Social Stats */}
-            <div className="flex items-center gap-6 mb-6">
-              <div className="flex items-center gap-2 text-slate-600">
-                <span className="text-base">👥</span>
-                <span className="font-semibold text-slate-900">
-                  {new Intl.NumberFormat('en-US').format(followersCount || 0)}
-                </span>
-                <span className="text-sm">Followers</span>
-              </div>
-              <div className="flex items-center gap-2 text-slate-600">
-                <span className="text-base">{bookmarksCount > 0 ? '❤️' : '🤍'}</span>
-                <span className="font-semibold text-slate-900">
-                  {new Intl.NumberFormat('en-US').format(bookmarksCount || 0)}
-                </span>
-                <span className="text-sm">Likes</span>
-              </div>
-            </div>
+          {/* Logo - positioned to overlap banner */}
+          <div className="relative -mt-20">
+            <LogoEditSection
+              organization={organization}
+              canEdit={canEdit}
+              onSave={handleImageSave}
+              saving={saving}
+              uploading={uploading}
+            />
           </div>
-          
-          {/* Action Buttons */}
-          <div className="flex items-center gap-3 py-4">
-            <button 
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                onFollow();
-              }}
-              className={`px-6 py-3 rounded-full font-semibold transition-all duration-300 flex items-center gap-2 ${
-                isFollowing 
-                  ? 'bg-slate-200 text-slate-800' 
-                  : `bg-gradient-to-r ${typeInfo.gradient} text-white hover:shadow-lg`
-              }`}
-            >
-              {isFollowing ? 'Following' : 'Follow'}
-            </button>
-            <button 
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                onBookmark();
-              }}
-              className="p-3 bg-slate-100 text-slate-600 rounded-full hover:bg-slate-200 transition-colors w-12 h-12 flex items-center justify-center"
-            >
-              <span className="text-lg">
-                {isBookmarked ? '❤️' : '🤍'}
-              </span>
-            </button>
+
+          {/* Organization Info */}
+          <div className="flex-1 pt-4">
+            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+              <div className="flex-1">
+                {/* Organization Type Badge */}
+                <div className="flex items-center gap-3 mb-3">
+                  <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-purple-100 text-purple-700 border border-purple-200">
+                    Company
+                  </span>
+                  {organization.year_founded && (
+                    <span className="text-sm text-slate-500 flex items-center gap-1">
+                      <Calendar className="w-4 h-4" />
+                      Since {organization.year_founded}
+                    </span>
+                  )}
+                </div>
+
+                {/* Organization Name and Edit Button */}
+                <div className="flex items-center gap-3 mb-2">
+                  <h1 className="text-3xl font-bold text-slate-900">{organization.name}</h1>
+                  {canEdit && (
+                    <button
+                      onClick={() => setIsEditingBasicInfo(true)}
+                      className="flex items-center gap-2 text-blue-600 hover:text-blue-700 px-3 py-1.5 rounded-lg hover:bg-blue-50 transition-colors"
+                    >
+                      <Edit3 className="w-4 h-4" />
+                      Edit Section
+                    </button>
+                  )}
+                </div>
+
+                {/* Location and Website */}
+                <div className="flex flex-wrap items-center gap-4 text-slate-600 mb-4">
+                  {organization.location && (
+                    <div className="flex items-center gap-2">
+                      <MapPin className="w-4 h-4" />
+                      <span>{organization.location}</span>
+                    </div>
+                  )}
+                  {organization.website && (
+                    <a
+                      href={organization.website.startsWith('http') ? organization.website : `https://${organization.website}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2 text-blue-600 hover:text-blue-700"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                      Website
+                    </a>
+                  )}
+                </div>
+
+                {/* Followers and Likes */}
+                <div className="flex items-center gap-6 text-slate-600">
+                  <div className="flex items-center gap-2">
+                    <Users className="w-4 h-4" />
+                    <span className="font-medium">{followersCount || 0}</span>
+                    <span>Followers</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-red-500">❤️</span>
+                    <span className="font-medium">{bookmarksCount || 0}</span>
+                    <span>Likes</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={onFollow}
+                  className="px-6 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition-colors"
+                >
+                  {isFollowing ? 'Following' : 'Follow'}
+                </button>
+                <button
+                  onClick={onBookmark}
+                  className="p-2 rounded-lg hover:bg-red-50 transition-colors"
+                >
+                  <span className={`text-xl ${isBookmarked ? 'text-red-500' : 'text-gray-400'}`}>
+                    ❤️
+                  </span>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Tabs */}
-        <div className="pb-6">
-          <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide">
-            {tabs.map((tab) => {
-              const isActive = activeTab === tab.id;
+        {/* Tabs Navigation */}
+        <div className="border-b border-slate-200">
+          <div className="flex overflow-x-auto">
+            {tabs && tabs.length > 0 && tabs.map((tab, index) => {
               const emoji = iconMap[tab.icon] || '📄';
-              
               return (
                 <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center gap-2 px-4 py-2.5 rounded-full font-medium text-sm transition-all duration-200 whitespace-nowrap ${
-                    isActive 
-                      ? `bg-gradient-to-r ${typeInfo.gradient} text-white shadow-md`
-                      : 'text-slate-600 hover:text-slate-800 hover:bg-slate-100'
+                  key={tab.key || `tab-${index}`}
+                  onClick={() => setActiveTab(tab.key)}
+                  className={`flex items-center gap-2 px-6 py-4 border-b-2 font-medium text-sm whitespace-nowrap transition-colors ${
+                    activeTab === tab.key
+                      ? `border-blue-500 bg-gradient-to-r ${typeInfo.gradient} text-white shadow-md`
+                      : 'border-transparent text-slate-600 hover:text-slate-800 hover:bg-slate-100'
                   }`}
                 >
                   <span className="text-base">{emoji}</span>
@@ -469,7 +426,7 @@ const EditableOrganizationHeader = ({
         </div>
       </div>
 
-      {/* Basic Info Edit Modal - Modern Design with Organic Gradient */}
+      {/* Basic Info Edit Modal */}
       {isEditingBasicInfo && (
         <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl transform transition-all overflow-hidden">
@@ -497,85 +454,75 @@ const EditableOrganizationHeader = ({
               </div>
             </div>
 
-            {/* Content */}
-            <div className="p-6 space-y-5">
+            {/* Form Content */}
+            <div className="p-6 space-y-4">
               {/* Organization Name */}
-              <div className="group">
+              <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-gradient-to-r from-purple-400 to-pink-400"></div>
+                  <div className="w-2 h-2 rounded-full bg-gradient-to-r from-blue-400 to-indigo-400"></div>
                   Organization Name
                 </label>
                 <input
                   type="text"
                   value={editData.name}
-                  onChange={(e) => setEditData({ ...editData, name: e.target.value })}
-                  className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-transparent focus:ring-2 focus:ring-purple-300 transition-all duration-200 group-hover:border-slate-300 bg-white"
+                  onChange={(e) => setEditData({...editData, name: e.target.value})}
+                  className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-transparent focus:ring-2 focus:ring-purple-300 transition-all duration-200"
                   placeholder="Enter organization name"
                 />
               </div>
 
               {/* Location */}
-              <div className="group">
+              <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-gradient-to-r from-blue-400 to-indigo-400"></div>
+                  <div className="w-2 h-2 rounded-full bg-gradient-to-r from-green-400 to-emerald-400"></div>
                   Location
                 </label>
-                <div className="relative">
-                  <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
-                  <input
-                    type="text"
-                    value={editData.location}
-                    onChange={(e) => setEditData({ ...editData, location: e.target.value })}
-                    className="w-full pl-11 pr-4 py-3 border-2 border-slate-200 rounded-xl focus:border-transparent focus:ring-2 focus:ring-purple-300 transition-all duration-200 group-hover:border-slate-300 bg-white"
-                    placeholder="e.g., San Francisco, CA"
-                  />
-                </div>
+                <input
+                  type="text"
+                  value={editData.location}
+                  onChange={(e) => setEditData({...editData, location: e.target.value})}
+                  className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-transparent focus:ring-2 focus:ring-purple-300 transition-all duration-200"
+                  placeholder="City, State or City, Country"
+                />
               </div>
 
               {/* Website */}
-              <div className="group">
+              <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-gradient-to-r from-pink-400 to-rose-400"></div>
+                  <div className="w-2 h-2 rounded-full bg-gradient-to-r from-purple-400 to-pink-400"></div>
                   Website
                 </label>
-                <div className="relative">
-                  <ExternalLink className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
-                  <input
-                    type="url"
-                    value={editData.website}
-                    onChange={(e) => setEditData({ ...editData, website: e.target.value })}
-                    className="w-full pl-11 pr-4 py-3 border-2 border-slate-200 rounded-xl focus:border-transparent focus:ring-2 focus:ring-purple-300 transition-all duration-200 group-hover:border-slate-300 bg-white"
-                    placeholder="https://yourwebsite.com"
-                  />
-                </div>
+                <input
+                  type="url"
+                  value={editData.website}
+                  onChange={(e) => setEditData({...editData, website: e.target.value})}
+                  className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-transparent focus:ring-2 focus:ring-purple-300 transition-all duration-200"
+                  placeholder="https://example.com"
+                />
               </div>
 
               {/* Year Founded */}
-              <div className="group">
+              <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-gradient-to-r from-amber-400 to-orange-400"></div>
+                  <div className="w-2 h-2 rounded-full bg-gradient-to-r from-yellow-400 to-orange-400"></div>
                   Year Founded
                 </label>
-                <div className="relative">
-                  <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
-                  <input
-                    type="number"
-                    value={editData.year_founded}
-                    onChange={(e) => setEditData({ ...editData, year_founded: e.target.value })}
-                    className="w-full pl-11 pr-4 py-3 border-2 border-slate-200 rounded-xl focus:border-transparent focus:ring-2 focus:ring-purple-300 transition-all duration-200 group-hover:border-slate-300 bg-white"
-                    placeholder="e.g., 1991"
-                    min="1800"
-                    max={new Date().getFullYear()}
-                  />
-                </div>
+                <input
+                  type="number"
+                  value={editData.year_founded}
+                  onChange={(e) => setEditData({...editData, year_founded: e.target.value})}
+                  className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-transparent focus:ring-2 focus:ring-purple-300 transition-all duration-200"
+                  placeholder="2020"
+                  min="1800"
+                  max={new Date().getFullYear()}
+                />
               </div>
 
-              {/* Loading State */}
+              {/* Saving Indicator */}
               {saving && (
-                <div className="relative overflow-hidden bg-white border-2 border-purple-100 rounded-xl p-4">
-                  {/* Subtle background gradient */}
+                <div className="relative p-4 rounded-xl overflow-hidden">
                   <div className="absolute inset-0">
-                    <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-purple-200 to-pink-200 rounded-full blur-xl opacity-30"></div>
+                    <div className="absolute top-0 left-0 w-16 h-16 bg-gradient-to-br from-purple-200 to-pink-200 rounded-full blur-xl opacity-30"></div>
                   </div>
                   <div className="relative flex items-center gap-3">
                     <div className="animate-spin rounded-full h-5 w-5 border-2 border-purple-400 border-t-transparent"></div>

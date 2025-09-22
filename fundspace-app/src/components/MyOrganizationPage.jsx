@@ -1,4 +1,4 @@
-// src/components/MyOrganizationPage.jsx - Updated with refresh capability
+// src/components/MyOrganizationPage.jsx - Updated to allow omega admins to create/join organizations
 import React, { useState, useEffect } from 'react';
 import { useOutletContext, useNavigate } from 'react-router-dom';
 import { AlertTriangle, Crown } from 'lucide-react';
@@ -74,7 +74,7 @@ export default function MyOrganizationPage() {
         );
     }
 
-    // No organization state - setup page uses its own layout
+    // ✅ UPDATED: No organization state - allow ALL users (including omega admins) to access setup
     if (!organization) {
         return (
             <StreamlinedOrganizationSetupPage 
@@ -87,89 +87,76 @@ export default function MyOrganizationPage() {
         );
     }
 
-    // Omega Admin display with expanded layout
-    if (isOmegaAdmin && !userMembership) {
-        return (
-            <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                <div className="bg-white p-8 rounded-xl shadow-sm border border-slate-200 text-center">
-                    <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <Crown className="w-8 h-8 text-blue-600" />
-                    </div>
-                    <h1 className="text-2xl font-bold text-slate-800 mb-2">Omega Admin Access</h1>
-                    <p className="text-slate-600 mb-6">
-                        You have administrative access to view and manage this organization as an Omega Admin.
-                    </p>
-                </div>
-            </div>
-        );
-    }
+    // ✅ UPDATED: Remove the omega admin restriction block entirely
+    // Previously there was a special case that prevented omega admins without memberships 
+    // from accessing normal organization functionality - this has been removed
 
-    // Main organization page with fully expanded layout
+    // Main organization page layout
     return (
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
             <div className="space-y-6">
-                {error && (
-                    <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-                        {error}
-                    </div>
-                )}
-
-                {/* Organization Header */}
-                <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                    <OrganizationHeader 
-                        organization={organization}
-                        userMembership={userMembership}
-                        profile={profile}
-                        onUpdate={updateOrganization}
-                        onLeave={() => setIsConfirmingLeave(true)}
-                        onDelete={() => setIsConfirmingDelete(true)}
-                        setError={setError}
-                    />
-                </div>
-
-                {/* Tab Navigation & Content */}
-                <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                    <OrganizationTabs 
-                        activeTab={activeTab}
-                        setActiveTab={setActiveTab}
-                        userMembership={userMembership}
-                        canViewAnalytics={canViewAnalytics}
-                    />
-                    
-                    <OrganizationTabContent 
-                        activeTab={activeTab}
-                        organization={organization}
-                        members={members}
-                        userMembership={userMembership}
-                        profile={profile}
-                        onMemberAction={fetchOrganizationData}
-                        setError={setError}
-                    />
-                </div>
-
-                {/* Modals */}
-                <LeaveOrganizationModal 
-                    isOpen={isConfirmingLeave}
-                    onClose={() => setIsConfirmingLeave(false)}
-                    organization={organization}
-                    userRole={userMembership?.role}
-                    onConfirm={async () => {
-                        await executeLeave();
-                        setIsConfirmingLeave(false);
-                    }}
-                    loading={loading}
-                />
-
-                <DeleteOrganizationModal 
-                    isOpen={isConfirmingDelete}
-                    onClose={() => setIsConfirmingDelete(false)}
+                <OrganizationHeader
                     organization={organization}
                     members={members}
-                    onConfirm={executeDeleteOrganization}
-                    loading={loading}
+                    userMembership={userMembership}
+                    userRole={userRole}
+                    isOmegaAdmin={isOmegaAdmin}
+                    onEditOrganization={(updatedOrg) => updateOrganization(updatedOrg)}
+                    onLeaveOrganization={() => setIsConfirmingLeave(true)}
+                    onDeleteOrganization={() => setIsConfirmingDelete(true)}
+                    canViewAnalytics={canViewAnalytics}
+                    error={error}
                     setError={setError}
                 />
+
+                <OrganizationTabs
+                    activeTab={activeTab}
+                    setActiveTab={setActiveTab}
+                    organization={organization}
+                    userMembership={userMembership}
+                    isOmegaAdmin={isOmegaAdmin}
+                    canViewAnalytics={canViewAnalytics}
+                />
+
+                <OrganizationTabContent
+                    activeTab={activeTab}
+                    setActiveTab={setActiveTab}
+                    organization={organization}
+                    members={members}
+                    userMembership={userMembership}
+                    session={session}
+                    isOmegaAdmin={isOmegaAdmin}
+                    canViewAnalytics={canViewAnalytics}
+                />
             </div>
+
+            {/* Leave Organization Modal */}
+            <LeaveOrganizationModal
+                isOpen={isConfirmingLeave}
+                onClose={() => setIsConfirmingLeave(false)}
+                organization={organization}
+                userRole={userRole}
+                onConfirm={async () => {
+                    const success = await executeLeave();
+                    if (success) {
+                        setIsConfirmingLeave(false);
+                        // Navigate to profile or refresh the page to show setup
+                        navigate('/profile/my-organization', { replace: true });
+                    }
+                }}
+                loading={loading}
+            />
+
+            {/* Delete Organization Modal */}
+            <DeleteOrganizationModal
+                isOpen={isConfirmingDelete}
+                onClose={() => setIsConfirmingDelete(false)}
+                organization={organization}
+                members={members}
+                onConfirm={executeDeleteOrganization}
+                loading={loading}
+                setError={setError}
+            />
         </div>
     );
 }

@@ -1,6 +1,6 @@
 // components/organization/DeleteOrganizationModal.jsx
 import React, { useState, useEffect } from 'react';
-import { Trash2 } from 'lucide-react';
+import { Trash2, CheckCircle } from 'lucide-react';
 
 export default function DeleteOrganizationModal({ 
     isOpen, 
@@ -12,11 +12,13 @@ export default function DeleteOrganizationModal({
     setError 
 }) {
     const [deleteConfirmText, setDeleteConfirmText] = useState('');
+    const [showSuccess, setShowSuccess] = useState(false);
 
     // Reset confirmation text when modal opens/closes
     useEffect(() => {
         if (isOpen) {
             setDeleteConfirmText('');
+            setShowSuccess(false);
             if (setError) setError('');
         }
     }, [isOpen, setError]);
@@ -27,20 +29,52 @@ export default function DeleteOrganizationModal({
             return;
         }
 
+        // Call onConfirm but don't wait for navigation
         const success = await onConfirm(deleteConfirmText);
         if (success) {
-            onClose();
+            // Show success state immediately
+            setShowSuccess(true);
+            
+            // Auto-close and let parent handle navigation
+            setTimeout(() => {
+                setShowSuccess(false);
+                onClose();
+            }, 1500);
         }
     };
 
     const handleClose = () => {
         setDeleteConfirmText('');
+        setShowSuccess(false);
         if (setError) setError('');
         onClose();
     };
 
     if (!isOpen || !organization) return null;
 
+    // Success state
+    if (showSuccess) {
+        return (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                <div className="bg-white p-8 rounded-xl shadow-xl max-w-md w-full mx-4 text-center">
+                    <div className="mb-4">
+                        <CheckCircle className="w-16 h-16 text-green-600 mx-auto mb-4" />
+                        <h3 className="text-xl font-semibold text-slate-800 mb-2">
+                            Organization Deleted
+                        </h3>
+                        <p className="text-slate-600">
+                            <strong>{organization.name}</strong> has been permanently deleted.
+                        </p>
+                        <p className="text-sm text-slate-500 mt-2">
+                            Redirecting you now...
+                        </p>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    // Main deletion modal
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white p-6 rounded-xl shadow-xl max-w-lg w-full mx-4">
@@ -55,7 +89,6 @@ export default function DeleteOrganizationModal({
                         Deleting <strong>{organization.name}</strong> will permanently:
                     </p>
                     
-                    {/* CORRECTED: All list items are now correctly placed inside the <ul> tag */}
                     <ul className="text-sm text-slate-600 space-y-2 mb-4 bg-red-50 border border-red-200 rounded-lg p-4">
                         <li className="flex items-start">
                             <span className="text-red-500 mr-2">•</span>

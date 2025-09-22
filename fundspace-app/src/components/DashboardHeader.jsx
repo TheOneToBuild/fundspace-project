@@ -196,7 +196,6 @@ export default function DashboardHeader({ profile }) {
             label: 'Organization',
             to: '/profile/my-organization',
             icon: <Building size={16} />,
-            hide: isOmegaAdmin
         },
         // Omega Admin Panel (only for omega admins)
         ...(isOmegaAdmin ? [omegaAdminItem] : [])

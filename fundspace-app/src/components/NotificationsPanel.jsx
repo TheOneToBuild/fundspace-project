@@ -257,7 +257,7 @@ const NotificationItem = ({ notification, onClick, onViewPost, currentUserId, on
             // For people-related notifications, navigate to the person's profile
             console.log('👥 User notification - navigating to user profile:', actor?.id);
             onClick(); // Close notifications panel
-            const profileUrl = `/profile/members/${actor.id}`;
+            const profileUrl = `/members/${actor.id}`;
             console.log('🔗 Navigating to:', profileUrl);
             navigate(profileUrl);
         } else if (organization_post_id) {

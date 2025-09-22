@@ -1,4 +1,4 @@
-// components/organization/OrganizationHeader.jsx - Enhanced banner implementation with fixed dropdown
+// components/organization/OrganizationHeader.jsx - Enhanced banner implementation with positioning
 import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -70,6 +70,9 @@ export default function OrganizationHeader({
 
     if (!organization) return null;
 
+    // Get banner position from organization data
+    const bannerPosition = organization.banner_position || { x: 50, y: 50 };
+
     return (
         <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
             {/* Enhanced Banner Section */}
@@ -81,6 +84,9 @@ export default function OrganizationHeader({
                             src={organization.banner_url || organization.banner_image_url} 
                             alt={`${organization.name} banner`}
                             className="w-full h-full object-cover"
+                            style={{
+                                objectPosition: `${bannerPosition.x}% ${bannerPosition.y}%`
+                            }}
                         />
                     ) : (
                         // Default gradient banner if no image

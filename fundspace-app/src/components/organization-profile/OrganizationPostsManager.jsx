@@ -7,6 +7,7 @@ import OrganizationPostCard from '../OrganizationPostCard.jsx';
 import OrganizationPostDetailModal from '../OrganizationPostDetailModal.jsx';
 import CreatePost from '../CreatePost.jsx';
 import { hasPermission, PERMISSIONS } from '../../utils/organizationPermissions.js';
+import { realtimeManager } from '../../utils/realtimeManager.js';
 
 const OrganizationPostsManager = ({ 
   organization, 
@@ -107,43 +108,35 @@ const OrganizationPostsManager = ({
     fetchOrganizationPosts();
   }, [fetchOrganizationPosts]);
 
-  // Set up real-time subscriptions for organization posts
+  // Set up real-time subscriptions for organization posts using realtimeManager
   useEffect(() => {
     if (!organization?.id) return;
 
-    const channel = supabase.channel(`organization_posts:${organization.id}`);
+    const channelName = `organization_posts:${organization.id}`;
     
-    channel
-      .on('postgres_changes', { 
-        event: 'INSERT', 
-        schema: 'public', 
-        table: 'organization_posts',
-        filter: `organization_id=eq.${organization.id}`
-      }, (payload) => {
+    const callbacks = {
+      onPostInsert: (payload) => {
         setOrganizationPosts(currentPosts => [payload.new, ...currentPosts]);
-      })
-      .on('postgres_changes', { 
-        event: 'UPDATE', 
-        schema: 'public', 
-        table: 'organization_posts',
-        filter: `organization_id=eq.${organization.id}`
-      }, (payload) => {
+      },
+      onPostUpdate: (payload) => {
         setOrganizationPosts(currentPosts => currentPosts.map(p => 
           p.id === payload.new.id ? { ...p, ...payload.new } : p
         ));
-      })
-      .on('postgres_changes', { 
-        event: 'DELETE', 
-        schema: 'public', 
-        table: 'organization_posts',
-        filter: `organization_id=eq.${organization.id}`
-      }, (payload) => {
+      },
+      onPostDelete: (payload) => {
         setOrganizationPosts(currentPosts => currentPosts.filter(p => p.id !== payload.old.id));
-      })
-      .subscribe();
+      }
+    };
+
+    const channel = realtimeManager.subscribeToOrganizationPosts(
+      channelName, 
+      supabase,
+      organization.id,
+      callbacks
+    );
 
     return () => {
-      supabase.removeChannel(channel);
+      realtimeManager.removeSubscription(channelName, supabase);
     };
   }, [organization?.id]);
 
