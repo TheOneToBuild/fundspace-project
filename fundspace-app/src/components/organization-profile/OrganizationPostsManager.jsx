@@ -179,13 +179,19 @@ const OrganizationPostsManager = ({
     }
   }, [canEditPosts, organization?.id]);
 
-  const handleCreateFirstPost = () => {
-    // Trigger the CreatePost modal by focusing on it
-    const createPostElement = document.querySelector('[data-create-post]');
-    if (createPostElement) {
-      createPostElement.click();
+ const handleCreateFirstPost = () => {
+  // Find and click the Post button
+  const postButton = document.querySelector('[data-create-post] button');
+  if (postButton) {
+    postButton.click();
+  } else {
+    // Fallback: click anywhere in the create post area
+    const createPostArea = document.querySelector('[data-create-post]');
+    if (createPostArea) {
+      createPostArea.click();
     }
-  };
+  }
+};
 
   // Handle adding comments (placeholder - this should integrate with your existing comment system)
   const handleAddComment = async (e) => {

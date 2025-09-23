@@ -259,7 +259,7 @@ const WelcomeBanner = ({ profile, organizationInfo }) => {
                             {/* Global Feed Option */}
                             <button 
                                 onClick={() => {
-                                    navigate('/profile/create-post?type=global');
+                                    navigate('/profile/community-hub?channel=hello-world');
                                     setShowCreatePopup(false);
                                 }}
                                 className="w-full p-4 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 transition-all duration-200 hover:scale-[1.02] group"
@@ -279,7 +279,7 @@ const WelcomeBanner = ({ profile, organizationInfo }) => {
                             {organizationInfo && (
                                 <button 
                                     onClick={() => {
-                                        navigate('/profile/create-post?type=organization');
+                                        navigate('/profile/community-hub?channel=hello-community');
                                         setShowCreatePopup(false);
                                     }}
                                     className="w-full p-4 rounded-xl border border-slate-200 bg-purple-50 hover:bg-purple-100 transition-all duration-200 hover:scale-[1.02] group"
@@ -315,4 +315,4 @@ WelcomeBanner.propTypes = {
     organizationInfo: PropTypes.object
 };
 
-export default WelcomeBanner;
+export default WelcomeBanner

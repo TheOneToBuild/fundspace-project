@@ -377,29 +377,7 @@ export default function HelloWorldChannel() {
 
   return (
     <div className="space-y-6">
-      {/* Channel Header */}
-      <div className="bg-gradient-to-r from-sky-50 to-blue-50 rounded-xl p-6 border border-sky-200">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-sky-500 rounded-xl flex items-center justify-center">
-              <Globe size={24} className="text-white" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-slate-800 flex items-center space-x-2">
-                <span>Hello World</span>
-                <span className="text-lg">🌍</span>
-              </h1>
-              <p className="text-sky-700 text-sm">Global community - connect with everyone</p>
-            </div>
-          </div>
-          <div className="flex items-center space-x-4 text-sm text-sky-600">
-            <div className="flex items-center space-x-1">
-              <Users size={16} />
-              <span>Global Community</span>
-            </div>
-          </div>
-        </div>
-      </div>
+  
 
       {/* Trending News */}
       <TrendingNewsSection />

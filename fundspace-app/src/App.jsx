@@ -4,7 +4,7 @@ import ScrollToTop from './components/ScrollToTop.jsx';
 import { supabase } from './supabaseClient';
 import { clearAllNotifications, markAllAsRead } from './utils/notificationCleanup';
 import HomePage from './HomePage.jsx';
-import CommunityHub from './components/CommunityHub.jsx';
+import CommunityHub from './components/community-hub/CommunityHub.jsx';
 import OmegaAdminUsers from './components/omega-admin/OmegaAdminUsers.jsx';
 import OmegaAdminGrants from './components/omega-admin/OmegaAdminGrants.jsx';
 import GrantsPageContent from './GrantsPageContent.jsx';

@@ -172,13 +172,9 @@ export default function DashboardHeader({ profile }) {
             exact: true
         },
         {
-            label: 'Community',
-            icon: <Globe size={16} />,
-            dropdown: [
-                { label: 'Hello World', to: '/profile/hello-world', icon: <Globe size={14} /> },
-                { label: 'Hello Community', to: '/profile/hello-community', icon: <Handshake size={14} /> },
-                { label: 'Community hub', to: '/profile/community-hub', icon: <Handshake size={14} /> }
-            ]
+            label: 'Community Hub',
+            to: '/profile/community-hub',
+            icon: <Globe size={16} />
         },
         // Grants Portal (conditionally)
         ...(isOmegaAdmin || hasOrganizationAccess ? [grantsPortalItem] : []),
@@ -193,7 +189,7 @@ export default function DashboardHeader({ profile }) {
             icon: <Users size={16} />
         },
         {
-            label: 'Organization',
+            label: 'My Organization',
             to: '/profile/my-organization',
             icon: <Building size={16} />,
         },
