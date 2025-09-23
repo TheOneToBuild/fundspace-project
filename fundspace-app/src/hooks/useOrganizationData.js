@@ -1,4 +1,4 @@
-// hooks/useOrganizationData.js - Complete fixed version for omega admins
+// hooks/useOrganizationData.js - Complete fixed version
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
@@ -19,9 +19,6 @@ export function useOrganizationData(profile, session) {
 
         setLoading(true);
         setError('');
-
-        // REMOVED: Early return for omega admins - they should be able to have organizations too
-        // This was the main issue preventing omega admins from accessing their organizations
 
         try {
             const { data: memberships, error: membershipError } = await supabase
@@ -149,7 +146,7 @@ export function useOrganizationData(profile, session) {
                 return;
             }
 
-            // Step 2: Also delete from the cache table
+            // Step 2: Delete from cache table (manual cache cleanup)
             const { error: cacheDeleteError } = await supabase
                 .from('organization_membership_cache')
                 .delete()
@@ -158,6 +155,7 @@ export function useOrganizationData(profile, session) {
 
             if (cacheDeleteError) {
                 console.warn('Warning: Failed to clean cache, but main membership deleted:', cacheDeleteError);
+                // Don't fail the whole operation for cache cleanup issues
             }
 
             // Step 3: Update profile to clear organization references
@@ -172,12 +170,8 @@ export function useOrganizationData(profile, session) {
                 })
                 .eq('id', session.user.id);
 
-            // Step 4: Try to refresh the cache if there's a function for it
-            try {
-                await supabase.rpc('refresh_org_cache');
-            } catch (refreshError) {
-                console.warn('Cache refresh failed (this may be normal):', refreshError);
-            }
+            // Step 4: REMOVED - No longer calling refresh_org_cache RPC function
+            // This was causing the 403 error. Manual cache cleanup above is sufficient.
 
             // Trigger refresh functions if available
             if (window.refreshDashboardOrganizationData) {
@@ -248,7 +242,7 @@ export function useOrganizationData(profile, session) {
                 })
                 .eq('id', session.user.id);
 
-            // Success - navigate away (removed alert call)
+            // Success - navigate away
             navigate('/profile');
             return true;
         } catch (err) {

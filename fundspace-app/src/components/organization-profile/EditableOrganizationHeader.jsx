@@ -247,7 +247,7 @@ const EditableOrganizationHeader = ({
             </div>
             <div className="flex items-center gap-3">
               <button
-                onClick={() => navigate('/dashboard')}
+               onClick={() => navigate('/profile/my-organization')}
                 className="flex items-center gap-2 bg-white bg-opacity-20 hover:bg-opacity-30 px-4 py-2 rounded-lg transition-colors"
               >
                 <ArrowLeft className="w-4 h-4" />
@@ -295,7 +295,7 @@ const EditableOrganizationHeader = ({
       <div className="max-w-7xl mx-auto px-8">
         <div className="flex items-start gap-6 pb-6">
           {/* Logo - positioned to overlap banner */}
-          <div className="relative -mt-20">
+         <div className="relative -mt-12"> // Instead of -mt-20
             <LogoEditSection
               organization={organization}
               canEdit={canEdit}
