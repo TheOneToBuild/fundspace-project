@@ -26,11 +26,16 @@ const MissionEditModal = ({
     await onSave(editData);
   };
 
+  // FIX: Properly handle image upload with state update
   const handleImageUpload = async (file) => {
-    const success = await onImageUpload(file);
-    if (success) {
-      // Update the editData with the new image URL
-      // Note: The parent should handle updating the actual URL
+    try {
+      const imageUrl = await onImageUpload(file);
+      if (imageUrl) {
+        // Update the editData with the new image URL
+        setEditData({ ...editData, mission_image_url: imageUrl });
+      }
+    } catch (error) {
+      console.error('Error uploading image:', error);
     }
   };
 
@@ -131,10 +136,15 @@ const MissionEditModal = ({
                     onChange={(e) => e.target.files[0] && handleImageUpload(e.target.files[0])}
                     className="hidden"
                     id="mission-image-upload"
+                    disabled={uploading}
                   />
                   <label
                     htmlFor="mission-image-upload"
-                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors cursor-pointer"
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors cursor-pointer ${
+                      uploading 
+                        ? 'bg-slate-400 text-white cursor-not-allowed' 
+                        : 'bg-blue-600 text-white hover:bg-blue-700'
+                    }`}
                   >
                     {uploading ? (
                       <>
@@ -156,6 +166,7 @@ const MissionEditModal = ({
                   value={editData.mission_image_url}
                   onChange={handleImageUrlChange}
                   placeholder="https://example.com/image.jpg"
+                  disabled={uploading}
                 />
               </div>
             </FormField>

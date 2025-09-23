@@ -143,41 +143,47 @@ const EditableOrganizationHome = ({
       )}
 
       {/* About Us Section */}
-      <div className="bg-white rounded-3xl p-10 border border-slate-200 shadow-sm grid md:grid-cols-2 gap-10 items-center relative">
-        {canCreatePosts && (
-          <button
-            onClick={() => setIsEditingMission(true)}
-            className="absolute top-4 right-4 flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
-          >
-            <Edit3 className="w-4 h-4" />
-            Edit Section
-          </button>
-        )}
-
-        <div className="flex flex-col h-full">
-          <h2 className="text-3xl font-black text-slate-900 mb-4">About Us ✨</h2>
-          <p className="text-slate-700 leading-relaxed text-lg flex-grow">
-            {organization.description || "Working to create positive impact in our community through strategic partnerships and innovative solutions."}
-          </p>
-          
-          {organization.focusAreas && organization.focusAreas.length > 0 && (
-            <div className="mt-8 pt-6 border-t border-slate-200">
-              <h4 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-3">Focus Areas</h4>
-              <div className="flex flex-wrap gap-3">
-                {organization.focusAreas.map((area) => (
-                  <FocusAreaPill key={area} area={area} />
-                ))}
-              </div>
-            </div>
+      <div className="bg-white rounded-3xl p-10 border border-slate-200 shadow-sm relative">
+        {/* Header with Title and Edit Button */}
+        <div className="flex items-start justify-between mb-6">
+          <h2 className="text-3xl font-black text-slate-900">About Us ✨</h2>
+          {canCreatePosts && (
+            <button
+              onClick={() => setIsEditingMission(true)}
+              className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors shadow-sm flex-shrink-0"
+            >
+              <Edit3 className="w-4 h-4" />
+              Edit Section
+            </button>
           )}
         </div>
-        
-        <div className="relative">
-          <img 
-            src={organization.mission_image_url || 'https://images.unsplash.com/photo-1582213782179-e0d53f98f2ca?w=800&h=600&fit=crop'} 
-            alt="About Us" 
-            className="rounded-2xl object-cover w-full h-full max-h-[450px]" 
-          />
+
+        {/* Content Grid */}
+        <div className="grid md:grid-cols-2 gap-10 items-center">
+          <div className="flex flex-col h-full">
+            <p className="text-slate-700 leading-relaxed text-lg flex-grow">
+              {organization.description || "Working to create positive impact in our community through strategic partnerships and innovative solutions."}
+            </p>
+            
+            {organization.focusAreas && organization.focusAreas.length > 0 && (
+              <div className="mt-8 pt-6 border-t border-slate-200">
+                <h4 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-3">Focus Areas</h4>
+                <div className="flex flex-wrap gap-3">
+                  {organization.focusAreas.map((area) => (
+                    <FocusAreaPill key={area} area={area} />
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+          
+          <div className="relative">
+            <img 
+              src={organization.mission_image_url || 'https://images.unsplash.com/photo-1582213782179-e0d53f98f2ca?w=800&h=600&fit=crop'} 
+              alt="About Us" 
+              className="rounded-2xl object-cover w-full h-full max-h-[450px]" 
+            />
+          </div>
         </div>
       </div>
 

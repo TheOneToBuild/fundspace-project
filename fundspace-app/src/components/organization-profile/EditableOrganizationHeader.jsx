@@ -1,8 +1,8 @@
-// src/components/organization-profile/EditableOrganizationHeader.jsx - Complete Updated Version
+// src/components/organization-profile/EditableOrganizationHeader.jsx - Updated with Edit Section Button
 import React, { useState } from 'react';
 import { 
   Eye, AlertTriangle, X, ArrowLeft, Edit3, Save, MapPin, ExternalLink, 
-  CheckCircle, Sparkles, Calendar, Users
+  CheckCircle, Sparkles, Calendar
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../supabaseClient.js';
@@ -48,20 +48,7 @@ const EditableOrganizationHeader = ({
 
   if (!organization) return null;
 
-  // Navigation handlers
-  const handleBackToDashboard = () => {
-    navigate('/dashboard');
-  };
 
-  const handleViewLive = () => {
-    if (organization.slug) {
-      navigate(`/organizations/${organization.slug}`);
-    } else {
-      const currentUrl = new URL(window.location);
-      currentUrl.searchParams.delete('edit');
-      navigate(currentUrl.pathname + currentUrl.search);
-    }
-  };
 
   // Organization type configuration
   const getTypeInfo = (type) => {
@@ -110,10 +97,14 @@ const EditableOrganizationHeader = ({
 
   // Icon mapping for tabs
   const iconMap = {
-    Globe: '🌐', Building: '🏢', Users: '👥', Rocket: '🚀', TrendingUp: '📈', 
-    Star: '⭐', DollarSign: '💰', HandHeart: '🤝', BarChart3: '📊', Heart: '❤️', 
-    Award: '🏆', BookOpen: '📚', Microscope: '🔬', Building2: '🏛️', Flag: '🚩', 
-    Briefcase: '💼', Target: '🎯', Camera: '📷'
+    'Globe': '🏠',
+    'Target': '🎯', 
+    'ClipboardList': '📋',
+    'Camera': '📸',
+    'Users': '👥',
+    'DollarSign': '💰',
+    'BarChart3': '📊',
+    'Heart': '❤️'
   };
 
   // Handle image uploads and banner position updates
@@ -256,14 +247,14 @@ const EditableOrganizationHeader = ({
             </div>
             <div className="flex items-center gap-3">
               <button
-                onClick={handleBackToDashboard}
+                onClick={() => navigate('/dashboard')}
                 className="flex items-center gap-2 bg-white bg-opacity-20 hover:bg-opacity-30 px-4 py-2 rounded-lg transition-colors"
               >
                 <ArrowLeft className="w-4 h-4" />
                 Back to Dashboard
               </button>
               <button
-                onClick={handleViewLive}
+                onClick={() => navigate(organization.slug ? `/organizations/${organization.slug}` : window.location.pathname.replace('?edit=true', ''))}
                 className="flex items-center gap-2 bg-white bg-opacity-20 hover:bg-opacity-30 px-4 py-2 rounded-lg transition-colors"
               >
                 <Eye className="w-4 h-4" />
@@ -321,7 +312,7 @@ const EditableOrganizationHeader = ({
                 {/* Organization Type Badge */}
                 <div className="flex items-center gap-3 mb-3">
                   <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-purple-100 text-purple-700 border border-purple-200">
-                    Company
+                    {typeInfo.label}
                   </span>
                   {organization.year_founded && (
                     <span className="text-sm text-slate-500 flex items-center gap-1">
@@ -369,12 +360,10 @@ const EditableOrganizationHeader = ({
                 {/* Followers and Likes */}
                 <div className="flex items-center gap-6 text-slate-600">
                   <div className="flex items-center gap-2">
-                    <Users className="w-4 h-4" />
                     <span className="font-medium">{followersCount || 0}</span>
                     <span>Followers</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="text-red-500">❤️</span>
                     <span className="font-medium">{bookmarksCount || 0}</span>
                     <span>Likes</span>
                   </div>
@@ -394,7 +383,7 @@ const EditableOrganizationHeader = ({
                   className="p-2 rounded-lg hover:bg-red-50 transition-colors"
                 >
                   <span className={`text-xl ${isBookmarked ? 'text-red-500' : 'text-gray-400'}`}>
-                    ❤️
+                    {isBookmarked ? '❤️' : '🤍'}
                   </span>
                 </button>
               </div>
@@ -402,26 +391,39 @@ const EditableOrganizationHeader = ({
           </div>
         </div>
 
-        {/* Tabs Navigation */}
+        {/* Tabs Navigation - FIXED VERSION */}
         <div className="border-b border-slate-200">
           <div className="flex overflow-x-auto">
-            {tabs && tabs.length > 0 && tabs.map((tab, index) => {
+            {tabs && tabs.length > 0 ? tabs.map((tab) => {
+              const isActive = activeTab === tab.id;
               const emoji = iconMap[tab.icon] || '📄';
+              
+              
               return (
                 <button
-                  key={tab.key || `tab-${index}`}
-                  onClick={() => setActiveTab(tab.key)}
+                  key={tab.id}
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (typeof setActiveTab === 'function' && tab.id) {
+                      setActiveTab(tab.id);
+                    }
+                  }}
                   className={`flex items-center gap-2 px-6 py-4 border-b-2 font-medium text-sm whitespace-nowrap transition-colors ${
-                    activeTab === tab.key
-                      ? `border-blue-500 bg-gradient-to-r ${typeInfo.gradient} text-white shadow-md`
+                    isActive
+                      ? 'border-blue-500 text-blue-600 bg-blue-50'
                       : 'border-transparent text-slate-600 hover:text-slate-800 hover:bg-slate-100'
                   }`}
+                  style={{ pointerEvents: 'auto', cursor: 'pointer' }}
                 >
                   <span className="text-base">{emoji}</span>
                   {tab.label}
                 </button>
               );
-            })}
+            }) : (
+              <div className="text-slate-600 px-6 py-4">No tabs available</div>
+            )}
           </div>
         </div>
       </div>

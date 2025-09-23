@@ -1,16 +1,13 @@
-// src/components/HelloWorldChannel.jsx - Fixed version with RLS issue resolved
+// src/components/HelloWorldChannel.jsx - Simplified without welcome banner
 import React, { useState, useEffect, useRef, useCallback, memo } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { supabase } from '../supabaseClient.js';
-import { ChevronLeft, ChevronRight, Clock, ArrowRight, Users, MessageCircle, Globe } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Users, MessageCircle, Globe } from 'lucide-react';
 import PostCard from './PostCard.jsx';
 import CreatePost from './CreatePost.jsx';
-import ProfileCompletionBanner from './ProfileCompletionBanner.jsx';
 import { rssNewsService as newsService } from '../services/rssNewsService.js';
 import { addOrganizationEventListener } from '../utils/organizationEvents.js';
 import { getOrganizationInfoForDashboard } from '../utils/membershipQueries.js';
-
-// ADD THESE IMPORTS
 import { realtimeManager } from '../utils/realtimeManager.js';
 import { getChannelInfo } from '../utils/channelUtils.js';
 
@@ -127,50 +124,6 @@ const TrendingNewsSection = () => {
   );
 };
 
-const HelloWorldWelcomeSection = ({ onEnterWorld, hasEnteredWorld }) => (
-  <div className="bg-gradient-to-r from-sky-50 to-blue-50 border border-sky-200 rounded-xl p-6 mb-6">
-    <div className="flex items-center justify-between">
-      <div className="flex items-center space-x-4">
-        <div className="text-4xl">🌍</div>
-        <div>
-          <div className="flex items-center space-x-3 mb-2">
-            <h2 className="text-xl font-bold text-slate-800">Welcome to Hello World</h2>
-            <div className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-sky-100 text-sky-800 border border-sky-200">
-              <span>#hello-world</span>
-            </div>
-          </div>
-          <p className="text-slate-600 max-w-2xl mb-4">Connect with the entire community! Share updates, discover opportunities, and engage.</p>
-          <div className="flex items-center space-x-4 text-sm text-slate-500">
-            <div className="flex items-center space-x-2">
-              <Users size={16} />
-              <span>Open community</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <MessageCircle size={16} />
-              <span>Share & discover</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Globe size={16} />
-              <span>All welcome</span>
-            </div>
-          </div>
-        </div>
-      </div>
-      {!hasEnteredWorld && (
-        <button onClick={onEnterWorld} className="flex items-center space-x-2 px-6 py-3 bg-sky-600 hover:bg-sky-700 text-white rounded-lg font-medium transition-colors shadow-sm">
-          <span>Join the Conversation</span>
-          <ArrowRight size={18} />
-        </button>
-      )}
-    </div>
-  </div>
-);
-
-HelloWorldWelcomeSection.propTypes = { 
-  onEnterWorld: PropTypes.func.isRequired, 
-  hasEnteredWorld: PropTypes.bool.isRequired 
-};
-
 const HelloWorldEmptyState = () => (
   <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-8 text-center">
     <div className="text-6xl mb-4">💬</div>
@@ -196,8 +149,6 @@ export default function HelloWorldChannel() {
   const [page, setPage] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
-  const [hasEnteredWorld, setHasEnteredWorld] = useState(false);
-  const [showWelcome, setShowWelcome] = useState(false);
   const [organizationInfo, setOrganizationInfo] = useState(null);
 
   const observer = useRef();
@@ -233,21 +184,10 @@ export default function HelloWorldChannel() {
       }
     });
 
-    const handleStorageChange = (e) => {
-      if (e.key === `hello-world-entered-${profile?.id}` && e.newValue === 'true') {
-        setHasEnteredWorld(true);
-        setShowWelcome(false);
-      }
-    };
-
-    window.addEventListener('storage', handleStorageChange);
-    return () => {
-      cleanup();
-      window.removeEventListener('storage', handleStorageChange);
-    };
+    return cleanup;
   }, [profile?.id]);
 
-  // FIXED: Fetch organization info using safe query
+  // Fetch organization info
   useEffect(() => {
     const fetchOrganizationInfo = async () => {
       if (!profile?.id) return;
@@ -262,16 +202,6 @@ export default function HelloWorldChannel() {
     };
     
     fetchOrganizationInfo();
-  }, [profile?.id]);
-
-  // Check if user has entered the world
-  useEffect(() => {
-    if (profile?.id) {
-      const storageKey = `hello-world-entered-${profile.id}`;
-      const hasEntered = localStorage.getItem(storageKey) === 'true';
-      setHasEnteredWorld(hasEntered);
-      setShowWelcome(!hasEntered);
-    }
   }, [profile?.id]);
 
   // Fetch posts
@@ -357,7 +287,7 @@ export default function HelloWorldChannel() {
     fetchPosts();
   }, [page, hasMore]);
 
-  // UPDATED: Real-time subscription using the new manager
+  // Real-time subscription
   useEffect(() => {
     if (!profile) return;
 
@@ -378,7 +308,6 @@ export default function HelloWorldChannel() {
       }
     };
 
-    // UPDATED: Use the realtime manager
     const subscription = realtimeManager.createSubscription(
       'hello-world',
       supabase,
@@ -422,19 +351,10 @@ export default function HelloWorldChannel() {
       }
     );
 
-    // UPDATED: Clean removal using the manager  
     return () => {
       realtimeManager.removeSubscription('hello-world', supabase);
     };
   }, [posts, profile?.id]);
-
-  const handleEnterWorld = () => {
-    if (profile?.id) {
-      localStorage.setItem(`hello-world-entered-${profile.id}`, 'true');
-      setHasEnteredWorld(true);
-      setShowWelcome(false);
-    }
-  };
 
   const handleNewPost = useCallback((newPost) => {
     const postWithOrgInfo = { 
@@ -457,39 +377,61 @@ export default function HelloWorldChannel() {
 
   return (
     <div className="space-y-6">
-      <ProfileCompletionBanner profile={profile} />
-      <TrendingNewsSection />
-      {showWelcome && (
-        <HelloWorldWelcomeSection 
-          onEnterWorld={handleEnterWorld} 
-          hasEnteredWorld={hasEnteredWorld}
-        />
-      )}
-      {(hasEnteredWorld || posts.length > 0) && (
-        <>
-          <HelloWorldChannelIdentifier />
-          <CreatePost 
-            profile={profile} 
-            onNewPost={handleNewPost} 
-            channel="hello-world" 
-            organizationType={organizationInfo?.type} 
-          />
-          {posts.length > 0 && (
-            <div className="space-y-6">
-              {posts.filter(post => post.profiles).map(post => (
-                <PostCard key={post.id} post={post} onDelete={handleDeletePost} />
-              ))}
+      {/* Channel Header */}
+      <div className="bg-gradient-to-r from-sky-50 to-blue-50 rounded-xl p-6 border border-sky-200">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-sky-500 rounded-xl flex items-center justify-center">
+              <Globe size={24} className="text-white" />
             </div>
-          )}
-          <div ref={loaderRef} className="h-10 text-center">
-            {isLoading && <p className="text-slate-500">Loading...</p>}
-            {!isLoading && !hasMore && posts.length > 0 && (
-              <p className="text-slate-500">You've reached the end.</p>
-            )}
+            <div>
+              <h1 className="text-2xl font-bold text-slate-800 flex items-center space-x-2">
+                <span>Hello World</span>
+                <span className="text-lg">🌍</span>
+              </h1>
+              <p className="text-sky-700 text-sm">Global community - connect with everyone</p>
+            </div>
           </div>
-          {!isLoading && posts.length === 0 && <HelloWorldEmptyState />}
-        </>
-      )}
+          <div className="flex items-center space-x-4 text-sm text-sky-600">
+            <div className="flex items-center space-x-1">
+              <Users size={16} />
+              <span>Global Community</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Trending News */}
+      <TrendingNewsSection />
+
+      {/* Create Post */}
+      <CreatePost 
+        profile={profile} 
+        onNewPost={handleNewPost} 
+        channel="hello-world" 
+        organizationType={organizationInfo?.type} 
+      />
+
+      {/* Posts Feed */}
+      <div className="space-y-6">
+        {posts.length === 0 && !isLoading ? (
+          <HelloWorldEmptyState />
+        ) : (
+          <>
+            {posts.filter(post => post.profiles).map(post => (
+              <PostCard key={post.id} post={post} onDelete={handleDeletePost} />
+            ))}
+            
+            {/* Load more trigger */}
+            <div ref={loaderRef} className="h-10 text-center">
+              {isLoading && <p className="text-slate-500">Loading...</p>}
+              {!isLoading && !hasMore && posts.length > 0 && (
+                <p className="text-slate-500">You've reached the end.</p>
+              )}
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }
