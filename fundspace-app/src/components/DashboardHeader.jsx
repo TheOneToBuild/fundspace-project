@@ -1,4 +1,4 @@
-// src/components/DashboardHeader.jsx - Updated with notification indicator
+// src/components/DashboardHeader.jsx - FIXED VERSION - Complete with all existing features
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { 
@@ -10,6 +10,27 @@ import GlobalSearch from './GlobalSearch.jsx';
 import headerLogoImage from '../assets/fundspace-logo2.png';
 import { isPlatformAdmin } from '../utils/permissions.js';
 import { getOrganizationForProfileNav } from '../utils/membershipQueries.js';
+
+// ✅ REQUEST DEDUPLICATION HOOK
+function useRequestDeduplication() {
+    const pendingRequests = useRef(new Map());
+
+    const deduplicate = useCallback((key, requestFunction) => {
+        if (pendingRequests.current.has(key)) {
+            return pendingRequests.current.get(key);
+        }
+
+        const promise = requestFunction()
+            .finally(() => {
+                pendingRequests.current.delete(key);
+            });
+
+        pendingRequests.current.set(key, promise);
+        return promise;
+    }, []);
+
+    return deduplicate;
+}
 
 export default function DashboardHeader({ profile }) {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -26,77 +47,103 @@ export default function DashboardHeader({ profile }) {
     const omegaMenuRef = useRef(null);
     const mobileMenuRef = useRef(null);
     
+    // ✅ Add request deduplication
+    const deduplicate = useRequestDeduplication();
+    
+    // ✅ Add subscription tracking to prevent duplicates
+    const activeSubscriptions = useRef(new Set());
+    const notificationRefreshTimeoutRef = useRef(null);
+    
     const isOmegaAdmin = isPlatformAdmin(profile?.is_omega_admin);
 
-    // Fetch profile stats
+    // ✅ FIXED - Only profile.id dependency, add deduplication
     const fetchProfileStats = useCallback(async () => {
         if (!profile?.id) return;
         
-        try {
-            const [followersRes, followingRes, connectionsRes] = await Promise.all([
-                supabase.from('followers').select('id').eq('following_id', profile.id),
-                supabase.from('followers').select('id').eq('follower_id', profile.id),
-                supabase.from('user_connections').select('id').or(`requester_id.eq.${profile.id},recipient_id.eq.${profile.id}`).eq('status', 'accepted')
-            ]);
+        return deduplicate(`profile-stats-${profile.id}`, async () => {
+            try {
+                const [followersRes, followingRes, connectionsRes] = await Promise.all([
+                    supabase.from('followers').select('id').eq('following_id', profile.id),
+                    supabase.from('followers').select('id').eq('follower_id', profile.id),
+                    supabase.from('user_connections').select('id').or(`requester_id.eq.${profile.id},recipient_id.eq.${profile.id}`).eq('status', 'accepted')
+                ]);
 
-            setStats({
-                followersCount: followersRes.data?.length || 0,
-                followingCount: followingRes.data?.length || 0,
-                connectionsCount: connectionsRes.data?.length || 0
-            });
-        } catch (error) {
-            console.error('Error fetching profile stats:', error);
-        }
-    }, [profile?.id]);
+                setStats({
+                    followersCount: followersRes.data?.length || 0,
+                    followingCount: followingRes.data?.length || 0,
+                    connectionsCount: connectionsRes.data?.length || 0
+                });
+            } catch (error) {
+                console.error('Error fetching profile stats:', error);
+            }
+        });
+    }, [profile?.id, deduplicate]);
 
-    // Fetch notification stats
+    // ✅ FIXED - Add deduplication
     const fetchNotificationStats = useCallback(async () => {
         if (!profile?.id) return;
         
-        try {
-            const { count, error } = await supabase
-                .from('notifications')
-                .select('id', { count: 'exact', head: true })
-                .eq('user_id', profile.id)
-                .eq('is_read', false);
-            
-            if (!error) {
-                setUnreadNotifications(count || 0);
+        return deduplicate(`notifications-${profile.id}`, async () => {
+            try {
+                const { count, error } = await supabase
+                    .from('notifications')
+                    .select('id', { count: 'exact', head: true })
+                    .eq('user_id', profile.id)
+                    .eq('is_read', false);
+                
+                if (!error) {
+                    setUnreadNotifications(count || 0);
+                }
+            } catch (error) {
+                console.error('Error fetching notification stats:', error);
             }
-        } catch (error) {
-            console.error('Error fetching notification stats:', error);
-        }
-    }, [profile?.id]);
+        });
+    }, [profile?.id, deduplicate]);
 
-    // Check organization access
+    // ✅ FIXED - Add deduplication
     const checkOrganizationAccess = useCallback(async () => {
         if (!profile?.id) return;
         
-        try {
-            const { data } = await supabase
-                .from('organization_memberships')
-                .select('id')
-                .eq('profile_id', profile.id)
-                .limit(1);
-            
-            setHasOrganizationAccess(data && data.length > 0);
-        } catch (error) {
-            console.error('Error checking organization access:', error);
-        }
-    }, [profile?.id]);
+        return deduplicate(`org-access-${profile.id}`, async () => {
+            try {
+                const { data } = await supabase
+                    .from('organization_memberships')
+                    .select('id')
+                    .eq('profile_id', profile.id)
+                    .limit(1);
+                
+                setHasOrganizationAccess(data && data.length > 0);
+            } catch (error) {
+                console.error('Error checking organization access:', error);
+                setHasOrganizationAccess(false);
+            }
+        });
+    }, [profile?.id, deduplicate]);
 
+    // ✅ FIXED - Only call when profile.id changes, not on every callback change
     useEffect(() => {
-        fetchProfileStats();
-        fetchNotificationStats();
-        checkOrganizationAccess();
-    }, [fetchProfileStats, fetchNotificationStats, checkOrganizationAccess]);
+        if (profile?.id) {
+            fetchProfileStats();
+            fetchNotificationStats();
+            checkOrganizationAccess();
+        }
+    }, [profile?.id]); // Remove the callback dependencies that cause infinite loops
 
-    // Set up real-time subscription for notifications
+    // ✅ FIXED - Improved subscription with deduplication and debouncing
     useEffect(() => {
         if (!profile?.id) return;
 
+        const subscriptionKey = `notifications-${profile.id}`;
+        
+        // Prevent duplicate subscriptions
+        if (activeSubscriptions.current.has(subscriptionKey)) {
+            return;
+        }
+
+        activeSubscriptions.current.add(subscriptionKey);
+
         const channel = supabase
-            .channel('notifications-count')
+            .channel(`notifications-count-${profile.id}`)
             .on('postgres_changes', 
                 { 
                     event: '*', 
@@ -105,13 +152,24 @@ export default function DashboardHeader({ profile }) {
                     filter: `user_id=eq.${profile.id}`
                 }, 
                 () => {
-                    fetchNotificationStats();
+                    // ✅ Debounce to prevent rapid fire requests
+                    if (notificationRefreshTimeoutRef.current) {
+                        clearTimeout(notificationRefreshTimeoutRef.current);
+                    }
+                    
+                    notificationRefreshTimeoutRef.current = setTimeout(() => {
+                        fetchNotificationStats();
+                    }, 500);
                 }
             )
             .subscribe();
 
         return () => {
+            activeSubscriptions.current.delete(subscriptionKey);
             supabase.removeChannel(channel);
+            if (notificationRefreshTimeoutRef.current) {
+                clearTimeout(notificationRefreshTimeoutRef.current);
+            }
         };
     }, [profile?.id, fetchNotificationStats]);
 
@@ -138,6 +196,15 @@ export default function DashboardHeader({ profile }) {
         }
         document.addEventListener("mousedown", handleClickOutside);
         return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
+
+    // ✅ Cleanup timeouts on unmount
+    useEffect(() => {
+        return () => {
+            if (notificationRefreshTimeoutRef.current) {
+                clearTimeout(notificationRefreshTimeoutRef.current);
+            }
+        };
     }, []);
 
     // Navigation items

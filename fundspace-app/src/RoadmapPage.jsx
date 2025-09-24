@@ -1,5 +1,3 @@
-// src/RoadmapPage.jsx
-
 import React, { useEffect, useContext } from 'react';
 import { motion } from 'framer-motion';
 import { Map, CheckCircle2, Rocket, Users, Bot, BarChart3, Globe, Sparkles, ArrowRight, Search, Target, Layers, Filter, FileText } from './components/Icons.jsx';
@@ -15,8 +13,8 @@ const Section = ({ children, className = 'py-28 md:py-40' }) => (
     transition={{ staggerChildren: 0.18 }}
   >{children}</motion.section>
 );
-const Pill = ({ children, color='blue' }) => {
-  const map = { blue:'bg-blue-100 text-blue-700', emerald:'bg-emerald-100 text-emerald-700', violet:'bg-violet-100 text-violet-700', rose:'bg-rose-100 text-rose-700', slate:'bg-slate-100 text-slate-700', orange:'bg-orange-100 text-orange-700', indigo:'bg-indigo-100 text-indigo-700' };
+const Pill = ({ children, color = 'blue' }) => {
+  const map = { blue: 'bg-blue-100 text-blue-700', emerald: 'bg-emerald-100 text-emerald-700', violet: 'bg-violet-100 text-violet-700', rose: 'bg-rose-100 text-rose-700', slate: 'bg-slate-100 text-slate-700', orange: 'bg-orange-100 text-orange-700', indigo: 'bg-indigo-100 text-indigo-700' };
   return <span className={`inline-flex items-center uppercase tracking-wide text-[11px] font-semibold px-4 py-1.5 rounded-full shadow-sm ${map[color]}`}>{children}</span>;
 };
 
@@ -36,7 +34,7 @@ const ROADMAP_PHASES = [
     label: 'Personalization',
     status: 'Next',
     title: 'Personal Dashboards',
-    text: 'Personalized dashboards for nonprofits to save, track, and manage grantswith deadline radar, alerts, and collaborative review.',
+    text: 'Personalized dashboards for nonprofits to save, track, and manage grantswith deadline radar, alerts, and collaborative review.',
     features: ['User accounts', 'Grant tracking', 'Deadline radar', 'Search alerts']
   },
   {
@@ -54,7 +52,7 @@ const ROADMAP_PHASES = [
     label: 'Funder Suite',
     status: 'Planned',
     title: 'Funder Analytics & Pipeline',
-    text: 'Dedicated dashboards for funders to track applications, impact, and feedbackbuilding a more transparent ecosystem.',
+    text: 'Dedicated dashboards for funders to track applications, impact, and feedbackbuilding a more transparent ecosystem.',
     features: ['Funder dashboard', 'Pipeline tracking', 'Impact analytics', 'Applicant feedback']
   },
   {
@@ -114,15 +112,12 @@ const RoadmapPhase = ({ phase, idx, isLast }) => {
       variants={fade}
       className="relative flex items-start group"
     >
-      {/* Timeline line */}
       {!isLast && (
         <div className="absolute left-8 top-16 h-24 w-0.5 bg-gradient-to-b from-blue-300 to-purple-300 z-0" />
       )}
-      {/* Icon */}
       <div className={`relative z-10 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-r ${phase.color} shadow-xl border-4 border-white`}>
         <Icon className="h-8 w-8 text-white" />
       </div>
-      {/* Card */}
       <div className={`ml-6 flex-1 bg-gradient-to-br ${bg} backdrop-blur-sm p-6 md:p-8 rounded-3xl border ${border} shadow-xl group-hover:scale-105 transition-all duration-300`}>
         <div className="flex items-start justify-between mb-4">
           <div>
@@ -208,7 +203,6 @@ const RoadmapPage = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-purple-50">
-      {/* HERO */}
       <Section className="pt-32 md:pt-40 pb-32 bg-[#f9f6f4] overflow-hidden">
         <div className="absolute inset-0 pointer-events-none">
           <div className="absolute -top-24 -left-32 w-[520px] h-[520px] bg-gradient-to-tr from-blue-300 via-indigo-300 to-violet-300 blur-3xl opacity-25" />
@@ -223,7 +217,7 @@ const RoadmapPage = () => {
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600">Roadmap</span>
           </h1>
           <p className="text-lg md:text-xl text-slate-700 mb-8 max-w-2xl mx-auto leading-relaxed">
-            From a simple index to a connected ecosystemhere's how we're building the future of funding for Bay Area changemakers. Every phase is shaped by your feedback and our shared mission.
+            From a simple index to a connected ecosystemhere's how we're building the future of funding for Bay Area changemakers. Every phase is shaped by your feedback and our shared mission.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <a href="/grants" className="inline-flex items-center justify-center px-8 py-4 rounded-2xl font-semibold bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:shadow-xl transition-all">Browse Grants <Search className="ml-2 h-5 w-5" /></a>
@@ -231,8 +225,6 @@ const RoadmapPage = () => {
           </div>
         </div>
       </Section>
-
-      {/* TIMELINE */}
       <Section className="bg-white pt-24 pb-32 md:pt-36 md:pb-40">
         <div className="max-w-5xl mx-auto px-6">
           <div className="text-center mb-16">
@@ -247,8 +239,6 @@ const RoadmapPage = () => {
           </div>
         </div>
       </Section>
-
-      {/* FEATURE CLUSTERS */}
       <Section className="bg-[#f9f6f4] pt-24 pb-32 md:pt-36 md:pb-40">
         <div className="max-w-6xl mx-auto px-6 lg:px-12 text-center mb-16">
           <Pill color="blue">CORE FEATURES</Pill>
@@ -261,8 +251,6 @@ const RoadmapPage = () => {
           ))}
         </div>
       </Section>
-
-      {/* CTA */}
       <Section className="bg-gradient-to-br from-blue-50 via-indigo-50 to-violet-50 py-32 md:py-44 overflow-hidden">
         <div className="absolute inset-0 pointer-events-none">
           <div className="absolute -top-10 -left-24 w-[420px] h-[420px] bg-gradient-to-tr from-blue-200 via-indigo-200 to-violet-200 blur-3xl opacity-35" />

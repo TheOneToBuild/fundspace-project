@@ -1,4 +1,3 @@
-// src/SpotlightLandingPage.jsx
 import React, { useEffect, useContext } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -13,15 +12,15 @@ const CountyCard = ({ slug, county, index }) => (
     viewport={{ once: true }}
     transition={{ duration: 0.6, delay: index * 0.1 }}
   >
-    <Link 
+    <Link
       to={`/spotlight/${slug}`}
       className="group block rounded-3xl overflow-hidden shadow-xl hover:shadow-2xl transition-all duration-500 ease-out transform hover:-translate-y-3 border border-white/60 bg-white/80 backdrop-blur-sm"
     >
       <div className="relative h-64 overflow-hidden">
-        <img 
-          src={county.heroImage} 
-          alt={`A view of ${county.communityName}`} 
-          className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-110" 
+        <img
+          src={county.heroImage}
+          alt={`A view of ${county.communityName}`}
+          className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-110"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent group-hover:from-black/40 transition-all duration-500"></div>
         <div className="absolute top-4 right-4">
@@ -39,12 +38,10 @@ const CountyCard = ({ slug, county, index }) => (
           </h3>
         </div>
       </div>
-      
       <div className="p-6">
         <p className="text-slate-600 leading-relaxed line-clamp-3 mb-4">
           {county.description}
         </p>
-        
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4 text-sm text-slate-500">
             <div className="flex items-center gap-1">
@@ -56,7 +53,6 @@ const CountyCard = ({ slug, county, index }) => (
               <span>Funders</span>
             </div>
           </div>
-          
           <div className="inline-flex items-center gap-2 text-blue-600 font-semibold text-sm group-hover:text-blue-700 transition-colors duration-300">
             <span>Explore</span>
             <ArrowRight className="h-4 w-4 transform group-hover:translate-x-0.5 transition-transform duration-300" />
@@ -84,17 +80,14 @@ const SpotlightLandingPage = () => {
 
   return (
     <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
-      {/* HERO SECTION */}
       <section className="text-center mb-16 relative">
-        {/* Magical background elements */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div className="absolute top-10 left-10 w-32 h-32 bg-gradient-to-r from-rose-400 to-pink-600 rounded-full opacity-10 animate-pulse"></div>
           <div className="absolute top-32 right-20 w-24 h-24 bg-gradient-to-r from-orange-400 to-red-600 rounded-full opacity-10 animate-pulse delay-1000"></div>
           <div className="absolute bottom-10 left-1/3 w-20 h-20 bg-gradient-to-r from-yellow-400 to-orange-600 rounded-full opacity-10 animate-pulse delay-2000"></div>
         </div>
-        
         <div className="relative bg-white/80 backdrop-blur-sm p-8 md:p-12 rounded-3xl border border-white/60 shadow-2xl">
-          <motion.div 
+          <motion.div
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ duration: 0.8, ease: 'easeOut' }}
@@ -102,8 +95,7 @@ const SpotlightLandingPage = () => {
           >
             <MapPin className="h-10 w-10 text-rose-600" />
           </motion.div>
-          
-          <motion.h1 
+          <motion.h1
             variants={fadeIn}
             initial="hidden"
             animate="visible"
@@ -114,9 +106,8 @@ const SpotlightLandingPage = () => {
               Spotlights
             </span>
           </motion.h1>
-          
-          <motion.p 
-            variants={{...fadeIn, transition: {...fadeIn.transition, delay: 0.2}}}
+          <motion.p
+            variants={{ ...fadeIn, transition: { ...fadeIn.transition, delay: 0.2 } }}
             initial="hidden"
             animate="visible"
             className="text-lg md:text-xl text-slate-600 mb-8 max-w-4xl mx-auto leading-relaxed"
@@ -124,22 +115,21 @@ const SpotlightLandingPage = () => {
             Explore the unique philanthropic landscapes of the 9 Bay Area counties. Discover the key organizations and fund providers driving change in each community.
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-rose-600 to-orange-600 font-semibold"> Every county has its own story of impact.</span>
           </motion.p>
-
-          <motion.div 
-            variants={{...fadeIn, transition: {...fadeIn.transition, delay: 0.4}}}
+          <motion.div
+            variants={{ ...fadeIn, transition: { ...fadeIn.transition, delay: 0.4 } }}
             initial="hidden"
             animate="visible"
             className="flex flex-col sm:flex-row items-center justify-center gap-4"
           >
-            <a 
-              href="/organizations" 
+            <a
+              href="/organizations"
               className="inline-flex items-center justify-center px-6 py-3 font-semibold rounded-full text-white bg-gradient-to-r from-rose-600 to-orange-600 hover:from-rose-700 hover:to-orange-700 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
             >
               <Search className="mr-2" size={18} />
               Explore All Organizations
             </a>
-            <a 
-              href="/grants" 
+            <a
+              href="/grants"
               className="inline-flex items-center justify-center px-6 py-3 font-semibold rounded-full text-orange-700 bg-orange-100 hover:bg-orange-200/70 transition-colors duration-300"
             >
               <TrendingUp className="mr-2" size={18} />
@@ -148,10 +138,8 @@ const SpotlightLandingPage = () => {
           </motion.div>
         </div>
       </section>
-
-      {/* COUNTY GRID SECTION */}
       <section>
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
@@ -165,40 +153,34 @@ const SpotlightLandingPage = () => {
             From San Francisco's urban innovation to Napa's community resilience, each county has a unique ecosystem of organizations creating positive change.
           </p>
         </motion.div>
-
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-7xl mx-auto">
           {countySlugs.map((slug, index) => (
-            <CountyCard 
-              key={slug} 
-              slug={slug} 
-              county={countySpotlightData[slug]} 
+            <CountyCard
+              key={slug}
+              slug={slug}
+              county={countySpotlightData[slug]}
               index={index}
             />
           ))}
         </div>
       </section>
-
-      {/* BOTTOM INFO SECTION */}
       <section className="mt-20">
         <div className="bg-gradient-to-r from-slate-800 to-slate-900 p-8 md:p-12 rounded-3xl text-white shadow-2xl max-w-4xl mx-auto text-center">
           <div className="w-16 h-16 mx-auto mb-6 bg-white/10 backdrop-blur-sm rounded-2xl flex items-center justify-center border border-white/20">
             <Heart className="h-8 w-8 text-white" />
           </div>
-          
           <h2 className="text-3xl md:text-4xl font-bold mb-4">
             Bay Area. Built by Community.
           </h2>
           <p className="text-lg md:text-xl opacity-90 mb-8 max-w-2xl mx-auto">
             Each spotlight tells the story of passionate organizations, generous fund providers, and communities working together to create a better future for the Bay Area.
           </p>
-          
           <div className="grid md:grid-cols-2 gap-6 max-w-2xl mx-auto">
             <div className="bg-white/10 backdrop-blur-sm p-6 rounded-2xl border border-white/20">
               <Users className="h-8 w-8 text-white mx-auto mb-3" />
               <h3 className="font-semibold mb-2">Local Organizations</h3>
               <p className="text-sm opacity-80">Discover grassroots organizations making a difference in each county.</p>
             </div>
-            
             <div className="bg-white/10 backdrop-blur-sm p-6 rounded-2xl border border-white/20">
               <Sparkles className="h-8 w-8 text-white mx-auto mb-3" />
               <h3 className="font-semibold mb-2">Funding Opportunities</h3>

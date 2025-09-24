@@ -37,24 +37,22 @@ export default function CommunityHub() {
     const channels = [
       {
         id: 'hello-world',
-        name: 'Hello World',
-        shortName: 'World',
+        name: 'Hello Platform-Wide',
+        shortName: 'Platform-Wide',
         description: 'Platform-wide community - connect with everyone',
         icon: Globe,
         color: 'blue',
         gradient: 'from-blue-500 to-indigo-600',
         tag: '#hello-world',
-        dbChannel: 'hello-world',
-        memberCount: '12.5K'
+        dbChannel: 'hello-world'
+        // Removed memberCount
       },
       {
         id: 'hello-community',
         name: userOrgType && ORGANIZATION_CHANNELS[userOrgType] 
           ? `Hello ${ORGANIZATION_CHANNELS[userOrgType].name}` 
-          : 'Hello Community',
-        shortName: userOrgType && ORGANIZATION_CHANNELS[userOrgType]
-          ? ORGANIZATION_CHANNELS[userOrgType].name.split(' ')[0]
-          : 'Community',
+          : 'Hello Community-Wide',
+        shortName: 'Community-Wide',
         description: userOrgType && ORGANIZATION_CHANNELS[userOrgType]
           ? `Connect with other ${ORGANIZATION_CHANNELS[userOrgType].name.toLowerCase()}`
           : 'Connect with your organization community',
@@ -71,7 +69,7 @@ export default function CommunityHub() {
         dbChannel: userOrgType && ORGANIZATION_CHANNELS[userOrgType]
           ? ORGANIZATION_CHANNELS[userOrgType].dbChannel
           : 'hello-community',
-        memberCount: '2.8K',
+        // Removed memberCount
         disabled: !organizationInfo
       },
       {
@@ -84,7 +82,7 @@ export default function CommunityHub() {
         gradient: BAY_AREA_COUNTIES[userCounty]?.gradient || 'from-green-500 to-emerald-600',
         tag: `#${userCounty}-county`,
         dbChannel: `hello-county-${userCounty}`,
-        memberCount: '1.2K',
+        // Removed memberCount
         disabled: true
       }
     ];
@@ -177,15 +175,7 @@ export default function CommunityHub() {
                           }`}>
                             {channel.shortName}
                           </h4>
-                          <p className={`text-xs mt-0.5 ${
-                            isDisabled 
-                              ? 'text-slate-400'
-                              : isActive 
-                                ? 'text-slate-600' 
-                                : 'text-slate-500'
-                          }`}>
-                            {channel.memberCount} members
-                          </p>
+                          {/* Removed member count display */}
                         </div>
                         {isDisabled && (
                           <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">
@@ -283,18 +273,26 @@ export default function CommunityHub() {
                       ? 'Join an organization to unlock community-specific channels and connect with your peers.'
                       : 'This exciting channel is coming soon! We\'re working hard to bring you amazing local community features.'}
                   </p>
-                  {activeChannelConfig?.id === 'hello-community' && (
-                    <button className="px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-200">
-                      Join an Organization
+                  <div className="space-y-3">
+                    <button 
+                      onClick={() => setActiveChannel('hello-world')}
+                      className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white px-8 py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-200 transform hover:-translate-y-1"
+                    >
+                      Explore Platform-Wide Channel
                     </button>
-                  )}
+                    {activeChannelConfig?.id === 'hello-community' && (
+                      <p className="text-sm text-slate-500">
+                        Complete your organization profile to unlock community features
+                      </p>
+                    )}
+                  </div>
                 </div>
               </div>
             )}
           </div>
 
           {/* Right Column - Sidebar */}
-          <Sidebar 
+          <Sidebar
             activeChannel={activeChannel}
             activeChannelConfig={activeChannelConfig}
             organizationInfo={organizationInfo}

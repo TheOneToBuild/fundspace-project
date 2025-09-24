@@ -1,4 +1,3 @@
-// Redesigned ForFundersPage (funders-centric experience)
 import React, { useState, useEffect, useContext } from 'react';
 import { supabase } from './supabaseClient.js';
 import { motion } from 'framer-motion';
@@ -83,7 +82,6 @@ const ForFundersPage = () => {
 
     return (
         <div className="min-h-screen bg-white">
-            {/* Hero */}
             <section className="relative pt-28 md:pt-36 pb-32 bg-[#f9f6f4] overflow-hidden">
                 <div className="absolute inset-0 pointer-events-none">
                     <div className="absolute -top-24 -left-32 w-[520px] h-[520px] bg-gradient-to-tr from-indigo-300 via-violet-300 to-fuchsia-300 blur-3xl opacity-25" />
@@ -96,13 +94,12 @@ const ForFundersPage = () => {
                         </h1>
                         <div className="group inline-flex flex-col rounded-3xl border border-slate-200/70 bg-white/80 backdrop-blur-sm px-7 py-6 shadow-lg shadow-slate-900/5 hover:shadow-xl transition-all w-full md:w-auto">
                             <p className="text-[11px] font-semibold tracking-wider text-slate-500 mb-2">WHY FUNDSPACE FOR FUNDERS</p>
-                            <p className="text-slate-800/95 text-base md:text-lg leading-relaxed max-w-lg">Surface high-potential grassroots organizations, streamline intake, reduce diligence friction, and monitor impact in one collaborative ecosystem. Move from reactive cycles to strategic, data‑informed deployment.</p>
+                            <p className="text-slate-800/95 text-base md:text-lg leading-relaxed max-w-lg">Surface high-potential grassroots organizations, streamline intake, reduce diligence friction, and monitor impact in one collaborative ecosystem. Move from reactive cycles to strategic, data-informed deployment.</p>
                         </div>
                         <div className="flex flex-wrap gap-3 pt-2">
                             <a href="/organizations" className="inline-flex items-center justify-center px-6 py-3 rounded-full font-semibold bg-indigo-600 text-white hover:bg-indigo-700 shadow-lg hover:shadow-xl transition-all text-sm">Explore Orgs <Search className="ml-2 h-4 w-4" /></a>
                             <a href="/contact" className="inline-flex items-center justify-center px-6 py-3 rounded-full font-semibold bg-slate-900 text-white hover:bg-slate-800 shadow-lg hover:shadow-xl transition-all text-sm">Partner With Us <ArrowRight className="ml-2 h-4 w-4" /></a>
                         </div>
-
                     </div>
                     <div className="relative">
                         <div className="relative rounded-3xl overflow-hidden shadow-2xl">
@@ -116,8 +113,6 @@ const ForFundersPage = () => {
                     </div>
                 </div>
             </section>
-
-            {/* Value Pillars */}
             <Section className="bg-white pt-32 pb-40 md:pt-44 md:pb-48">
                 <div className="max-w-6xl mx-auto px-6 lg:px-12 text-center mb-16">
                     <Pill color="blue">CORE VALUE</Pill>
@@ -125,16 +120,14 @@ const ForFundersPage = () => {
                     <p className="mt-6 text-lg md:text-xl text-slate-600 max-w-3xl mx-auto leading-relaxed">A modern infrastructure layer for foundations, corporate & public funders to discover, diligence, and steward community partners—without manual sprawl.</p>
                 </div>
                 <div className="max-w-7xl mx-auto px-6 lg:px-12 grid md:grid-cols-2 lg:grid-cols-3 gap-10">
-                    <ValueCard icon={Search} title="Strategic Discovery" accent="from-indigo-500 via-violet-500 to-fuchsia-500" description="AI + taxonomy powered search surfaces mission‑aligned, readiness‑signaled organizations you might otherwise miss." />
-                    <ValueCard icon={Target} title="Fit & Readiness Signals" accent="from-emerald-500 via-teal-500 to-cyan-500" description="Eligibility, focus area, geography, stage & capacity indicators reduce top‑of‑funnel noise." />
-                    <ValueCard icon={Handshake} title="Collaborative Ecosystem" accent="from-orange-500 via-rose-500 to-pink-500" description="Co‑funding visibility & network intelligence reveal partnership opportunities and reduce duplication." />
+                    <ValueCard icon={Search} title="Strategic Discovery" accent="from-indigo-500 via-violet-500 to-fuchsia-500" description="AI + taxonomy powered search surfaces mission-aligned, readiness-signaled organizations you might otherwise miss." />
+                    <ValueCard icon={Target} title="Fit & Readiness Signals" accent="from-emerald-500 via-teal-500 to-cyan-500" description="Eligibility, focus area, geography, stage & capacity indicators reduce top-of-funnel noise." />
+                    <ValueCard icon={Handshake} title="Collaborative Ecosystem" accent="from-orange-500 via-rose-500 to-pink-500" description="Co-funding visibility & network intelligence reveal partnership opportunities and reduce duplication." />
                     <ValueCard icon={BarChart3} title="Impact Transparency" accent="from-sky-500 via-blue-500 to-indigo-500" description="Standardized outcome storytelling & dashboards create faster renewal + scaling decisions." />
-                    <ValueCard icon={Briefcase} title="Streamlined Intake" accent="from-slate-800 via-slate-900 to-slate-900" description="Reusable narrative assets, structured data capture & guided forms replace ad‑hoc PDFs & inbox chaos." />
+                    <ValueCard icon={Briefcase} title="Streamlined Intake" accent="from-slate-800 via-slate-900 to-slate-900" description="Reusable narrative assets, structured data capture & guided forms replace ad-hoc PDFs & inbox chaos." />
                     <ValueCard icon={Rocket} title="Learning Flywheel" accent="from-purple-500 via-fuchsia-500 to-pink-600" description="Every cycle improves matching accuracy, benchmarks & pattern detection across focus areas." />
                 </div>
             </Section>
-
-            {/* Intelligence + Platform Layer */}
             <Section className="bg-[#f9f6f4] pt-32 pb-40 md:pt-44 md:pb-48">
                 <div className="max-w-6xl mx-auto px-6 lg:px-12 grid lg:grid-cols-2 gap-16 items-start">
                     <motion.div variants={fadeIn} className="space-y-8">
@@ -145,7 +138,7 @@ const ForFundersPage = () => {
                             <li className="flex gap-3"><span className="mt-2 h-2 w-2 rounded-full bg-indigo-500" /> <p><strong className="text-slate-700">Adaptive Matching:</strong> Opportunity + org fingerprint model improves relevance each cycle.</p></li>
                             <li className="flex gap-3"><span className="mt-2 h-2 w-2 rounded-full bg-fuchsia-500" /> <p><strong className="text-slate-700">Gap Mapping:</strong> Identify underserved geographies & focus areas to inform proactive sourcing.</p></li>
                             <li className="flex gap-3"><span className="mt-2 h-2 w-2 rounded-full bg-emerald-500" /> <p><strong className="text-slate-700">Outcome Layer:</strong> Structured impact narratives unify quantitative KPIs & qualitative stories.</p></li>
-                            <li className="flex gap-3"><span className="mt-2 h-2 w-2 rounded-full bg-sky-500" /> <p><strong className="text-slate-700">Portfolio View:</strong> Rollups highlight concentration risk, renewal readiness & co‑fund alignment.</p></li>
+                            <li className="flex gap-3"><span className="mt-2 h-2 w-2 rounded-full bg-sky-500" /> <p><strong className="text-slate-700">Portfolio View:</strong> Rollups highlight concentration risk, renewal readiness & co-fund alignment.</p></li>
                         </ul>
                         <div className="flex gap-4 pt-2">
                             <a href="/contact" className="inline-flex items-center px-6 py-3 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm shadow-lg">Request Funder Preview <ArrowRight className="ml-2 h-4 w-4" /></a>
@@ -161,11 +154,11 @@ const ForFundersPage = () => {
                                 </div>
                                 <div className="grid gap-5">
                                     {[
-                                        {icon:Search, label:'Discovery Coverage', text:'Aggregates public, foundation & community-submitted opportunities.'},
-                                        {icon:Users, label:'Org Graph', text:'Maps relationships & shared collaborators to surface coalition potential.'},
-                                        {icon:BarChart3, label:'Outcome Dashboards', text:'Normalized metrics + narrative assets ready for portfolio reporting.'},
-                                        {icon:TrendingUp, label:'Pattern Insights', text:'Highlights emerging themes & traction signals across cohorts.'}
-                                    ].map((row,i)=>(
+                                        { icon: Search, label: 'Discovery Coverage', text: 'Aggregates public, foundation & community-submitted opportunities.' },
+                                        { icon: Users, label: 'Org Graph', text: 'Maps relationships & shared collaborators to surface coalition potential.' },
+                                        { icon: BarChart3, label: 'Outcome Dashboards', text: 'Normalized metrics + narrative assets ready for portfolio reporting.' },
+                                        { icon: TrendingUp, label: 'Pattern Insights', text: 'Highlights emerging themes & traction signals across cohorts.' }
+                                    ].map((row, i) => (
                                         <div key={i} className="flex gap-4">
                                             <div className="h-11 w-11 rounded-xl bg-white/10 flex items-center justify-center ring-1 ring-white/10"><row.icon className="h-5 w-5 text-white" /></div>
                                             <div className="flex-1">
@@ -181,8 +174,6 @@ const ForFundersPage = () => {
                     </motion.div>
                 </div>
             </Section>
-
-            {/* Workflow */}
             <Section className="bg-white pt-32 pb-40 md:pt-44 md:pb-48">
                 <div className="max-w-6xl mx-auto px-6 lg:px-12 mb-16 text-center">
                     <Pill color="emerald">FUNDER WORKFLOW</Pill>
@@ -193,13 +184,11 @@ const ForFundersPage = () => {
                     <WorkflowStep index={1} icon={Target} title="Define Focus & Signals" description="Geographies, impact themes & baseline eligibility establish your sourcing fingerprint." accent="from-indigo-500 to-violet-600" />
                     <WorkflowStep index={2} icon={Search} title="Surface & Shortlist" description="Adaptive engine ranks emerging & established organizations by strategic fit." accent="from-emerald-500 to-teal-600" />
                     <WorkflowStep index={3} icon={Handshake} title="Assess & Engage" description="Readiness signals + reusable assets streamline diligence & invite fairness." accent="from-orange-500 to-pink-600" />
-                    <WorkflowStep index={4} icon={Users} title="Collaborate & Co‑Fund" description="Reveal overlap & invite aligned partners into joint initiative windows." accent="from-sky-500 to-indigo-600" />
+                    <WorkflowStep index={4} icon={Users} title="Collaborate & Co-Fund" description="Reveal overlap & invite aligned partners into joint initiative windows." accent="from-sky-500 to-indigo-600" />
                     <WorkflowStep index={5} icon={BarChart3} title="Track Outcomes" description="Unified impact narrative + KPI dashboards enable faster renewal confidence." accent="from-purple-500 to-fuchsia-600" />
                     <WorkflowStep index={6} icon={Rocket} title="Learn & Amplify" description="Pattern insights inform next cycle focus, equity gaps & scaling bets." accent="from-slate-800 to-slate-900" />
                 </div>
             </Section>
-
-            {/* Submit Opportunity */}
             <Section className="bg-[#f9f6f4] pt-32 pb-40 md:pt-44 md:pb-48">
                 <motion.div variants={fadeIn} className="max-w-4xl mx-auto bg-white/80 backdrop-blur-sm p-8 md:p-12 rounded-3xl border border-white/60 shadow-2xl">
                     <div className="text-center mb-8">
@@ -212,23 +201,21 @@ const ForFundersPage = () => {
                     <form onSubmit={submitOpportunity} className="space-y-6">
                         <div>
                             <label htmlFor="opp-url" className="block text-sm font-semibold text-slate-700 mb-2">Opportunity URL <span className="text-red-500">*</span></label>
-                            <input id="opp-url" type="url" value={url} onChange={e=>setUrl(e.target.value)} placeholder="https://foundation.org/rfp" required className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all bg-white/80" />
+                            <input id="opp-url" type="url" value={url} onChange={e => setUrl(e.target.value)} placeholder="https://foundation.org/rfp" required className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all bg-white/80" />
                         </div>
                         <div>
                             <label htmlFor="opp-notes" className="block text-sm font-semibold text-slate-700 mb-2">Notes (Optional)</label>
-                            <textarea id="opp-notes" value={notes} onChange={e=>setNotes(e.target.value)} rows="4" placeholder="Helpful context: focus area, funding range, deadline details, eligibility nuances." className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all bg-white/80 resize-none" />
+                            <textarea id="opp-notes" value={notes} onChange={e => setNotes(e.target.value)} rows="4" placeholder="Helpful context: focus area, funding range, deadline details, eligibility nuances." className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all bg-white/80 resize-none" />
                         </div>
                         <button type="submit" disabled={submitting} className="w-full inline-flex items-center justify-center px-8 py-4 font-semibold rounded-2xl text-white bg-gradient-to-r from-indigo-600 via-violet-600 to-fuchsia-600 hover:via-violet-500 shadow-lg hover:shadow-xl transition-all disabled:opacity-50">
                             {submitting ? (<><Loader className="animate-spin h-5 w-5 mr-3" />Submitting...</>) : (<><UploadCloud className="mr-2" size={20} />Submit Opportunity</>)}
                         </button>
                     </form>
                     {msg && (
-                        <div className={`mt-6 p-4 rounded-2xl text-sm font-medium ${msg.type==='success' ? 'bg-gradient-to-r from-emerald-100 to-teal-100 text-emerald-800 border border-emerald-200' : 'bg-gradient-to-r from-rose-100 to-pink-100 text-rose-800 border border-rose-200'}`}> <div className="flex items-center gap-2"> {msg.type==='success' ? <CheckCircle2 size={16} className="text-emerald-600" /> : <MessageSquare size={16} className="text-rose-600" />} {msg.text}</div></div>
+                        <div className={`mt-6 p-4 rounded-2xl text-sm font-medium ${msg.type === 'success' ? 'bg-gradient-to-r from-emerald-100 to-teal-100 text-emerald-800 border border-emerald-200' : 'bg-gradient-to-r from-rose-100 to-pink-100 text-rose-800 border border-rose-200'}`}> <div className="flex items-center gap-2"> {msg.type === 'success' ? <CheckCircle2 size={16} className="text-emerald-600" /> : <MessageSquare size={16} className="text-rose-600" />} {msg.text}</div></div>
                     )}
                 </motion.div>
             </Section>
-
-            {/* Roadmap */}
             <Section className="bg-white pt-32 pb-40 md:pt-44 md:pb-56">
                 <div className="max-w-6xl mx-auto px-6 lg:px-12 text-center mb-14">
                     <Pill color="slate">ON THE HORIZON</Pill>
@@ -237,19 +224,17 @@ const ForFundersPage = () => {
                 </div>
                 <div className="max-w-7xl mx-auto px-6 lg:px-12 grid md:grid-cols-2 lg:grid-cols-3 gap-8">
                     {[
-                        {icon:BarChart3, title:'Portfolio Heatmaps', text:'Visualize geographic & focus area allocation including equity gap alerts.'},
-                        {icon:Users, title:'Collaborative Windows', text:'Launch co‑funded thematic rounds & shared diligence spaces.'},
-                        {icon:Zap, title:'Automated Eligibility Pre‑Check', text:'Instant rubric scoring against funder-defined criteria.'},
-                        {icon:Briefcase, title:'Integrated Renewal Workflows', text:'Signal expiring multi‑year agreements & surface performance context.'},
-                        {icon:Heart, title:'Grantee Capacity Signals', text:'Early indicators of organizational strain or scaling readiness.'},
-                        {icon:TrendingUp, title:'Predictive Outcome Modeling', text:'Model projected impact scenarios based on historical analogs.'},
-                    ].map((f,i)=>(
-                        <ValueCard key={i} icon={f.icon} title={f.title} description={f.text} accent={i%2? 'from-indigo-500 to-violet-600':'from-emerald-500 to-teal-600'} />
+                        { icon: BarChart3, title: 'Portfolio Heatmaps', text: 'Visualize geographic & focus area allocation including equity gap alerts.' },
+                        { icon: Users, title: 'Collaborative Windows', text: 'Launch co-funded thematic rounds & shared diligence spaces.' },
+                        { icon: Zap, title: 'Automated Eligibility Pre-Check', text: 'Instant rubric scoring against funder-defined criteria.' },
+                        { icon: Briefcase, title: 'Integrated Renewal Workflows', text: 'Signal expiring multi-year agreements & surface performance context.' },
+                        { icon: Heart, title: 'Grantee Capacity Signals', text: 'Early indicators of organizational strain or scaling readiness.' },
+                        { icon: TrendingUp, title: 'Predictive Outcome Modeling', text: 'Model projected impact scenarios based on historical analogs.' },
+                    ].map((f, i) => (
+                        <ValueCard key={i} icon={f.icon} title={f.title} description={f.text} accent={i % 2 ? 'from-indigo-500 to-violet-600' : 'from-emerald-500 to-teal-600'} />
                     ))}
                 </div>
             </Section>
-
-            {/* Final CTA */}
             <section className="relative py-32 md:py-40 bg-gradient-to-br from-indigo-50 via-violet-50 to-fuchsia-50 overflow-hidden">
                 <div className="absolute inset-0 pointer-events-none">
                     <div className="absolute -top-10 -left-24 w-[420px] h-[420px] bg-gradient-to-tr from-indigo-200 via-violet-200 to-fuchsia-200 blur-3xl opacity-35" />
@@ -260,7 +245,7 @@ const ForFundersPage = () => {
                         <Sparkles className="h-10 w-10 text-indigo-600" />
                     </div>
                     <h2 className="text-4xl md:text-5xl font-black tracking-tight text-slate-900 mb-6 leading-[1.05]">Partner With Fundspace To Accelerate Equitable Capital Flow</h2>
-                    <p className="text-lg md:text-xl text-slate-700 max-w-2xl mx-auto leading-relaxed mb-12">Bring efficiency, transparency & inclusive reach to your grantmaking. Let\'s build the connective tissue for sustained community outcomes.</p>
+                    <p className="text-lg md:text-xl text-slate-700 max-w-2xl mx-auto leading-relaxed mb-12">Bring efficiency, transparency & inclusive reach to your grantmaking. Let's build the connective tissue for sustained community outcomes.</p>
                     <div className="flex flex-col sm:flex-row gap-4 justify-center">
                         <a href="/contact" className="inline-flex items-center justify-center px-8 py-4 rounded-2xl font-semibold bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg hover:shadow-xl transition-all">Request A Conversation <ArrowRight className="ml-2 h-5 w-5" /></a>
                         <a href="/organizations" className="inline-flex items-center justify-center px-8 py-4 rounded-2xl font-semibold bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 shadow-sm transition-all">Explore Organizations <Search className="ml-2 h-5 w-5" /></a>

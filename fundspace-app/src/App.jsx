@@ -56,14 +56,10 @@ export const LayoutContext = createContext({ setPageBgColor: () => {} });
 const AuthRedirect = ({ children }) => {
   const { session, profile, loading } = useOutletContext();
   const location = useLocation();
-  
   if (loading) return children;
-  
-  // Only redirect logged-in users who are specifically on the homepage with no query parameters
   if (session && profile && location.pathname === '/' && location.search === '') {
     return <Navigate to="/profile" replace />;
   }
-  
   return children;
 };
 
@@ -108,13 +104,10 @@ const AppLayout = () => {
   const { session, profile, notifications, unreadCount, markNotificationsAsRead, handleClearAllNotifications, handleViewPost, refreshProfile } = useOutletContext();
   const [pageBgColor, setPageBgColor] = useState('bg-transparent');
   const location = useLocation();
-
-  // Only reset background color for routes that don't use PublicPageLayout
   useEffect(() => {
-    // Routes that use PublicPageLayout and should keep their custom backgrounds
     const publicPageLayoutRoutes = [
       '/profile',
-      '/profile/connections', 
+      '/profile/connections',
       '/profile/hello-community',
       '/profile/discover',
       '/profile/settings',
@@ -124,7 +117,7 @@ const AppLayout = () => {
       '/profile/organizations',
       '/profile/my-organization',
       '/profile/notifications',
-      '/profile/members', // Now includes member profiles since they use PublicPageLayout too
+      '/profile/members',
       '/organizations',
       '/grants',
       '/faq',
@@ -132,17 +125,13 @@ const AppLayout = () => {
       '/about',
       '/contact'
     ];
-    
-    const shouldKeepBackground = publicPageLayoutRoutes.some(route => 
+    const shouldKeepBackground = publicPageLayoutRoutes.some(route =>
       location.pathname === route || location.pathname.startsWith(route + '/')
     );
-    
-    // Only reset background for routes that don't use PublicPageLayout
     if (!shouldKeepBackground) {
       setPageBgColor('bg-transparent');
     }
   }, [location.pathname]);
-
   return (
     <LayoutContext.Provider value={{ setPageBgColor, pageBgColor }}>
       <div className={`min-h-screen ${pageBgColor} font-sans text-slate-800 flex flex-col`}>
@@ -169,13 +158,11 @@ const AppLayout = () => {
 
 function ResetPasswordPage() {
   const navigate = useNavigate();
-
   const handleResetSuccess = () => {
-    navigate('/login', { 
+    navigate('/login', {
       state: { message: 'Password updated successfully! You can now sign in.' }
     });
   };
-
   return (
     <AuthLayout>
       <ResetPasswordForm onResetSuccess={handleResetSuccess} />
@@ -189,7 +176,6 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
-
   const fetchSessionData = async (session) => {
     if (!session) {
       setProfile(null);
@@ -215,7 +201,6 @@ export default function App() {
       setLoading(false);
     }
   };
-
   const refreshProfile = async () => {
     if (!session?.user?.id) return;
     try {
@@ -225,7 +210,6 @@ export default function App() {
       console.error('Error refreshing profile:', error);
     }
   };
-
   const handleClearAllNotifications = async () => {
     if (!session?.user?.id) return;
     try {
@@ -238,7 +222,6 @@ export default function App() {
       console.error('Error clearing notifications:', error);
     }
   };
-
   const handleViewPost = async (postId, isOrganizationPost = false) => {
     const selector = isOrganizationPost ? `[data-organization-post-id="${postId}"]` : `[data-post-id="${postId}"]`;
     if (!isOrganizationPost) {
@@ -255,7 +238,6 @@ export default function App() {
       }
     }, 100);
   };
-
   const markNotificationsAsRead = async () => {
     if (unreadCount === 0 || !session) return;
     const unreadIds = notifications.filter(n => !n.is_read).map(n => n.id);
@@ -268,7 +250,6 @@ export default function App() {
       console.error('Error marking notifications as read:', error);
     }
   };
-
   useEffect(() => {
     const getInitialSession = async () => {
       setLoading(true);
@@ -287,19 +268,15 @@ export default function App() {
     });
     return () => subscription.unsubscribe();
   }, []);
-
-  // FIXED: Proper real-time subscription cleanup for notifications
   useEffect(() => {
     if (!session?.user?.id) return;
-    
     const channel = supabase.channel(`profile-notifications:${session.user.id}`);
-    
     channel
-      .on('postgres_changes', { 
-        event: 'INSERT', 
-        schema: 'public', 
-        table: 'notifications', 
-        filter: `user_id=eq.${session.user.id}` 
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'notifications',
+        filter: `user_id=eq.${session.user.id}`
       }, async (payload) => {
         try {
           const { data: actor } = await supabase
@@ -307,7 +284,6 @@ export default function App() {
             .select('*')
             .eq('id', payload.new.actor_id)
             .single();
-            
           if (actor) {
             setNotifications(current => [{ ...payload.new, actor_id: actor }, ...current]);
             setUnreadCount(current => current + 1);
@@ -317,23 +293,18 @@ export default function App() {
         }
       })
       .subscribe((status) => {
-        // Only log errors, not successful connections
         if (status === 'CHANNEL_ERROR') {
           console.error('Notifications subscription error');
         }
       });
-    
     return () => {
-      // FIXED: Properly unsubscribe and remove channel
       if (channel) {
         channel.unsubscribe();
         supabase.removeChannel(channel);
       }
     };
   }, [session?.user?.id]);
-
   const outletContext = { session, profile, loading, notifications, unreadCount, markNotificationsAsRead, handleClearAllNotifications, handleViewPost, refreshProfile };
-
   return (
     <BrowserRouter>
       <ScrollToTop />
@@ -379,7 +350,6 @@ export default function App() {
               <Route path="omega-admin/users" element={<OmegaAdminUsers />} />
               <Route path="omega-admin/grants" element={<OmegaAdminGrants />} />
               <Route path="notifications" element={<NotificationsPage />} />
-              {/* FIXED: Add redirect for bare /members path and keep the parameterized route */}
               <Route path="members" element={<Navigate to="/profile/connections" replace />} />
               <Route path="members/:profileId" element={<MemberProfilePage />} />
             </Route>

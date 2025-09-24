@@ -44,34 +44,47 @@ const TrendingPosts = ({ activeChannelConfig, organizationInfo, onTrendingPostCl
         .eq('channel', channelFilter)
         .gte('created_at', sevenDaysAgo.toISOString())
         .order('created_at', { ascending: false })
-        .limit(50);
+        .limit(100);
 
       if (error) throw error;
 
-      // Calculate trending score for each post
+      // Improved trending score calculation focused on comments and reactions
       const postsWithTrendingScore = fetchedPosts?.map(post => {
         const hoursOld = (new Date() - new Date(post.created_at)) / (1000 * 60 * 60);
-        const ageWeight = Math.max(0.1, 1 - (hoursOld / 168)); // Decay over 7 days
+        const daysOld = hoursOld / 24;
         
-        // Trending score: weighted combination of likes, comments, and recency
-        const trendingScore = (
-          (post.likes_count * 1.0) + 
-          (post.comments_count * 2.0) + // Comments are worth more
-          (ageWeight * 10) // Recent posts get boost
-        ) / Math.max(1, hoursOld * 0.1); // Divide by age factor
+        // Age decay factor (stronger decay for older posts)
+        const ageWeight = Math.max(0.05, Math.exp(-daysOld * 0.3));
+        
+        // Trending score: heavily weighted towards comments (engagement quality)
+        const engagementScore = (
+          (post.comments_count * 3.0) + // Comments are most valuable (discussions)
+          (post.likes_count * 1.0)      // Likes are less valuable but still count
+        );
+        
+        // Final score with age decay
+        const trendingScore = engagementScore * ageWeight * 100;
+        
+        // Calculate engagement growth percentage
+        const totalEngagement = post.likes_count + post.comments_count;
+        const expectedEngagement = Math.max(0.1, daysOld * 0.8); // Expected baseline
+        const growthRate = Math.round(((totalEngagement - expectedEngagement) / expectedEngagement) * 100);
 
         return {
           ...post,
           trendingScore,
           hoursOld: Math.floor(hoursOld),
-          engagement: post.likes_count + post.comments_count
+          daysOld: Math.max(0.1, daysOld),
+          engagement: totalEngagement,
+          growthRate: Math.max(0, Math.min(999, growthRate))
         };
       }) || [];
 
-      // Sort by trending score and take top 3
+      // Sort by trending score and take top 6 (instead of 3)
       const topTrending = postsWithTrendingScore
+        .filter(post => post.engagement > 0) // Only show posts with some engagement
         .sort((a, b) => b.trendingScore - a.trendingScore)
-        .slice(0, 3);
+        .slice(0, 6);
 
       setTrendingPosts(topTrending);
     } catch (error) {
@@ -82,40 +95,66 @@ const TrendingPosts = ({ activeChannelConfig, organizationInfo, onTrendingPostCl
     }
   };
 
-  const truncateContent = (content, maxLength = 60) => {
+  // FIXED: Proper HTML content truncation with entity decoding
+  const truncateContent = (content, maxLength = 50) => {
     if (!content) return '';
-    return content.length > maxLength ? content.substring(0, maxLength) + '...' : content;
+    
+    // Create a temporary div to parse and decode HTML content
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = content;
+    
+    // Get the plain text content (this automatically decodes HTML entities)
+    const plainText = tempDiv.textContent || tempDiv.innerText || '';
+    
+    // Clean up any extra whitespace
+    const cleanText = plainText.replace(/\s+/g, ' ').trim();
+    
+    if (cleanText.length > maxLength) {
+      // Truncate at word boundary
+      const truncated = cleanText.substring(0, maxLength);
+      const lastSpaceIndex = truncated.lastIndexOf(' ');
+      
+      if (lastSpaceIndex > 0 && lastSpaceIndex > maxLength * 0.7) {
+        return truncated.substring(0, lastSpaceIndex) + '...';
+      }
+      return truncated + '...';
+    }
+    
+    return cleanText;
   };
 
   const getTimeAgo = (hoursOld) => {
     if (hoursOld < 1) return 'Just now';
-    if (hoursOld < 24) return `${hoursOld}h ago`;
+    if (hoursOld < 24) return `${Math.floor(hoursOld)}h ago`;
     const days = Math.floor(hoursOld / 24);
+    if (days === 1) return '1d ago';
     return `${days}d ago`;
   };
 
-  const getEngagementGrowth = (engagement, hoursOld) => {
-    // Simple growth calculation based on engagement vs age
-    const baselineEngagement = Math.max(1, hoursOld * 0.5);
-    const growthRate = ((engagement - baselineEngagement) / baselineEngagement) * 100;
-    return Math.max(0, Math.min(999, Math.round(growthRate)));
-  };
-
-  const handlePostClick = (postId) => {
-    // Check if post is in current visible posts, if not, we can't scroll to it
+  // Enhanced clickable post handler
+  const handlePostClick = (postId, event) => {
+    event.stopPropagation();
+    
+    // Always try to navigate to the post, either by scrolling or loading
     const isPostVisible = posts.some(post => post.id === postId);
+    
     if (isPostVisible) {
+      // If post is visible, scroll to it
       onTrendingPostClick(postId);
     } else {
-      // Could implement a "Load more to see this post" feature here
-      console.log('Post not currently visible in feed');
+      // If post is not visible, could either:
+      // 1. Load more posts to find it, or
+      // 2. Navigate to a direct post view
+      // For now, we'll trigger the callback anyway and let parent handle it
+      console.log(`Trending post ${postId} not visible, requesting navigation`);
+      onTrendingPostClick(postId);
     }
   };
 
   if (loading) {
     return (
-      <div className="space-y-4">
-        {[...Array(3)].map((_, i) => (
+      <div className="space-y-3">
+        {[...Array(6)].map((_, i) => (
           <div key={i} className="animate-pulse">
             <div className="h-4 bg-slate-200 rounded mb-2"></div>
             <div className="h-3 bg-slate-200 rounded w-3/4 mb-2"></div>
@@ -137,80 +176,93 @@ const TrendingPosts = ({ activeChannelConfig, organizationInfo, onTrendingPostCl
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
       {trendingPosts.map((post, index) => {
-        const growthRate = getEngagementGrowth(post.engagement, post.hoursOld);
-        const isHot = growthRate > 50;
         const isPostVisible = posts.some(p => p.id === post.id);
+        const isHot = post.growthRate > 100;
         
         return (
           <div 
             key={post.id} 
-            className={`group cursor-pointer hover:bg-slate-50 rounded-lg p-3 transition-colors ${
-              isPostVisible ? '' : 'opacity-60'
+            className={`group cursor-pointer hover:bg-slate-50 rounded-lg p-3 transition-all duration-200 hover:shadow-sm border border-transparent hover:border-slate-200 ${
+              !isPostVisible ? 'opacity-75' : ''
             }`}
-            onClick={() => handlePostClick(post.id)}
+            onClick={(e) => handlePostClick(post.id, e)}
+            title="Click to view post"
           >
-            <div className={`border-l-4 pl-3 ${
-              index === 0 ? 'border-green-500' : 
+            <div className={`border-l-3 pl-3 ${
+              index === 0 ? 'border-emerald-500' : 
               index === 1 ? 'border-blue-500' : 
-              'border-purple-500'
+              index === 2 ? 'border-purple-500' :
+              index === 3 ? 'border-orange-500' :
+              index === 4 ? 'border-pink-500' :
+              'border-indigo-500'
             }`}>
               <div className="flex items-start justify-between">
                 <div className="flex-1 min-w-0">
+                  {/* Author info */}
                   <div className="flex items-center space-x-2 mb-2">
-                    <div className="w-5 h-5 rounded-full bg-slate-300 flex-shrink-0">
+                    <div className="w-4 h-4 rounded-full bg-slate-300 flex-shrink-0">
                       {post.profiles?.avatar_url ? (
                         <img 
                           src={post.profiles.avatar_url} 
-                          alt={post.profiles.full_name}
+                          alt="Profile" 
                           className="w-full h-full rounded-full object-cover"
                         />
                       ) : (
-                        <div className="w-full h-full rounded-full bg-slate-400"></div>
+                        <div className="w-full h-full rounded-full bg-gradient-to-br from-blue-400 to-purple-500" />
                       )}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="text-xs font-medium text-slate-900 truncate">
+                      <p className="text-xs font-medium text-slate-700 truncate">
                         {post.profiles?.full_name || 'Anonymous'}
+                      </p>
+                      <p className="text-xs text-slate-500">
+                        {getTimeAgo(post.hoursOld)}
                       </p>
                     </div>
                   </div>
                   
-                  <h4 className="font-medium text-sm text-slate-900 mb-2 line-clamp-2 group-hover:text-blue-600 transition-colors">
-                    {truncateContent(post.content)}
-                  </h4>
+                  {/* Post content preview */}
+                  <p className="text-sm text-slate-600 leading-relaxed mb-2 line-clamp-2">
+                    {truncateContent(post.content, 65)}
+                  </p>
                   
+                  {/* Engagement metrics and growth */}
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2 text-xs text-slate-500">
+                    <div className="flex items-center space-x-3 text-xs text-slate-500">
                       <div className="flex items-center space-x-1">
-                        <Heart size={10} />
+                        <Heart size={11} className="text-red-400" />
                         <span>{post.likes_count}</span>
                       </div>
                       <div className="flex items-center space-x-1">
-                        <MessageCircle size={10} />
+                        <MessageCircle size={11} className="text-blue-400" />
                         <span>{post.comments_count}</span>
-                      </div>
-                      <div className="flex items-center space-x-1">
-                        <Clock size={10} />
-                        <span>{getTimeAgo(post.hoursOld)}</span>
                       </div>
                     </div>
                     
-                    <div className={`text-xs font-semibold flex items-center space-x-1 ${
-                      index === 0 ? 'text-green-600' : 
-                      index === 1 ? 'text-blue-600' : 
-                      'text-purple-600'
+                    {/* Growth percentage indicator */}
+                    <div className={`text-xs font-medium flex items-center space-x-1 px-2 py-1 rounded-full ${
+                      isHot ? 'bg-orange-100 text-orange-700' : 
+                      index === 0 ? 'bg-emerald-100 text-emerald-700' : 
+                      index === 1 ? 'bg-blue-100 text-blue-700' : 
+                      index === 2 ? 'bg-purple-100 text-purple-700' :
+                      index === 3 ? 'bg-orange-100 text-orange-700' :
+                      index === 4 ? 'bg-pink-100 text-pink-700' :
+                      'bg-indigo-100 text-indigo-700'
                     }`}>
                       {isHot && (
-                        <span className="text-orange-500">🔥</span>
+                        <span className="text-orange-500 text-xs">🔥</span>
                       )}
-                      <span>+{growthRate}%</span>
+                      <span>+{post.growthRate}%</span>
                     </div>
                   </div>
                   
+                  {/* Status indicator for non-visible posts */}
                   {!isPostVisible && (
-                    <p className="text-xs text-slate-400 mt-1">Load more posts to view</p>
+                    <p className="text-xs text-slate-400 mt-1 italic">
+                      📍 Scroll to find this post
+                    </p>
                   )}
                 </div>
               </div>
