@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fundspace RAG Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800 antialiased p-6">
+    <div class="max-w-7xl mx-auto bg-white rounded-xl shadow-lg p-8">
+        <h1 class="text-3xl font-bold text-gray-900 mb-6">Fundspace RAG Dashboard</h1>
+
+        <!-- Organization URL Input Section -->
+        <div class="mb-8 p-6 bg-gray-50 rounded-lg border border-gray-200">
+            <h2 class="text-xl font-semibold mb-4 text-gray-700">Add an Organization</h2>
+            <div class="flex flex-col sm:flex-row gap-4 mb-4">
+                <input type="text" id="org-name-input" placeholder="Organization Name" class="flex-1 p-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <input type="text" id="org-url-input" placeholder="Organization URL (e.g., https://www.rwctogether.org)" class="flex-1 p-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+            <button id="scrape-btn" class="w-full sm:w-auto px-6 py-3 bg-blue-600 text-white font-bold rounded-lg shadow-md hover:bg-blue-700 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                Scrape & Index
+            </button>
+            <div id="scrape-status" class="mt-4 text-sm text-gray-600"></div>
+        </div>
+
+        <!-- Scraped Organizations Display -->
+        <div class="mb-8">
+            <h2 class="text-xl font-semibold mb-4 text-gray-700">Indexed Organizations</h2>
+            <div id="scraped-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <!-- Dynamically populated by JS -->
+            </div>
+        </div>
+
+        <!-- Chat Function Section -->
+        <div class="p-6 bg-gray-50 rounded-lg border border-gray-200">
+            <h2 class="text-xl font-semibold mb-4 text-gray-700">Ask a Question</h2>
+            <div id="chat-window" class="h-80 overflow-y-auto p-4 mb-4 bg-white rounded-lg border border-gray-300">
+                <div id="messages" class="flex flex-col gap-4">
+                    <div class="flex items-start">
+                        <div class="bg-blue-100 p-3 rounded-lg shadow-sm max-w-xs">
+                            <p class="text-blue-800 text-sm font-semibold">Bot</p>
+                            <p class="text-gray-800">Hi there! Ask me a question about any indexed organization.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="flex gap-4">
+                <input type="text" id="question-input" placeholder="Enter your question..." class="flex-1 p-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <button id="chat-btn" class="px-6 py-3 bg-green-600 text-white font-bold rounded-lg shadow-md hover:bg-green-700 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-green-500">
+                    Ask
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Use local storage to persist the list of indexed organizations
+        const ORGS_KEY = 'indexed_organizations';
+        const getIndexedOrgs = () => JSON.parse(localStorage.getItem(ORGS_KEY) || '{}');
+        const setIndexedOrgs = (orgs) => localStorage.setItem(ORGS_KEY, JSON.stringify(orgs));
+
+        const scrapeBtn = document.getElementById('scrape-btn');
+        const scrapeStatus = document.getElementById('scrape-status');
+        const scrapedList = document.getElementById('scraped-list');
+        const chatBtn = document.getElementById('chat-btn');
+        const questionInput = document.getElementById('question-input');
+        const messagesDiv = document.getElementById('messages');
+
+        // Simulated RAG data
+        const MOCK_DATA = {
+            "Redwood City Together": {
+                "What is the mission of the organization?": "Redwood City Together advances the success of youth and families in Redwood City and North Fair Oaks through community collaboration.",
+                "How can I get involved?": "You can get involved by joining one of their working groups or by donating. The website mentions a Promotores Outreach Team.",
+                "What are their main initiatives?": "Their main initiatives include the CCCS UndocuSupport Initiative and Law Enforcement & Community Relations."
+            },
+            "Thrive Alliance": {
+                "What is the mission of the organization?": "Thrive Alliance supports and strengthens nonprofits by providing them with resources and a collaborative community.",
+                "Where is thrive?": "Thrive Alliance is located in San Mateo County.",
+                "What kind of services does Thrive Alliance provide?": "Thrive Alliance offers services like capacity building, resource sharing, and community engagement."
+            }
+        };
+
+        const renderOrganizations = () => {
+            const orgs = getIndexedOrgs();
+            scrapedList.innerHTML = Object.keys(orgs).map(orgName => `
+                <div class="flex items-center p-4 bg-white rounded-lg border border-gray-300 shadow-sm">
+                    <svg class="w-6 h-6 text-blue-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M3 14h18m-9-4v8m-7-4h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                    </svg>
+                    <span class="font-medium text-gray-900">${orgName}</span>
+                </div>
+            `).join('');
+        };
+
+        scrapeBtn.addEventListener('click', () => {
+            const orgName = document.getElementById('org-name-input').value;
+            const orgUrl = document.getElementById('org-url-input').value;
+            if (!orgName || !orgUrl) {
+                scrapeStatus.textContent = 'Please enter both an organization name and URL.';
+                return;
+            }
+            
+            scrapeStatus.textContent = `Scraping and indexing ${orgName} from ${orgUrl}...`;
+            setTimeout(() => {
+                const orgs = getIndexedOrgs();
+                orgs[orgName] = { url: orgUrl };
+                setIndexedOrgs(orgs);
+                scrapeStatus.textContent = `Successfully indexed ${orgName}.`;
+                renderOrganizations();
+            }, 2000);
+        });
+
+        chatBtn.addEventListener('click', async () => {
+            const question = questionInput.value;
+            if (!question) return;
+
+            messagesDiv.innerHTML += `
+                <div class="flex items-start justify-end">
+                    <div class="bg-blue-600 text-white p-3 rounded-lg shadow-sm max-w-xs">
+                        <p class="text-sm font-semibold">You</p>
+                        <p class="text-white">${question}</p>
+                    </div>
+                </div>
+            `;
+            questionInput.value = '';
+
+            const botMessagePlaceholder = document.createElement('div');
+            botMessagePlaceholder.className = "flex items-start";
+            botMessagePlaceholder.innerHTML = `
+                <div class="bg-gray-200 p-3 rounded-lg shadow-sm max-w-xs">
+                    <p class="text-sm font-semibold text-gray-800">Bot</p>
+                    <div class="animate-pulse flex space-x-2">
+                        <div class="rounded-full bg-gray-400 h-2 w-2"></div>
+                        <div class="rounded-full bg-gray-400 h-2 w-2"></div>
+                        <div class="rounded-full bg-gray-400 h-2 w-2"></div>
+                    </div>
+                </div>
+            `;
+            messagesDiv.appendChild(botMessagePlaceholder);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+            
+            setTimeout(() => {
+                const orgs = getIndexedOrgs();
+                const orgNames = Object.keys(orgs);
+                let answer = "I'm sorry, I don't have enough information on that topic in my knowledge base.";
+                for (const orgName of orgNames) {
+                    const mockAnswer = MOCK_DATA[orgName]?.[question];
+                    if (mockAnswer) {
+                        answer = mockAnswer;
+                        break;
+                    }
+                }
+                
+                botMessagePlaceholder.innerHTML = `
+                    <div class="bg-blue-100 p-3 rounded-lg shadow-sm max-w-xs">
+                        <p class="text-blue-800 text-sm font-semibold">Bot</p>
+                        <p class="text-gray-800">${answer}</p>
+                    </div>
+                `;
+                messagesDiv.scrollTop = messagesDiv.scrollHeight;
+            }, 3000);
+        });
+
+        document.addEventListener('DOMContentLoaded', () => {
+            renderOrganizations();
+        });
+    </script>
+</body>
+</html>

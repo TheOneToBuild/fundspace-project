@@ -1,36 +1,62 @@
-// utils/membershipQueries.js - FIXED VERSION with circuit breaker pattern
+// src/utils/membershipQueries.js - FINAL VERSION with complete deduplication
 import { supabase } from '../supabaseClient.js';
 
-// ✅ Circuit breaker to prevent cascade failures
+// ✅ GLOBAL REQUEST DEDUPLICATION for membership queries
+const membershipRequestCache = new Map();
+const CACHE_TTL = 30000; // 30 seconds
+
+function deduplicateMembershipRequest(key, requestFunction) {
+  const now = Date.now();
+  
+  // Check if we have a recent cached result
+  const cached = membershipRequestCache.get(key);
+  if (cached && (now - cached.timestamp) < CACHE_TTL) {
+    return Promise.resolve(cached.data);
+  }
+  
+  // Check if request is already in progress
+  if (cached && cached.promise) {
+    return cached.promise;
+  }
+  
+  // Make new request
+  const promise = requestFunction()
+    .then(result => {
+      membershipRequestCache.set(key, {
+        data: result,
+        timestamp: now,
+        promise: null
+      });
+      return result;
+    })
+    .catch(error => {
+      membershipRequestCache.delete(key);
+      throw error;
+    });
+  
+  // Store the promise while request is in progress
+  membershipRequestCache.set(key, {
+    data: null,
+    timestamp: now,
+    promise
+  });
+  
+  return promise;
+}
+
+// Circuit breaker to prevent cascade failures
 let cacheFailureCount = 0;
 const MAX_CACHE_FAILURES = 3;
 const CACHE_COOLDOWN = 60000; // 1 minute
 let lastCacheFailure = 0;
 
-// ✅ Request deduplication for membership queries
-const pendingQueries = new Map();
-
-function deduplicate(key, queryFn) {
-  if (pendingQueries.has(key)) {
-    return pendingQueries.get(key);
-  }
-  
-  const promise = queryFn().finally(() => {
-    pendingQueries.delete(key);
-  });
-  
-  pendingQueries.set(key, promise);
-  return promise;
-}
-
 /**
- * Get current user's primary organization info
- * Uses the simple cache table directly with circuit breaker
+ * Get current user's primary organization info with full deduplication
  */
 export async function getOrganizationInfoForDashboard(profileId) {
   if (!profileId) return null;
   
-  return deduplicate(`org-info-${profileId}`, async () => {
+  return deduplicateMembershipRequest(`dashboard-${profileId}`, async () => {
     try {
       const now = Date.now();
       const shouldSkipCache = cacheFailureCount >= MAX_CACHE_FAILURES && 
@@ -38,7 +64,7 @@ export async function getOrganizationInfoForDashboard(profileId) {
 
       if (!shouldSkipCache) {
         try {
-          // Try cache table first, but handle multiple/no rows gracefully
+          // Try cache table first
           const { data: cacheData, error } = await supabase
             .from('organization_membership_cache')
             .select('*')
@@ -46,10 +72,9 @@ export async function getOrganizationInfoForDashboard(profileId) {
             .order('joined_at', { ascending: false })
             .limit(1);
 
-          // If successful and has data, use it
           if (!error && cacheData && cacheData.length > 0) {
             const cache = cacheData[0];
-            cacheFailureCount = 0; // Reset failure count on success
+            cacheFailureCount = 0; // Reset on success
             
             return {
               id: cache.organization_id,
@@ -65,7 +90,6 @@ export async function getOrganizationInfoForDashboard(profileId) {
             };
           }
 
-          // If cache query failed, increment failure count
           if (error) {
             cacheFailureCount++;
             lastCacheFailure = now;
@@ -74,47 +98,62 @@ export async function getOrganizationInfoForDashboard(profileId) {
         } catch (cacheError) {
           cacheFailureCount++;
           lastCacheFailure = now;
-          console.warn(`Cache exception ${cacheFailureCount}/${MAX_CACHE_FAILURES}:`, cacheError.message);
+          console.warn(`Cache exception:`, cacheError.message);
         }
-      } else {
-        console.warn('Skipping cache due to repeated failures, using fallback');
       }
 
-      // Fallback: Try original table with separate queries to avoid RLS recursion
+      // Fallback: Use RPC function with strict deduplication
       try {
-        const { data: membership, error: membershipError } = await supabase
-          .from('organization_memberships')
-          .select('*')
-          .eq('profile_id', profileId)
-          .order('joined_at', { ascending: false })
-          .limit(1);
+        const { data: funcData, error: funcError } = await supabase
+          .rpc('get_user_organization_membership', { 
+            user_id: profileId 
+          });
 
-        if (!membershipError && membership && membership.length > 0) {
-          const membershipData = membership[0];
-          
-          // Separate query for organization details to avoid RLS issues
-          const { data: org, error: orgError } = await supabase
-            .from('organizations')
-            .select('id, name, type, tagline, image_url, slug')
-            .eq('id', membershipData.organization_id)
-            .single();
-
-          if (!orgError && org) {
-            return {
-              ...org,
-              membership: {
-                role: membershipData.role,
-                id: membershipData.id
-              }
-            };
-          } else {
-            console.warn('Organization details fetch failed:', orgError?.message);
-          }
-        } else {
-          console.warn('Membership fetch failed:', membershipError?.message);
+        if (!funcError && funcData && funcData.length > 0) {
+          const membershipData = funcData[0];
+          return {
+            id: membershipData.organization_id,
+            name: membershipData.organization_name,
+            type: membershipData.organization_type,
+            tagline: membershipData.organization_tagline,
+            image_url: membershipData.organization_image_url,
+            slug: membershipData.organization_slug,
+            membership: {
+              role: membershipData.role,
+              id: membershipData.id
+            }
+          };
         }
-      } catch (fallbackError) {
-        console.warn('Fallback query failed:', fallbackError.message);
+      } catch (rpcError) {
+        console.warn('RPC function failed:', rpcError.message);
+      }
+
+      // Final fallback: Direct queries
+      const { data: membership, error: membershipError } = await supabase
+        .from('organization_memberships')
+        .select('*')
+        .eq('profile_id', profileId)
+        .order('joined_at', { ascending: false })
+        .limit(1);
+
+      if (!membershipError && membership && membership.length > 0) {
+        const membershipData = membership[0];
+        
+        const { data: org, error: orgError } = await supabase
+          .from('organizations')
+          .select('id, name, type, tagline, image_url, slug')
+          .eq('id', membershipData.organization_id)
+          .single();
+
+        if (!orgError && org) {
+          return {
+            ...org,
+            membership: {
+              role: membershipData.role,
+              id: membershipData.id
+            }
+          };
+        }
       }
 
       return null;
@@ -126,49 +165,37 @@ export async function getOrganizationInfoForDashboard(profileId) {
 }
 
 /**
- * Get organization info for profile navigation
+ * Get organization info for profile navigation - with deduplication
  */
 export async function getOrganizationForProfileNav(profileId) {
   if (!profileId) return [];
   
-  return deduplicate(`org-nav-${profileId}`, async () => {
+  return deduplicateMembershipRequest(`nav-${profileId}`, async () => {
     try {
-      // Skip cache if it's been failing repeatedly
-      const now = Date.now();
-      const shouldSkipCache = cacheFailureCount >= MAX_CACHE_FAILURES && 
-                             (now - lastCacheFailure) < CACHE_COOLDOWN;
+      const { data: cacheData, error } = await supabase
+        .from('organization_membership_cache')
+        .select('organization_name, organization_slug')
+        .eq('profile_id', profileId)
+        .order('joined_at', { ascending: false })
+        .limit(1);
 
-      if (!shouldSkipCache) {
-        try {
-          // Use array query instead of single to avoid multiple/no rows error
-          const { data: cacheData, error } = await supabase
-            .from('organization_membership_cache')
-            .select('organization_name, organization_slug')
-            .eq('profile_id', profileId)
-            .order('joined_at', { ascending: false })
-            .limit(1);
-
-          if (!error && cacheData && cacheData.length > 0) {
-            return [{
-              organizations: {
-                name: cacheData[0].organization_name,
-                slug: cacheData[0].organization_slug
-              }
-            }];
+      if (!error && cacheData && cacheData.length > 0) {
+        return [{
+          organizations: {
+            name: cacheData[0].organization_name,
+            slug: cacheData[0].organization_slug
           }
-        } catch (cacheError) {
-          console.warn('Navigation cache error:', cacheError.message);
-        }
+        }];
       }
 
-      // Fallback logic - use direct queries
-      const { data: membership, error } = await supabase
+      // Fallback logic
+      const { data: membership, error: membershipError } = await supabase
         .from('organization_memberships')
         .select('organization_id')
         .eq('profile_id', profileId)
         .limit(1);
 
-      if (!error && membership && membership.length > 0) {
+      if (!membershipError && membership && membership.length > 0) {
         const { data: org } = await supabase
           .from('organizations')
           .select('name, slug')
@@ -194,54 +221,43 @@ export async function getOrganizationForProfileNav(profileId) {
 }
 
 /**
- * Get organization memberships for multiple users (bulk query)
+ * Get organization memberships for multiple users - with deduplication
  */
 export async function getBulkOrganizationMemberships(profileIds) {
   if (!profileIds || profileIds.length === 0) return {};
   
-  const cacheKey = `bulk-memberships-${profileIds.sort().join(',')}`;
+  const cacheKey = `bulk-${profileIds.sort().join(',')}`;
   
-  return deduplicate(cacheKey, async () => {
+  return deduplicateMembershipRequest(cacheKey, async () => {
     try {
-      // Skip cache if failing repeatedly
-      const now = Date.now();
-      const shouldSkipCache = cacheFailureCount >= MAX_CACHE_FAILURES && 
-                             (now - lastCacheFailure) < CACHE_COOLDOWN;
+      const { data: cacheData, error } = await supabase
+        .from('organization_membership_cache')
+        .select('profile_id, organization_name, organization_type, role')
+        .in('profile_id', profileIds)
+        .eq('is_public', true);
 
-      if (!shouldSkipCache) {
-        try {
-          const { data: cacheData, error } = await supabase
-            .from('organization_membership_cache')
-            .select('profile_id, organization_name, organization_type, role')
-            .in('profile_id', profileIds)
-            .eq('is_public', true);
-
-          if (!error && cacheData) {
-            const membershipMap = {};
-            cacheData.forEach(item => {
-              if (!membershipMap[item.profile_id]) {
-                membershipMap[item.profile_id] = {
-                  organization_name: item.organization_name,
-                  organization_type: item.organization_type,
-                  role: item.role
-                };
-              }
-            });
-            return membershipMap;
+      if (!error && cacheData) {
+        const membershipMap = {};
+        cacheData.forEach(item => {
+          if (!membershipMap[item.profile_id]) {
+            membershipMap[item.profile_id] = {
+              organization_name: item.organization_name,
+              organization_type: item.organization_type,
+              role: item.role
+            };
           }
-        } catch (cacheError) {
-          console.warn('Bulk cache error:', cacheError.message);
-        }
+        });
+        return membershipMap;
       }
 
       // Fallback to direct query
-      const { data: memberships, error } = await supabase
+      const { data: memberships, error: directError } = await supabase
         .from('organization_memberships')
         .select('profile_id, organization_id, organization_type, role')
         .in('profile_id', profileIds)
         .eq('is_public', true);
 
-      if (!error && memberships) {
+      if (!directError && memberships) {
         const membershipMap = {};
         memberships.forEach(membership => {
           if (!membershipMap[membership.profile_id]) {
@@ -263,38 +279,15 @@ export async function getBulkOrganizationMemberships(profileIds) {
 }
 
 /**
- * Check if user has access to organization management
+ * Check if user has access to organization management - with deduplication
  */
 export async function checkOrganizationAccess(organizationId, userId) {
   if (!organizationId || !userId) return false;
   
-  return deduplicate(`org-access-${organizationId}-${userId}`, async () => {
+  return deduplicateMembershipRequest(`access-${organizationId}-${userId}`, async () => {
     try {
-      // Skip cache if failing repeatedly
-      const now = Date.now();
-      const shouldSkipCache = cacheFailureCount >= MAX_CACHE_FAILURES && 
-                             (now - lastCacheFailure) < CACHE_COOLDOWN;
-
-      if (!shouldSkipCache) {
-        try {
-          const { data, error } = await supabase
-            .from('organization_membership_cache')
-            .select('role')
-            .eq('organization_id', organizationId)
-            .eq('profile_id', userId)
-            .limit(1);
-
-          if (!error && data && data.length > 0) {
-            return ['admin', 'super_admin'].includes(data[0].role);
-          }
-        } catch (cacheError) {
-          console.warn('Access cache error:', cacheError.message);
-        }
-      }
-
-      // Fallback query
       const { data, error } = await supabase
-        .from('organization_memberships')
+        .from('organization_membership_cache')
         .select('role')
         .eq('organization_id', organizationId)
         .eq('profile_id', userId)
@@ -302,6 +295,18 @@ export async function checkOrganizationAccess(organizationId, userId) {
 
       if (!error && data && data.length > 0) {
         return ['admin', 'super_admin'].includes(data[0].role);
+      }
+
+      // Fallback query
+      const { data: directData, error: directError } = await supabase
+        .from('organization_memberships')
+        .select('role')
+        .eq('organization_id', organizationId)
+        .eq('profile_id', userId)
+        .limit(1);
+
+      if (!directError && directData && directData.length > 0) {
+        return ['admin', 'super_admin'].includes(directData[0].role);
       }
 
       return false;
@@ -313,36 +318,43 @@ export async function checkOrganizationAccess(organizationId, userId) {
 }
 
 /**
- * Get user's organization membership with error handling
+ * Get organization info for community data - alias with deduplication
+ */
+export async function getOrganizationInfoForCommunity(profileId) {
+  return getOrganizationInfoForDashboard(profileId);
+}
+
+/**
+ * Direct membership query with deduplication
  */
 export async function getUserOrganizationMembership(profileId) {
   if (!profileId) return null;
   
-  return deduplicate(`user-membership-${profileId}`, async () => {
+  return deduplicateMembershipRequest(`membership-${profileId}`, async () => {
     try {
-      // Try stored procedure first if available
+      // Try RPC function first with deduplication
       const { data: funcData, error: funcError } = await supabase
         .rpc('get_user_organization_membership', { 
           user_id: profileId 
         });
 
       if (!funcError && funcData && funcData.length > 0) {
-        const membershipData = funcData[0];
+        const membership = funcData[0];
         return {
-          id: membershipData.id,
-          profile_id: membershipData.profile_id,
-          organization_id: membershipData.organization_id,
-          organization_type: membershipData.organization_type,
-          role: membershipData.role,
-          joined_at: membershipData.joined_at,
-          functional_role: membershipData.functional_role,
-          membership_type: membershipData.membership_type,
-          is_public: membershipData.is_public,
+          id: membership.id,
+          profile_id: membership.profile_id,
+          organization_id: membership.organization_id,
+          organization_type: membership.organization_type,
+          role: membership.role,
+          joined_at: membership.joined_at,
+          functional_role: membership.functional_role,
+          membership_type: membership.membership_type,
+          is_public: membership.is_public,
           organization: {
-            id: membershipData.organization_id,
-            name: membershipData.organization_name,
-            tagline: membershipData.organization_tagline,
-            image_url: membershipData.organization_image_url
+            id: membership.organization_id,
+            name: membership.organization_name,
+            tagline: membership.organization_tagline,
+            image_url: membership.organization_image_url
           }
         };
       }
@@ -382,3 +394,22 @@ export async function getUserOrganizationMembership(profileId) {
     }
   });
 }
+
+// Clean up old cache entries periodically
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, value] of membershipRequestCache.entries()) {
+    if (now - value.timestamp > CACHE_TTL) {
+      membershipRequestCache.delete(key);
+    }
+  }
+}, CACHE_TTL);
+
+export default {
+  getOrganizationInfoForDashboard,
+  getOrganizationInfoForCommunity,
+  getOrganizationForProfileNav,
+  getBulkOrganizationMemberships,
+  checkOrganizationAccess,
+  getUserOrganizationMembership
+};
