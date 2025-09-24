@@ -1,4 +1,4 @@
-// src/components/HelloWorldChannel.jsx - Simplified without welcome banner
+// src/components/HelloWorldChannel.jsx - Optimized with Page Data Loader
 import React, { useState, useEffect, useRef, useCallback, memo } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { supabase } from '../supabaseClient.js';
@@ -10,6 +10,7 @@ import { addOrganizationEventListener } from '../utils/organizationEvents.js';
 import { getOrganizationInfoForDashboard } from '../utils/membershipQueries.js';
 import { realtimeManager } from '../utils/realtimeManager.js';
 import { getChannelInfo } from '../utils/channelUtils.js';
+import { usePageDataLoader } from '../hooks/usePageDataLoader';
 
 import PropTypes from 'prop-types';
 
@@ -151,6 +152,9 @@ export default function HelloWorldChannel() {
   const [hasMore, setHasMore] = useState(true);
   const [organizationInfo, setOrganizationInfo] = useState(null);
 
+  // ✅ NEW: Add page data loader for batched API calls
+  const { pageData, loadPostsPageData, clearPageData } = usePageDataLoader();
+
   const observer = useRef();
   const loaderRef = useCallback(node => {
     if (isLoading) return;
@@ -162,6 +166,13 @@ export default function HelloWorldChannel() {
     });
     if (node) observer.current.observe(node);
   }, [isLoading, hasMore]);
+
+  // ✅ NEW: Load batched data whenever posts change
+  useEffect(() => {
+    if (posts.length > 0) {
+      loadPostsPageData(posts);
+    }
+  }, [posts, loadPostsPageData]);
 
   // Organization event listener
   useEffect(() => {
@@ -204,7 +215,7 @@ export default function HelloWorldChannel() {
     fetchOrganizationInfo();
   }, [profile?.id]);
 
-  // Fetch posts
+  // ✅ OPTIMIZED: Fetch posts without individual post_likes calls
   useEffect(() => {
     const fetchPosts = async () => {
       if (!hasMore) return;
@@ -249,29 +260,14 @@ export default function HelloWorldChannel() {
           }
         } else {
           if (postsData && postsData.length > 0) {
-            const postIds = postsData.map(post => post.id);
-            const { data: allReactions } = await supabase
-              .from('post_likes')
-              .select('post_id, reaction_type')
-              .in('post_id', postIds);
-              
-            const enrichedPosts = postsData.map(post => {
-              const reactionsForPost = allReactions?.filter(r => r.post_id === post.id) || [];
-              const reactionSummary = reactionsForPost.reduce((acc, r) => {
-                const type = r.reaction_type || 'like';
-                acc[type] = (acc[type] || 0) + 1;
-                return acc;
-              }, {});
-              return { 
-                ...post, 
-                reactions: { 
-                  summary: Object.entries(reactionSummary).map(([type, count]) => ({ type, count })), 
-                  sample: [] 
-                } 
-              };
-            });
+            // ✅ REMOVED: Individual post_likes loading - now handled by pageData
+            // Instead, just set basic post structure and let pageData provide likes
+            const basicPosts = postsData.map(post => ({
+              ...post,
+              reactions: { summary: [], sample: [] }
+            }));
             
-            setPosts(prevPosts => (page === 0 ? enrichedPosts : [...prevPosts, ...enrichedPosts]));
+            setPosts(prevPosts => (page === 0 ? basicPosts : [...prevPosts, ...basicPosts]));
             if (postsData.length < POSTS_PER_PAGE) setHasMore(false);
           } else {
             setHasMore(false);
@@ -294,6 +290,9 @@ export default function HelloWorldChannel() {
     const refreshPostCounts = async (postId) => {
       const isInCurrentPosts = posts.some(p => p.id === postId);
       if (!isInCurrentPosts) return;
+
+      // ✅ NEW: Clear page data cache when real-time updates occur
+      clearPageData();
 
       const { data: postData } = await supabase
         .from('posts')
@@ -330,15 +329,19 @@ export default function HelloWorldChannel() {
               if (currentPosts.some(p => p.id === newPostWithProfile.id)) return currentPosts;
               return [newPostWithProfile, ...currentPosts];
             });
+            // Clear page data to force refresh with new post
+            clearPageData();
           }
         },
         onPostDelete: (payload) => {
           setPosts(currentPosts => currentPosts.filter(p => p.id !== payload.old.id));
+          clearPageData();
         },
         onPostUpdate: (payload) => {
           setPosts(currentPosts => currentPosts.map(p => 
             p.id === payload.new.id ? { ...p, ...payload.new } : p
           ));
+          clearPageData();
         },
         onLikeChange: (payload) => {
           const postId = payload.new?.post_id || payload.old?.post_id;
@@ -354,7 +357,7 @@ export default function HelloWorldChannel() {
     return () => {
       realtimeManager.removeSubscription('hello-world', supabase);
     };
-  }, [posts, profile?.id]);
+  }, [posts, profile?.id, clearPageData]);
 
   const handleNewPost = useCallback((newPost) => {
     const postWithOrgInfo = { 
@@ -369,16 +372,17 @@ export default function HelloWorldChannel() {
       reactions: { summary: [], sample: [] } 
     };
     setPosts(p => [postWithOrgInfo, ...p]);
-  }, [profile, organizationInfo]);
+    // Clear page data to include new post in next batch
+    clearPageData();
+  }, [profile, organizationInfo, clearPageData]);
   
   const handleDeletePost = useCallback((postId) => {
     setPosts(p => p.filter(post => post.id !== postId));
-  }, []);
+    clearPageData();
+  }, [clearPageData]);
 
   return (
     <div className="space-y-6">
-  
-
       {/* Trending News */}
       <TrendingNewsSection />
 
@@ -397,7 +401,12 @@ export default function HelloWorldChannel() {
         ) : (
           <>
             {posts.filter(post => post.profiles).map(post => (
-              <PostCard key={post.id} post={post} onDelete={handleDeletePost} />
+              <PostCard 
+                key={post.id} 
+                post={post} 
+                onDelete={handleDeletePost}
+                pageData={pageData}
+              />
             ))}
             
             {/* Load more trigger */}

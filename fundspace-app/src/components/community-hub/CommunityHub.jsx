@@ -1,4 +1,4 @@
-// src/components/community-hub/CommunityHub.jsx
+// src/components/community-hub/CommunityHub.jsx - Optimized with Page Data Loader
 import React, { useState, useEffect } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { Globe, Building, MapPin } from 'lucide-react';
@@ -8,6 +8,7 @@ import TrendingNews from './TrendingNews';
 import EmptyState from './EmptyState';
 import Sidebar from './Sidebar';
 import { useCommunityData } from './useCommunityData';
+import { usePageDataLoader } from '../../hooks/usePageDataLoader';
 import { BAY_AREA_COUNTIES, ORGANIZATION_CHANNELS, getOrgBaseType } from './constants';
 
 export default function CommunityHub() {
@@ -27,6 +28,9 @@ export default function CommunityHub() {
     setPage
   } = useCommunityData(profile);
 
+  // ✅ NEW: Add page data loader for batched API calls
+  const { pageData, loadPostsPageData, clearPageData } = usePageDataLoader();
+
   // Mock county for now
   const userCounty = 'santa-clara';
 
@@ -45,7 +49,6 @@ export default function CommunityHub() {
         gradient: 'from-blue-500 to-indigo-600',
         tag: '#hello-world',
         dbChannel: 'hello-world'
-        // Removed memberCount
       },
       {
         id: 'hello-community',
@@ -69,7 +72,6 @@ export default function CommunityHub() {
         dbChannel: userOrgType && ORGANIZATION_CHANNELS[userOrgType]
           ? ORGANIZATION_CHANNELS[userOrgType].dbChannel
           : 'hello-community',
-        // Removed memberCount
         disabled: !organizationInfo
       },
       {
@@ -82,7 +84,6 @@ export default function CommunityHub() {
         gradient: BAY_AREA_COUNTIES[userCounty]?.gradient || 'from-green-500 to-emerald-600',
         tag: `#${userCounty}-county`,
         dbChannel: `hello-county-${userCounty}`,
-        // Removed memberCount
         disabled: true
       }
     ];
@@ -93,11 +94,20 @@ export default function CommunityHub() {
   const channels = getChannelConfig();
   const activeChannelConfig = channels.find(c => c.id === activeChannel);
 
+  // ✅ NEW: Load batched data whenever posts change
+  useEffect(() => {
+    if (posts.length > 0) {
+      loadPostsPageData(posts);
+    }
+  }, [posts, loadPostsPageData]);
+
   // Reset posts when channel changes
   useEffect(() => {
+    // ✅ NEW: Clear page data when changing channels
+    clearPageData();
     resetPosts();
     fetchPosts(0, activeChannelConfig);
-  }, [activeChannel, activeChannelConfig?.dbChannel]);
+  }, [activeChannel, activeChannelConfig?.dbChannel, clearPageData]);
 
   // Channel change handler
   const handleChannelChange = (channelId) => {
@@ -121,6 +131,14 @@ export default function CommunityHub() {
         postElement.classList.remove('ring-2', 'ring-blue-300', 'ring-opacity-50');
       }, 3000);
     }
+  };
+
+  // ✅ NEW: Enhanced load more that triggers data loading
+  const handleLoadMore = async () => {
+    const nextPage = page + 1;
+    setPage(nextPage);
+    await fetchPosts(nextPage, activeChannelConfig);
+    // Data will be automatically loaded by the useEffect above when posts change
   };
 
   return (
@@ -175,7 +193,6 @@ export default function CommunityHub() {
                           }`}>
                             {channel.shortName}
                           </h4>
-                          {/* Removed member count display */}
                         </div>
                         {isDisabled && (
                           <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">
@@ -226,7 +243,12 @@ export default function CommunityHub() {
                   ) : posts.length > 0 ? (
                     posts.map(post => (
                       <div key={post.id} id={`post-${post.id}`} className="transition-all duration-300">
-                        <PostCard post={post} onDelete={handleDeletePost} />
+                        {/* ✅ NEW: Pass pageData to PostCard */}
+                        <PostCard 
+                          post={post} 
+                          onDelete={handleDeletePost}
+                          pageData={pageData}
+                        />
                       </div>
                     ))
                   ) : (
@@ -241,10 +263,7 @@ export default function CommunityHub() {
                 {hasMore && posts.length > 0 && (
                   <div className="text-center">
                     <button 
-                      onClick={() => {
-                        setPage(prev => prev + 1);
-                        fetchPosts(page + 1, activeChannelConfig);
-                      }}
+                      onClick={handleLoadMore}
                       disabled={loading}
                       className="px-8 py-4 bg-white hover:bg-slate-50 border-2 border-slate-200 hover:border-slate-300 rounded-2xl font-semibold text-slate-700 transition-all duration-200 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
                     >

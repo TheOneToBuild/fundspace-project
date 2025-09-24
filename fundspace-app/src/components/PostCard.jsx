@@ -1,8 +1,9 @@
-// PostCard.jsx - Complete Fixed Version with deduplication and parsedTags fix
+// PostCard.jsx - Complete Optimized Version with Global Data Manager
 import React, { useState, useEffect, useMemo, memo, lazy, Suspense, useCallback, useRef } from 'react';
 import { supabase } from '../supabaseClient';
 import { useOutletContext } from 'react-router-dom';
 import { addOrganizationEventListener } from '../utils/organizationEvents';
+import globalDataManager from '../utils/globalDataManager';
 import PostHeader from './post/PostHeader';
 import PostBody from './post/PostBody';
 import PostActions from './post/PostActions';
@@ -15,578 +16,422 @@ import { reactions } from './post/constants';
 const ReactionsModal = lazy(() => import('./post/ReactionsModal'));
 const ImageViewer = lazy(() => import('./post/ImageViewer'));
 
-// ✅ REQUEST DEDUPLICATION HOOK
-function useRequestDeduplication() {
-    const pendingRequests = useRef(new Map());
+function PostCard({ 
+  post, 
+  onDelete, 
+  disabled = false, 
+  showOrganizationAsAuthor = false, 
+  organization,
+  pageData // NEW: Page-level batched data
+}) {
+  const { profile: currentUserProfile } = useOutletContext();
+  
+  // Use batched data if available, otherwise fall back to individual loading
+  const [likeCount, setLikeCount] = useState(() => {
+    if (pageData?.postLikes?.[post.id]) {
+      return pageData.postLikes[post.id].likes_count;
+    }
+    return post.likes_count || 0;
+  });
+  
+  const [commentCount, setCommentCount] = useState(post.comments_count || 0);
+  const [selectedReaction, setSelectedReaction] = useState(null);
+  
+  const [reactors, setReactors] = useState(() => {
+    if (pageData?.postLikes?.[post.id]) {
+      return pageData.postLikes[post.id].reactors || [];
+    }
+    return [];
+  });
+  
+  const [reactionSummary, setReactionSummary] = useState(() => {
+    if (pageData?.postLikes?.[post.id]) {
+      return pageData.postLikes[post.id].reaction_summary;
+    }
+    return post.reactions?.summary || [];
+  });
+  
+  const [isEditing, setIsEditing] = useState(false);
+  const [showComments, setShowComments] = useState(false);
+  const [isImageModalOpen, setIsImageModalOpen] = useState(false);
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+  const [showReactionsModal, setShowReactionsModal] = useState(false);
+  const [showReactorsPreview, setShowReactorsPreview] = useState(false);
+  const [isProcessingReaction, setIsProcessingReaction] = useState(false);
+  
+  const reactorsTimeoutRef = useRef(null);
+  const reactionDebounceRef = useRef(null);
+  const mountedRef = useRef(true);
 
-    const deduplicate = useCallback((key, requestFunction) => {
-        if (pendingRequests.current.has(key)) {
-            return pendingRequests.current.get(key);
-        }
+  const { content, created_at, profiles: individualAuthor, image_url, image_urls, tags } = post;
+  const parsedTags = tags ? (typeof tags === 'string' ? JSON.parse(tags) : tags) : [];
+  const isAuthor = currentUserProfile?.id === individualAuthor?.id;
+  const displayImages = image_urls && image_urls.length > 0 ? image_urls : (image_url ? [image_url] : []);
 
-        const promise = requestFunction()
-            .finally(() => {
-                pendingRequests.current.delete(key);
-            });
-
-        pendingRequests.current.set(key, promise);
-        return promise;
-    }, []);
-
-    return deduplicate;
-}
-
-function PostCard({ post, onDelete, disabled = false, showOrganizationAsAuthor = false, organization }) {
-    const { profile: currentUserProfile } = useOutletContext();
-    const [likeCount, setLikeCount] = useState(post.likes_count || 0);
-    const [commentCount, setCommentCount] = useState(post.comments_count || 0);
-    const [selectedReaction, setSelectedReaction] = useState(null);
-    const [reactors, setReactors] = useState([]);
-    const [reactionSummary, setReactionSummary] = useState(post.reactions?.summary || []);
-    const [isEditing, setIsEditing] = useState(false);
-    const [showComments, setShowComments] = useState(false);
-    const [isImageModalOpen, setIsImageModalOpen] = useState(false);
-    const [selectedImageIndex, setSelectedImageIndex] = useState(0);
-    const [showReactionsModal, setShowReactionsModal] = useState(false);
-    const [showReactorsPreview, setShowReactorsPreview] = useState(false);
-    const reactorsTimeoutRef = useRef(null);
-    const [authorOrganizationInfo, setAuthorOrganizationInfo] = useState(null);
-    const [fetchingOrgInfo, setFetchingOrgInfo] = useState(false);
-
-    // ✅ Add request deduplication
-    const deduplicate = useRequestDeduplication();
-
-    const { content, created_at, profiles: individualAuthor, image_url, image_urls, tags } = post;
-    // ✅ FIX: Define parsedTags properly
-    const parsedTags = tags ? (typeof tags === 'string' ? JSON.parse(tags) : tags) : [];
-    const isAuthor = currentUserProfile?.id === individualAuthor?.id;
-    const displayImages = image_urls && image_urls.length > 0 ? image_urls : (image_url ? [image_url] : []);
-
-    // ✅ FIXED: Replace problematic query with deduplication
-    useEffect(() => {
-        const fetchAuthorOrganizationInfo = async () => {
-            if (!individualAuthor?.id || fetchingOrgInfo) return;
-            
-            setFetchingOrgInfo(true);
-            
-            // Use deduplication for organization info
-            return deduplicate(`org-info-${individualAuthor.id}`, async () => {
-                try {
-                    // Method 1: Try the stored procedure first (if it exists)
-                    const { data: membershipData, error: funcError } = await supabase
-                        .rpc('get_user_organization_membership', { 
-                            user_id: individualAuthor.id 
-                        });
-
-                    if (!funcError && membershipData && membershipData.length > 0) {
-                        const membership = membershipData[0];
-                        setAuthorOrganizationInfo({
-                            id: membership.organization_id,
-                            name: membership.organization_name,
-                            tagline: membership.organization_tagline,
-                            type: membership.organization_type,
-                            image_url: membership.organization_image_url,
-                            role: membership.role
-                        });
-                        setFetchingOrgInfo(false);
-                        return;
-                    }
-
-                    // Method 2: Fallback to separate queries (no joins)
-                    const { data: memberships, error } = await supabase
-                        .from('organization_memberships')
-                        .select('organization_id, organization_type, role, is_public')
-                        .eq('profile_id', individualAuthor.id)
-                        .eq('is_public', true) // Only fetch public memberships to avoid RLS issues
-                        .order('joined_at', { ascending: false })
-                        .limit(1);
-
-                    if (error) {
-                        console.error('PostCard: Error fetching author organization membership:', error);
-                        setAuthorOrganizationInfo(null);
-                        setFetchingOrgInfo(false);
-                        return;
-                    }
-
-                    if (memberships && memberships.length > 0) {
-                        const membership = memberships[0];
-                        
-                        // Separate query for organization details
-                        const { data: orgData, error: orgError } = await supabase
-                            .from('organizations')
-                            .select('id, name, tagline, type, image_url')
-                            .eq('id', membership.organization_id)
-                            .single();
-
-                        if (!orgError && orgData) {
-                            setAuthorOrganizationInfo({
-                                id: orgData.id,
-                                name: orgData.name,
-                                tagline: orgData.tagline,
-                                type: orgData.type,
-                                image_url: orgData.image_url,
-                                role: membership.role
-                            });
-                        } else {
-                            console.warn('Could not fetch organization details:', orgError);
-                            setAuthorOrganizationInfo(null);
-                        }
-                    } else {
-                        setAuthorOrganizationInfo(null);
-                    }
-                } catch (err) {
-                    console.error('PostCard: Error fetching author organization info:', err);
-                    setAuthorOrganizationInfo(null);
-                } finally {
-                    setFetchingOrgInfo(false);
-                }
-            });
-        };
-
-        fetchAuthorOrganizationInfo();
-    }, [individualAuthor?.id, deduplicate]); // ✅ Add deduplicate to dependencies
-
-    useEffect(() => {
-        if (!isAuthor || !currentUserProfile?.id) return;
-        const cleanup = addOrganizationEventListener('organizationChanged', (event) => {
-            const { profileId, organization } = event.detail;
-            if (profileId === currentUserProfile.id) {
-                if (organization) {
-                    setAuthorOrganizationInfo({
-                        id: organization.id, name: organization.name, type: organization.type,
-                        tagline: organization.tagline, image_url: organization.image_url, role: 'member'
-                    });
-                } else {
-                    setAuthorOrganizationInfo(null);
-                }
-            }
-        });
-        const handleStorageChange = (e) => {
-            if (e.key === 'orgChangeEvent' && e.newValue) {
-                try {
-                    const message = JSON.parse(e.newValue);
-                    if (message.profileId === currentUserProfile.id) {
-                        if (message.organization) {
-                            setAuthorOrganizationInfo({
-                                id: message.organization.id, name: message.organization.name, type: message.organization.type,
-                                tagline: message.organization.tagline, image_url: message.organization.image_url, role: 'member'
-                            });
-                        } else {
-                            setAuthorOrganizationInfo(null);
-                        }
-                    }
-                } catch (error) {
-                    console.error('PostCard: Failed to parse cross-tab message:', error);
-                }
-            }
-        };
-        window.addEventListener('storage', handleStorageChange);
-        return () => {
-            cleanup();
-            window.removeEventListener('storage', handleStorageChange);
-        };
-    }, [isAuthor, currentUserProfile?.id]);
-
-    const displayAuthor = useMemo(() => {
-        if (showOrganizationAsAuthor && organization) {
-            return {
-                full_name: organization.name, avatar_url: organization.logo_url,
-                organization_name: organization.funder_type?.name || 'Funder'
-            };
-        }
-        const author = { ...individualAuthor };
-        if (authorOrganizationInfo) {
-            author.organization_name = authorOrganizationInfo.name;
-            author.organization_type = authorOrganizationInfo.type;
-            if (authorOrganizationInfo.role && !author.title) {
-                author.title = authorOrganizationInfo.role.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
-            }
-        }
-        return author;
-    }, [showOrganizationAsAuthor, organization, individualAuthor, authorOrganizationInfo]);
-
-    // ✅ FIXED - Only update when props change, not state
-    useEffect(() => {
-        setCommentCount(post.comments_count || 0);
-        setLikeCount(post.likes_count || 0);
-        setReactionSummary(post.reactions?.summary || []);
-    }, [post.comments_count, post.likes_count, post.reactions]);
+  // Enhanced author with batched data
+  const displayAuthor = useMemo(() => {
+    if (showOrganizationAsAuthor && organization) {
+      return {
+        full_name: organization.name,
+        avatar_url: organization.logo_url,
+        organization_name: organization.funder_type?.name || 'Funder'
+      };
+    }
     
-    // ✅ FIXED - Remove likeCount dependency and add deduplication
-    useEffect(() => {
-        const fetchReactors = async () => {
-            const postLikeCount = post.likes_count || 0;
-            if (postLikeCount <= 0 || !post?.id) { 
-                setReactors([]);
-                return;
-            }
-            
-            return deduplicate(`reactors-${post.id}`, async () => {
-                try {
-                    const { data: likesData, error: likesError } = await supabase
-                        .from('post_likes')
-                        .select('user_id, reaction_type, created_at')
-                        .eq('post_id', post.id)
-                        .order('created_at', { ascending: false });
+    let author = { ...individualAuthor };
+    
+    // Use batched profile data if available
+    if (pageData?.profiles?.[author.id]) {
+      author = { ...author, ...pageData.profiles[author.id] };
+    }
+    
+    // Use batched organization membership if available
+    if (pageData?.orgMemberships?.[author.id]) {
+      const membership = pageData.orgMemberships[author.id];
+      author.organization_name = membership.organization?.name || author.organization_name;
+      author.organization_type = membership.organization?.type || author.organization_type;
+      author.role = membership.role || author.role;
+      if (membership.role && !author.title) {
+        author.title = membership.role.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
+      }
+    }
+    
+    return author;
+  }, [showOrganizationAsAuthor, organization, individualAuthor, pageData]);
 
-                    if (likesError) {
-                        console.error('Error fetching likes:', likesError);
-                        setReactors([]);
-                        return;
-                    }
-
-                    if (likesData && likesData.length > 0) {
-                        const userIds = likesData.map(like => like.user_id);
-                        const { data: profilesData, error: profilesError } = await supabase
-                            .from('profiles')
-                            .select('id, full_name, avatar_url, title, organization_name, role')
-                            .in('id', userIds);
-
-                        if (profilesError) {
-                            console.error('Error fetching profiles:', profilesError);
-                            setReactors([]);
-                            return;
-                        }
-
-                        const transformedReactors = likesData.map(like => {
-                            const profile = profilesData?.find(p => p.id === like.user_id);
-                            return { 
-                                user_id: like.user_id, 
-                                profile_id: profile?.id, 
-                                full_name: profile?.full_name, 
-                                avatar_url: profile?.avatar_url, 
-                                title: profile?.title, 
-                                organization_name: profile?.organization_name, 
-                                role: profile?.role, 
-                                reaction_type: like.reaction_type, 
-                                created_at: like.created_at 
-                            };
-                        }).filter(reactor => reactor.full_name);
-                        
-                        setReactors(transformedReactors);
-                    } else { 
-                        setReactors([]); 
-                    }
-                } catch (error) {
-                    console.error('Error in fetchReactors:', error);
-                    setReactors([]);
-                }
-            });
-        };
-        fetchReactors();
-    }, [post.id, post.likes_count, deduplicate]); // ✅ Use post.likes_count, not state likeCount
-
-    // ✅ FIXED - Add deduplication to reaction status check
-    useEffect(() => {
-        const checkReactionStatus = async () => {
-            if (!currentUserProfile || !post?.id) return;
-            
-            return deduplicate(`reaction-${post.id}-${currentUserProfile.id}`, async () => {
-                try {
-                    const { data, error } = await supabase
-                        .from('post_likes')
-                        .select('reaction_type')
-                        .eq('post_id', post.id)
-                        .eq('user_id', currentUserProfile.id)
-                        .maybeSingle();
-
-                    if (error) {
-                        console.error('Error checking reaction status:', error);
-                        setSelectedReaction(null);
-                    } else {
-                        setSelectedReaction(data?.reaction_type || null);
-                    }
-                } catch (error) {
-                    console.error('Error in checkReactionStatus:', error);
-                    setSelectedReaction(null);
-                }
-            });
-        };
-        checkReactionStatus();
-    }, [post.id, currentUserProfile?.id, deduplicate]);
-
-    // ✅ FIXED - Add deduplication to refresh
-    const refreshPostData = useCallback(async () => {
-        if (!post?.id) return;
+  // Load post data only if not provided by pageData
+  useEffect(() => {
+    const loadPostData = async () => {
+      // Skip if we have pageData or if component unmounted
+      if (!mountedRef.current || pageData?.postLikes?.[post.id] || !post.id) return;
+      
+      try {
+        // Use global data manager for batched loading
+        const postData = await globalDataManager.getPostLikesForPost(post.id);
         
-        return deduplicate(`refresh-${post.id}`, async () => {
-            try {
-                const { data: likesData, error: likesError } = await supabase
-                    .from('post_likes')
-                    .select('user_id, reaction_type')
-                    .eq('post_id', post.id);
+        if (!mountedRef.current) return;
+        
+        setLikeCount(postData.likes_count);
+        setReactionSummary(postData.reaction_summary);
+        setReactors(postData.reactors);
+      } catch (error) {
+        console.error('Error loading post data:', error);
+      }
+    };
 
-                if (likesError) throw likesError;
+    loadPostData();
+  }, [post.id, pageData]);
 
-                const summary = {};
-                likesData.forEach(like => {
-                    const type = like.reaction_type || 'like';
-                    summary[type] = (summary[type] || 0) + 1;
-                });
-                setLikeCount(likesData.length);
-                setReactionSummary(Object.entries(summary).map(([type, count]) => ({ type, count })));
-            } catch (error) { 
-                console.error('Failed to refresh post data:', error); 
-            }
-        });
-    }, [post?.id, deduplicate]);
+  // Check user's reaction status
+  useEffect(() => {
+    const checkReactionStatus = async () => {
+      if (!currentUserProfile?.id || !post.id) return;
+      
+      try {
+        const { data, error } = await supabase
+          .from('post_likes')
+          .select('reaction_type')
+          .eq('post_id', post.id)
+          .eq('user_id', currentUserProfile.id)
+          .maybeSingle();
 
-    const handleReaction = async (reactionType) => {
-        if (!currentUserProfile || !post?.id || disabled) return;
+        if (!error && mountedRef.current) {
+          setSelectedReaction(data?.reaction_type || null);
+        }
+      } catch (error) {
+        console.error('Error checking reaction status:', error);
+      }
+    };
+
+    checkReactionStatus();
+  }, [post.id, currentUserProfile?.id]);
+
+  // Organization change listener (only for authors)
+  useEffect(() => {
+    if (!isAuthor || !currentUserProfile?.id) return;
+    
+    const cleanup = addOrganizationEventListener('organizationChanged', (event) => {
+      const { profileId, organization } = event.detail;
+      if (profileId === currentUserProfile.id && mountedRef.current) {
+        // Update will be handled by displayAuthor memo
+      }
+    });
+
+    return cleanup;
+  }, [isAuthor, currentUserProfile?.id]);
+
+  // Handle reaction with debouncing and proper state management
+  const handleReaction = useCallback(async (reactionType) => {
+    if (!currentUserProfile || !post?.id || disabled || isProcessingReaction) return;
+    
+    // Clear any pending debounced calls
+    if (reactionDebounceRef.current) {
+      clearTimeout(reactionDebounceRef.current);
+    }
+    
+    // Debounce rapid clicks
+    reactionDebounceRef.current = setTimeout(async () => {
+      if (!mountedRef.current) return;
+      
+      setIsProcessingReaction(true);
+      
+      try {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
-        
-        try {
-            const { data: existingReaction } = await supabase
-                .from('post_likes')
-                .select('id')
-                .eq('post_id', post.id)
-                .eq('user_id', user.id)
-                .maybeSingle();
 
-            if (existingReaction && selectedReaction === reactionType) {
-                await supabase.from('post_likes').delete().eq('id', existingReaction.id);
-                setSelectedReaction(null);
-            } else {
-                await supabase
-                    .from('post_likes')
-                    .upsert({ 
-                        post_id: post.id, 
-                        user_id: user.id, 
-                        reaction_type: reactionType 
-                    }, { onConflict: 'post_id,user_id' });
-                setSelectedReaction(reactionType);
-            }
-            await refreshPostData();
-        } catch (error) {
-            console.error('Error handling reaction:', error);
-        }
-    };
+        const { data: existingReaction } = await supabase
+          .from('post_likes')
+          .select('id, reaction_type')
+          .eq('post_id', post.id)
+          .eq('user_id', user.id)
+          .maybeSingle();
 
-    const updateMentionRecords = async (postId, mentions) => {
-        try {
-            await supabase.from('post_mentions').delete().eq('post_id', postId);
-            const mentionsArray = Array.isArray(mentions) ? mentions : [];
-            if (mentionsArray.length === 0) return;
-
-            const mentionRecords = mentionsArray.map(mention => {
-                const record = { post_id: postId, mention_type: mention.type };
-                if (mention.type === 'user') { 
-                    record.mentioned_profile_id = mention.id; 
-                } else if (mention.type === 'organization') {
-                    const [orgType, orgId] = mention.id.split('-');
-                    record.mentioned_organization_id = parseInt(orgId);
-                    record.mentioned_organization_type = orgType;
-                }
-                return record;
-            });
-            const { error } = await supabase.from('post_mentions').insert(mentionRecords);
-            if (error) throw error;
-        } catch (error) { 
-            console.error('Error updating mention records:', error); 
-        }
-    };
-
-    const handleEditPost = async (editData) => {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user || user.id !== post.user_id) return;
-
-        const content = editData.content || '';
-        const imageUrls = editData.image_urls || [];
-        const tags = editData.tags ? JSON.parse(editData.tags) : [];
-        const mentions = editData.mentions ? JSON.parse(editData.mentions) : [];
-
-        const updateData = {
-            content: content.trim(), 
-            tags: tags.length > 0 ? JSON.stringify(tags) : null,
-            image_urls: imageUrls.length > 0 ? imageUrls : null,
-            image_url: imageUrls.length === 1 ? imageUrls[0] : null,
-            mentions: mentions.length > 0 ? JSON.stringify(mentions) : null,
-        };
-
-        const { data: updatedPost, error } = await supabase
-            .from('posts')
-            .update(updateData)
-            .eq('id', post.id)
-            .select()
-            .single();
-
-        if (error) {
-            alert('Failed to update post. Please try again.');
-            console.error("Post update error:", error);
+        if (existingReaction && selectedReaction === reactionType) {
+          // Remove reaction
+          await supabase.from('post_likes').delete().eq('id', existingReaction.id);
+          if (mountedRef.current) {
+            setSelectedReaction(null);
+            setLikeCount(prev => Math.max(0, prev - 1));
+          }
         } else {
-            post.content = updatedPost.content;
-            post.tags = updatedPost.tags ? JSON.parse(updatedPost.tags) : [];
-            post.image_urls = updatedPost.image_urls;
-            post.image_url = updatedPost.image_url;
-            post.mentions = updatedPost.mentions ? JSON.parse(updatedPost.mentions) : [];
-            await updateMentionRecords(post.id, mentions);
-            setIsEditing(false);
-        }
-    };
-
-    const handleDeletePost = async () => {
-        if (!window.confirm('Are you sure you want to delete this post?')) return;
-        
-        const { error } = await supabase.from('posts').delete().eq('id', post.id);
-        if (error) { 
-            alert("Failed to delete post."); 
-        } else if (onDelete) { 
-            onDelete(post.id); 
-        }
-    };
-
-    const handleImageClick = (index) => { 
-        setSelectedImageIndex(index); 
-        setIsImageModalOpen(true); 
-    };
-
-    const handleReactorsEnter = () => { 
-        if (reactorsTimeoutRef.current) {
-            clearTimeout(reactorsTimeoutRef.current); 
-        }
-        setShowReactorsPreview(true); 
-    };
-
-    const handleReactorsLeave = () => { 
-        reactorsTimeoutRef.current = setTimeout(() => { 
-            setShowReactorsPreview(false); 
-        }, 300); 
-    };
-
-    // ✅ Cleanup timeouts
-    useEffect(() => {
-        return () => {
-            if (reactorsTimeoutRef.current) {
-                clearTimeout(reactorsTimeoutRef.current);
+          // Add or update reaction
+          await supabase
+            .from('post_likes')
+            .upsert({ 
+              post_id: post.id, 
+              user_id: user.id, 
+              reaction_type: reactionType 
+            }, { onConflict: 'post_id,user_id' });
+          
+          if (mountedRef.current) {
+            setSelectedReaction(reactionType);
+            if (!existingReaction) {
+              setLikeCount(prev => prev + 1);
             }
-        };
-    }, []);
+          }
+        }
 
-    if (!post || !displayAuthor) return null;
+        // Clear cached data to force refresh on next load
+        globalDataManager.clearCache(`post-likes-batch`);
+        
+      } catch (error) {
+        console.error('Error handling reaction:', error);
+      } finally {
+        if (mountedRef.current) {
+          setTimeout(() => {
+            setIsProcessingReaction(false);
+          }, 500);
+        }
+      }
+    }, 200); // 200ms debounce
+  }, [currentUserProfile, post?.id, disabled, selectedReaction, isProcessingReaction]);
 
-    return (
-        <div className="post-card bg-white p-5 rounded-xl shadow-sm border border-slate-200 transition-all duration-300" data-post-id={post.id}>
-            <PostHeader 
-                author={displayAuthor} 
-                createdAt={created_at} 
-                isAuthor={isAuthor} 
-                onEdit={() => setIsEditing(true)} 
-                onDelete={handleDeletePost} 
-            />
-            
-            {isEditing ? (
-                <EditPost 
-                    post={post} 
-                    onSave={handleEditPost} 
-                    onCancel={() => setIsEditing(false)} 
-                />
-            ) : (
-                <PostBody 
-                    content={content} 
-                    images={displayImages} 
-                    tags={parsedTags}
-                    onImageClick={handleImageClick} 
-                />
-            )}
-            
-            <div className="flex items-center justify-between text-sm text-slate-500 my-2 min-h-[20px]">
-                <div className="relative" onMouseEnter={handleReactorsEnter} onMouseLeave={handleReactorsLeave}>
-                    {likeCount > 0 && (
-                        <div className="flex items-center cursor-pointer">
-                            <div className="flex items-center -space-x-1">
-                                {(reactionSummary || []).sort((a, b) => b.count - a.count).slice(0, 3).map(({ type }) => {
-                                    const reaction = reactions.find(r => r.type === type);
-                                    if (!reaction) return null;
-                                    return (
-                                        <div key={type} className={`p-0.5 rounded-full ${reaction.color} border-2 border-white`}>
-                                            <reaction.Icon size={12} className="text-white" />
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                            <ReactorsText 
-                                likeCount={likeCount} 
-                                reactors={reactors} 
-                                onViewReactions={() => setShowReactionsModal(true)} 
-                            />
-                        </div>
-                    )}
-                    {showReactorsPreview && likeCount > 0 && (
-                        <ReactionsPreview 
-                            reactors={reactors} 
-                            likeCount={likeCount} 
-                            onViewAll={() => { 
-                                setShowReactorsPreview(false); 
-                                setShowReactionsModal(true); 
-                            }} 
-                        />
-                    )}
-                </div>
-                {commentCount > 0 && (
-                    <span 
-                        className="cursor-pointer hover:underline" 
-                        onClick={() => setShowComments(!showComments)}
-                    >
-                        {commentCount} {commentCount === 1 ? 'comment' : 'comments'}
-                    </span>
-                )}
+  const handleEditPost = async (editData) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user || user.id !== post.user_id) return;
+
+    const content = editData.content || '';
+    const imageUrls = editData.image_urls || [];
+    const tags = editData.tags ? JSON.parse(editData.tags) : [];
+    const mentions = editData.mentions ? JSON.parse(editData.mentions) : [];
+
+    const updateData = {
+      content: content.trim(),
+      tags: tags.length > 0 ? JSON.stringify(tags) : null,
+      image_urls: imageUrls.length > 0 ? imageUrls : null,
+      image_url: imageUrls.length === 1 ? imageUrls[0] : null,
+      mentions: mentions.length > 0 ? JSON.stringify(mentions) : null,
+    };
+
+    const { data: updatedPost, error } = await supabase
+      .from('posts')
+      .update(updateData)
+      .eq('id', post.id)
+      .select()
+      .single();
+
+    if (error) {
+      alert('Failed to update post. Please try again.');
+      console.error("Post update error:", error);
+    } else {
+      Object.assign(post, {
+        content: updatedPost.content,
+        tags: updatedPost.tags ? JSON.parse(updatedPost.tags) : [],
+        image_urls: updatedPost.image_urls,
+        image_url: updatedPost.image_url,
+        mentions: updatedPost.mentions ? JSON.parse(updatedPost.mentions) : []
+      });
+      setIsEditing(false);
+    }
+  };
+
+  const handleDeletePost = async () => {
+    if (!window.confirm('Are you sure you want to delete this post?')) return;
+    
+    const { error } = await supabase.from('posts').delete().eq('id', post.id);
+    if (error) {
+      alert("Failed to delete post.");
+    } else if (onDelete) {
+      onDelete(post.id);
+    }
+  };
+
+  const handleImageClick = (index) => {
+    setSelectedImageIndex(index);
+    setIsImageModalOpen(true);
+  };
+
+  const handleReactorsEnter = () => {
+    if (reactorsTimeoutRef.current) {
+      clearTimeout(reactorsTimeoutRef.current);
+    }
+    setShowReactorsPreview(true);
+  };
+
+  const handleReactorsLeave = () => {
+    reactorsTimeoutRef.current = setTimeout(() => {
+      setShowReactorsPreview(false);
+    }, 300);
+  };
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      mountedRef.current = false;
+      if (reactorsTimeoutRef.current) {
+        clearTimeout(reactorsTimeoutRef.current);
+      }
+      if (reactionDebounceRef.current) {
+        clearTimeout(reactionDebounceRef.current);
+      }
+    };
+  }, []);
+
+  if (!post || !displayAuthor) return null;
+
+  return (
+    <div className="post-card bg-white p-5 rounded-xl shadow-sm border border-slate-200 transition-all duration-300" data-post-id={post.id}>
+      <PostHeader 
+        author={displayAuthor} 
+        createdAt={created_at} 
+        isAuthor={isAuthor} 
+        onEdit={() => setIsEditing(true)} 
+        onDelete={handleDeletePost} 
+      />
+      
+      {isEditing ? (
+        <EditPost 
+          post={post} 
+          onSave={handleEditPost} 
+          onCancel={() => setIsEditing(false)} 
+        />
+      ) : (
+        <PostBody 
+          content={content} 
+          images={displayImages} 
+          tags={parsedTags}
+          onImageClick={handleImageClick} 
+        />
+      )}
+      
+      <div className="flex items-center justify-between text-sm text-slate-500 my-2 min-h-[20px]">
+        <div className="relative" onMouseEnter={handleReactorsEnter} onMouseLeave={handleReactorsLeave}>
+          {likeCount > 0 && (
+            <div className="flex items-center cursor-pointer">
+              <div className="flex items-center -space-x-1">
+                {(reactionSummary || []).sort((a, b) => b.count - a.count).slice(0, 3).map(({ type }) => {
+                  const reaction = reactions.find(r => r.type === type);
+                  if (!reaction) return null;
+                  return (
+                    <div key={type} className={`p-0.5 rounded-full ${reaction.color} border-2 border-white`}>
+                      <reaction.Icon size={12} className="text-white" />
+                    </div>
+                  );
+                })}
+              </div>
+              <ReactorsText 
+                likeCount={likeCount} 
+                reactors={reactors} 
+                onViewReactions={() => setShowReactionsModal(true)} 
+              />
             </div>
-            
-            {!isEditing && (
-                <PostActions 
-                    onReaction={handleReaction} 
-                    onComment={() => setShowComments(!showComments)} 
-                    onShare={() => alert('Share functionality not implemented yet.')} 
-                    selectedReaction={selectedReaction} 
-                    disabled={disabled} 
-                />
-            )}
-            
-            {showComments && (
-                <div className="mt-4 border-t pt-4 max-h-96 overflow-y-auto">
-                    <CommentSection 
-                        post={post} 
-                        currentUserProfile={currentUserProfile} 
-                        onCommentAdded={() => setCommentCount(prev => prev + 1)} 
-                        onCommentDeleted={() => setCommentCount(prev => Math.max(0, prev - 1))} 
-                    />
-                </div>
-            )}
-            
-            <Suspense fallback={null}>
-                {showReactionsModal && (
-                    <ReactionsModal 
-                        isOpen={showReactionsModal} 
-                        onClose={() => setShowReactionsModal(false)} 
-                        reactors={reactors} 
-                        likeCount={likeCount} 
-                        reactionSummary={reactionSummary} 
-                    />
-                )}
-                
-                {isImageModalOpen && (
-                    <ImageViewer 
-                        post={post} 
-                        images={displayImages} 
-                        initialIndex={selectedImageIndex} 
-                        isOpen={isImageModalOpen} 
-                        onClose={() => setIsImageModalOpen(false)} 
-                        onReaction={handleReaction} 
-                        selectedReaction={selectedReaction} 
-                        currentUserProfile={currentUserProfile} 
-                        likeCount={likeCount} 
-                        reactionSummary={reactionSummary} 
-                        commentCount={commentCount} 
-                        onCommentAdded={() => setCommentCount(prev => prev + 1)} 
-                        onCommentDeleted={() => setCommentCount(prev => Math.max(0, prev - 1))} 
-                        reactors={reactors} 
-                        onViewReactions={() => setShowReactionsModal(true)} 
-                    />
-                )}
-            </Suspense>
+          )}
+          {showReactorsPreview && likeCount > 0 && (
+            <ReactionsPreview 
+              reactors={reactors} 
+              likeCount={likeCount} 
+              onViewAll={() => { 
+                setShowReactorsPreview(false); 
+                setShowReactionsModal(true); 
+              }} 
+            />
+          )}
         </div>
-    );
+        {commentCount > 0 && (
+          <span 
+            className="cursor-pointer hover:underline" 
+            onClick={() => setShowComments(!showComments)}
+          >
+            {commentCount} {commentCount === 1 ? 'comment' : 'comments'}
+          </span>
+        )}
+      </div>
+      
+      {!isEditing && (
+        <PostActions 
+          onReaction={handleReaction} 
+          onComment={() => setShowComments(!showComments)} 
+          onShare={() => alert('Share functionality not implemented yet.')} 
+          selectedReaction={selectedReaction} 
+          disabled={disabled || isProcessingReaction}
+          postId={post.id}
+        />
+      )}
+      
+      {showComments && (
+        <div className="mt-4 border-t pt-4 max-h-96 overflow-y-auto">
+          <CommentSection 
+            post={post} 
+            currentUserProfile={currentUserProfile} 
+            onCommentAdded={() => setCommentCount(prev => prev + 1)} 
+            onCommentDeleted={() => setCommentCount(prev => Math.max(0, prev - 1))} 
+          />
+        </div>
+      )}
+      
+      <Suspense fallback={null}>
+        {showReactionsModal && (
+          <ReactionsModal 
+            isOpen={showReactionsModal} 
+            onClose={() => setShowReactionsModal(false)} 
+            reactors={reactors} 
+            likeCount={likeCount} 
+            reactionSummary={reactionSummary} 
+          />
+        )}
+        
+        {isImageModalOpen && (
+          <ImageViewer 
+            post={post} 
+            images={displayImages} 
+            initialIndex={selectedImageIndex} 
+            isOpen={isImageModalOpen} 
+            onClose={() => setIsImageModalOpen(false)} 
+            onReaction={handleReaction} 
+            selectedReaction={selectedReaction} 
+            currentUserProfile={currentUserProfile} 
+            likeCount={likeCount} 
+            reactionSummary={reactionSummary} 
+            commentCount={commentCount} 
+            onCommentAdded={() => setCommentCount(prev => prev + 1)} 
+            onCommentDeleted={() => setCommentCount(prev => Math.max(0, prev - 1))} 
+            reactors={reactors} 
+            onViewReactions={() => setShowReactionsModal(true)} 
+          />
+        )}
+      </Suspense>
+    </div>
+  );
 }
 
 export default memo(PostCard);
