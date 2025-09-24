@@ -3,7 +3,7 @@ import { BrowserRouter, Routes, Route, Link, NavLink, Outlet, useOutletContext, 
 import ScrollToTop from './components/ScrollToTop.jsx';
 import { supabase } from './supabaseClient';
 import { clearAllNotifications, markAllAsRead } from './utils/notificationCleanup';
-import HomePage from './HomePage.jsx';
+import HomePage from './homepage/HomePage.jsx';
 import CommunityHub from './components/community-hub/CommunityHub.jsx';
 import OmegaAdminUsers from './components/omega-admin/OmegaAdminUsers.jsx';
 import OmegaAdminGrants from './components/omega-admin/OmegaAdminGrants.jsx';

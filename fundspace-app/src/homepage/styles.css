@@ -1,0 +1,158 @@
+/* src/homepage/styles.css - All HomePage-specific styles */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+
+body { 
+  font-family: 'Inter', sans-serif; 
+  -webkit-font-smoothing: antialiased; 
+  -moz-osx-font-smoothing: grayscale; 
+}
+
+.tracking-tighter { 
+  letter-spacing: -0.05em; 
+}
+
+.scroller { 
+  overflow-x: auto; 
+  scrollbar-width: none; 
+  -ms-overflow-style: none; 
+}
+
+.scroller::-webkit-scrollbar { 
+  display: none; 
+}
+
+.scroller-inner { 
+  display: flex; 
+  gap: 1.5rem; 
+  animation: scroll 80s linear infinite; 
+  width: calc(360px * 18 + 1.5rem * 17); 
+}
+
+@keyframes scroll {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(calc(-360px * 9 - 1.5rem * 8)); }
+}
+
+.scroller:hover .scroller-inner { 
+  animation-play-state: paused; 
+}
+
+.magical-hover { 
+  transition: all 0.3s ease; 
+  cursor: pointer; 
+}
+
+.magical-hover:hover { 
+  text-shadow: 0 0 20px rgba(255, 255, 255, 0.8); 
+  transform: scale(1.05); 
+}
+
+@keyframes fade-in-up { 
+  from { opacity: 0; transform: translateY(20px); } 
+  to { opacity: 1; transform: translateY(0); } 
+}
+
+@keyframes fade-out-up { 
+  from { opacity: 1; transform: translateY(0); } 
+  to { opacity: 0; transform: translateY(-20px); } 
+}
+
+.fade-in-up { 
+  animation: fade-in-up 0.5s ease-out forwards; 
+}
+
+.fade-out-up { 
+  animation: fade-out-up 0.5s ease-in forwards; 
+}
+
+@media (max-width: 768px) {
+  .scroller-inner { 
+    animation-duration: 60s; 
+  }
+}
+
+.magic-fundspace { 
+  background: linear-gradient(90deg,#7e3af2,#ec4899,#f97316,#3b82f6); 
+  background-size: 250% 250%;
+  -webkit-background-clip: text; 
+  background-clip: text; 
+  color: transparent; 
+  position: relative;
+  transition: background-position 1s ease, text-shadow .4s ease, transform .4s ease;
+}
+
+.magic-fundspace:hover { 
+  background-position: 100% 0; 
+  text-shadow: 0 0 6px rgba(236,72,153,.4), 0 0 18px rgba(126,58,242,.5);
+}
+
+.magic-fundspace::after {
+  content:""; 
+  position:absolute; 
+  inset:0; 
+  background:linear-gradient(120deg,transparent 0%,rgba(255,255,255,.6) 45%,transparent 55%); 
+  background-size:200% 200%; 
+  mix-blend-mode:overlay; 
+  opacity:0; 
+  transition:opacity .4s ease, transform .9s ease; 
+  transform:translateX(-30%);
+}
+
+.magic-fundspace:hover::after { 
+  opacity:.9; 
+  transform:translateX(30%); 
+}
+
+.magic-mission {
+  background: linear-gradient(90deg,#0ea5e9,#10b981,#14b8a6,#0ea5e9);
+  background-size: 300% 300%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  position: relative;
+  transition: background-position 1s ease, text-shadow .4s ease, transform .4s ease;
+}
+
+.magic-mission:hover { 
+  background-position: 100% 0; 
+  text-shadow: 0 0 8px rgba(16,185,129,.45); 
+}
+
+.magic-mission::after {
+  content:""; 
+  position:absolute; 
+  inset:0; 
+  background:linear-gradient(110deg,transparent 0%,rgba(255,255,255,.55) 40%,transparent 60%);
+  background-size:220% 220%; 
+  mix-blend-mode:overlay; 
+  opacity:0; 
+  transform:translateX(-25%);
+  transition:opacity .5s ease, transform 1s ease;
+}
+
+.magic-mission:hover::after { 
+  opacity:.9; 
+  transform:translateX(25%); 
+}
+
+/* Popup hover animation for Build Your Mission section cards */
+.mission-card { 
+  transition: transform .45s cubic-bezier(.22,.9,.3,1), box-shadow .5s ease, filter .45s ease; 
+  will-change: transform; 
+}
+
+.mission-card:hover { 
+  transform: translateY(-8px) scale(1.035); 
+  box-shadow: 0 8px 28px -6px rgba(0,0,0,.15), 0 12px 48px -12px rgba(16,24,40,.25); 
+  filter: brightness(1.02) saturate(1.05);
+}
+
+.mission-card:active { 
+  transform: translateY(-4px) scale(1.02); 
+}
+
+@media (prefers-reduced-motion: reduce) { 
+  .mission-card { 
+    transition: none; 
+  } 
+}
