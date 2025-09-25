@@ -4,12 +4,10 @@ import { supabase } from '../supabaseClient';
 import { rssNewsService as newsService } from '../services/rssNewsService.js';
 import { getOrganizationInfoForDashboard, getBulkOrganizationMemberships } from '../utils/membershipQueries.js';
 
-// ADD THESE IMPORTS
 import { realtimeManager } from '../utils/realtimeManager.js';
 import { getChannelInfo } from '../utils/channelUtils.js';
-import { usePageDataLoader } from '../hooks/usePageDataLoader'; // ✅ CRITICAL FIX
+import { usePageDataLoader } from '../hooks/usePageDataLoader';
 
-// Import all the smaller components
 import WelcomeBanner from './dashboard/WelcomeBanner.jsx';
 import ConnectionsAvatars from './dashboard/ConnectionsAvatars.jsx';
 import TrendingPostsSection from './dashboard/TrendingPostsSection.jsx';
@@ -21,10 +19,8 @@ import GrantDetailModal from '../GrantDetailModal.jsx';
 import QuickActions from './dashboard/QuickActions.jsx';
 import StatsCard from './dashboard/StatsCard.jsx';
 
-// Import the custom hook
 import { useHelloCommunityPosts } from '../hooks/useHelloCommunityPosts.jsx';
 
-// Custom hooks for data fetching
 const useNews = () => {
     const [news, setNews] = useState([]);
 
@@ -43,7 +39,6 @@ const useNews = () => {
     return news;
 };
 
-// UPDATED: useTrendingPosts hook with safe queries
 const useTrendingPosts = () => {
     const [trendingPosts, setTrendingPosts] = useState([]);
     const { profile } = useOutletContext() || {};
@@ -67,7 +62,6 @@ const useTrendingPosts = () => {
                         .select('id, full_name, avatar_url')
                         .in('id', profileIds);
 
-                    // FIXED: Use safe bulk membership query instead of problematic join
                     const membershipMap = await getBulkOrganizationMemberships(profileIds);
 
                     const postIds = postsData.map(post => post.id);
@@ -108,7 +102,6 @@ const useTrendingPosts = () => {
 
         fetchTrendingPosts();
 
-        // UPDATED: Use the new realtime manager with your channel system
         if (profile) {
             const subscription = realtimeManager.createSubscription(
                 'hello-world', 
@@ -156,7 +149,6 @@ const useTrendingPosts = () => {
             );
         }
 
-        // UPDATED: Clean removal using the manager
         return () => {
             if (profile) {
                 realtimeManager.removeSubscription('hello-world', supabase);
@@ -167,6 +159,7 @@ const useTrendingPosts = () => {
     return trendingPosts;
 };
 
+// ✅ FIXED: Removed problematic grant_opportunities query
 const useTrendingGrants = () => {
     const [trendingGrants, setTrendingGrants] = useState([]);
 
@@ -175,6 +168,7 @@ const useTrendingGrants = () => {
             try {
                 let grantsData, grantsError;
                 
+                // ✅ REMOVED: No more is_active query
                 const { data: grantsWithOrgs, error: orgsError } = await supabase
                     .from('grants')
                     .select(`
@@ -187,12 +181,14 @@ const useTrendingGrants = () => {
                             slug
                         )
                     `)
+                    .order('created_at', { ascending: false })
                     .limit(15);
                 
                 if (orgsError) {
                     const { data: grantsOnly, error: grantsOnlyError } = await supabase
                         .from('grants')
                         .select('*')
+                        .order('created_at', { ascending: false })
                         .limit(15);
                     grantsData = grantsOnly;
                     grantsError = grantsOnlyError;
@@ -271,7 +267,6 @@ const useTrendingGrants = () => {
     return { trendingGrants, setTrendingGrants };
 };
 
-// UPDATED: useUserData hook with refresh capability
 const useUserData = (profile) => {
     const [organizationInfo, setOrganizationInfo] = useState(null);
     const [stats, setStats] = useState({
@@ -292,7 +287,6 @@ const useUserData = (profile) => {
             if (!profile?.id) return;
             setLoading(true);
             try {
-                // Use safe query function instead of problematic join
                 const orgData = await getOrganizationInfoForDashboard(profile.id);
                 setOrganizationInfo(orgData);
             } catch (err) {
@@ -303,7 +297,7 @@ const useUserData = (profile) => {
             }
         };
         fetchUserData();
-    }, [profile?.id, refreshTrigger]); // Add refreshTrigger as dependency
+    }, [profile?.id, refreshTrigger]);
 
     return { organizationInfo, stats, loading, refreshOrganizationData };
 };
@@ -312,7 +306,6 @@ export default function HomeDashboard() {
     const { profile } = useOutletContext() || {};
     const navigate = useNavigate();
     
-    // ✅ CRITICAL FIX: Add page data loader for batched API calls
     const { pageData, loadPostsPageData, clearPageData } = usePageDataLoader();
     
     const [selectedPost, setSelectedPost] = useState(null);
@@ -327,7 +320,6 @@ export default function HomeDashboard() {
     const { trendingGrants, setTrendingGrants } = useTrendingGrants();
     const helloCommunityPosts = useHelloCommunityPosts(organizationInfo);
 
-    // ✅ CRITICAL FIX: Load batched data whenever posts change
     useEffect(() => {
         const allPosts = [...trendingPosts, ...helloCommunityPosts].filter(Boolean);
         if (allPosts.length > 0) {
@@ -335,7 +327,6 @@ export default function HomeDashboard() {
         }
     }, [trendingPosts, helloCommunityPosts, loadPostsPageData]);
 
-    // NEW: Expose refresh function globally for organization changes
     useEffect(() => {
         window.refreshDashboardOrganizationData = refreshOrganizationData;
         return () => {
@@ -519,7 +510,7 @@ export default function HomeDashboard() {
                 posts={trendingPosts}
                 onViewMore={handleViewMorePosts}
                 onPostClick={handlePostClick}
-                pageData={pageData} // ✅ CRITICAL FIX: Pass pageData
+                pageData={pageData}
             />
             
             <HelloCommunitySection
@@ -527,7 +518,7 @@ export default function HomeDashboard() {
                 onViewMore={handleViewMoreCommunity}
                 onPostClick={handlePostClick}
                 organizationInfo={organizationInfo}
-                pageData={pageData} // ✅ CRITICAL FIX: Pass pageData
+                pageData={pageData}
             />
             
             <TrendingGrantsSection 
@@ -547,7 +538,7 @@ export default function HomeDashboard() {
                     setSelectedPost(null);
                 }}
                 currentUserProfile={profile}
-                pageData={pageData} // ✅ CRITICAL FIX: Pass pageData
+                pageData={pageData}
             />
 
             <GrantDetailModal
@@ -562,3 +553,4 @@ export default function HomeDashboard() {
         </div>
     );
 }
+                

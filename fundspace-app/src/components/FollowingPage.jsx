@@ -1,11 +1,10 @@
-// src/components/FollowingPage.jsx - Fixed with pageData batching
 import React, { useState, useEffect } from 'react';
 import { useOutletContext, Link } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import { UserCheck, ArrowLeft } from 'lucide-react';
 import Avatar from './Avatar';
 import { unfollowUser } from '../utils/followUtils';
-import { usePageDataLoader } from '../hooks/usePageDataLoader'; // ✅ ADD THIS
+import { usePageDataLoader } from '../hooks/usePageDataLoader';
 
 export default function FollowingPage() {
     const { profile: currentUserProfile, pageData } = useOutletContext();
@@ -13,10 +12,7 @@ export default function FollowingPage() {
     const [loading, setLoading] = useState(true);
     const [unfollowingInProgress, setUnfollowingInProgress] = useState(new Set());
 
-    // ✅ ADD: Page data loader for batched API calls
     const { pageData: localPageData, loadConnectionsPageData, clearPageData } = usePageDataLoader();
-    
-    // Use pageData from context if available, otherwise use local
     const activePageData = pageData || localPageData;
 
     useEffect(() => {
@@ -29,11 +25,11 @@ export default function FollowingPage() {
         try {
             setLoading(true);
             
-            // ✅ OPTIMIZED: Get just the connection data, then batch load profiles
+            // ✅ CORRECT: follower_id and following_id are the correct column names
             const { data, error } = await supabase
                 .from('followers')
                 .select('following_id, created_at')
-                .eq('follower_id', currentUserProfile.id)
+                .eq('follower_id', currentUserProfile.id) // ✅ CORRECT: follower_id
                 .order('created_at', { ascending: false });
 
             if (error) {
@@ -42,10 +38,8 @@ export default function FollowingPage() {
             }
 
             if (data && data.length > 0) {
-                // ✅ CRITICAL FIX: Load batched profile and organization data
                 await loadConnectionsPageData([], data);
                 
-                // Format the data using batched pageData
                 const formattedFollowing = data.map(follow => {
                     const profileData = activePageData?.profiles?.[follow.following_id];
                     const orgMembership = activePageData?.orgMemberships?.[follow.following_id];
@@ -77,26 +71,27 @@ export default function FollowingPage() {
         if (!currentUserProfile || unfollowingInProgress.has(profileIdToUnfollow)) return;
         
         setUnfollowingInProgress(prev => new Set(prev).add(profileIdToUnfollow));
+        
+        setFollowing(prevFollowing => 
+            prevFollowing.filter(person => person.id !== profileIdToUnfollow)
+        );
 
         try {
             const result = await unfollowUser(currentUserProfile.id, profileIdToUnfollow);
             
-            if (result.success) {
-                // Remove from local state
-                setFollowing(prev => prev.filter(user => user.id !== profileIdToUnfollow));
-            } else {
+            if (!result.success) {
                 console.error('Error unfollowing user:', result.error);
+                fetchFollowing();
             }
         } catch (error) {
             console.error('Error in handleUnfollow:', error);
+            fetchFollowing();
         } finally {
             setUnfollowingInProgress(prev => {
                 const newSet = new Set(prev);
                 newSet.delete(profileIdToUnfollow);
                 return newSet;
             });
-            
-            // Clear cache when follow state changes
             clearPageData();
         }
     };
@@ -116,7 +111,6 @@ export default function FollowingPage() {
 
     return (
         <div className="space-y-6">
-            {/* Header */}
             <div className="flex items-center space-x-4">
                 <Link 
                     to="/profile" 
@@ -128,80 +122,77 @@ export default function FollowingPage() {
                 <div>
                     <h1 className="text-2xl font-bold text-slate-900">Following</h1>
                     <p className="text-slate-600">
-                        {loading ? 'Loading...' : `You're following ${following.length} ${following.length === 1 ? 'person' : 'people'}`}
+                        {loading ? 'Loading...' : `You are following ${following.length} ${following.length === 1 ? 'person' : 'people'}`}
                     </p>
                 </div>
             </div>
 
-            {/* Following List */}
             {loading ? (
                 <div className="text-center py-12">
                     <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                    <p className="text-slate-600 mt-2">Loading who you're following...</p>
+                    <p className="text-slate-600 mt-2">Loading...</p>
                 </div>
             ) : following.length > 0 ? (
                 <div className="space-y-3">
-                    {following.map(user => {
-                        const isUnfollowing = unfollowingInProgress.has(user.id);
+                    {following.map(person => {
+                        const isUnfollowingInProgress = unfollowingInProgress.has(person.id);
                         
-                        // ✅ ENHANCEMENT: Use enhanced profile data from pageData
-                        const enhancedUser = {
-                            ...user,
-                            ...(activePageData?.profiles?.[user.id] || {}),
+                        const enhancedPerson = {
+                            ...person,
+                            ...(activePageData?.profiles?.[person.id] || {}),
                         };
                         
-                        const orgMembership = activePageData?.orgMemberships?.[user.id];
+                        const orgMembership = activePageData?.orgMemberships?.[person.id];
                         if (orgMembership) {
-                            enhancedUser.organization_name = orgMembership.organization?.name || enhancedUser.organization_name;
-                            enhancedUser.role = orgMembership.role || enhancedUser.role;
-                            enhancedUser.title = orgMembership.role || enhancedUser.title;
+                            enhancedPerson.organization_name = orgMembership.organization?.name || enhancedPerson.organization_name;
+                            enhancedPerson.role = orgMembership.role || enhancedPerson.role;
+                            enhancedPerson.title = orgMembership.role || enhancedPerson.title;
                         }
                         
                         return (
                             <div 
-                                key={user.id} 
+                                key={person.id} 
                                 className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 hover:shadow-md transition-shadow"
                             >
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center space-x-3">
                                         <Avatar 
-                                            src={enhancedUser.avatar_url} 
-                                            fullName={enhancedUser.full_name} 
+                                            src={enhancedPerson.avatar_url} 
+                                            fullName={enhancedPerson.full_name} 
                                             size="lg" 
                                         />
                                         <div className="flex-grow">
                                             <Link 
-                                                to={`/profile/members/${user.id}`}
+                                                to={`/profile/members/${person.id}`}
                                                 className="text-lg font-semibold text-slate-900 hover:text-blue-600 transition-colors"
                                             >
-                                                {enhancedUser.full_name}
+                                                {enhancedPerson.full_name}
                                             </Link>
                                             
-                                            {enhancedUser.title && (
-                                                <p className="text-sm text-slate-600 mt-1">{enhancedUser.title}</p>
+                                            {enhancedPerson.title && (
+                                                <p className="text-sm text-slate-600 mt-1">{enhancedPerson.title}</p>
                                             )}
                                             
-                                            {enhancedUser.organization_name && (
+                                            {enhancedPerson.organization_name && (
                                                 <p className="text-sm text-slate-500 mt-1">
-                                                    {enhancedUser.organization_name}
+                                                    {enhancedPerson.organization_name}
                                                 </p>
                                             )}
                                             
                                             <p className="text-xs text-slate-400 mt-1">
-                                                You followed {formatDate(user.followed_at)}
+                                                Following since {formatDate(person.followed_at)}
                                             </p>
                                         </div>
                                     </div>
 
-                                    {/* Unfollow Button */}
                                     <div className="flex-shrink-0">
                                         <button
-                                            onClick={() => handleUnfollow(user.id)}
-                                            disabled={isUnfollowing}
-                                            className="inline-flex items-center px-3 py-2 text-sm font-medium bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                            onClick={() => handleUnfollow(person.id)}
+                                            disabled={isUnfollowingInProgress}
+                                            className="inline-flex items-center px-3 py-2 text-sm font-medium bg-green-100 text-green-700 rounded-lg hover:bg-red-100 hover:text-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                         >
                                             <UserCheck className="w-4 h-4 mr-1" />
-                                            {isUnfollowing ? 'Unfollowing...' : 'Following'}
+                                            {isUnfollowingInProgress ? 'Unfollowing...' : 'Following'}
                                         </button>
                                     </div>
                                 </div>
@@ -215,14 +206,14 @@ export default function FollowingPage() {
                         <UserCheck className="w-8 h-8 text-slate-400" />
                     </div>
                     <h3 className="text-lg font-medium text-slate-900 mb-2">Not following anyone yet</h3>
-                    <p className="text-slate-600 max-w-md mx-auto mb-4">
-                        Discover and follow other community members to see their updates in your feed.
+                    <p className="text-slate-600 max-w-md mx-auto">
+                        Discover interesting people in the community and follow them to see their updates in your feed!
                     </p>
                     <Link 
                         to="/profile/members"
-                        className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                        className="inline-block mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                     >
-                        Explore Members
+                        Discover Members
                     </Link>
                 </div>
             )}

@@ -1,11 +1,10 @@
-// src/components/FollowersPage.jsx - Fixed with pageData batching
 import React, { useState, useEffect } from 'react';
 import { useOutletContext, Link } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import { UserCheck, UserPlus, ArrowLeft } from 'lucide-react';
 import Avatar from './Avatar';
 import { followUser, unfollowUser } from '../utils/followUtils';
-import { usePageDataLoader } from '../hooks/usePageDataLoader'; // ✅ ADD THIS
+import { usePageDataLoader } from '../hooks/usePageDataLoader';
 
 export default function FollowersPage() {
     const { profile: currentUserProfile, pageData } = useOutletContext();
@@ -14,10 +13,7 @@ export default function FollowersPage() {
     const [followedIds, setFollowedIds] = useState(new Set());
     const [followingInProgress, setFollowingInProgress] = useState(new Set());
 
-    // ✅ ADD: Page data loader for batched API calls
     const { pageData: localPageData, loadConnectionsPageData, clearPageData } = usePageDataLoader();
-    
-    // Use pageData from context if available, otherwise use local
     const activePageData = pageData || localPageData;
 
     useEffect(() => {
@@ -31,11 +27,11 @@ export default function FollowersPage() {
         try {
             setLoading(true);
             
-            // ✅ OPTIMIZED: Get just the connection data, then batch load profiles
+            // ✅ FIXED: Use correct column name 'following_id' instead of 'followed_id'
             const { data, error } = await supabase
                 .from('followers')
                 .select('follower_id, created_at')
-                .eq('following_id', currentUserProfile.id)
+                .eq('following_id', currentUserProfile.id) // ✅ CORRECT: following_id
                 .order('created_at', { ascending: false });
 
             if (error) {
@@ -44,10 +40,8 @@ export default function FollowersPage() {
             }
 
             if (data && data.length > 0) {
-                // ✅ CRITICAL FIX: Load batched profile and organization data
                 await loadConnectionsPageData(data, []);
                 
-                // Format the data using batched pageData
                 const formattedFollowers = data.map(follow => {
                     const profileData = activePageData?.profiles?.[follow.follower_id];
                     const orgMembership = activePageData?.orgMemberships?.[follow.follower_id];
@@ -77,7 +71,7 @@ export default function FollowersPage() {
 
     const fetchFollowedUsers = async () => {
         try {
-            // Get list of users that current user is following
+            // ✅ CORRECT: follower_id and following_id are correct
             const { data, error } = await supabase
                 .from('followers')
                 .select('following_id')
@@ -98,7 +92,6 @@ export default function FollowersPage() {
     const handleFollow = async (profileIdToFollow) => {
         if (!currentUserProfile || followingInProgress.has(profileIdToFollow)) return;
         
-        // Optimistic update
         setFollowedIds(prev => new Set(prev).add(profileIdToFollow));
         setFollowingInProgress(prev => new Set(prev).add(profileIdToFollow));
 
@@ -107,7 +100,6 @@ export default function FollowersPage() {
             
             if (!result.success) {
                 console.error('Error following user:', result.error);
-                // Revert optimistic update
                 setFollowedIds(prev => {
                     const newSet = new Set(prev);
                     newSet.delete(profileIdToFollow);
@@ -116,7 +108,6 @@ export default function FollowersPage() {
             }
         } catch (error) {
             console.error('Error in handleFollow:', error);
-            // Revert optimistic update
             setFollowedIds(prev => {
                 const newSet = new Set(prev);
                 newSet.delete(profileIdToFollow);
@@ -128,8 +119,6 @@ export default function FollowersPage() {
                 newSet.delete(profileIdToFollow);
                 return newSet;
             });
-            
-            // Clear cache when follow state changes
             clearPageData();
         }
     };
@@ -137,7 +126,6 @@ export default function FollowersPage() {
     const handleUnfollow = async (profileIdToUnfollow) => {
         if (!currentUserProfile || followingInProgress.has(profileIdToUnfollow)) return;
         
-        // Optimistic update
         setFollowedIds(prev => {
             const newSet = new Set(prev);
             newSet.delete(profileIdToUnfollow);
@@ -150,12 +138,10 @@ export default function FollowersPage() {
             
             if (!result.success) {
                 console.error('Error unfollowing user:', result.error);
-                // Revert optimistic update
                 setFollowedIds(prev => new Set(prev).add(profileIdToUnfollow));
             }
         } catch (error) {
             console.error('Error in handleUnfollow:', error);
-            // Revert optimistic update
             setFollowedIds(prev => new Set(prev).add(profileIdToUnfollow));
         } finally {
             setFollowingInProgress(prev => {
@@ -163,8 +149,6 @@ export default function FollowersPage() {
                 newSet.delete(profileIdToUnfollow);
                 return newSet;
             });
-            
-            // Clear cache when follow state changes
             clearPageData();
         }
     };
@@ -184,7 +168,6 @@ export default function FollowersPage() {
 
     return (
         <div className="space-y-6">
-            {/* Header */}
             <div className="flex items-center space-x-4">
                 <Link 
                     to="/profile" 
@@ -201,7 +184,6 @@ export default function FollowersPage() {
                 </div>
             </div>
 
-            {/* Followers List */}
             {loading ? (
                 <div className="text-center py-12">
                     <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
@@ -213,7 +195,6 @@ export default function FollowersPage() {
                         const isFollowing = followedIds.has(follower.id);
                         const isFollowingInProgress = followingInProgress.has(follower.id);
                         
-                        // ✅ ENHANCEMENT: Use enhanced profile data from pageData
                         const enhancedFollower = {
                             ...follower,
                             ...(activePageData?.profiles?.[follower.id] || {}),
@@ -262,7 +243,6 @@ export default function FollowersPage() {
                                         </div>
                                     </div>
 
-                                    {/* Follow Back Button */}
                                     <div className="flex-shrink-0">
                                         {isFollowing ? (
                                             <button
