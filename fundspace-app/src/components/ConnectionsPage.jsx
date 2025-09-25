@@ -1,4 +1,4 @@
-// src/components/ConnectionsPage.jsx - Optimized with Batching for All Connection Data
+// src/components/ConnectionsPage.jsx - Fixed with proper auth user ID handling
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useOutletContext, Link } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
@@ -31,13 +31,30 @@ class ConnectionsDataManager {
     return this.isValidCache(item) ? item.data : null;
   }
 
+  // Get the current user's auth ID
+  async getCurrentAuthUserId() {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      return user?.id;
+    } catch (error) {
+      console.error('Error getting current user:', error);
+      return null;
+    }
+  }
+
   // Batch load all connection data in one go
-  async loadAllConnectionData(userId) {
-    const cacheKey = this.getCacheKey('all-data', { userId });
+  async loadAllConnectionData() {
+    const cacheKey = this.getCacheKey('all-data', {});
     const cached = this.getCache(cacheKey);
     if (cached) return cached;
 
     try {
+      // Get the current auth user ID first
+      const authUserId = await this.getCurrentAuthUserId();
+      if (!authUserId) {
+        throw new Error('No authenticated user found');
+      }
+
       // Execute all queries in parallel for maximum efficiency
       const [
         connectionsResult,
@@ -48,64 +65,86 @@ class ConnectionsDataManager {
         // Get established connections
         supabase
           .from('user_connections')
-          .select('id, created_at, requester_id, recipient_id, connected_at')
-          .or(`requester_id.eq.${userId},recipient_id.eq.${userId}`)
+          .select('id, created_at, requester_id, recipient_id, updated_at')
+          .or(`requester_id.eq.${authUserId},recipient_id.eq.${authUserId}`)
           .eq('status', 'accepted'),
         
         // Get incoming pending requests
         supabase
           .from('user_connections')
           .select('id, created_at, requester_id')
-          .eq('recipient_id', userId)
+          .eq('recipient_id', authUserId)
           .eq('status', 'pending'),
         
         // Get outgoing pending requests
         supabase
           .from('user_connections')
           .select('id, created_at, recipient_id')
-          .eq('requester_id', userId)
+          .eq('requester_id', authUserId)
           .eq('status', 'pending'),
         
         // Get all sent requests for discovery filtering
         supabase
           .from('user_connections')
           .select('recipient_id')
-          .eq('requester_id', userId)
+          .eq('requester_id', authUserId)
           .eq('status', 'pending')
       ]);
 
-      // Collect all user IDs we need profile data for
-      const allUserIds = new Set();
+      // Collect all auth user IDs we need profile data for
+      const allAuthUserIds = new Set();
       
       // Add connection user IDs
       connectionsResult.data?.forEach(conn => {
-        const otherUserId = conn.requester_id === userId ? conn.recipient_id : conn.requester_id;
-        allUserIds.add(otherUserId);
+        const otherUserId = conn.requester_id === authUserId ? conn.recipient_id : conn.requester_id;
+        allAuthUserIds.add(otherUserId);
       });
       
       // Add request user IDs
-      incomingRequestsResult.data?.forEach(req => allUserIds.add(req.requester_id));
-      outgoingRequestsResult.data?.forEach(req => allUserIds.add(req.recipient_id));
+      incomingRequestsResult.data?.forEach(req => allAuthUserIds.add(req.requester_id));
+      outgoingRequestsResult.data?.forEach(req => allAuthUserIds.add(req.recipient_id));
 
-      // Batch load all profile data
-      const profilesData = allUserIds.size > 0 
-        ? await globalDataManager.getProfiles(Array.from(allUserIds))
-        : {};
+      // Convert auth user IDs to profile data
+      let authUserToProfileMap = {};
+      let allUserProfiles = {};
+      let orgMembershipsData = {};
 
-      // Batch load organization memberships
-      const orgMembershipsData = allUserIds.size > 0 
-        ? await globalDataManager.getOrganizationMemberships(Array.from(allUserIds))
-        : {};
+      if (allAuthUserIds.size > 0) {
+        const authUserIdsArray = Array.from(allAuthUserIds);
+        
+        // Get profiles for these auth user IDs - assuming profiles table has auth_user_id column
+        // If your profiles.id IS the auth user ID, use this instead:
+        const { data: profilesData, error: profilesError } = await supabase
+          .from('profiles')
+          .select('id, full_name, avatar_url, title, location, organizational_role')
+          .in('id', authUserIdsArray); // Change this line if your schema is different
+        
+        if (profilesError) {
+          console.error('Error fetching profiles:', profilesError);
+        } else {
+          // Create mapping from auth_user_id to profile data
+          profilesData?.forEach(profile => {
+            authUserToProfileMap[profile.id] = profile; // Assuming profile.id = auth user id
+            allUserProfiles[profile.id] = profile;
+          });
+
+          // Get organization memberships for all profile IDs
+          const profileIds = profilesData?.map(p => p.id).filter(Boolean) || [];
+          if (profileIds.length > 0) {
+            orgMembershipsData = await globalDataManager.getOrganizationMemberships(profileIds);
+          }
+        }
+      }
 
       // Process connections with enhanced profile data
       const connections = connectionsResult.data?.map(conn => {
-        const otherUserId = conn.requester_id === userId ? conn.recipient_id : conn.requester_id;
-        const userProfile = profilesData[otherUserId] || { id: otherUserId, full_name: 'Unknown User' };
-        const orgMembership = orgMembershipsData[otherUserId];
+        const otherAuthUserId = conn.requester_id === authUserId ? conn.recipient_id : conn.requester_id;
+        const userProfile = authUserToProfileMap[otherAuthUserId] || { id: otherAuthUserId, full_name: 'Unknown User' };
+        const orgMembership = orgMembershipsData[userProfile.id];
         
         return {
           id: conn.id,
-          connected_at: conn.connected_at || conn.created_at,
+          connected_at: conn.updated_at || conn.created_at,
           user: {
             ...userProfile,
             organization_name: orgMembership?.organization?.name || userProfile.organization_name,
@@ -119,8 +158,8 @@ class ConnectionsDataManager {
       const pendingRequests = [
         // Incoming requests
         ...(incomingRequestsResult.data?.map(req => {
-          const userProfile = profilesData[req.requester_id] || { id: req.requester_id, full_name: 'Unknown User' };
-          const orgMembership = orgMembershipsData[req.requester_id];
+          const userProfile = authUserToProfileMap[req.requester_id] || { id: req.requester_id, full_name: 'Unknown User' };
+          const orgMembership = orgMembershipsData[userProfile.id];
           
           return {
             id: req.id,
@@ -137,8 +176,8 @@ class ConnectionsDataManager {
         }) || []),
         // Outgoing requests
         ...(outgoingRequestsResult.data?.map(req => {
-          const userProfile = profilesData[req.recipient_id] || { id: req.recipient_id, full_name: 'Unknown User' };
-          const orgMembership = orgMembershipsData[req.recipient_id];
+          const userProfile = authUserToProfileMap[req.recipient_id] || { id: req.recipient_id, full_name: 'Unknown User' };
+          const orgMembership = orgMembershipsData[userProfile.id];
           
           return {
             id: req.id,
@@ -155,17 +194,18 @@ class ConnectionsDataManager {
         }) || [])
       ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
-      // Get connected user IDs for discovery filtering
-      const connectedUserIds = new Set([
+      // Get connected user IDs for discovery filtering (use profile IDs)
+      const connectedProfileIds = new Set([
         ...connections.map(c => c.user.id),
         ...pendingRequests.map(r => r.user_profile.id),
-        ...(sentRequestsResult.data?.map(r => r.recipient_id) || [])
+        ...(sentRequestsResult.data?.map(r => authUserToProfileMap[r.recipient_id]?.id).filter(Boolean) || [])
       ]);
 
       const result = {
         connections,
         pendingRequests,
-        connectedUserIds
+        connectedProfileIds,
+        authUserId
       };
 
       this.setCache(cacheKey, result);
@@ -176,27 +216,42 @@ class ConnectionsDataManager {
       return {
         connections: [],
         pendingRequests: [],
-        connectedUserIds: new Set()
+        connectedProfileIds: new Set(),
+        authUserId: null
       };
     }
   }
 
   // Batch load discovery data
-  async loadDiscoveryData(userId, searchQuery = '', filterType = 'all', connectedUserIds = new Set()) {
-    const cacheKey = this.getCacheKey('discovery', { userId, searchQuery, filterType });
+  async loadDiscoveryData(searchQuery = '', filterType = 'all', connectedProfileIds = new Set()) {
+    const cacheKey = this.getCacheKey('discovery', { searchQuery, filterType });
     const cached = this.getCache(cacheKey);
     if (cached) return cached;
 
     try {
+      // Get current user's profile ID to exclude from results
+      const authUserId = await this.getCurrentAuthUserId();
+      if (!authUserId) return [];
+
+      const { data: currentUserProfile } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('id', authUserId)
+        .single();
+
       let query = supabase
         .from('profiles')
         .select('id, full_name, title, avatar_url, location, organization_name, organization_type, role')
-        .neq('id', userId)
         .limit(20);
 
+      // Exclude current user
+      if (currentUserProfile?.id) {
+        query = query.neq('id', currentUserProfile.id);
+      }
+
       // Filter out connected users
-      if (connectedUserIds.size > 0) {
-        const userIdArray = Array.from(connectedUserIds);
+      if (connectedProfileIds.size > 0) {
+        const userIdArray = Array.from(connectedProfileIds);
         query = query.not('id', 'in', `(${userIdArray.map(id => `"${id}"`).join(',')})`);
       }
 
@@ -251,7 +306,8 @@ export default function ConnectionsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState('all');
   
-  const connectedUserIdsRef = useRef(new Set());
+  const connectedProfileIdsRef = useRef(new Set());
+  const authUserIdRef = useRef(null);
 
   // Load all connection data in batches
   const loadConnectionData = useCallback(async () => {
@@ -260,11 +316,12 @@ export default function ConnectionsPage() {
     setLoading(true);
     
     try {
-      const data = await connectionsDataManager.loadAllConnectionData(currentUserProfile.id);
+      const data = await connectionsDataManager.loadAllConnectionData();
       
       setConnections(data.connections);
       setPendingRequests(data.pendingRequests);
-      connectedUserIdsRef.current = data.connectedUserIds;
+      connectedProfileIdsRef.current = data.connectedProfileIds;
+      authUserIdRef.current = data.authUserId;
       
     } catch (error) {
       console.error('Error loading connection data:', error);
@@ -281,10 +338,9 @@ export default function ConnectionsPage() {
     
     try {
       const data = await connectionsDataManager.loadDiscoveryData(
-        currentUserProfile.id,
         searchQuery,
         filterType,
-        connectedUserIdsRef.current
+        connectedProfileIdsRef.current
       );
       
       setDiscoveredMembers(data);
@@ -309,17 +365,29 @@ export default function ConnectionsPage() {
   }, [activeTab, loadDiscoveryData]);
 
   // Action handlers with optimistic updates and cache invalidation
-  const handleSendConnectionRequest = useCallback(async (userId) => {
-    if (actionInProgress.has(userId)) return;
+  const handleSendConnectionRequest = useCallback(async (profileId) => {
+    if (actionInProgress.has(profileId)) return;
+    if (!authUserIdRef.current) return;
 
-    setActionInProgress(prev => new Set(prev).add(userId));
+    setActionInProgress(prev => new Set(prev).add(profileId));
 
     try {
+      // Get the recipient's auth user ID from their profile ID
+      const { data: recipientProfile } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('id', profileId)
+        .single();
+
+      if (!recipientProfile) {
+        throw new Error('Recipient profile not found');
+      }
+
       const { error } = await supabase
         .from('user_connections')
         .insert({
-          requester_id: currentUserProfile.id,
-          recipient_id: userId,
+          requester_id: authUserIdRef.current,
+          recipient_id: recipientProfile.id, // This should be the auth user ID
           status: 'pending'
         });
       
@@ -327,7 +395,7 @@ export default function ConnectionsPage() {
       
       // Clear cache and reload data
       connectionsDataManager.clearCache();
-      setDiscoveredMembers(prev => prev.filter(member => member.id !== userId));
+      setDiscoveredMembers(prev => prev.filter(member => member.id !== profileId));
       await loadConnectionData();
       
     } catch (error) {
@@ -335,21 +403,21 @@ export default function ConnectionsPage() {
     } finally {
       setActionInProgress(prev => {
         const newSet = new Set(prev);
-        newSet.delete(userId);
+        newSet.delete(profileId);
         return newSet;
       });
     }
-  }, [currentUserProfile?.id, loadConnectionData]);
+  }, [loadConnectionData]);
 
-  const handleAcceptRequest = useCallback(async (requestId, userId) => {
-    if (actionInProgress.has(userId)) return;
+  const handleAcceptRequest = useCallback(async (requestId, profileId) => {
+    if (actionInProgress.has(profileId)) return;
 
-    setActionInProgress(prev => new Set(prev).add(userId));
+    setActionInProgress(prev => new Set(prev).add(profileId));
 
     try {
       const { error } = await supabase
         .from('user_connections')
-        .update({ status: 'accepted', connected_at: new Date().toISOString() })
+        .update({ status: 'accepted', updated_at: new Date().toISOString() })
         .eq('id', requestId);
       
       if (error) throw error;
@@ -363,16 +431,16 @@ export default function ConnectionsPage() {
     } finally {
       setActionInProgress(prev => {
         const newSet = new Set(prev);
-        newSet.delete(userId);
+        newSet.delete(profileId);
         return newSet;
       });
     }
   }, [loadConnectionData]);
 
-  const handleDeclineRequest = useCallback(async (requestId, userId) => {
-    if (actionInProgress.has(userId)) return;
+  const handleDeclineRequest = useCallback(async (requestId, profileId) => {
+    if (actionInProgress.has(profileId)) return;
 
-    setActionInProgress(prev => new Set(prev).add(userId));
+    setActionInProgress(prev => new Set(prev).add(profileId));
 
     try {
       const { error } = await supabase
@@ -391,16 +459,16 @@ export default function ConnectionsPage() {
     } finally {
       setActionInProgress(prev => {
         const newSet = new Set(prev);
-        newSet.delete(userId);
+        newSet.delete(profileId);
         return newSet;
       });
     }
   }, [loadConnectionData]);
 
-  const handleWithdrawRequest = useCallback(async (requestId, userId) => {
-    if (actionInProgress.has(userId)) return;
+  const handleWithdrawRequest = useCallback(async (requestId, profileId) => {
+    if (actionInProgress.has(profileId)) return;
 
-    setActionInProgress(prev => new Set(prev).add(userId));
+    setActionInProgress(prev => new Set(prev).add(profileId));
 
     try {
       const { error } = await supabase
@@ -420,19 +488,19 @@ export default function ConnectionsPage() {
     } finally {
       setActionInProgress(prev => {
         const newSet = new Set(prev);
-        newSet.delete(userId);
+        newSet.delete(profileId);
         return newSet;
       });
     }
   }, [loadConnectionData, loadDiscoveryData]);
 
-  const handleDisconnect = useCallback(async (connectionId, userId) => {
-    if (actionInProgress.has(userId)) return;
+  const handleDisconnect = useCallback(async (connectionId, profileId) => {
+    if (actionInProgress.has(profileId)) return;
     if (!window.confirm('Are you sure you want to disconnect? This will remove the professional connection between you.')) {
       return;
     }
 
-    setActionInProgress(prev => new Set(prev).add(userId));
+    setActionInProgress(prev => new Set(prev).add(profileId));
 
     try {
       const { error } = await supabase
@@ -451,7 +519,7 @@ export default function ConnectionsPage() {
     } finally {
       setActionInProgress(prev => {
         const newSet = new Set(prev);
-        newSet.delete(userId);
+        newSet.delete(profileId);
         return newSet;
       });
     }

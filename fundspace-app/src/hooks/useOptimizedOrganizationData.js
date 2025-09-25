@@ -1,208 +1,327 @@
-// src/hooks/useOptimizedOrganizationData.js - Optimized organization data hook with batching
-import { useState, useEffect, useCallback } from 'react';
+// src/hooks/useOptimizedOrganizationData.js - Fixed version for multiple memberships
+import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import globalDataManager from '../utils/globalDataManager';
 
-// Organization data manager for batching all organization-related queries
+// Batch manager for organization data
 class OrganizationDataManager {
   constructor() {
     this.cache = new Map();
+    this.pendingRequests = new Map();
     this.CACHE_TTL = 30000; // 30 seconds
   }
 
-  getCacheKey(type, params) {
-    return `org-${type}-${JSON.stringify(params)}`;
-  }
+  // Get all user's organization memberships (not just one)
+  async getUserMemberships(profileId) {
+    const cacheKey = `user-memberships-${profileId}`;
+    
+    if (this.cache.has(cacheKey)) {
+      const cached = this.cache.get(cacheKey);
+      if (Date.now() - cached.timestamp < this.CACHE_TTL) {
+        return cached.data;
+      }
+      this.cache.delete(cacheKey);
+    }
 
-  isValidCache(cacheItem) {
-    return cacheItem && (Date.now() - cacheItem.timestamp) < this.CACHE_TTL;
-  }
+    if (this.pendingRequests.has(cacheKey)) {
+      return this.pendingRequests.get(cacheKey);
+    }
 
-  setCache(key, data) {
-    this.cache.set(key, { data, timestamp: Date.now() });
-  }
-
-  getCache(key) {
-    const item = this.cache.get(key);
-    return this.isValidCache(item) ? item.data : null;
-  }
-
-  // Batch load all organization data
-  async loadAllOrganizationData(organizationId, userId) {
-    const cacheKey = this.getCacheKey('all-data', { organizationId, userId });
-    const cached = this.getCache(cacheKey);
-    if (cached) return cached;
+    const promise = this._fetchUserMemberships(profileId);
+    this.pendingRequests.set(cacheKey, promise);
 
     try {
-      // Execute all organization queries in parallel
-      const [
-        organizationResult,
-        membersResult,
-        userMembershipResult,
-        organizationPostsResult,
-        organizationPhotosResult,
-        organizationProgramsResult,
-        organizationNorthStarsResult
-      ] = await Promise.all([
-        // Get organization details
-        supabase
-          .from('organizations')
-          .select('*')
-          .eq('id', organizationId)
-          .single(),
-        
-        // Get organization members
-        supabase
-          .from('organization_memberships')
-          .select(`
-            id, profile_id, role, joined_at, functional_role, membership_type, is_public,
-            profiles!organization_memberships_profile_id_fkey(
-              id, full_name, avatar_url, title, email
-            )
-          `)
-          .eq('organization_id', organizationId)
-          .eq('is_public', true),
-        
-        // Get user's membership
-        supabase
-          .from('organization_memberships')
-          .select('*')
-          .eq('organization_id', organizationId)
-          .eq('profile_id', userId)
-          .maybeSingle(),
-        
-        // Get organization posts
-        supabase
-          .from('organization_posts')
-          .select(`
-            id, content, created_at, image_urls, likes_count, comments_count,
-            profiles!organization_posts_profile_id_fkey(
-              id, full_name, avatar_url, title
-            )
-          `)
-          .eq('organization_id', organizationId)
-          .order('created_at', { ascending: false })
-          .limit(20),
-        
-        // Get organization photos
-        supabase
-          .from('organization_photos')
-          .select('id, image_url, caption, created_at, likes_count, comments_count')
-          .eq('organization_id', organizationId)
-          .order('created_at', { ascending: false })
-          .limit(20),
-        
-        // Get organization programs
-        supabase
-          .from('organization_programs')
-          .select('*')
-          .eq('organization_id', organizationId)
-          .limit(10),
-        
-        // Get organization north stars
-        supabase
-          .from('organization_north_stars')
-          .select('*')
-          .eq('organization_id', organizationId)
-      ]);
-
-      // Process organization posts with batched likes data
-      let processedPosts = [];
-      if (organizationPostsResult.data?.length > 0) {
-        const postIds = organizationPostsResult.data.map(p => p.id);
-        
-        // Use global data manager for organization post likes
-        const { data: postLikesData } = await supabase
-          .from('organization_post_likes')
-          .select('organization_post_id, user_id, reaction_type')
-          .in('organization_post_id', postIds);
-
-        // Group likes by post
-        const likesByPost = {};
-        postLikesData?.forEach(like => {
-          if (!likesByPost[like.organization_post_id]) {
-            likesByPost[like.organization_post_id] = [];
-          }
-          likesByPost[like.organization_post_id].push(like);
-        });
-
-        // Process posts with like data
-        processedPosts = organizationPostsResult.data.map(post => {
-          const postLikes = likesByPost[post.id] || [];
-          const reactionCounts = {};
-          postLikes.forEach(like => {
-            const type = like.reaction_type || 'like';
-            reactionCounts[type] = (reactionCounts[type] || 0) + 1;
-          });
-
-          return {
-            ...post,
-            likes_count: postLikes.length,
-            reactions: {
-              summary: Object.entries(reactionCounts).map(([type, count]) => ({ type, count })),
-              sample: postLikes.slice(0, 3)
-            }
-          };
-        });
-      }
-
-      // Collect member user IDs for batch profile enhancement
-      const memberUserIds = membersResult.data?.map(m => m.profile_id) || [];
-      
-      // Batch load organization memberships for enhanced member data
-      const orgMembershipsData = memberUserIds.length > 0 
-        ? await globalDataManager.getOrganizationMemberships(memberUserIds)
-        : {};
-
-      // Enhanced members with organization data
-      const enhancedMembers = membersResult.data?.map(member => {
-        const orgMembership = orgMembershipsData[member.profile_id];
-        return {
-          ...member,
-          profiles: {
-            ...member.profiles,
-            organization_name: orgMembership?.organization?.name || member.profiles?.organization_name,
-            organization_type: orgMembership?.organization?.type || member.profiles?.organization_type,
-            enhanced_role: orgMembership?.role || member.role
-          }
-        };
-      }) || [];
-
-      const result = {
-        organization: organizationResult.data,
-        members: enhancedMembers,
-        userMembership: userMembershipResult.data,
-        organizationPosts: processedPosts,
-        organizationPhotos: organizationPhotosResult.data || [],
-        organizationPrograms: organizationProgramsResult.data || [],
-        organizationNorthStars: organizationNorthStarsResult.data || []
-      };
-
-      this.setCache(cacheKey, result);
-      return result;
-
-    } catch (error) {
-      console.error('Error loading organization data:', error);
-      return {
-        organization: null,
-        members: [],
-        userMembership: null,
-        organizationPosts: [],
-        organizationPhotos: [],
-        organizationPrograms: [],
-        organizationNorthStars: []
-      };
+      const data = await promise;
+      this.cache.set(cacheKey, { data, timestamp: Date.now() });
+      return data;
+    } finally {
+      this.pendingRequests.delete(cacheKey);
     }
   }
 
-  clearCache() {
-    this.cache.clear();
+  async _fetchUserMemberships(profileId) {
+    try {
+      const { data: memberships, error } = await supabase
+        .from('organization_memberships')
+        .select('organization_id, role, membership_type, organization_type, joined_at')
+        .eq('profile_id', profileId)
+        .order('joined_at', { ascending: false });
+
+      if (error) throw error;
+      return memberships || [];
+    } catch (error) {
+      console.error('Error fetching user memberships:', error);
+      return [];
+    }
+  }
+
+  // Get organization details
+  async getOrganizationDetails(organizationId) {
+    const cacheKey = `org-details-${organizationId}`;
+    
+    if (this.cache.has(cacheKey)) {
+      const cached = this.cache.get(cacheKey);
+      if (Date.now() - cached.timestamp < this.CACHE_TTL) {
+        return cached.data;
+      }
+      this.cache.delete(cacheKey);
+    }
+
+    if (this.pendingRequests.has(cacheKey)) {
+      return this.pendingRequests.get(cacheKey);
+    }
+
+    const promise = this._fetchOrganizationDetails(organizationId);
+    this.pendingRequests.set(cacheKey, promise);
+
+    try {
+      const data = await promise;
+      this.cache.set(cacheKey, { data, timestamp: Date.now() });
+      return data;
+    } finally {
+      this.pendingRequests.delete(cacheKey);
+    }
+  }
+
+  async _fetchOrganizationDetails(organizationId) {
+    try {
+      const { data: organization, error } = await supabase
+        .from('organizations')
+        .select('*')
+        .eq('id', organizationId)
+        .single();
+
+      if (error) throw error;
+      return organization;
+    } catch (error) {
+      console.error('Error fetching organization details:', error);
+      return null;
+    }
+  }
+
+  // Get organization members
+  async getOrganizationMembers(organizationId) {
+    const cacheKey = `org-members-${organizationId}`;
+    
+    if (this.cache.has(cacheKey)) {
+      const cached = this.cache.get(cacheKey);
+      if (Date.now() - cached.timestamp < this.CACHE_TTL) {
+        return cached.data;
+      }
+      this.cache.delete(cacheKey);
+    }
+
+    if (this.pendingRequests.has(cacheKey)) {
+      return this.pendingRequests.get(cacheKey);
+    }
+
+    const promise = this._fetchOrganizationMembers(organizationId);
+    this.pendingRequests.set(cacheKey, promise);
+
+    try {
+      const data = await promise;
+      this.cache.set(cacheKey, { data, timestamp: Date.now() });
+      return data;
+    } finally {
+      this.pendingRequests.delete(cacheKey);
+    }
+  }
+
+  async _fetchOrganizationMembers(organizationId) {
+    try {
+      const { data: members, error } = await supabase
+        .from('organization_memberships')
+        .select(`
+          id,
+          profile_id,
+          role,
+          membership_type,
+          joined_at,
+          profiles (
+            id,
+            full_name,
+            avatar_url,
+            title,
+            organizational_role
+          )
+        `)
+        .eq('organization_id', organizationId)
+        .order('role', { ascending: false })
+        .order('joined_at', { ascending: true });
+
+      if (error) throw error;
+      return members?.filter(member => member.profiles) || [];
+    } catch (error) {
+      console.error('Error fetching organization members:', error);
+      return [];
+    }
+  }
+
+  // Get organization posts with enhanced data
+  async getOrganizationPosts(organizationId) {
+    const cacheKey = `org-posts-${organizationId}`;
+    
+    if (this.cache.has(cacheKey)) {
+      const cached = this.cache.get(cacheKey);
+      if (Date.now() - cached.timestamp < this.CACHE_TTL) {
+        return cached.data;
+      }
+      this.cache.delete(cacheKey);
+    }
+
+    if (this.pendingRequests.has(cacheKey)) {
+      return this.pendingRequests.get(cacheKey);
+    }
+
+    const promise = this._fetchOrganizationPosts(organizationId);
+    this.pendingRequests.set(cacheKey, promise);
+
+    try {
+      const data = await promise;
+      this.cache.set(cacheKey, { data, timestamp: Date.now() });
+      return data;
+    } finally {
+      this.pendingRequests.delete(cacheKey);
+    }
+  }
+
+  async _fetchOrganizationPosts(organizationId) {
+    try {
+      const { data: posts, error } = await supabase
+        .from('posts')
+        .select(`
+          *,
+          profiles (
+            id,
+            full_name,
+            avatar_url,
+            title,
+            organizational_role
+          )
+        `)
+        .eq('organization_id', organizationId)
+        .order('created_at', { ascending: false })
+        .limit(20);
+
+      if (error) throw error;
+
+      // Batch load post likes for all posts
+      if (posts?.length > 0) {
+        const postIds = posts.map(post => post.id);
+        const postLikesData = await globalDataManager.getBatchPostLikes(postIds);
+        
+        return posts.map(post => ({
+          ...post,
+          likes_count: postLikesData[post.id]?.likes_count || 0,
+          user_reaction: postLikesData[post.id]?.user_reaction || null
+        }));
+      }
+
+      return posts || [];
+    } catch (error) {
+      console.error('Error fetching organization posts:', error);
+      return [];
+    }
+  }
+
+  // Get organization programs
+  async getOrganizationPrograms(organizationId) {
+    const cacheKey = `org-programs-${organizationId}`;
+    
+    if (this.cache.has(cacheKey)) {
+      const cached = this.cache.get(cacheKey);
+      if (Date.now() - cached.timestamp < this.CACHE_TTL) {
+        return cached.data;
+      }
+      this.cache.delete(cacheKey);
+    }
+
+    try {
+      const { data: programs, error } = await supabase
+        .from('organization_programs')
+        .select('*')
+        .eq('organization_id', organizationId)
+        .eq('is_active', true)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      
+      const result = programs || [];
+      this.cache.set(cacheKey, { data: result, timestamp: Date.now() });
+      return result;
+    } catch (error) {
+      console.error('Error fetching organization programs:', error);
+      return [];
+    }
+  }
+
+  // Get organization photos
+  async getOrganizationPhotos(organizationId) {
+    const cacheKey = `org-photos-${organizationId}`;
+    
+    if (this.cache.has(cacheKey)) {
+      const cached = this.cache.get(cacheKey);
+      if (Date.now() - cached.timestamp < this.CACHE_TTL) {
+        return cached.data;
+      }
+      this.cache.delete(cacheKey);
+    }
+
+    try {
+      const { data: photos, error } = await supabase
+        .from('organization_photos')
+        .select('*')
+        .eq('organization_id', organizationId)
+        .order('created_at', { ascending: false })
+        .limit(20);
+
+      if (error) throw error;
+      
+      const result = photos || [];
+      this.cache.set(cacheKey, { data: result, timestamp: Date.now() });
+      return result;
+    } catch (error) {
+      console.error('Error fetching organization photos:', error);
+      return [];
+    }
+  }
+
+  // Get organization north stars
+  async getOrganizationNorthStars(organizationId) {
+    const cacheKey = `org-north-stars-${organizationId}`;
+    
+    if (this.cache.has(cacheKey)) {
+      const cached = this.cache.get(cacheKey);
+      if (Date.now() - cached.timestamp < this.CACHE_TTL) {
+        return cached.data;
+      }
+      this.cache.delete(cacheKey);
+    }
+
+    try {
+      const { data: northStars, error } = await supabase
+        .from('organization_north_stars')
+        .select('*')
+        .eq('organization_id', organizationId)
+        .eq('is_published', true)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      
+      const result = northStars || [];
+      this.cache.set(cacheKey, { data: result, timestamp: Date.now() });
+      return result;
+    } catch (error) {
+      console.error('Error fetching organization north stars:', error);
+      return [];
+    }
   }
 }
 
+// Create singleton instance
 const organizationDataManager = new OrganizationDataManager();
 
-export function useOptimizedOrganizationData(profile, session) {
+export default function useOptimizedOrganizationData(profile, session) {
   const [state, setState] = useState({
     organization: null,
     members: [],
@@ -211,6 +330,8 @@ export function useOptimizedOrganizationData(profile, session) {
     organizationPhotos: [],
     organizationPrograms: [],
     organizationNorthStars: [],
+    allMemberships: [], // NEW: Store all user memberships
+    selectedOrganization: null, // NEW: Track which org is selected
     loading: false,
     error: null
   });
@@ -219,172 +340,98 @@ export function useOptimizedOrganizationData(profile, session) {
     setState(prev => ({ ...prev, error }));
   }, []);
 
-  // Check user membership and get organization ID
-  const checkMembership = useCallback(async () => {
-    if (!profile?.id) return null;
-
-    try {
-      const { data, error } = await supabase
-        .from('organization_memberships')
-        .select('organization_id, role')
-        .eq('profile_id', profile.id)
-        .maybeSingle();
-
-      if (error) {
-        console.error('Error checking membership:', error);
-        return null;
-      }
-
-      return data;
-    } catch (error) {
-      console.error('Error in checkMembership:', error);
-      return null;
-    }
-  }, [profile?.id]);
-
-  // Fetch all organization data with batching
-  const fetchOrganizationData = useCallback(async () => {
+  // Get user's primary organization (first one or specified one)
+  const selectOrganization = useCallback(async (organizationId = null) => {
     if (!profile?.id) return;
 
     setState(prev => ({ ...prev, loading: true, error: null }));
 
     try {
-      // First check membership to get organization ID
-      const membership = await checkMembership();
+      // Get all user memberships
+      const memberships = await organizationDataManager.getUserMemberships(profile.id);
       
-      if (!membership?.organization_id) {
+      if (!memberships || memberships.length === 0) {
         setState(prev => ({
           ...prev,
           loading: false,
           organization: null,
           userMembership: null,
-          members: []
+          members: [],
+          allMemberships: [],
+          selectedOrganization: null
         }));
         return;
       }
 
-      // Load all organization data in batches
-      const data = await organizationDataManager.loadAllOrganizationData(
-        membership.organization_id,
-        profile.id
-      );
+      // Select organization (specified one or first one)
+      const selectedMembership = organizationId 
+        ? memberships.find(m => m.organization_id === organizationId)
+        : memberships[0];
+
+      if (!selectedMembership) {
+        setState(prev => ({
+          ...prev,
+          loading: false,
+          allMemberships: memberships,
+          organization: null,
+          userMembership: null,
+          selectedOrganization: null
+        }));
+        return;
+      }
+
+      const selectedOrgId = selectedMembership.organization_id;
+
+      // Load all data for the selected organization in parallel
+      const [
+        organization,
+        members,
+        posts,
+        photos,
+        programs,
+        northStars
+      ] = await Promise.all([
+        organizationDataManager.getOrganizationDetails(selectedOrgId),
+        organizationDataManager.getOrganizationMembers(selectedOrgId),
+        organizationDataManager.getOrganizationPosts(selectedOrgId),
+        organizationDataManager.getOrganizationPhotos(selectedOrgId),
+        organizationDataManager.getOrganizationPrograms(selectedOrgId),
+        organizationDataManager.getOrganizationNorthStars(selectedOrgId)
+      ]);
 
       setState(prev => ({
         ...prev,
         loading: false,
-        organization: data.organization,
-        members: data.members,
-        userMembership: data.userMembership,
-        organizationPosts: data.organizationPosts,
-        organizationPhotos: data.organizationPhotos,
-        organizationPrograms: data.organizationPrograms,
-        organizationNorthStars: data.organizationNorthStars
+        organization,
+        userMembership: selectedMembership,
+        members,
+        organizationPosts: posts,
+        organizationPhotos: photos,
+        organizationPrograms: programs,
+        organizationNorthStars: northStars,
+        allMemberships: memberships,
+        selectedOrganization: selectedOrgId
       }));
 
     } catch (error) {
-      console.error('Error fetching organization data:', error);
-      setState(prev => ({
-        ...prev,
-        loading: false,
-        error: 'Failed to load organization data'
-      }));
+      console.error('Error loading organization data:', error);
+      setError(error.message);
+      setState(prev => ({ ...prev, loading: false }));
     }
-  }, [profile?.id, checkMembership]);
+  }, [profile?.id]);
 
-  // Update organization
-  const updateOrganization = useCallback(async (updates) => {
-    if (!state.organization?.id) return;
-
-    try {
-      const { data, error } = await supabase
-        .from('organizations')
-        .update(updates)
-        .eq('id', state.organization.id)
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      setState(prev => ({
-        ...prev,
-        organization: data
-      }));
-
-      // Clear cache to reflect updates
-      organizationDataManager.clearCache();
-      
-    } catch (error) {
-      console.error('Error updating organization:', error);
-      setError('Failed to update organization');
-    }
-  }, [state.organization?.id, setError]);
-
-  // Execute leave organization
-  const executeLeave = useCallback(async () => {
-    if (!state.userMembership?.id) return;
-
-    try {
-      const { error } = await supabase
-        .from('organization_memberships')
-        .delete()
-        .eq('id', state.userMembership.id);
-
-      if (error) throw error;
-
-      // Clear cache and reset state
-      organizationDataManager.clearCache();
-      setState(prev => ({
-        ...prev,
-        organization: null,
-        userMembership: null,
-        members: []
-      }));
-
-    } catch (error) {
-      console.error('Error leaving organization:', error);
-      setError('Failed to leave organization');
-    }
-  }, [state.userMembership?.id, setError]);
-
-  // Execute delete organization
-  const executeDeleteOrganization = useCallback(async () => {
-    if (!state.organization?.id) return;
-
-    try {
-      const { error } = await supabase
-        .from('organizations')
-        .delete()
-        .eq('id', state.organization.id);
-
-      if (error) throw error;
-
-      // Clear cache and reset state
-      organizationDataManager.clearCache();
-      setState(prev => ({
-        ...prev,
-        organization: null,
-        userMembership: null,
-        members: []
-      }));
-
-    } catch (error) {
-      console.error('Error deleting organization:', error);
-      setError('Failed to delete organization');
-    }
-  }, [state.organization?.id, setError]);
-
-  // Initial data load
+  // Load data when profile changes
   useEffect(() => {
-    fetchOrganizationData();
-  }, [fetchOrganizationData]);
+    if (profile?.id) {
+      selectOrganization();
+    }
+  }, [profile?.id, selectOrganization]);
 
+  // Return hook interface
   return {
     ...state,
-    setError,
-    checkMembership,
-    fetchOrganizationData,
-    updateOrganization,
-    executeLeave,
-    executeDeleteOrganization
+    selectOrganization,
+    refresh: () => selectOrganization(state.selectedOrganization),
+    hasMultipleOrganizations: state.allMemberships.length > 1
   };
 }

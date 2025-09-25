@@ -7,7 +7,7 @@ import OrganizationTabs from './organization/OrganizationTabs.jsx';
 import OrganizationTabContent from './organization/OrganizationTabContent.jsx';
 import LeaveOrganizationModal from './organization/LeaveOrganizationModal.jsx';
 import DeleteOrganizationModal from './organization/DeleteOrganizationModal.jsx';
-import { useOptimizedOrganizationData } from '../hooks/useOptimizedOrganizationData.js';
+import useOptimizedOrganizationData from '../hooks/useOptimizedOrganizationData.js';
 import { hasPermission, PERMISSIONS } from '../utils/organizationPermissions.js';
 
 const OrganizationJoinPrompt = ({ onStartOnboarding }) => {

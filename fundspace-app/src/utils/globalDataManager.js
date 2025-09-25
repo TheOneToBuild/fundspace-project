@@ -1,4 +1,4 @@
-// src/utils/globalDataManager.js - Centralized request batching and caching
+// src/utils/globalDataManager.js - Centralized request batching and caching (Fixed)
 import { supabase } from '../supabaseClient';
 
 class GlobalDataManager {
@@ -8,7 +8,8 @@ class GlobalDataManager {
     this.batchQueues = {
       postLikes: new Map(),
       profiles: new Map(),
-      orgMemberships: new Map()
+      orgMemberships: new Map(),
+      comments: new Map()
     };
     this.batchTimeouts = {};
     
@@ -206,28 +207,7 @@ class GlobalDataManager {
 
   async _fetchOrgMemberships(userIds) {
     try {
-      // Try batch RPC call first
-      const { data: rpcData, error: rpcError } = await supabase
-        .rpc('get_batch_user_organization_memberships', { user_ids: userIds });
-
-      if (!rpcError && rpcData) {
-        const membershipsMap = {};
-        rpcData.forEach(membership => {
-          membershipsMap[membership.profile_id] = {
-            organization: {
-              id: membership.organization_id,
-              name: membership.organization_name,
-              type: membership.organization_type,
-              image_url: membership.organization_image_url
-            },
-            role: membership.role,
-            membership_type: membership.membership_type
-          };
-        });
-        return membershipsMap;
-      }
-
-      // Fallback to individual queries
+      // Direct queries approach - no RPC needed
       const { data: memberships, error } = await supabase
         .from('organization_memberships')
         .select('profile_id, organization_id, role, organization_type')
@@ -267,6 +247,60 @@ class GlobalDataManager {
       return membershipsMap;
     } catch (error) {
       console.error('Error fetching batch org memberships:', error);
+      return {};
+    }
+  }
+
+  // Batch comment loading
+  async getPostComments(postIds) {
+    const cacheKey = this.getCacheKey('post-comments-batch', postIds.sort());
+    const cached = this.getCache(cacheKey);
+    if (cached) return cached;
+
+    if (this.pendingRequests.has(cacheKey)) {
+      return this.pendingRequests.get(cacheKey);
+    }
+
+    const promise = this._fetchPostComments(postIds);
+    this.pendingRequests.set(cacheKey, promise);
+
+    try {
+      const result = await promise;
+      this.setCache(cacheKey, result);
+      return result;
+    } finally {
+      this.pendingRequests.delete(cacheKey);
+    }
+  }
+
+  async _fetchPostComments(postIds) {
+    try {
+      const { data: commentsData, error } = await supabase
+        .from('post_comments')
+        .select(`
+          id, post_id, content, created_at, likes_count, image_urls,
+          profiles:profile_id(id, full_name, avatar_url)
+        `)
+        .in('post_id', postIds)
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+
+      // Group comments by post_id
+      const commentsByPost = {};
+      postIds.forEach(postId => {
+        commentsByPost[postId] = [];
+      });
+
+      commentsData?.forEach(comment => {
+        if (commentsByPost[comment.post_id]) {
+          commentsByPost[comment.post_id].push(comment);
+        }
+      });
+
+      return commentsByPost;
+    } catch (error) {
+      console.error('Error fetching batch comments:', error);
       return {};
     }
   }
@@ -340,67 +374,9 @@ class GlobalDataManager {
     });
   }
 
-  // Batch comment loading
-  async getPostComments(postIds) {
-    const cacheKey = this.getCacheKey('post-comments-batch', postIds.sort());
-    const cached = this.getCache(cacheKey);
-    if (cached) return cached;
-
-    if (this.pendingRequests.has(cacheKey)) {
-      return this.pendingRequests.get(cacheKey);
-    }
-
-    const promise = this._fetchPostComments(postIds);
-    this.pendingRequests.set(cacheKey, promise);
-
-    try {
-      const result = await promise;
-      this.setCache(cacheKey, result);
-      return result;
-    } finally {
-      this.pendingRequests.delete(cacheKey);
-    }
-  }
-
-  async _fetchPostComments(postIds) {
-    try {
-      const { data: commentsData, error } = await supabase
-        .from('post_comments')
-        .select(`
-          id, post_id, content, created_at, likes_count, image_urls,
-          profiles:profile_id(id, full_name, avatar_url)
-        `)
-        .in('post_id', postIds)
-        .order('created_at', { ascending: true });
-
-      if (error) throw error;
-
-      // Group comments by post_id
-      const commentsByPost = {};
-      postIds.forEach(postId => {
-        commentsByPost[postId] = [];
-      });
-
-      commentsData?.forEach(comment => {
-        if (commentsByPost[comment.post_id]) {
-          commentsByPost[comment.post_id].push(comment);
-        }
-      });
-
-      return commentsByPost;
-    } catch (error) {
-      console.error('Error fetching batch comments:', error);
-      return {};
-    }
-  }
-
   // Single post comments (with batching)
   async getCommentsForPost(postId) {
     return new Promise((resolve) => {
-      if (!this.batchQueues.comments) {
-        this.batchQueues.comments = new Map();
-      }
-      
       this.batchQueues.comments.set(postId, resolve);
 
       if (this.batchTimeouts.comments) {
