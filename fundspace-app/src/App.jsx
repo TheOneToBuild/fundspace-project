@@ -51,6 +51,51 @@ import AuthLayout from './components/auth/AuthLayout';
 import ConnectionsPage from './components/ConnectionsPage.jsx';
 import GrantsPortalPage from './components/GrantsPortalPage.jsx';
 
+// ✅ CRITICAL FIX: Import and enable API Request Optimizer
+import apiRequestOptimizer from './utils/apiRequestOptimizer';
+
+// Enable API optimizer to intercept individual API calls
+apiRequestOptimizer.enableDebug();
+console.log('🚀 API Request Optimizer enabled - individual API calls will be batched automatically');
+
+// ✅ OPTIONAL: Add API call monitoring in development
+if (process.env.NODE_ENV === 'development') {
+  // Monitor all Supabase API calls
+  const originalFetch = window.fetch;
+  let callCount = 0;
+  let recentCalls = [];
+  
+  window.fetch = function(...args) {
+    const url = args[0];
+    if (typeof url === 'string' && url.includes('supabase.co/rest/v1/')) {
+      callCount++;
+      const endpoint = url.split('/rest/v1/')[1]?.split('?')[0];
+      const timestamp = new Date().toISOString();
+      
+      recentCalls.push({ endpoint, timestamp, url });
+      if (recentCalls.length > 50) recentCalls.shift(); // Keep last 50 calls
+      
+      console.log(`🔍 API Call #${callCount}: ${endpoint}`);
+      
+      // Alert if too many calls in short time
+      if (callCount > 20) {
+        console.warn('⚠️ HIGH API USAGE DETECTED - Check for missing pageData props!');
+        console.log('Recent API calls:', recentCalls.slice(-10));
+      }
+    }
+    return originalFetch.apply(this, args);
+  };
+  
+  // Log API optimizer stats periodically
+  setInterval(() => {
+    const stats = apiRequestOptimizer.getStats();
+    if (callCount > 0 || stats.interceptedCalls > 0) {
+      console.log(`📊 Last minute: ${callCount} API calls, ${stats.interceptedCalls} intercepted by optimizer`);
+      callCount = 0;
+    }
+  }, 60000); // Every minute
+}
+
 export const LayoutContext = createContext({ setPageBgColor: () => {} });
 
 const AuthRedirect = ({ children }) => {

@@ -1,244 +1,10 @@
-// src/ProfilePage.jsx - Optimized with Batching for All Profile Data
+// src/ProfilePage.jsx - Complete Optimization with usePageDataLoader
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from './supabaseClient';
 import { Outlet, useOutletContext } from 'react-router-dom';
 import PublicPageLayout from './components/PublicPageLayout.jsx';
 import GrantDetailModal from './GrantDetailModal.jsx';
-import globalDataManager from './utils/globalDataManager';
-
-// Enhanced profile data manager for batching all profile-related queries
-class ProfileDataManager {
-    constructor() {
-        this.cache = new Map();
-        this.CACHE_TTL = 30000; // 30 seconds
-    }
-
-    getCacheKey(type, params) {
-        return `profile-${type}-${JSON.stringify(params)}`;
-    }
-
-    isValidCache(cacheItem) {
-        return cacheItem && (Date.now() - cacheItem.timestamp) < this.CACHE_TTL;
-    }
-
-    setCache(key, data) {
-        this.cache.set(key, { data, timestamp: Date.now() });
-    }
-
-    getCache(key) {
-        const item = this.cache.get(key);
-        return this.isValidCache(item) ? item.data : null;
-    }
-
-    // Batch load all profile page data
-    async loadAllProfileData(userId) {
-        const cacheKey = this.getCacheKey('all-data', { userId });
-        const cached = this.getCache(cacheKey);
-        if (cached) return cached;
-
-        try {
-            // Execute all profile queries in parallel
-            const [
-                followersResult,
-                followingResult,
-                postsResult,
-                savedGrantsResult,
-                trendingGrantsResult,
-                communityMembersResult
-            ] = await Promise.all([
-                // Get followers with profiles
-                supabase
-                    .from('followers')
-                    .select('follower_id, created_at')
-                    .eq('following_id', userId),
-                
-                // Get following with profiles  
-                supabase
-                    .from('followers')
-                    .select('following_id, created_at')
-                    .eq('follower_id', userId),
-                
-                // Get user's posts
-                supabase
-                    .from('posts')
-                    .select('*, profiles!posts_profile_id_fkey(id, full_name, avatar_url, role, title, organization_name)')
-                    .eq('profile_id', userId)
-                    .order('created_at', { ascending: false }),
-                
-                // Get saved grants
-                supabase
-                    .from('saved_grants')
-                    .select('id, grant_id, created_at')
-                    .eq('user_id', userId)
-                    .order('created_at', { ascending: false }),
-                
-                // Get trending grants
-                supabase.rpc('get_trending_grants'),
-                
-                // Get community members for suggestions
-                supabase
-                    .from('profiles')
-                    .select('id, full_name, avatar_url, title, organization_name')
-                    .neq('id', userId)
-                    .limit(10)
-            ]);
-
-            // Collect all user IDs for batch profile loading
-            const userIds = new Set();
-            followersResult.data?.forEach(f => userIds.add(f.follower_id));
-            followingResult.data?.forEach(f => userIds.add(f.following_id));
-
-            // Batch load profile data for all users
-            const profilesData = userIds.size > 0 
-                ? await globalDataManager.getProfiles(Array.from(userIds))
-                : {};
-
-            // Batch load organization memberships
-            const orgMembershipsData = userIds.size > 0 
-                ? await globalDataManager.getOrganizationMemberships(Array.from(userIds))
-                : {};
-
-            // Process followers with enhanced profile data
-            const followers = followersResult.data?.map(follower => {
-                const userProfile = profilesData[follower.follower_id] || { 
-                    id: follower.follower_id, 
-                    full_name: 'Unknown User' 
-                };
-                const orgMembership = orgMembershipsData[follower.follower_id];
-                
-                return {
-                    ...userProfile,
-                    organization_name: orgMembership?.organization?.name || userProfile.organization_name,
-                    organization_type: orgMembership?.organization?.type || userProfile.organization_type,
-                    role: orgMembership?.role || userProfile.role,
-                    followed_at: follower.created_at
-                };
-            }) || [];
-
-            // Process following with enhanced profile data
-            const following = followingResult.data?.map(follow => {
-                const userProfile = profilesData[follow.following_id] || { 
-                    id: follow.following_id, 
-                    full_name: 'Unknown User' 
-                };
-                const orgMembership = orgMembershipsData[follow.following_id];
-                
-                return {
-                    ...userProfile,
-                    organization_name: orgMembership?.organization?.name || userProfile.organization_name,
-                    organization_type: orgMembership?.organization?.type || userProfile.organization_type,
-                    role: orgMembership?.role || userProfile.role,
-                    followed_at: follow.created_at
-                };
-            }) || [];
-
-            // Process posts - use global data manager for post likes
-            let posts = postsResult.data || [];
-            if (posts.length > 0) {
-                const postIds = posts.map(p => p.id);
-                const postLikesData = await globalDataManager.getPostLikes(postIds);
-                
-                posts = posts.map(post => ({
-                    ...post,
-                    likes_count: postLikesData[post.id]?.likes_count || 0,
-                    comments_count: post.comments_count || 0,
-                    reactions: {
-                        summary: postLikesData[post.id]?.reaction_summary || [],
-                        sample: []
-                    }
-                }));
-            }
-
-            // Process saved grants
-            let savedGrants = [];
-            if (savedGrantsResult.data?.length > 0) {
-                const grantIds = savedGrantsResult.data.map(sg => sg.grant_id);
-                const { data: grantsData } = await supabase
-                    .from('grants')
-                    .select('*')
-                    .in('id', grantIds);
-
-                if (grantsData?.length > 0) {
-                    const orgIds = [...new Set(grantsData.map(g => g.organization_id).filter(Boolean))];
-                    let orgsData = [];
-                    
-                    if (orgIds.length > 0) {
-                        const { data: organizationsData } = await supabase
-                            .from('organizations')
-                            .select('id, name, image_url, slug')
-                            .in('id', orgIds);
-                        orgsData = organizationsData || [];
-                    }
-
-                    savedGrants = savedGrantsResult.data.map(savedGrant => {
-                        const grantData = grantsData.find(g => g.id === savedGrant.grant_id);
-                        if (!grantData) return null;
-
-                        const orgData = orgsData.find(o => o.id === grantData.organization_id);
-
-                        return {
-                            ...grantData,
-                            dueDate: grantData.deadline,
-                            save_id: savedGrant.id,
-                            foundationName: orgData?.name || 'Unknown Organization',
-                            funderLogoUrl: orgData?.image_url || null
-                        };
-                    }).filter(Boolean);
-                }
-            }
-
-            const result = {
-                followers,
-                following,
-                posts,
-                savedGrants,
-                trendingGrants: trendingGrantsResult.data || [],
-                communityMembers: communityMembersResult.data || [],
-                socialStats: {
-                    totalFollowers: followers.length,
-                    totalFollowing: following.length,
-                    totalPosts: posts.length
-                },
-                impactMetrics: {
-                    grantsApplied: Math.floor(Math.random() * 15) + 5,
-                    grantsReceived: Math.floor(Math.random() * 5) + 1,
-                    totalFunding: Math.floor(Math.random() * 500000) + 50000,
-                    communitiesHelped: Math.floor(Math.random() * 10) + 3,
-                    postsShared: posts.length,
-                    connectionsGrown: followers.length + following.length
-                },
-                stories: [
-                    { id: 1, type: 'grant_success', title: 'Grant Success', image: null, viewed: false },
-                    { id: 2, type: 'community_event', title: 'Workshop', image: null, viewed: true },
-                    { id: 3, type: 'team_update', title: 'Team News', image: null, viewed: false }
-                ]
-            };
-
-            this.setCache(cacheKey, result);
-            return result;
-
-        } catch (error) {
-            console.error('Error loading profile data:', error);
-            return {
-                followers: [],
-                following: [],
-                posts: [],
-                savedGrants: [],
-                trendingGrants: [],
-                communityMembers: [],
-                socialStats: { totalFollowers: 0, totalFollowing: 0, totalPosts: 0 },
-                impactMetrics: { grantsApplied: 0, grantsReceived: 0, totalFunding: 0, communitiesHelped: 0, postsShared: 0, connectionsGrown: 0 },
-                stories: []
-            };
-        }
-    }
-
-    clearCache() {
-        this.cache.clear();
-    }
-}
-
-const profileDataManager = new ProfileDataManager();
+import { usePageDataLoader } from './hooks/usePageDataLoader'; // ✅ NEW: Use optimized data loader
 
 export default function ProfilePage() {
     const appContext = useOutletContext();
@@ -255,11 +21,15 @@ export default function ProfilePage() {
         communityMembers: [],
         followingUsers: [],
         followerUsers: [],
-        impactMetrics: { grantsApplied: 0, grantsReceived: 0, totalFunding: 0, communitiesHelped: 0, postsShared: 0, connectionsGrown: 0 },
+        impactMetrics: { 
+            grantsApplied: 0, 
+            grantsReceived: 0, 
+            totalFunding: 0, 
+            communitiesHelped: 0, 
+            postsShared: 0, 
+            connectionsGrown: 0 
+        },
         stories: [],
-        communityEvents: [],
-        suggestedConnections: [],
-        recentActivity: [],
         totalPosts: 0,
         totalFollowers: 0,
         totalFollowing: 0,
@@ -267,38 +37,117 @@ export default function ProfilePage() {
         showCreatePost: false
     });
 
-    const { trendingGrants, savedGrants, posts, isDetailModalOpen, selectedGrant, dataLoading, error, communityMembers, impactMetrics, stories, activeTab, totalPosts, totalFollowers, totalFollowing, suggestedConnections, followerUsers, followingUsers } = appState;
+    // ✅ NEW: Use optimized page data loader instead of profileDataManager
+    const { pageData, loadProfilePageData, loadPostsPageData, clearPageData } = usePageDataLoader();
 
-    // Optimized data fetching with batching
+    const { 
+        trendingGrants, savedGrants, posts, isDetailModalOpen, selectedGrant, 
+        dataLoading, error, communityMembers, impactMetrics, stories, activeTab, 
+        totalPosts, totalFollowers, totalFollowing, suggestedConnections, 
+        followerUsers, followingUsers 
+    } = appState;
+
+    // ✅ OPTIMIZED: Fetch all data with batched calls
     const fetchPageData = useCallback(async (userId) => {
         if (!userId) return;
         
         setAppState(prev => ({ ...prev, dataLoading: true, error: null }));
         
         try {
-            const data = await profileDataManager.loadAllProfileData(userId);
-            
+            // Load posts first
+            const { data: postsData } = await supabase
+                .from('posts')
+                .select(`
+                    id, content, created_at, likes_count, comments_count, channel, tags, image_urls,
+                    profiles:profile_id(id, full_name, avatar_url, title, organization_name, role, organization_type)
+                `)
+                .eq('profile_id', userId)
+                .order('created_at', { ascending: false })
+                .limit(20);
+
+            const posts = postsData || [];
+
+            // ✅ NEW: Load batched page data for posts instead of individual API calls
+            await loadProfilePageData(userId, posts);
+
+            // Load other profile data in parallel (these are OK as single calls)
+            const [
+                { data: savedGrantsData },
+                { data: trendingGrantsData },
+                { data: followersData },
+                { data: followingData },
+                { data: communityMembersData }
+            ] = await Promise.all([
+                supabase
+                    .from('saved_grants')
+                    .select('*, grant_opportunities(*)')
+                    .eq('user_id', userId)
+                    .limit(10),
+                supabase
+                    .from('grant_opportunities')
+                    .select('*')
+                    .eq('is_active', true)
+                    .order('created_at', { ascending: false })
+                    .limit(5),
+                supabase
+                    .from('followers')
+                    .select('follower_id, profiles:follower_id(id, full_name, avatar_url, title, organization_name)')
+                    .eq('followed_id', userId)
+                    .limit(20),
+                supabase
+                    .from('followers') 
+                    .select('followed_id, profiles:followed_id(id, full_name, avatar_url, title, organization_name)')
+                    .eq('follower_id', userId)
+                    .limit(20),
+                supabase
+                    .from('profiles')
+                    .select('id, full_name, avatar_url, title, organization_name')
+                    .neq('id', userId)
+                    .limit(10)
+            ]);
+
+            // Calculate impact metrics
+            const impactMetrics = {
+                grantsApplied: Math.floor(Math.random() * 15) + 5,
+                grantsReceived: Math.floor(Math.random() * 5) + 1,
+                totalFunding: Math.floor(Math.random() * 500000) + 50000,
+                communitiesHelped: followersData?.length || 0,
+                postsShared: posts.length,
+                connectionsGrown: (followersData?.length || 0) + (followingData?.length || 0)
+            };
+
+            const stories = [
+                { id: 1, type: 'grant_success', title: 'Grant Success', image: null, viewed: false },
+                { id: 2, type: 'community_event', title: 'Workshop', image: null, viewed: true },
+                { id: 3, type: 'team_update', title: 'Team News', image: null, viewed: false }
+            ];
+
             setAppState(prev => ({
                 ...prev,
                 dataLoading: false,
-                savedGrants: data.savedGrants,
-                trendingGrants: data.trendingGrants,
-                posts: data.posts,
-                totalPosts: data.socialStats.totalPosts,
-                followerUsers: data.followers,
-                totalFollowers: data.socialStats.totalFollowers,
-                followingUsers: data.following,
-                totalFollowing: data.socialStats.totalFollowing,
-                communityMembers: data.communityMembers,
-                suggestedConnections: data.communityMembers.slice(0, 5),
-                impactMetrics: data.impactMetrics,
-                stories: data.stories
+                posts,
+                savedGrants: savedGrantsData?.map(sg => sg.grant_opportunities) || [],
+                trendingGrants: trendingGrantsData || [],
+                totalPosts: posts.length,
+                followerUsers: followersData?.map(f => f.profiles) || [],
+                totalFollowers: followersData?.length || 0,
+                followingUsers: followingData?.map(f => f.profiles) || [],
+                totalFollowing: followingData?.length || 0,
+                communityMembers: communityMembersData || [],
+                suggestedConnections: (communityMembersData || []).slice(0, 5),
+                impactMetrics,
+                stories
             }));
+
         } catch (error) {
             console.error('Error fetching page data:', error);
-            setAppState(prev => ({ ...prev, dataLoading: false, error: 'Failed to load data. Please try again.' }));
+            setAppState(prev => ({ 
+                ...prev, 
+                dataLoading: false, 
+                error: 'Failed to load data. Please try again.' 
+            }));
         }
-    }, []);
+    }, [loadProfilePageData]);
 
     const handleTabChange = useCallback(newTab => {
         setAppState(prev => ({ ...prev, activeTab: newTab }));
@@ -324,13 +173,13 @@ export default function ProfilePage() {
             }));
             
             // Clear cache and reload data
-            profileDataManager.clearCache();
+            clearPageData();
             fetchPageData(session.user.id);
             
         } catch (error) {
             console.error('Error updating follow status:', error);
         }
-    }, [session, fetchPageData]);
+    }, [session, fetchPageData, clearPageData]);
 
     const handleUnfollowUser = useCallback(userId => {
         handleFollowUser(userId, 'unfollow');
@@ -355,13 +204,19 @@ export default function ProfilePage() {
     const handleNewPost = useCallback(newPostData => {
         setAppState(prev => ({
             ...prev,
-            posts: [{ ...newPostData, profiles: profile, reactions: { summary: [], sample: [] }, likes_count: 0, comments_count: 0 }, ...prev.posts],
+            posts: [{ 
+                ...newPostData, 
+                profiles: profile, 
+                reactions: { summary: [], sample: [] }, 
+                likes_count: 0, 
+                comments_count: 0 
+            }, ...prev.posts],
             totalPosts: prev.totalPosts + 1
         }));
         
         // Clear cache to include new post
-        profileDataManager.clearCache();
-    }, [profile]);
+        clearPageData();
+    }, [profile, clearPageData]);
 
     const handleDeletePost = useCallback(deletedPostId => {
         setAppState(prev => ({
@@ -371,8 +226,8 @@ export default function ProfilePage() {
         }));
         
         // Clear cache to reflect deletion
-        profileDataManager.clearCache();
-    }, []);
+        clearPageData();
+    }, [clearPageData]);
 
     const openDetail = useCallback(grant => {
         setAppState(prev => ({ ...prev, selectedGrant: grant, isDetailModalOpen: true }));
@@ -414,23 +269,25 @@ export default function ProfilePage() {
     const handleSaveGrant = useCallback(async grantId => {
         if (session && grantId) {
             await supabase.from('saved_grants').insert({ user_id: session.user.id, grant_id: grantId });
-            profileDataManager.clearCache();
+            clearPageData();
             fetchPageData(session.user.id);
         }
-    }, [session, fetchPageData]);
+    }, [session, fetchPageData, clearPageData]);
 
     const handleUnsaveGrant = useCallback(async grantId => {
         if (session && grantId) {
             await supabase.from('saved_grants').delete().match({ user_id: session.user.id, grant_id: grantId });
-            profileDataManager.clearCache();
+            clearPageData();
             fetchPageData(session.user.id);
         }
-    }, [session, fetchPageData]);
+    }, [session, fetchPageData, clearPageData]);
 
+    // ✅ NEW: Add pageData to outlet context so child components can use batched data
     const outletContext = useMemo(() => ({
         ...appContext,
         profile,
         posts,
+        pageData, // ✅ NEW: Pass pageData to child components
         handleNewPost,
         handleDeletePost,
         savedGrants,
@@ -451,7 +308,13 @@ export default function ProfilePage() {
         socialStats: { totalPosts, totalFollowers, totalFollowing },
         followerUsers,
         followingUsers
-    }), [appContext, profile, posts, handleNewPost, handleDeletePost, savedGrants, session, handleSaveGrant, handleUnsaveGrant, openDetail, activeTab, handleTabChange, impactMetrics, stories, handleStoryClick, handleCreateStory, communityMembers, suggestedConnections, handleFollowUser, handleUnfollowUser, totalPosts, totalFollowers, totalFollowing, followerUsers, followingUsers]);
+    }), [
+        appContext, profile, posts, pageData, handleNewPost, handleDeletePost, 
+        savedGrants, session, handleSaveGrant, handleUnsaveGrant, openDetail, 
+        activeTab, handleTabChange, impactMetrics, stories, handleStoryClick, 
+        handleCreateStory, communityMembers, suggestedConnections, handleFollowUser, 
+        handleUnfollowUser, totalPosts, totalFollowers, totalFollowing, followerUsers, followingUsers
+    ]);
 
     if (loading || !profile) {
         return (
@@ -469,7 +332,10 @@ export default function ProfilePage() {
             <div className="min-h-screen bg-[#faf7f4] flex items-center justify-center">
                 <div className="text-center bg-white/80 backdrop-blur-sm p-8 rounded-xl shadow-sm border border-red-200">
                     <p className="text-red-600 mb-4">{error}</p>
-                    <button onClick={() => fetchPageData(session.user.id)} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                    <button 
+                        onClick={() => fetchPageData(session.user.id)} 
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                    >
                         Retry
                     </button>
                 </div>
