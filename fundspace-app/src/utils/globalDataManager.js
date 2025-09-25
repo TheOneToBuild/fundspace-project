@@ -340,6 +340,93 @@ class GlobalDataManager {
     });
   }
 
+  // Batch comment loading
+  async getPostComments(postIds) {
+    const cacheKey = this.getCacheKey('post-comments-batch', postIds.sort());
+    const cached = this.getCache(cacheKey);
+    if (cached) return cached;
+
+    if (this.pendingRequests.has(cacheKey)) {
+      return this.pendingRequests.get(cacheKey);
+    }
+
+    const promise = this._fetchPostComments(postIds);
+    this.pendingRequests.set(cacheKey, promise);
+
+    try {
+      const result = await promise;
+      this.setCache(cacheKey, result);
+      return result;
+    } finally {
+      this.pendingRequests.delete(cacheKey);
+    }
+  }
+
+  async _fetchPostComments(postIds) {
+    try {
+      const { data: commentsData, error } = await supabase
+        .from('post_comments')
+        .select(`
+          id, post_id, content, created_at, likes_count, image_urls,
+          profiles:profile_id(id, full_name, avatar_url)
+        `)
+        .in('post_id', postIds)
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+
+      // Group comments by post_id
+      const commentsByPost = {};
+      postIds.forEach(postId => {
+        commentsByPost[postId] = [];
+      });
+
+      commentsData?.forEach(comment => {
+        if (commentsByPost[comment.post_id]) {
+          commentsByPost[comment.post_id].push(comment);
+        }
+      });
+
+      return commentsByPost;
+    } catch (error) {
+      console.error('Error fetching batch comments:', error);
+      return {};
+    }
+  }
+
+  // Single post comments (with batching)
+  async getCommentsForPost(postId) {
+    return new Promise((resolve) => {
+      if (!this.batchQueues.comments) {
+        this.batchQueues.comments = new Map();
+      }
+      
+      this.batchQueues.comments.set(postId, resolve);
+
+      if (this.batchTimeouts.comments) {
+        clearTimeout(this.batchTimeouts.comments);
+      }
+
+      this.batchTimeouts.comments = setTimeout(async () => {
+        const postIds = Array.from(this.batchQueues.comments.keys());
+        const resolvers = Array.from(this.batchQueues.comments.values());
+        this.batchQueues.comments.clear();
+
+        try {
+          const batchResult = await this.getPostComments(postIds);
+          
+          resolvers.forEach((resolver, index) => {
+            const postId = postIds[index];
+            resolver(batchResult[postId] || []);
+          });
+        } catch (error) {
+          console.error('Batch comments error:', error);
+          resolvers.forEach(resolver => resolver([]));
+        }
+      }, this.BATCH_DELAY);
+    });
+  }
+
   // Clear cache
   clearCache(prefix) {
     if (prefix) {

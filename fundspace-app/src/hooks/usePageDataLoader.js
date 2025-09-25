@@ -19,16 +19,18 @@ export function usePageDataLoader() {
       const uniqueAuthorIds = [...new Set(authorIds)];
 
       // Batch load all data simultaneously
-      const [postLikesData, profilesData, orgMembershipsData] = await Promise.all([
+      const [postLikesData, profilesData, orgMembershipsData, commentsData] = await Promise.all([
         globalDataManager.getPostLikes(postIds),
         globalDataManager.getProfiles(uniqueAuthorIds),
-        globalDataManager.getOrganizationMemberships(uniqueAuthorIds)
+        globalDataManager.getOrganizationMemberships(uniqueAuthorIds),
+        globalDataManager.getPostComments(postIds)
       ]);
 
       const combinedData = {
         postLikes: postLikesData,
         profiles: profilesData,
-        orgMemberships: orgMembershipsData
+        orgMemberships: orgMembershipsData,
+        comments: commentsData
       };
 
       setPageData(combinedData);

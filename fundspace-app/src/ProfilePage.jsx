@@ -1,9 +1,244 @@
-// src/ProfilePage.jsx - FIXED VERSION
+// src/ProfilePage.jsx - Optimized with Batching for All Profile Data
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from './supabaseClient';
 import { Outlet, useOutletContext } from 'react-router-dom';
 import PublicPageLayout from './components/PublicPageLayout.jsx';
 import GrantDetailModal from './GrantDetailModal.jsx';
+import globalDataManager from './utils/globalDataManager';
+
+// Enhanced profile data manager for batching all profile-related queries
+class ProfileDataManager {
+    constructor() {
+        this.cache = new Map();
+        this.CACHE_TTL = 30000; // 30 seconds
+    }
+
+    getCacheKey(type, params) {
+        return `profile-${type}-${JSON.stringify(params)}`;
+    }
+
+    isValidCache(cacheItem) {
+        return cacheItem && (Date.now() - cacheItem.timestamp) < this.CACHE_TTL;
+    }
+
+    setCache(key, data) {
+        this.cache.set(key, { data, timestamp: Date.now() });
+    }
+
+    getCache(key) {
+        const item = this.cache.get(key);
+        return this.isValidCache(item) ? item.data : null;
+    }
+
+    // Batch load all profile page data
+    async loadAllProfileData(userId) {
+        const cacheKey = this.getCacheKey('all-data', { userId });
+        const cached = this.getCache(cacheKey);
+        if (cached) return cached;
+
+        try {
+            // Execute all profile queries in parallel
+            const [
+                followersResult,
+                followingResult,
+                postsResult,
+                savedGrantsResult,
+                trendingGrantsResult,
+                communityMembersResult
+            ] = await Promise.all([
+                // Get followers with profiles
+                supabase
+                    .from('followers')
+                    .select('follower_id, created_at')
+                    .eq('following_id', userId),
+                
+                // Get following with profiles  
+                supabase
+                    .from('followers')
+                    .select('following_id, created_at')
+                    .eq('follower_id', userId),
+                
+                // Get user's posts
+                supabase
+                    .from('posts')
+                    .select('*, profiles!posts_profile_id_fkey(id, full_name, avatar_url, role, title, organization_name)')
+                    .eq('profile_id', userId)
+                    .order('created_at', { ascending: false }),
+                
+                // Get saved grants
+                supabase
+                    .from('saved_grants')
+                    .select('id, grant_id, created_at')
+                    .eq('user_id', userId)
+                    .order('created_at', { ascending: false }),
+                
+                // Get trending grants
+                supabase.rpc('get_trending_grants'),
+                
+                // Get community members for suggestions
+                supabase
+                    .from('profiles')
+                    .select('id, full_name, avatar_url, title, organization_name')
+                    .neq('id', userId)
+                    .limit(10)
+            ]);
+
+            // Collect all user IDs for batch profile loading
+            const userIds = new Set();
+            followersResult.data?.forEach(f => userIds.add(f.follower_id));
+            followingResult.data?.forEach(f => userIds.add(f.following_id));
+
+            // Batch load profile data for all users
+            const profilesData = userIds.size > 0 
+                ? await globalDataManager.getProfiles(Array.from(userIds))
+                : {};
+
+            // Batch load organization memberships
+            const orgMembershipsData = userIds.size > 0 
+                ? await globalDataManager.getOrganizationMemberships(Array.from(userIds))
+                : {};
+
+            // Process followers with enhanced profile data
+            const followers = followersResult.data?.map(follower => {
+                const userProfile = profilesData[follower.follower_id] || { 
+                    id: follower.follower_id, 
+                    full_name: 'Unknown User' 
+                };
+                const orgMembership = orgMembershipsData[follower.follower_id];
+                
+                return {
+                    ...userProfile,
+                    organization_name: orgMembership?.organization?.name || userProfile.organization_name,
+                    organization_type: orgMembership?.organization?.type || userProfile.organization_type,
+                    role: orgMembership?.role || userProfile.role,
+                    followed_at: follower.created_at
+                };
+            }) || [];
+
+            // Process following with enhanced profile data
+            const following = followingResult.data?.map(follow => {
+                const userProfile = profilesData[follow.following_id] || { 
+                    id: follow.following_id, 
+                    full_name: 'Unknown User' 
+                };
+                const orgMembership = orgMembershipsData[follow.following_id];
+                
+                return {
+                    ...userProfile,
+                    organization_name: orgMembership?.organization?.name || userProfile.organization_name,
+                    organization_type: orgMembership?.organization?.type || userProfile.organization_type,
+                    role: orgMembership?.role || userProfile.role,
+                    followed_at: follow.created_at
+                };
+            }) || [];
+
+            // Process posts - use global data manager for post likes
+            let posts = postsResult.data || [];
+            if (posts.length > 0) {
+                const postIds = posts.map(p => p.id);
+                const postLikesData = await globalDataManager.getPostLikes(postIds);
+                
+                posts = posts.map(post => ({
+                    ...post,
+                    likes_count: postLikesData[post.id]?.likes_count || 0,
+                    comments_count: post.comments_count || 0,
+                    reactions: {
+                        summary: postLikesData[post.id]?.reaction_summary || [],
+                        sample: []
+                    }
+                }));
+            }
+
+            // Process saved grants
+            let savedGrants = [];
+            if (savedGrantsResult.data?.length > 0) {
+                const grantIds = savedGrantsResult.data.map(sg => sg.grant_id);
+                const { data: grantsData } = await supabase
+                    .from('grants')
+                    .select('*')
+                    .in('id', grantIds);
+
+                if (grantsData?.length > 0) {
+                    const orgIds = [...new Set(grantsData.map(g => g.organization_id).filter(Boolean))];
+                    let orgsData = [];
+                    
+                    if (orgIds.length > 0) {
+                        const { data: organizationsData } = await supabase
+                            .from('organizations')
+                            .select('id, name, image_url, slug')
+                            .in('id', orgIds);
+                        orgsData = organizationsData || [];
+                    }
+
+                    savedGrants = savedGrantsResult.data.map(savedGrant => {
+                        const grantData = grantsData.find(g => g.id === savedGrant.grant_id);
+                        if (!grantData) return null;
+
+                        const orgData = orgsData.find(o => o.id === grantData.organization_id);
+
+                        return {
+                            ...grantData,
+                            dueDate: grantData.deadline,
+                            save_id: savedGrant.id,
+                            foundationName: orgData?.name || 'Unknown Organization',
+                            funderLogoUrl: orgData?.image_url || null
+                        };
+                    }).filter(Boolean);
+                }
+            }
+
+            const result = {
+                followers,
+                following,
+                posts,
+                savedGrants,
+                trendingGrants: trendingGrantsResult.data || [],
+                communityMembers: communityMembersResult.data || [],
+                socialStats: {
+                    totalFollowers: followers.length,
+                    totalFollowing: following.length,
+                    totalPosts: posts.length
+                },
+                impactMetrics: {
+                    grantsApplied: Math.floor(Math.random() * 15) + 5,
+                    grantsReceived: Math.floor(Math.random() * 5) + 1,
+                    totalFunding: Math.floor(Math.random() * 500000) + 50000,
+                    communitiesHelped: Math.floor(Math.random() * 10) + 3,
+                    postsShared: posts.length,
+                    connectionsGrown: followers.length + following.length
+                },
+                stories: [
+                    { id: 1, type: 'grant_success', title: 'Grant Success', image: null, viewed: false },
+                    { id: 2, type: 'community_event', title: 'Workshop', image: null, viewed: true },
+                    { id: 3, type: 'team_update', title: 'Team News', image: null, viewed: false }
+                ]
+            };
+
+            this.setCache(cacheKey, result);
+            return result;
+
+        } catch (error) {
+            console.error('Error loading profile data:', error);
+            return {
+                followers: [],
+                following: [],
+                posts: [],
+                savedGrants: [],
+                trendingGrants: [],
+                communityMembers: [],
+                socialStats: { totalFollowers: 0, totalFollowing: 0, totalPosts: 0 },
+                impactMetrics: { grantsApplied: 0, grantsReceived: 0, totalFunding: 0, communitiesHelped: 0, postsShared: 0, connectionsGrown: 0 },
+                stories: []
+            };
+        }
+    }
+
+    clearCache() {
+        this.cache.clear();
+    }
+}
+
+const profileDataManager = new ProfileDataManager();
 
 export default function ProfilePage() {
     const appContext = useOutletContext();
@@ -32,172 +267,32 @@ export default function ProfilePage() {
         showCreatePost: false
     });
 
-    const { trendingGrants, savedGrants, posts, isDetailModalOpen, selectedGrant, dataLoading, error, communityMembers, impactMetrics, stories, activeTab, totalPosts, totalFollowers, totalFollowing, suggestedConnections } = appState;
+    const { trendingGrants, savedGrants, posts, isDetailModalOpen, selectedGrant, dataLoading, error, communityMembers, impactMetrics, stories, activeTab, totalPosts, totalFollowers, totalFollowing, suggestedConnections, followerUsers, followingUsers } = appState;
 
-    // REMOVED: LayoutContext usage that was conflicting with PublicPageLayout
-    // useEffect(() => {
-    //     setPageBgColor('bg-[#faf7f4]');
-    //     return () => setPageBgColor('bg-transparent');
-    // }, [setPageBgColor]);
-
+    // Optimized data fetching with batching
     const fetchPageData = useCallback(async (userId) => {
         if (!userId) return;
         
         setAppState(prev => ({ ...prev, dataLoading: true, error: null }));
         
         try {
-            const fetchPostsWithReactions = async () => {
-                const { data: basicPosts, error: postsError } = await supabase
-                    .from('posts')
-                    .select(`
-                        *,
-                        profiles!posts_profile_id_fkey(id, full_name, avatar_url, role, title, organization_name)
-                    `)
-                    .eq('channel', 'hello-world')
-                    .order('created_at', { ascending: false });
-
-                if (postsError) return { data: [], error: postsError };
-
-                const postsWithReactions = await Promise.all(
-                    (basicPosts || []).map(async (post) => {
-                        const { data: reactionData } = await supabase
-                            .from('post_likes')
-                            .select('reaction_type')
-                            .eq('post_id', post.id);
-
-                        const counts = {};
-                        reactionData?.forEach(like => {
-                            if (like.reaction_type) counts[like.reaction_type] = (counts[like.reaction_type] || 0) + 1;
-                        });
-
-                        const reactionSummary = Object.entries(counts).map(([type, count]) => ({ type, count }));
-
-                        const { count: likesCount } = await supabase
-                            .from('post_likes')
-                            .select('*', { count: 'exact', head: true })
-                            .eq('post_id', post.id);
-
-                        const { count: commentsCount } = await supabase
-                            .from('post_comments')
-                            .select('*', { count: 'exact', head: true })
-                            .eq('post_id', post.id);
-
-                        return {
-                            ...post,
-                            likes_count: likesCount || 0,
-                            comments_count: commentsCount || 0,
-                            reactions: { summary: reactionSummary, sample: [] }
-                        };
-                    })
-                );
-
-                return { data: postsWithReactions, error: null };
-            };
-
-            const fetchSavedGrants = async () => {
-                try {
-                    const { data: savedGrantsData, error: savedError } = await supabase
-                        .from('saved_grants')
-                        .select('id, grant_id, created_at')
-                        .eq('user_id', userId)
-                        .order('created_at', { ascending: false });
-
-                    if (savedError || !savedGrantsData) return [];
-
-                    const grantIds = savedGrantsData.map(sg => sg.grant_id);
-                    if (grantIds.length === 0) return [];
-
-                    const { data: grantsData, error: grantsError } = await supabase
-                        .from('grants')
-                        .select('*')
-                        .in('id', grantIds);
-
-                    if (grantsError || !grantsData) return [];
-
-                    const orgIds = [...new Set(grantsData.map(g => g.organization_id).filter(Boolean))];
-                    let orgsData = [];
-                    if (orgIds.length > 0) {
-                        const { data: organizationsData } = await supabase
-                            .from('organizations')
-                            .select('id, name, image_url, slug')
-                            .in('id', orgIds);
-                        orgsData = organizationsData || [];
-                    }
-
-                    return savedGrantsData.map(savedGrant => {
-                        const grantData = grantsData.find(g => g.id === savedGrant.grant_id);
-                        if (!grantData) return null;
-
-                        const orgData = orgsData.find(o => o.id === grantData.organization_id);
-
-                        return {
-                            ...grantData,
-                            dueDate: grantData.deadline,
-                            save_id: savedGrant.id,
-                            foundationName: orgData?.name || 'Unknown Organization',
-                            funderLogoUrl: orgData?.image_url || null
-                        };
-                    }).filter(Boolean);
-                } catch (error) {
-                    console.error('Error fetching saved grants:', error);
-                    return [];
-                }
-            };
-
-            const [
-                savedGrantsData,
-                trendingGrantsRes,
-                postsRes,
-                socialStatsRes,
-                followersRes,
-                followingRes,
-                communityMembersRes
-            ] = await Promise.all([
-                fetchSavedGrants(),
-                supabase.rpc('get_trending_grants'),
-                fetchPostsWithReactions(),
-                supabase.from('profiles').select('id').eq('id', userId).single(),
-                supabase
-                    .from('followers')
-                    .select('follower_id, profiles!followers_follower_id_fkey(id, full_name, avatar_url, title)')
-                    .eq('following_id', userId),
-                supabase
-                    .from('followers')
-                    .select('following_id, profiles!followers_following_id_fkey(id, full_name, avatar_url, title)')
-                    .eq('follower_id', userId),
-                supabase
-                    .from('profiles')
-                    .select('id, full_name, avatar_url, title, organization_name')
-                    .neq('id', userId)
-                    .limit(10)
-            ]);
-
+            const data = await profileDataManager.loadAllProfileData(userId);
+            
             setAppState(prev => ({
                 ...prev,
                 dataLoading: false,
-                savedGrants: savedGrantsData,
-                trendingGrants: trendingGrantsRes.data || [],
-                posts: postsRes.data || [],
-                totalPosts: postsRes.data?.length || 0,
-                followerUsers: followersRes.data?.map(f => f.profiles) || [],
-                totalFollowers: followersRes.data?.length || 0,
-                followingUsers: followingRes.data?.map(f => f.profiles) || [],
-                totalFollowing: followingRes.data?.length || 0,
-                communityMembers: communityMembersRes.data || [],
-                suggestedConnections: communityMembersRes.data?.slice(0, 5) || [],
-                impactMetrics: {
-                    grantsApplied: Math.floor(Math.random() * 15) + 5,
-                    grantsReceived: Math.floor(Math.random() * 5) + 1,
-                    totalFunding: Math.floor(Math.random() * 500000) + 50000,
-                    communitiesHelped: Math.floor(Math.random() * 10) + 3,
-                    postsShared: postsRes.data?.length || 0,
-                    connectionsGrown: (followersRes.data?.length || 0) + (followingRes.data?.length || 0)
-                },
-                stories: [
-                    { id: 1, type: 'grant_success', title: 'Grant Success', image: null, viewed: false },
-                    { id: 2, type: 'community_event', title: 'Workshop', image: null, viewed: true },
-                    { id: 3, type: 'team_update', title: 'Team News', image: null, viewed: false }
-                ]
+                savedGrants: data.savedGrants,
+                trendingGrants: data.trendingGrants,
+                posts: data.posts,
+                totalPosts: data.socialStats.totalPosts,
+                followerUsers: data.followers,
+                totalFollowers: data.socialStats.totalFollowers,
+                followingUsers: data.following,
+                totalFollowing: data.socialStats.totalFollowing,
+                communityMembers: data.communityMembers,
+                suggestedConnections: data.communityMembers.slice(0, 5),
+                impactMetrics: data.impactMetrics,
+                stories: data.stories
             }));
         } catch (error) {
             console.error('Error fetching page data:', error);
@@ -228,6 +323,8 @@ export default function ProfilePage() {
                 detail: { action, followerId: session.user.id, followingId: userId }
             }));
             
+            // Clear cache and reload data
+            profileDataManager.clearCache();
             fetchPageData(session.user.id);
             
         } catch (error) {
@@ -261,6 +358,9 @@ export default function ProfilePage() {
             posts: [{ ...newPostData, profiles: profile, reactions: { summary: [], sample: [] }, likes_count: 0, comments_count: 0 }, ...prev.posts],
             totalPosts: prev.totalPosts + 1
         }));
+        
+        // Clear cache to include new post
+        profileDataManager.clearCache();
     }, [profile]);
 
     const handleDeletePost = useCallback(deletedPostId => {
@@ -269,6 +369,9 @@ export default function ProfilePage() {
             posts: prev.posts.filter(p => p.id !== deletedPostId),
             totalPosts: Math.max(0, prev.totalPosts - 1)
         }));
+        
+        // Clear cache to reflect deletion
+        profileDataManager.clearCache();
     }, []);
 
     const openDetail = useCallback(grant => {
@@ -311,6 +414,7 @@ export default function ProfilePage() {
     const handleSaveGrant = useCallback(async grantId => {
         if (session && grantId) {
             await supabase.from('saved_grants').insert({ user_id: session.user.id, grant_id: grantId });
+            profileDataManager.clearCache();
             fetchPageData(session.user.id);
         }
     }, [session, fetchPageData]);
@@ -318,6 +422,7 @@ export default function ProfilePage() {
     const handleUnsaveGrant = useCallback(async grantId => {
         if (session && grantId) {
             await supabase.from('saved_grants').delete().match({ user_id: session.user.id, grant_id: grantId });
+            profileDataManager.clearCache();
             fetchPageData(session.user.id);
         }
     }, [session, fetchPageData]);
@@ -343,8 +448,10 @@ export default function ProfilePage() {
         suggestedConnections,
         handleFollowUser,
         handleUnfollowUser,
-        socialStats: { totalPosts, totalFollowers, totalFollowing }
-    }), [appContext, profile, posts, handleNewPost, handleDeletePost, savedGrants, session, handleSaveGrant, handleUnsaveGrant, openDetail, activeTab, handleTabChange, impactMetrics, stories, handleStoryClick, handleCreateStory, communityMembers, suggestedConnections, handleFollowUser, handleUnfollowUser, totalPosts, totalFollowers, totalFollowing]);
+        socialStats: { totalPosts, totalFollowers, totalFollowing },
+        followerUsers,
+        followingUsers
+    }), [appContext, profile, posts, handleNewPost, handleDeletePost, savedGrants, session, handleSaveGrant, handleUnsaveGrant, openDetail, activeTab, handleTabChange, impactMetrics, stories, handleStoryClick, handleCreateStory, communityMembers, suggestedConnections, handleFollowUser, handleUnfollowUser, totalPosts, totalFollowers, totalFollowing, followerUsers, followingUsers]);
 
     if (loading || !profile) {
         return (

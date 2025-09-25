@@ -7,8 +7,9 @@ import OrganizationTabs from './organization/OrganizationTabs.jsx';
 import OrganizationTabContent from './organization/OrganizationTabContent.jsx';
 import LeaveOrganizationModal from './organization/LeaveOrganizationModal.jsx';
 import DeleteOrganizationModal from './organization/DeleteOrganizationModal.jsx';
-import { useOrganizationData } from '../hooks/useOrganizationData.js';
+import { useOptimizedOrganizationData } from '../hooks/useOptimizedOrganizationData.js';
 import { hasPermission, PERMISSIONS } from '../utils/organizationPermissions.js';
+
 const OrganizationJoinPrompt = ({ onStartOnboarding }) => {
   return (
     <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-16">
@@ -69,6 +70,8 @@ export default function MyOrganizationPage() {
   const [activeTab, setActiveTab] = useState('overview');
   const [isConfirmingLeave, setIsConfirmingLeave] = useState(false);
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
+  
+  // Use optimized organization data hook instead of the original
   const {
     organization,
     members,
@@ -81,11 +84,12 @@ export default function MyOrganizationPage() {
     executeLeave,
     executeDeleteOrganization,
     updateOrganization
-  } = useOrganizationData(profile, session);
+  } = useOptimizedOrganizationData(profile, session);
 
   const isOmegaAdmin = profile?.is_omega_admin === true;
   const userRole = userMembership?.role;
   const canViewAnalytics = ['super_admin', 'admin'].includes(userRole) || isOmegaAdmin;
+  
   useEffect(() => {
     window.refreshMyOrganizationPage = () => {
       checkMembership();
