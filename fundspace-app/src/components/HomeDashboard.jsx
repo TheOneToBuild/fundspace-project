@@ -7,6 +7,7 @@ import { getOrganizationInfoForDashboard, getBulkOrganizationMemberships } from 
 // ADD THESE IMPORTS
 import { realtimeManager } from '../utils/realtimeManager.js';
 import { getChannelInfo } from '../utils/channelUtils.js';
+import { usePageDataLoader } from '../hooks/usePageDataLoader'; // ✅ CRITICAL FIX
 
 // Import all the smaller components
 import WelcomeBanner from './dashboard/WelcomeBanner.jsx';
@@ -310,6 +311,10 @@ const useUserData = (profile) => {
 export default function HomeDashboard() {
     const { profile } = useOutletContext() || {};
     const navigate = useNavigate();
+    
+    // ✅ CRITICAL FIX: Add page data loader for batched API calls
+    const { pageData, loadPostsPageData, clearPageData } = usePageDataLoader();
+    
     const [selectedPost, setSelectedPost] = useState(null);
     const [isPostModalOpen, setIsPostModalOpen] = useState(false);
     const [selectedGrant, setSelectedGrant] = useState(null);
@@ -321,6 +326,14 @@ export default function HomeDashboard() {
     const trendingPosts = useTrendingPosts();
     const { trendingGrants, setTrendingGrants } = useTrendingGrants();
     const helloCommunityPosts = useHelloCommunityPosts(organizationInfo);
+
+    // ✅ CRITICAL FIX: Load batched data whenever posts change
+    useEffect(() => {
+        const allPosts = [...trendingPosts, ...helloCommunityPosts].filter(Boolean);
+        if (allPosts.length > 0) {
+            loadPostsPageData(allPosts);
+        }
+    }, [trendingPosts, helloCommunityPosts, loadPostsPageData]);
 
     // NEW: Expose refresh function globally for organization changes
     useEffect(() => {
@@ -506,6 +519,7 @@ export default function HomeDashboard() {
                 posts={trendingPosts}
                 onViewMore={handleViewMorePosts}
                 onPostClick={handlePostClick}
+                pageData={pageData} // ✅ CRITICAL FIX: Pass pageData
             />
             
             <HelloCommunitySection
@@ -513,6 +527,7 @@ export default function HomeDashboard() {
                 onViewMore={handleViewMoreCommunity}
                 onPostClick={handlePostClick}
                 organizationInfo={organizationInfo}
+                pageData={pageData} // ✅ CRITICAL FIX: Pass pageData
             />
             
             <TrendingGrantsSection 
@@ -532,6 +547,7 @@ export default function HomeDashboard() {
                     setSelectedPost(null);
                 }}
                 currentUserProfile={profile}
+                pageData={pageData} // ✅ CRITICAL FIX: Pass pageData
             />
 
             <GrantDetailModal

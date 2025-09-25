@@ -1,4 +1,4 @@
-// src/components/dashboard/TrendingPostsSection.jsx
+// src/components/dashboard/TrendingPostsSection.jsx - Fixed with pageData
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../supabaseClient';
@@ -6,18 +6,42 @@ import { ChevronLeft, ChevronRight, MessageCircle, Heart } from 'lucide-react';
 import { renderMentionsInText } from '../../utils/mentionUtils';
 import PropTypes from 'prop-types';
 
-// Temporary inline TrendingPostCard component - move this to its own file later
-const TrendingPostCard = ({ post, onClick }) => {
+// ✅ OPTIMIZED: TrendingPostCard now uses pageData
+const TrendingPostCard = ({ post, onClick, pageData }) => {
     const navigate = useNavigate();
-    const [localLikes, setLocalLikes] = React.useState(post?.reactions?.summary?.reduce((total, r) => total + r.count, 0) || 0);
-    const [localComments, setLocalComments] = React.useState(post?.comments_count || 0);
+    
+    // ✅ CRITICAL FIX: Use pageData for likes instead of post.reactions
+    const likesFromPageData = pageData?.postLikes?.[post.id]?.likes_count;
+    const commentsFromPageData = pageData?.comments?.[post.id]?.length;
+    
+    const [localLikes, setLocalLikes] = React.useState(
+        likesFromPageData ?? post?.reactions?.summary?.reduce((total, r) => total + r.count, 0) ?? post?.likes_count ?? 0
+    );
+    const [localComments, setLocalComments] = React.useState(
+        commentsFromPageData ?? post?.comments_count ?? 0
+    );
+
+    // ✅ CRITICAL FIX: Update when pageData changes
+    React.useEffect(() => {
+        if (pageData?.postLikes?.[post.id]) {
+            setLocalLikes(pageData.postLikes[post.id].likes_count || 0);
+        }
+        if (pageData?.comments?.[post.id]) {
+            setLocalComments(pageData.comments[post.id].length || 0);
+        }
+    }, [pageData, post.id]);
 
     // Update local state when post prop changes (from real-time updates)
     React.useEffect(() => {
-        const newLikeCount = post?.reactions?.summary?.reduce((total, r) => total + r.count, 0) || 0;
-        setLocalLikes(newLikeCount);
-        setLocalComments(post?.comments_count || 0);
-    }, [post?.reactions?.summary, post?.comments_count]);
+        // Only update if pageData doesn't have more recent info
+        if (!pageData?.postLikes?.[post.id]) {
+            const newLikeCount = post?.reactions?.summary?.reduce((total, r) => total + r.count, 0) || post?.likes_count || 0;
+            setLocalLikes(newLikeCount);
+        }
+        if (!pageData?.comments?.[post.id]) {
+            setLocalComments(post?.comments_count || 0);
+        }
+    }, [post?.reactions?.summary, post?.comments_count, post?.likes_count, pageData, post.id]);
 
     const formatTimeAgo = (dateString) => {
         const now = new Date();
@@ -198,6 +222,17 @@ const TrendingPostCard = ({ post, onClick }) => {
     ];
     const hasImages = allImages.length > 0;
 
+    // ✅ CRITICAL FIX: Use enhanced author data from pageData
+    const authorProfile = pageData?.profiles?.[post.profile_id || post.profiles?.id] || post.profiles;
+    const orgMembership = pageData?.orgMemberships?.[post.profile_id || post.profiles?.id];
+    
+    const displayAuthor = {
+        ...authorProfile,
+        organization_name: orgMembership?.organization?.name || authorProfile?.organization_name,
+        organization_type: orgMembership?.organization?.type || authorProfile?.organization_type,
+        role: orgMembership?.role || authorProfile?.role
+    };
+
     return (
         <div
             className="flex-shrink-0 w-80 bg-white rounded-xl border border-slate-200 overflow-hidden hover:shadow-lg transition-all duration-200 cursor-pointer group"
@@ -221,17 +256,17 @@ const TrendingPostCard = ({ post, onClick }) => {
             <div className="p-6">
                 <div className="flex items-center space-x-3 mb-4">
                     <img
-                        src={post.profiles?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(post.profiles?.full_name || 'User')}&background=6366f1&color=ffffff`}
-                        alt={post.profiles?.full_name || 'User'}
+                        src={displayAuthor?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(displayAuthor?.full_name || 'User')}&background=6366f1&color=ffffff`}
+                        alt={displayAuthor?.full_name || 'User'}
                         className="w-10 h-10 rounded-full object-cover"
                     />
                     <div className="flex-1 min-w-0">
                         <h4 className="font-semibold text-slate-900 text-sm truncate">
-                            {post.profiles?.full_name || 'Anonymous'}
+                            {displayAuthor?.full_name || 'Anonymous'}
                         </h4>
-                        {post.profiles?.organization_name && (
+                        {displayAuthor?.organization_name && (
                             <p className="text-xs text-slate-500 truncate">
-                                {post.profiles.organization_name}
+                                {displayAuthor.organization_name}
                             </p>
                         )}
                     </div>
@@ -262,7 +297,8 @@ const TrendingPostCard = ({ post, onClick }) => {
     );
 };
 
-const TrendingPostsSection = ({ posts, onViewMore, onPostClick }) => {
+// ✅ CRITICAL FIX: Accept and pass pageData prop
+const TrendingPostsSection = ({ posts, onViewMore, onPostClick, pageData }) => {
     const scrollPosts = (direction) => {
         const container = document.getElementById('trending-posts-scroll');
         if (container) {
@@ -309,6 +345,7 @@ const TrendingPostsSection = ({ posts, onViewMore, onPostClick }) => {
                             key={post.id}
                             post={post}
                             onClick={() => onPostClick(post)}
+                            pageData={pageData} // ✅ CRITICAL FIX: Pass pageData to each card
                         />
                     ))}
                 </div>
@@ -329,10 +366,12 @@ const TrendingPostsSection = ({ posts, onViewMore, onPostClick }) => {
     );
 };
 
+// ✅ CRITICAL FIX: Add pageData to PropTypes
 TrendingPostsSection.propTypes = {
     posts: PropTypes.array.isRequired,
     onViewMore: PropTypes.func.isRequired,
-    onPostClick: PropTypes.func.isRequired
+    onPostClick: PropTypes.func.isRequired,
+    pageData: PropTypes.object // ✅ ADD pageData prop type
 };
 
 export default TrendingPostsSection;

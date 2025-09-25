@@ -1,16 +1,23 @@
-// src/components/FollowingPage.jsx
+// src/components/FollowingPage.jsx - Fixed with pageData batching
 import React, { useState, useEffect } from 'react';
 import { useOutletContext, Link } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import { UserCheck, ArrowLeft } from 'lucide-react';
 import Avatar from './Avatar';
 import { unfollowUser } from '../utils/followUtils';
+import { usePageDataLoader } from '../hooks/usePageDataLoader'; // ✅ ADD THIS
 
 export default function FollowingPage() {
-    const { profile: currentUserProfile } = useOutletContext();
+    const { profile: currentUserProfile, pageData } = useOutletContext();
     const [following, setFollowing] = useState([]);
     const [loading, setLoading] = useState(true);
     const [unfollowingInProgress, setUnfollowingInProgress] = useState(new Set());
+
+    // ✅ ADD: Page data loader for batched API calls
+    const { pageData: localPageData, loadConnectionsPageData, clearPageData } = usePageDataLoader();
+    
+    // Use pageData from context if available, otherwise use local
+    const activePageData = pageData || localPageData;
 
     useEffect(() => {
         if (currentUserProfile?.id) {
@@ -22,21 +29,10 @@ export default function FollowingPage() {
         try {
             setLoading(true);
             
-            // Get all users that the current user is following
+            // ✅ OPTIMIZED: Get just the connection data, then batch load profiles
             const { data, error } = await supabase
                 .from('followers')
-                .select(`
-                    following_id,
-                    created_at,
-                    profiles!followers_following_id_fkey(
-                        id,
-                        full_name,
-                        avatar_url,
-                        title,
-                        organization_name,
-                        role
-                    )
-                `)
+                .select('following_id, created_at')
                 .eq('follower_id', currentUserProfile.id)
                 .order('created_at', { ascending: false });
 
@@ -45,20 +41,33 @@ export default function FollowingPage() {
                 return;
             }
 
-            // Format the data for easier use
-            const formattedFollowing = data?.map(follow => ({
-                id: follow.profiles.id,
-                full_name: follow.profiles.full_name,
-                avatar_url: follow.profiles.avatar_url,
-                title: follow.profiles.title,
-                organization_name: follow.profiles.organization_name,
-                role: follow.profiles.role,
-                followed_at: follow.created_at
-            })) || [];
+            if (data && data.length > 0) {
+                // ✅ CRITICAL FIX: Load batched profile and organization data
+                await loadConnectionsPageData([], data);
+                
+                // Format the data using batched pageData
+                const formattedFollowing = data.map(follow => {
+                    const profileData = activePageData?.profiles?.[follow.following_id];
+                    const orgMembership = activePageData?.orgMemberships?.[follow.following_id];
+                    
+                    return {
+                        id: follow.following_id,
+                        full_name: profileData?.full_name || 'Unknown User',
+                        avatar_url: profileData?.avatar_url || null,
+                        title: profileData?.title || orgMembership?.role || null,
+                        organization_name: orgMembership?.organization?.name || profileData?.organization_name || null,
+                        role: orgMembership?.role || profileData?.role || null,
+                        followed_at: follow.created_at
+                    };
+                });
 
-            setFollowing(formattedFollowing);
+                setFollowing(formattedFollowing);
+            } else {
+                setFollowing([]);
+            }
         } catch (error) {
             console.error('Error in fetchFollowing:', error);
+            setFollowing([]);
         } finally {
             setLoading(false);
         }
@@ -86,6 +95,9 @@ export default function FollowingPage() {
                 newSet.delete(profileIdToUnfollow);
                 return newSet;
             });
+            
+            // Clear cache when follow state changes
+            clearPageData();
         }
     };
 
@@ -132,6 +144,19 @@ export default function FollowingPage() {
                     {following.map(user => {
                         const isUnfollowing = unfollowingInProgress.has(user.id);
                         
+                        // ✅ ENHANCEMENT: Use enhanced profile data from pageData
+                        const enhancedUser = {
+                            ...user,
+                            ...(activePageData?.profiles?.[user.id] || {}),
+                        };
+                        
+                        const orgMembership = activePageData?.orgMemberships?.[user.id];
+                        if (orgMembership) {
+                            enhancedUser.organization_name = orgMembership.organization?.name || enhancedUser.organization_name;
+                            enhancedUser.role = orgMembership.role || enhancedUser.role;
+                            enhancedUser.title = orgMembership.role || enhancedUser.title;
+                        }
+                        
                         return (
                             <div 
                                 key={user.id} 
@@ -140,8 +165,8 @@ export default function FollowingPage() {
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center space-x-3">
                                         <Avatar 
-                                            src={user.avatar_url} 
-                                            fullName={user.full_name} 
+                                            src={enhancedUser.avatar_url} 
+                                            fullName={enhancedUser.full_name} 
                                             size="lg" 
                                         />
                                         <div className="flex-grow">
@@ -149,16 +174,16 @@ export default function FollowingPage() {
                                                 to={`/profile/members/${user.id}`}
                                                 className="text-lg font-semibold text-slate-900 hover:text-blue-600 transition-colors"
                                             >
-                                                {user.full_name}
+                                                {enhancedUser.full_name}
                                             </Link>
                                             
-                                            {user.title && (
-                                                <p className="text-sm text-slate-600 mt-1">{user.title}</p>
+                                            {enhancedUser.title && (
+                                                <p className="text-sm text-slate-600 mt-1">{enhancedUser.title}</p>
                                             )}
                                             
-                                            {user.organization_name && (
+                                            {enhancedUser.organization_name && (
                                                 <p className="text-sm text-slate-500 mt-1">
-                                                    {user.organization_name}
+                                                    {enhancedUser.organization_name}
                                                 </p>
                                             )}
                                             

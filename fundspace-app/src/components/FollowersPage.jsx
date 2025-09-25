@@ -1,17 +1,24 @@
-// src/components/FollowersPage.jsx
+// src/components/FollowersPage.jsx - Fixed with pageData batching
 import React, { useState, useEffect } from 'react';
 import { useOutletContext, Link } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import { UserCheck, UserPlus, ArrowLeft } from 'lucide-react';
 import Avatar from './Avatar';
 import { followUser, unfollowUser } from '../utils/followUtils';
+import { usePageDataLoader } from '../hooks/usePageDataLoader'; // ✅ ADD THIS
 
 export default function FollowersPage() {
-    const { profile: currentUserProfile } = useOutletContext();
+    const { profile: currentUserProfile, pageData } = useOutletContext();
     const [followers, setFollowers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [followedIds, setFollowedIds] = useState(new Set());
     const [followingInProgress, setFollowingInProgress] = useState(new Set());
+
+    // ✅ ADD: Page data loader for batched API calls
+    const { pageData: localPageData, loadConnectionsPageData, clearPageData } = usePageDataLoader();
+    
+    // Use pageData from context if available, otherwise use local
+    const activePageData = pageData || localPageData;
 
     useEffect(() => {
         if (currentUserProfile?.id) {
@@ -24,21 +31,10 @@ export default function FollowersPage() {
         try {
             setLoading(true);
             
-            // Get all users who follow the current user
+            // ✅ OPTIMIZED: Get just the connection data, then batch load profiles
             const { data, error } = await supabase
                 .from('followers')
-                .select(`
-                    follower_id,
-                    created_at,
-                    profiles!followers_follower_id_fkey(
-                        id,
-                        full_name,
-                        avatar_url,
-                        title,
-                        organization_name,
-                        role
-                    )
-                `)
+                .select('follower_id, created_at')
                 .eq('following_id', currentUserProfile.id)
                 .order('created_at', { ascending: false });
 
@@ -47,20 +43,33 @@ export default function FollowersPage() {
                 return;
             }
 
-            // Format the data for easier use
-            const formattedFollowers = data?.map(follow => ({
-                id: follow.profiles.id,
-                full_name: follow.profiles.full_name,
-                avatar_url: follow.profiles.avatar_url,
-                title: follow.profiles.title,
-                organization_name: follow.profiles.organization_name,
-                role: follow.profiles.role,
-                followed_at: follow.created_at
-            })) || [];
+            if (data && data.length > 0) {
+                // ✅ CRITICAL FIX: Load batched profile and organization data
+                await loadConnectionsPageData(data, []);
+                
+                // Format the data using batched pageData
+                const formattedFollowers = data.map(follow => {
+                    const profileData = activePageData?.profiles?.[follow.follower_id];
+                    const orgMembership = activePageData?.orgMemberships?.[follow.follower_id];
+                    
+                    return {
+                        id: follow.follower_id,
+                        full_name: profileData?.full_name || 'Unknown User',
+                        avatar_url: profileData?.avatar_url || null,
+                        title: profileData?.title || orgMembership?.role || null,
+                        organization_name: orgMembership?.organization?.name || profileData?.organization_name || null,
+                        role: orgMembership?.role || profileData?.role || null,
+                        followed_at: follow.created_at
+                    };
+                });
 
-            setFollowers(formattedFollowers);
+                setFollowers(formattedFollowers);
+            } else {
+                setFollowers([]);
+            }
         } catch (error) {
             console.error('Error in fetchFollowers:', error);
+            setFollowers([]);
         } finally {
             setLoading(false);
         }
@@ -119,6 +128,9 @@ export default function FollowersPage() {
                 newSet.delete(profileIdToFollow);
                 return newSet;
             });
+            
+            // Clear cache when follow state changes
+            clearPageData();
         }
     };
 
@@ -151,6 +163,9 @@ export default function FollowersPage() {
                 newSet.delete(profileIdToUnfollow);
                 return newSet;
             });
+            
+            // Clear cache when follow state changes
+            clearPageData();
         }
     };
 
@@ -198,6 +213,19 @@ export default function FollowersPage() {
                         const isFollowing = followedIds.has(follower.id);
                         const isFollowingInProgress = followingInProgress.has(follower.id);
                         
+                        // ✅ ENHANCEMENT: Use enhanced profile data from pageData
+                        const enhancedFollower = {
+                            ...follower,
+                            ...(activePageData?.profiles?.[follower.id] || {}),
+                        };
+                        
+                        const orgMembership = activePageData?.orgMemberships?.[follower.id];
+                        if (orgMembership) {
+                            enhancedFollower.organization_name = orgMembership.organization?.name || enhancedFollower.organization_name;
+                            enhancedFollower.role = orgMembership.role || enhancedFollower.role;
+                            enhancedFollower.title = orgMembership.role || enhancedFollower.title;
+                        }
+                        
                         return (
                             <div 
                                 key={follower.id} 
@@ -206,8 +234,8 @@ export default function FollowersPage() {
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center space-x-3">
                                         <Avatar 
-                                            src={follower.avatar_url} 
-                                            fullName={follower.full_name} 
+                                            src={enhancedFollower.avatar_url} 
+                                            fullName={enhancedFollower.full_name} 
                                             size="lg" 
                                         />
                                         <div className="flex-grow">
@@ -215,16 +243,16 @@ export default function FollowersPage() {
                                                 to={`/profile/members/${follower.id}`}
                                                 className="text-lg font-semibold text-slate-900 hover:text-blue-600 transition-colors"
                                             >
-                                                {follower.full_name}
+                                                {enhancedFollower.full_name}
                                             </Link>
                                             
-                                            {follower.title && (
-                                                <p className="text-sm text-slate-600 mt-1">{follower.title}</p>
+                                            {enhancedFollower.title && (
+                                                <p className="text-sm text-slate-600 mt-1">{enhancedFollower.title}</p>
                                             )}
                                             
-                                            {follower.organization_name && (
+                                            {enhancedFollower.organization_name && (
                                                 <p className="text-sm text-slate-500 mt-1">
-                                                    {follower.organization_name}
+                                                    {enhancedFollower.organization_name}
                                                 </p>
                                             )}
                                             
