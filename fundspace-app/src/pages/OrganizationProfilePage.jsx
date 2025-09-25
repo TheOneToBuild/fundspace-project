@@ -1,7 +1,8 @@
-// src/pages/OrganizationProfilePage.jsx - Refactored for Real-Time State Updates with Programs Tab
+// src/pages/OrganizationProfilePage.jsx - Added pageData support
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../supabaseClient.js';
+import { usePageDataLoader } from '../hooks/usePageDataLoader'; // NEW: Add page data loader
 
 // Shared Components
 import PublicPageLayout from '../components/PublicPageLayout.jsx';
@@ -60,153 +61,233 @@ const PlaceholderContent = ({ contentType, organizationType }) => (
 const OrganizationProfilePage = () => {
   const { slug } = useParams();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const isEditMode = searchParams.get('edit') === 'true';
+  const [searchParams, setSearchParams] = useSearchParams();
+  const hasInitialized = useRef(false);
+  
+  // NEW: Add page data loader for batched API calls
+  const { pageData, loadPostsPageData, clearPageData } = usePageDataLoader();
 
   const [organization, setOrganization] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [session, setSession] = useState(null);
-  const [profile, setProfile] = useState(null);
-  const [activeTab, setActiveTab] = useState('home');
-  const [organizationPosts, setOrganizationPosts] = useState([]);
-  const [teamMembers, setTeamMembers] = useState([]);
   const [userMembership, setUserMembership] = useState(null);
-  const [photos, setPhotos] = useState([]);
-  const [hasGrants, setHasGrants] = useState(false);
-  const [hasPrograms, setHasPrograms] = useState(false);
+  const [activeTab, setActiveTab] = useState('home');
+  const [organizationPosts, setOrganizationPosts] = useState([]); // NEW: Track organization posts
+  
+  // Social features (follow/bookmark)
+  const {
+    isFollowing,
+    followersCount,
+    isBookmarked,
+    bookmarksCount,
+    toggleFollow,
+    toggleBookmark
+  } = useOrganizationSocial(organization?.id, session?.user?.id);
 
-  const orgConfig = ORG_TYPE_CONFIGS[organization?.type] || ORG_TYPE_CONFIGS.default;
-
-  // Function to handle state updates from child components
-  const handleUpdateOrganization = (updatedData) => {
-    setOrganization(prevOrg => ({ ...prevOrg, ...updatedData }));
+  // Edit mode state
+  const isEditMode = searchParams.get('edit') === 'true';
+  
+  // Get organization type configuration
+  const getOrgTypeFromType = (type) => {
+    if (!type) return 'default';
+    const baseType = type.split('.')[0];
+    return ['foundation', 'nonprofit'].includes(baseType) ? baseType : 'default';
   };
+  
+  const orgConfig = organization ? ORG_TYPE_CONFIGS[getOrgTypeFromType(organization.type)] : ORG_TYPE_CONFIGS.default;
 
+  // Get active user session
   useEffect(() => {
-    const getSessionAndProfile = async () => {
+    const getSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       setSession(session);
-      
-      if (session?.user) {
-        const { data: profileData } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', session.user.id)
-          .single();
-        setProfile(profileData);
-      }
     };
-    getSessionAndProfile();
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      setProfile(session?.user ? profile : null);
-    });
+    getSession();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => setSession(session)
+    );
+
     return () => subscription.unsubscribe();
   }, []);
 
+  // Check user's membership in this organization
   useEffect(() => {
-    const fetchOrganizationData = async () => {
-      if (!slug) return;
-      
-      setLoading(true);
-      setError(null);
-      
-      try {
-        const { data, error } = await supabase.from('organizations').select('*').eq('slug', slug).single();
-        if (error) throw error;
-        
-        const { data: categoryData } = await supabase
-          .from('organization_categories')
-          .select('categories(name)')
-          .eq('organization_id', data.id);
-        
-        const focusAreas = categoryData?.map(item => item.categories?.name).filter(Boolean) || [];
-        
-        setOrganization({ ...data, focusAreas });
+    const checkMembership = async () => {
+      if (!session?.user?.id || !organization?.id) {
+        setUserMembership(null);
+        return;
+      }
 
-      } catch (err) {
-        setError("Could not load organization profile.");
-      } finally {
-        setLoading(false);
+      try {
+        const { data: membership } = await supabase
+          .from('organization_memberships')
+          .select('role, joined_at')
+          .eq('organization_id', organization.id)
+          .eq('profile_id', session.user.id)
+          .maybeSingle();
+
+        setUserMembership(membership);
+      } catch (error) {
+        console.error('Error checking membership:', error);
+        setUserMembership(null);
       }
     };
-    
-    fetchOrganizationData();
-  }, [slug]);
 
-  useEffect(() => {
-    if (!organization?.id) return;
+    checkMembership();
+  }, [session?.user?.id, organization?.id]);
 
-    const checkUserMembership = async () => {
-      if (!session?.user?.id) return;
-      const { data } = await supabase
-        .from('organization_memberships')
+  // Load organization data
+  const loadOrganization = useCallback(async () => {
+    if (!slug) {
+      setError("Organization identifier is required");
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      // Determine if slug is numeric (ID) or text (slug)
+      const isNumeric = /^\d+$/.test(slug);
+      const query = supabase
+        .from('organizations')
         .select('*')
-        .eq('profile_id', session.user.id)
-        .eq('organization_id', organization.id)
-        .maybeSingle();
-      setUserMembership(data);
-    };
+        .single();
+      
+      if (isNumeric) {
+        query.eq('id', parseInt(slug, 10));
+      } else {
+        query.eq('slug', slug);
+      }
 
-    const fetchSecondaryData = async () => {
-        const { data: photoData } = await supabase.from('organization_photos').select('*').eq('organization_id', organization.id).order('display_order', { ascending: true });
-        setPhotos(photoData || []);
-        
-        const { data: teamData } = await supabase.from('organization_memberships').select('*, profiles(*)').eq('organization_id', organization.id).eq('is_public', true);
-        setTeamMembers(teamData || []);
+      const { data: orgData, error: orgError } = await query;
 
-        const { count: grantsCount } = await supabase.from('grants').select('*', { count: 'exact', head: true }).eq('organization_id', organization.id);
-        setHasGrants(grantsCount > 0);
+      if (orgError) throw orgError;
+      if (!orgData) throw new Error("Organization not found");
 
-        // Check for programs
-        const { count: programsCount } = await supabase.from('organization_programs').select('*', { count: 'exact', head: true }).eq('organization_id', organization.id).eq('is_active', true);
-        setHasPrograms(programsCount > 0);
-    };
+      setOrganization(orgData);
+      
+      // NEW: Load organization posts for batched data
+      const { data: postsData, error: postsError } = await supabase
+        .from('organization_posts')
+        .select('*')
+        .eq('organization_id', orgData.id)
+        .order('created_at', { ascending: false })
+        .limit(20);
 
-    checkUserMembership();
-    fetchSecondaryData();
-  }, [organization?.id, session?.user?.id]);
+      if (!postsError && postsData) {
+        setOrganizationPosts(postsData);
+        // Load batched data for organization posts
+        loadPostsPageData(postsData);
+      }
 
-  const { isFollowing, followersCount, isBookmarked, bookmarksCount, toggleFollow, toggleBookmark } = useOrganizationSocial(organization?.id, session?.user?.id);
-  
-  const getTabConfiguration = () => {
-    const baseTabs = [{ id: 'home', label: 'Home', icon: 'Globe' }];
-    if (orgConfig.showNorthStar) baseTabs.push({ id: 'northstar', label: 'North Star', icon: 'Target' });
-    if (orgConfig.showPrograms) baseTabs.push({ id: 'programs', label: 'Programs', icon: 'ClipboardList' });
-    if (orgConfig.showPhotos) baseTabs.push({ id: 'photos', label: 'Photos', icon: 'Camera' });
-    baseTabs.push({ id: 'team', label: 'Team', icon: 'Users' });
-    if (hasGrants) baseTabs.push({ id: 'grants', label: 'Grants', icon: 'DollarSign' });
-    return baseTabs;
-  };
+    } catch (err) {
+      console.error('Error loading organization:', err);
+      setError(err.message || 'Failed to load organization');
+    } finally {
+      setLoading(false);
+    }
+  }, [slug, loadPostsPageData]);
 
+  // Initial load
+  useEffect(() => {
+    if (!hasInitialized.current) {
+      hasInitialized.current = true;
+      loadOrganization();
+    }
+  }, [loadOrganization]);
+
+  // Clear cache when organization changes
+  useEffect(() => {
+    return () => clearPageData();
+  }, [clearPageData, organization?.id]);
+
+  // Handle organization updates (for edit mode)
+  const handleUpdateOrganization = useCallback((updatedData) => {
+    setOrganization(prev => ({ ...prev, ...updatedData }));
+  }, []);
+
+  // Tab management
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    if (tab && ['home', 'team', 'northstar', 'programs', 'photos', 'grants'].includes(tab)) {
+      setActiveTab(tab);
+    }
+  }, [searchParams]);
+
+  const handleTabChange = useCallback((newTab) => {
+    setActiveTab(newTab);
+    const newSearchParams = new URLSearchParams(searchParams);
+    newSearchParams.set('tab', newTab);
+    setSearchParams(newSearchParams, { replace: true });
+  }, [searchParams, setSearchParams]);
+
+  // Get available tabs based on organization type and permissions
+  const getTabConfiguration = useCallback(() => {
+    if (!organization) return [];
+
+    const canEdit = userMembership && hasPermission(userMembership.role, PERMISSIONS.EDIT_ORGANIZATION_PROFILE);
+    const hasGrants = organization.grants && organization.grants.length > 0;
+
+    const tabs = [
+      { id: 'home', label: 'Overview', available: true },
+      { id: 'team', label: 'Team', available: true },
+      { id: 'northstar', label: 'North Star', available: orgConfig.showNorthStar },
+      { id: 'programs', label: 'Programs', available: orgConfig.showPrograms },
+      { id: 'photos', label: 'Photos', available: orgConfig.showPhotos },
+      { id: 'grants', label: 'Grants', available: hasGrants }
+    ];
+
+    return tabs.filter(tab => tab.available);
+  }, [organization, orgConfig, userMembership]);
+
+  // Render active tab content with pageData
   const renderActiveTab = () => {
-    const props = {
+    if (!organization) return null;
+
+    // Common props passed to all tab components - INCLUDING pageData
+    const commonProps = {
       organization,
-      organizationPosts,
-      teamMembers,
-      session,
       userMembership,
-      photos,
+      session,
       onUpdate: handleUpdateOrganization,
-      activeTab,
-      setActiveTab,
-      currentUserProfile: profile
+      pageData, // NEW: Pass pageData to all tab components
+      organizationPosts // NEW: Pass organization posts
     };
 
     switch (activeTab) {
-      case 'home': return isEditMode ? <EditableOrganizationHome {...props} /> : <OrganizationHome {...props} />;
-      case 'team': return <OrganizationTeam {...props} />;
-      case 'northstar': return <OrganizationNorthStar {...props} isEditMode={isEditMode} />;
-      case 'programs': return isEditMode ? <EditableOrganizationPrograms {...props} /> : <OrganizationPrograms {...props} isEditMode={isEditMode} />;
-      case 'photos': return isEditMode ? <EditableOrganizationPhotos {...props} /> : <OrganizationPhotos {...props} />;
-      case 'grants': return hasGrants ? <OrganizationGrantsFixed {...props} /> : <PlaceholderContent contentType="Grants" />;
-      default: return <PlaceholderContent contentType={activeTab} />;
+      case 'home': return isEditMode ? 
+        <EditableOrganizationHome {...commonProps} /> : <OrganizationHome {...commonProps} />;
+      case 'team': return <OrganizationTeam {...commonProps} />;
+      case 'northstar': return <OrganizationNorthStar {...commonProps} isEditMode={isEditMode} />;
+      case 'programs': return isEditMode ? 
+        <EditableOrganizationPrograms {...commonProps} /> : <OrganizationPrograms {...commonProps} isEditMode={isEditMode} />;
+      case 'photos': return isEditMode ? 
+        <EditableOrganizationPhotos {...commonProps} /> : <OrganizationPhotos {...commonProps} />;
+      case 'grants': return <OrganizationGrantsFixed {...commonProps} />;
+      default: return <PlaceholderContent contentType={activeTab} organizationType={organization.type} />;
     }
   };
 
-  if (loading) return <PublicPageLayout><div className="flex items-center justify-center py-20"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div><span className="ml-3 text-slate-500">Loading organization...</span></div></PublicPageLayout>;
-  if (error || !organization) return <PublicPageLayout><div className="text-center py-20"><p className="text-red-600">{error || "Organization not found."}</p></div></PublicPageLayout>;
+  if (loading) return (
+    <PublicPageLayout>
+      <div className="flex items-center justify-center py-20">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <span className="ml-3 text-slate-500">Loading organization...</span>
+      </div>
+    </PublicPageLayout>
+  );
+  
+  if (error || !organization) return (
+    <PublicPageLayout>
+      <div className="text-center py-20">
+        <p className="text-red-600">{error || "Organization not found."}</p>
+      </div>
+    </PublicPageLayout>
+  );
   
   return (
     <PublicPageLayout bgColor="bg-slate-50">
@@ -221,7 +302,7 @@ const OrganizationProfilePage = () => {
           onBookmark={toggleBookmark}
           config={orgConfig}
           activeTab={activeTab}
-          setActiveTab={setActiveTab}
+          setActiveTab={handleTabChange}
           tabs={getTabConfiguration()}
           userMembership={userMembership}
           session={session}
@@ -238,7 +319,7 @@ const OrganizationProfilePage = () => {
           onBookmark={toggleBookmark}
           config={orgConfig}
           activeTab={activeTab}
-          setActiveTab={setActiveTab}
+          setActiveTab={handleTabChange}
           tabs={getTabConfiguration()}
           userMembership={userMembership}
           session={session}
@@ -246,7 +327,11 @@ const OrganizationProfilePage = () => {
         />
       )}
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto"><div className="min-h-screen py-8">{renderActiveTab()}</div></div>
+        <div className="max-w-7xl mx-auto">
+          <div className="min-h-screen py-8">
+            {renderActiveTab()}
+          </div>
+        </div>
       </div>
     </PublicPageLayout>
   );

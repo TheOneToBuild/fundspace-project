@@ -1,5 +1,4 @@
-// src/components/OrganizationPostCard.jsx - Fixed handleEditPost function
-
+// src/components/OrganizationPostCard.jsx - Simple fix to add pageData support
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { useOutletContext } from 'react-router-dom';
@@ -22,7 +21,8 @@ export default function OrganizationPostCard({
   canEdit,
   currentUserId,
   onOpenDetail,
-  currentUserProfile
+  currentUserProfile,
+  pageData // NEW: Accept pageData prop for batched loading
 }) {
   // FALLBACK: Use useOutletContext if currentUserProfile is not passed
   const outletContext = useOutletContext();
@@ -48,11 +48,27 @@ export default function OrganizationPostCard({
   const organizationAvatar = organization?.logo_url || organization?.image_url;
   const parsedTags = post?.tags ? JSON.parse(post.tags) : [];
 
-  // Load user's reaction and reaction summary - KEEP ORIGINAL WORKING LOGIC
+  // MODIFIED: Only load reactions if pageData doesn't exist
   useEffect(() => {
     const loadReactions = async () => {
       if (!post?.id) return;
       
+      // Skip loading if we have pageData for this post
+      if (pageData?.organizationPostLikes?.[post.id]) {
+        const postData = pageData.organizationPostLikes[post.id];
+        setTotalLikes(postData.likes_count || 0);
+        setReactionSummary(postData.reaction_summary || []);
+        setReactors(postData.reactors || []);
+        
+        // Still need to check user's reaction
+        if (currentUserId) {
+          const userReaction = postData.user_reaction || null;
+          setSelectedReaction(userReaction);
+        }
+        return; // Skip the API calls since we have cached data
+      }
+      
+      // Original loading logic when pageData is not available
       try {
         // Get user's current reaction
         if (currentUserId) {
@@ -66,7 +82,7 @@ export default function OrganizationPostCard({
           setSelectedReaction(userReaction?.reaction_type || null);
         }
 
-        // Get reaction summary and reactors (same as PostCard)
+        // Get reaction summary and reactors
         const { data: reactionData } = await supabase
           .from('organization_post_likes')
           .select('reaction_type, user_id, created_at')
@@ -85,7 +101,7 @@ export default function OrganizationPostCard({
           setReactionSummary(summary);
           setTotalLikes(reactionData.length);
 
-          // Get profiles for reactors (matching PostCard format)
+          // Get profiles for reactors
           const userIds = reactionData.map(like => like.user_id);
           const { data: profilesData } = await supabase
             .from('profiles')
@@ -117,8 +133,9 @@ export default function OrganizationPostCard({
     };
 
     loadReactions();
-  }, [post?.id, currentUserId]);
+  }, [post?.id, currentUserId, pageData]);
 
+  // Rest of your existing functions remain the same...
   const refreshPostData = async () => {
     if (!post?.id) return;
     try {
@@ -152,14 +169,12 @@ export default function OrganizationPostCard({
         .maybeSingle();
 
       if (existingReaction && selectedReaction === reactionType) {
-        // Remove reaction if clicking the same one
         await supabase
           .from('organization_post_likes')
           .delete()
           .eq('id', existingReaction.id);
         setSelectedReaction(null);
       } else {
-        // Add or update reaction
         await supabase
           .from('organization_post_likes')
           .upsert({
@@ -170,7 +185,6 @@ export default function OrganizationPostCard({
         setSelectedReaction(reactionType);
       }
 
-      // Refresh reaction data
       await refreshPostData();
     } catch (error) {
       console.error('Error handling reaction:', error);
@@ -186,21 +200,15 @@ export default function OrganizationPostCard({
     setShowMenu(false);
   };
 
-  // FIXED: Add edit functionality for organization posts with proper data handling
   const handleEditPost = async (editData) => {
     try {
-      console.log('📝 Edit data received:', editData);
-      
-      // FIXED: Handle different data formats from EditPost component
       let images = [];
       let tags = [];
       let content = '';
 
-      // Handle content
       if (typeof editData === 'object') {
         content = editData.content || editData.editedContent || '';
         
-        // Handle images - could be in different formats
         if (editData.images) {
           images = Array.isArray(editData.images) ? editData.images : [];
         } else if (editData.editedImages) {
@@ -209,50 +217,32 @@ export default function OrganizationPostCard({
           images = Array.isArray(editData.image_urls) ? editData.image_urls : [];
         }
         
-        // Handle tags
         if (editData.tags) {
           tags = Array.isArray(editData.tags) ? editData.tags : [];
         } else if (editData.editedTags) {
           tags = Array.isArray(editData.editedTags) ? editData.editedTags : [];
         }
       } else {
-        // If editData is not an object, try to handle legacy format
         content = String(editData || '');
       }
 
-      // Validate and clean the data
       content = String(content).trim();
       images = images.filter(img => img && typeof img === 'string' && img.trim().length > 0);
       tags = tags.filter(tag => tag && typeof tag === 'string' && tag.trim().length > 0);
 
-      console.log('📝 Processed data:', { 
-        content, 
-        images, 
-        tags,
-        imagesLength: images.length,
-        tagsLength: tags.length 
-      });
+      const updateData = { content: content || '' };
 
-      // Prepare update data with proper validation
-      const updateData = {
-        content: content || ''
-      };
-
-      // Only update tags if they exist
       if (tags.length > 0) {
         updateData.tags = JSON.stringify(tags);
       } else {
         updateData.tags = null;
       }
 
-      // Only update images if they exist and are valid URLs
       if (images.length > 0) {
         updateData.image_urls = images;
       } else {
         updateData.image_urls = null;
       }
-
-      console.log('📝 Final update data for database:', updateData);
 
       const { data: updatedPost, error } = await supabase
         .from('organization_posts')
@@ -262,32 +252,26 @@ export default function OrganizationPostCard({
         .single();
       
       if (error) {
-        console.error("❌ Post update error:", error);
+        console.error("Post update error:", error);
         alert(`Failed to update post: ${error.message}`);
         return;
       }
 
-      console.log('✅ Post updated successfully:', updatedPost);
-
-      // Update the local post data
       if (updatedPost) {
         post.content = updatedPost.content;
         post.tags = updatedPost.tags;
         post.image_urls = updatedPost.image_urls;
-        // Don't update updated_at since it doesn't exist in the table
       }
       
       setIsEditing(false);
       
     } catch (error) {
-      console.error('❌ Unexpected error updating organization post:', error);
+      console.error('Unexpected error updating organization post:', error);
       alert(`Failed to update post: ${error.message}`);
     }
   };
 
-  // Add image click handler for modal
   const handleImageClick = (index) => {
-    // TODO: Implement image viewer modal
     console.log('Image clicked:', index);
   };
 
@@ -376,13 +360,12 @@ export default function OrganizationPostCard({
         </div>
       </div>
 
-      {/* Content - Clickable to open modal ONLY when not editing */}
+      {/* Content */}
       {isEditing ? (
         <EditPost 
           post={post} 
           onSave={handleEditPost} 
           onCancel={() => setIsEditing(false)}
-          // Pass current data to EditPost
           initialContent={post.content}
           initialImages={images}
           initialTags={parsedTags}
@@ -401,7 +384,7 @@ export default function OrganizationPostCard({
         </div>
       )}
 
-      {/* Reaction Summary and Comment Count - SIMPLIFIED */}
+      {/* Reaction Summary and Comment Count */}
       <div className="flex items-center justify-between text-sm text-slate-500 my-2 min-h-[20px]">
         <div 
           className="relative" 
@@ -426,7 +409,6 @@ export default function OrganizationPostCard({
               </span>
             </div>
           )}
-          {/* SIMPLIFIED REACTORS PREVIEW */}
           {showReactorsPreview && totalLikes > 0 && reactors.length > 0 && (
             <div className="absolute left-0 bottom-full mb-2 bg-white border border-slate-200 rounded-lg shadow-lg p-3 z-20 min-w-[200px]">
               <div className="space-y-2">
@@ -459,7 +441,7 @@ export default function OrganizationPostCard({
         )}
       </div>
 
-      {/* Actions Bar - Using PostActions component - ONLY show when not editing */}
+      {/* Actions Bar */}
       {!isEditing && (
         <PostActions 
           onReaction={handleReaction}
@@ -470,7 +452,7 @@ export default function OrganizationPostCard({
         />
       )}
 
-      {/* Comments Section - FIXED: Pass organization context to CommentSection */}
+      {/* Comments Section */}
       {showComments && !isEditing && (
         <div className="mt-4 border-t pt-4 max-h-96 overflow-y-auto">
           <CommentSection 
@@ -482,7 +464,7 @@ export default function OrganizationPostCard({
             currentUserProfile={finalUserProfile}
             onCommentAdded={() => setCommentsCount(prev => prev + 1)}
             onCommentDeleted={() => setCommentsCount(prev => Math.max(0, prev - 1))}
-            organization={organization} // FIXED: Pass organization context for comments
+            organization={organization}
           />
         </div>
       )}
