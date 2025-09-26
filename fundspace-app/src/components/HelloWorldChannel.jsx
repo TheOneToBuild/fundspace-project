@@ -1,4 +1,4 @@
-// src/components/HelloWorldChannel.jsx - CORRECTED: Use ProfilePage batched data
+// src/components/HelloWorldChannel.jsx - OPTIMIZED: Use globalDataManager for posts
 import React, { useState, useEffect, useRef, useCallback, memo } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { supabase } from '../supabaseClient.js';
@@ -9,6 +9,7 @@ import { rssNewsService as newsService } from '../services/rssNewsService.js';
 import { addOrganizationEventListener } from '../utils/organizationEvents.js';
 import { getOrganizationInfoForDashboard } from '../utils/membershipQueries.js';
 import { realtimeManager } from '../utils/realtimeManager.js';
+import globalDataManager from '../utils/globalDataManager.js'; // ✅ ADD THIS IMPORT
 
 import PropTypes from 'prop-types';
 
@@ -131,12 +132,12 @@ const POSTS_PER_PAGE = 5;
 export default function HelloWorldChannel() {
   const { 
     profile,
-    // CRITICAL: Get batched data from ProfilePage context
-    pageData,           // Batched profiles, likes, organizations
-    postsLikesData,     // Batched post likes data  
-    handlePostLike,     // Centralized like handler
-    handleNewPost: handleNewPostContext,  // From ProfilePage context
-    handleDeletePost: handleDeletePostContext  // From ProfilePage context
+    // Get batched data from ProfilePage context
+    pageData,           
+    postsLikesData,     
+    handlePostLike,     
+    handleNewPost: handleNewPostContext,  
+    handleDeletePost: handleDeletePostContext  
   } = useOutletContext() || {};
   
   const [posts, setPosts] = useState([]);
@@ -145,7 +146,7 @@ export default function HelloWorldChannel() {
   const [hasMore, setHasMore] = useState(true);
   const [organizationInfo, setOrganizationInfo] = useState(null);
 
-  // CRITICAL: Create enhanced pageData with all batched info
+  // Create enhanced pageData with all batched info
   const enhancedPageData = React.useMemo(() => ({
     ...pageData,
     postLikes: postsLikesData || pageData?.postLikes || {},
@@ -207,30 +208,32 @@ export default function HelloWorldChannel() {
     fetchOrganizationInfo();
   }, [profile?.id]);
 
-  // FIXED: Simplified post fetching - no individual enrichment
+  // ✅ OPTIMIZED: Use globalDataManager for posts instead of direct queries
   useEffect(() => {
     const fetchPosts = async () => {
       if (!hasMore) return;
       setIsLoading(true);
       try {
-        // Try RPC first for optimized query
-        let postsData = [];
-        try {
-          const { data: rpcData, error: rpcError } = await supabase.rpc('get_ranked_feed', { 
-            page_number: page, 
-            page_size: POSTS_PER_PAGE 
-          });
-          
-          if (!rpcError && rpcData?.length > 0) {
-            postsData = rpcData;
-          }
-        } catch (rpcError) {
-          console.warn('RPC failed, using fallback:', rpcError);
-        }
+        // ✅ BEFORE (Direct query causing 23 posts API calls):
+        // const { data, error: postsError } = await supabase
+        //   .from('posts')
+        //   .select(`*, profiles:profile_id(...)`)
+        //   .eq('channel', 'hello-world')
 
-        // Fallback to direct query
-        if (postsData.length === 0) {
-          const { data, error: postsError } = await supabase
+        // ✅ AFTER (Use globalDataManager for batched loading):
+        if (page === 0) {
+          // First page - use globalDataManager
+          const postsData = await globalDataManager.getPostsByChannel('hello-world', POSTS_PER_PAGE);
+          
+          if (postsData && postsData.length > 0) {
+            setPosts(postsData);
+            if (postsData.length < POSTS_PER_PAGE) setHasMore(false);
+          } else {
+            setHasMore(false);
+          }
+        } else {
+          // Subsequent pages - still need direct query but with optimization
+          const { data: postsData, error: postsError } = await supabase
             .from('posts')
             .select(`*, profiles:profile_id(id, full_name, avatar_url, title, organization_name, role, organization_type)`)
             .eq('channel', 'hello-world')
@@ -238,21 +241,20 @@ export default function HelloWorldChannel() {
             .range(page * POSTS_PER_PAGE, (page + 1) * POSTS_PER_PAGE - 1);
 
           if (postsError) throw postsError;
-          postsData = data || [];
-        }
 
-        if (postsData.length > 0) {
-          // CRITICAL: Don't do individual enrichment here - let pageData handle it
-          const basicPosts = postsData.map(post => ({
-            ...post,
-            reactions: { summary: [], sample: [] }
-          }));
-          
-          setPosts(prevPosts => (page === 0 ? basicPosts : [...prevPosts, ...basicPosts]));
-          if (postsData.length < POSTS_PER_PAGE) setHasMore(false);
-        } else {
-          setHasMore(false);
+          if (postsData && postsData.length > 0) {
+            const basicPosts = postsData.map(post => ({
+              ...post,
+              reactions: { summary: [], sample: [] }
+            }));
+            
+            setPosts(prevPosts => [...prevPosts, ...basicPosts]);
+            if (postsData.length < POSTS_PER_PAGE) setHasMore(false);
+          } else {
+            setHasMore(false);
+          }
         }
+        
       } catch (error) {
         console.error("Error fetching posts:", error);
         setHasMore(false);

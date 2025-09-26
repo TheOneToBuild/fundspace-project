@@ -1,9 +1,10 @@
-// src/components/dashboard/ConnectionsAvatars.jsx
+// src/components/dashboard/ConnectionsAvatars.jsx - OPTIMIZED: Batch user queries
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, Plus, Users, UserCheck } from 'lucide-react';
 import { supabase } from '../../supabaseClient';
 import { getUserConnections } from '../../utils/userConnectionsUtils';
+import { optimizedSupabaseQuery } from '../../utils/apiRequestOptimizer'; // ✅ ADD THIS IMPORT
 import PropTypes from 'prop-types';
 
 const ConnectionAvatar = ({ person, hasRecentPost, type, onClick }) => {
@@ -74,26 +75,41 @@ const ConnectionsAvatars = ({ currentUserProfile }) => {
     const [recentPostUsers, setRecentPostUsers] = useState(new Set());
     const [loading, setLoading] = useState(true);
 
-    // Fetch user following
+    // ✅ OPTIMIZED: Fetch user following with API optimizer
     const fetchFollowing = async (userId) => {
         try {
-            const { data: followingData, error } = await supabase
-                .from('followers')
-                .select(`
-                    id,
-                    following_id,
-                    created_at,
-                    following:following_id (
+            // ✅ BEFORE (Direct query):
+            // const { data: followingData, error } = await supabase
+            //   .from('followers')
+            //   .select(`
+            //     id,
+            //     following_id,
+            //     created_at,
+            //     following:following_id (...)
+            //   `)
+
+            // ✅ AFTER (Optimized):
+            const { data: followingData, error } = await optimizedSupabaseQuery(
+                supabase
+                    .from('followers')
+                    .select(`
                         id,
-                        full_name,
-                        avatar_url,
-                        title,
-                        organization_name
-                    )
-                `)
-                .eq('follower_id', userId)
-                .order('created_at', { ascending: false })
-                .limit(20);
+                        following_id,
+                        created_at,
+                        following:following_id (
+                            id,
+                            full_name,
+                            avatar_url,
+                            title,
+                            organization_name
+                        )
+                    `)
+                    .eq('follower_id', userId)
+                    .order('created_at', { ascending: false })
+                    .limit(20),
+                'following_single',
+                { userId }
+            );
 
             if (error) {
                 console.error('Error fetching following:', error);
@@ -140,11 +156,16 @@ const ConnectionsAvatars = ({ currentUserProfile }) => {
                 if (allUserIds.length > 0) {
                     const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
                     
-                    const { data: recentPosts } = await supabase
-                        .from('posts')
-                        .select('profile_id')
-                        .in('profile_id', allUserIds)
-                        .gte('created_at', twentyFourHoursAgo);
+                    // ✅ OPTIMIZED: Use API optimizer for recent posts check
+                    const { data: recentPosts } = await optimizedSupabaseQuery(
+                        supabase
+                            .from('posts')
+                            .select('profile_id')
+                            .in('profile_id', allUserIds)
+                            .gte('created_at', twentyFourHoursAgo),
+                        'posts_recent_activity',
+                        { userIds: allUserIds }
+                    );
                     
                     if (recentPosts) {
                         const recentPostUserIds = new Set(recentPosts.map(post => post.profile_id));

@@ -79,7 +79,7 @@ export default function OrganizationPostCard({
 
         // ✅ AFTER (Optimized with batch loading):
         if (currentUserId) {
-          const optimizedUserReactionQuery = optimizedSupabaseQuery(
+          const { data: userReactionData } = await optimizedSupabaseQuery(
             supabase
               .from('organization_post_likes')
               .select('reaction_type')
@@ -89,7 +89,8 @@ export default function OrganizationPostCard({
             { postIds: [post.id], userId: currentUserId }
           );
           
-          const { data: userReaction } = await optimizedUserReactionQuery.maybeSingle();
+          // Handle array or single result
+          const userReaction = Array.isArray(userReactionData) ? userReactionData[0] : userReactionData;
           setSelectedReaction(userReaction?.reaction_type || null);
         }
 
@@ -119,34 +120,37 @@ export default function OrganizationPostCard({
           setTotalLikes(reactionData.length);
 
           // ✅ OPTIMIZED: Batch load profiles for reactors
-          const userIds = reactionData.map(like => like.user_id);
-          const optimizedProfilesQuery = optimizedSupabaseQuery(
-            supabase
-              .from('profiles')
-              .select('id, full_name, avatar_url, title, organization_name, role')
-              .in('id', userIds),
-            'profiles_single',
-            { userIds }
-          );
-
-          const { data: profilesData } = await optimizedProfilesQuery;
-
-          const transformedReactors = reactionData.map(like => {
-            const profile = profilesData?.find(p => p.id === like.user_id);
-            return {
-              user_id: like.user_id,
-              profile_id: profile?.id,
-              full_name: profile?.full_name,
-              avatar_url: profile?.avatar_url,
-              title: profile?.title,
-              organization_name: profile?.organization_name,
-              role: profile?.role,
-              reaction_type: like.reaction_type,
-              created_at: like.created_at
-            };
-          }).filter(reactor => reactor.full_name);
+          const userIds = reactionData.map(like => like.user_id).filter(Boolean); // Filter out undefined
           
-          setReactors(transformedReactors);
+          if (userIds.length > 0) {
+            const { data: profilesData } = await optimizedSupabaseQuery(
+              supabase
+                .from('profiles')
+                .select('id, full_name, avatar_url, title, organization_name, role')
+                .in('id', userIds),
+              'profiles_single',
+              { userIds }
+            );
+
+            const transformedReactors = reactionData.map(like => {
+              const profile = profilesData?.find(p => p.id === like.user_id);
+              return {
+                user_id: like.user_id,
+                profile_id: profile?.id,
+                full_name: profile?.full_name,
+                avatar_url: profile?.avatar_url,
+                title: profile?.title,
+                organization_name: profile?.organization_name,
+                role: profile?.role,
+                reaction_type: like.reaction_type,
+                created_at: like.created_at
+              };
+            }).filter(reactor => reactor.full_name);
+            
+            setReactors(transformedReactors);
+          } else {
+            setReactors([]);
+          }
         } else {
           setReactors([]);
         }
@@ -169,7 +173,7 @@ export default function OrganizationPostCard({
       //   .eq('organization_post_id', post.id);
 
       // ✅ AFTER (Optimized):
-      const optimizedLikesQuery = optimizedSupabaseQuery(
+      const { data: likesData, error: likesError } = await optimizedSupabaseQuery(
         supabase
           .from('organization_post_likes')
           .select('user_id, reaction_type')
@@ -178,7 +182,6 @@ export default function OrganizationPostCard({
         { postIds: [post.id] }
       );
 
-      const { data: likesData, error: likesError } = await optimizedLikesQuery;
       if (likesError) throw likesError;
 
       const summary = {};

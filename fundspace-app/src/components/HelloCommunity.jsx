@@ -1,4 +1,4 @@
-// src/components/HelloCommunity.jsx - Fixed with Page Data Loader
+// src/components/HelloCommunity.jsx - OPTIMIZED: Use pageData instead of direct queries
 import React, { useState, useEffect, useCallback, memo, useRef } from 'react';
 import { useOutletContext, useLocation, useNavigate } from 'react-router-dom';
 import PropTypes from 'prop-types';
@@ -9,7 +9,8 @@ import PostCard from './PostCard.jsx';
 import { rssNewsService as newsService } from '../services/rssNewsService.js';
 import { addOrganizationEventListener } from '../utils/organizationEvents';
 import { getOrganizationInfoForCommunity } from '../utils/membershipQueries.js';
-import { usePageDataLoader } from '../hooks/usePageDataLoader'; // ADDED
+import { usePageDataLoader } from '../hooks/usePageDataLoader';
+import globalDataManager from '../utils/globalDataManager.js'; // ✅ ADD THIS IMPORT
 
 // Organization channel configuration - now maps to actual database channels
 const ORGANIZATION_CHANNELS = {
@@ -120,7 +121,7 @@ export default function HelloCommunity() {
   const location = useLocation();
   const navigate = useNavigate();
   
-  // ADDED: Page data loader for batched API calls
+  // Page data loader for batched API calls
   const { pageData, loadPostsPageData, clearPageData } = usePageDataLoader();
   
   const [posts, setPosts] = useState([]);
@@ -162,36 +163,35 @@ export default function HelloCommunity() {
     fetchOrganizationInfo();
   }, [profile?.id]);
 
-  // Fetch posts based on current channel
+  // ✅ OPTIMIZED: Fetch posts using globalDataManager instead of direct queries
   const fetchPosts = useCallback(async () => {
     if (!profile?.id) return;
 
     setLoading(true);
     try {
-      let query = supabase
-        .from('posts')
-        .select(`
-          *,
-          profiles (
-            id, full_name, avatar_url, title, organizational_role
-          )
-        `)
-        .order('created_at', { ascending: false })
-        .limit(20);
+      let postsData = [];
 
-      // Filter by channel
-      if (currentChannel === 'community' && organizationType) {
-        query = query.eq('channel', channelConfig.dbChannel);
+      // ✅ BEFORE (Direct query causing multiple posts API calls):
+      // let query = supabase
+      //   .from('posts')
+      //   .select(`
+      //     *,
+      //     profiles (
+      //       id, full_name, avatar_url, title, organizational_role
+      //     )
+      //   `)
+
+      // ✅ AFTER (Use globalDataManager for batched loading):
+      if (currentChannel === 'community' && channelConfig) {
+        // Use globalDataManager for community posts
+        postsData = await globalDataManager.getPostsByChannel(channelConfig.dbChannel, 20);
       } else {
-        query = query.eq('channel', 'hello-world');
+        // Use globalDataManager for hello-world posts
+        postsData = await globalDataManager.getPostsByChannel('hello-world', 20);
       }
 
-      const { data, error } = await query;
-
-      if (error) throw error;
-
       if (isMountedRef.current) {
-        setPosts(data || []);
+        setPosts(postsData || []);
       }
     } catch (error) {
       console.error('Error fetching posts:', error);
@@ -200,16 +200,16 @@ export default function HelloCommunity() {
         setLoading(false);
       }
     }
-  }, [profile?.id, currentChannel, organizationType, channelConfig]);
+  }, [profile?.id, currentChannel, channelConfig]);
 
-  // ADDED: Load batched data when posts change
+  // Load batched data when posts change
   useEffect(() => {
     if (posts.length > 0) {
       loadPostsPageData(posts);
     }
   }, [posts, loadPostsPageData]);
 
-  // ADDED: Clear cache when component unmounts or channel changes
+  // Clear cache when component unmounts or channel changes
   useEffect(() => {
     return () => clearPageData();
   }, [clearPageData, currentChannel]);
@@ -368,7 +368,7 @@ export default function HelloCommunity() {
                   <PostCard 
                     key={post.id} 
                     post={post} 
-                    pageData={pageData} // ADDED: Pass pageData for batched loading
+                    pageData={pageData} 
                     onDelete={handleDeletePost}
                     disabled={loading}
                   />

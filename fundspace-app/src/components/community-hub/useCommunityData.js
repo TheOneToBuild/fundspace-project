@@ -1,9 +1,10 @@
-// src/components/community-hub/useCommunityData.js
+// src/components/community-hub/useCommunityData.js - OPTIMIZED: Use globalDataManager
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../supabaseClient';
 import { addOrganizationEventListener } from '../../utils/organizationEvents';
 import { getOrganizationInfoForCommunity } from '../../utils/membershipQueries.js';
 import { POSTS_PER_PAGE, getOrgBaseType } from './constants';
+import globalDataManager from '../../utils/globalDataManager.js'; // ✅ ADD THIS IMPORT
 
 export const useCommunityData = (profile) => {
   const [posts, setPosts] = useState([]);
@@ -50,7 +51,7 @@ export const useCommunityData = (profile) => {
     fetchOrganizationInfo();
   }, [profile?.id]);
 
-  // Fetch posts function
+  // ✅ OPTIMIZED: Fetch posts function using globalDataManager
   const fetchPosts = async (pageNum, channelConfig) => {
     if (!channelConfig || channelConfig.disabled) {
       setLoading(false);
@@ -61,15 +62,29 @@ export const useCommunityData = (profile) => {
       let postsData;
       
       if (channelConfig.id === 'hello-world') {
-        const { data, error } = await supabase
-          .from('posts')
-          .select(`*, profiles:profile_id(id, full_name, avatar_url, title, organization_name, role, organization_type)`)
-          .eq('channel', 'hello-world')
-          .order('created_at', { ascending: false })
-          .range(pageNum * POSTS_PER_PAGE, (pageNum + 1) * POSTS_PER_PAGE - 1);
+        // ✅ BEFORE (Direct query causing individual posts API calls):
+        // const { data, error } = await supabase
+        //   .from('posts')
+        //   .select(`*, profiles:profile_id(...)`)
+        //   .eq('channel', 'hello-world')
+
+        // ✅ AFTER (Use globalDataManager for batched loading):
+        if (pageNum === 0) {
+          // First page - use globalDataManager
+          postsData = await globalDataManager.getPostsByChannel('hello-world', POSTS_PER_PAGE);
+        } else {
+          // Subsequent pages - fallback to direct query with range
+          const { data, error } = await supabase
+            .from('posts')
+            .select(`*, profiles:profile_id(id, full_name, avatar_url, title, organization_name, role, organization_type)`)
+            .eq('channel', 'hello-world')
+            .order('created_at', { ascending: false })
+            .range(pageNum * POSTS_PER_PAGE, (pageNum + 1) * POSTS_PER_PAGE - 1);
+          
+          if (error) throw error;
+          postsData = data;
+        }
         
-        if (error) throw error;
-        postsData = data;
       } else if (channelConfig.id === 'hello-community') {
         const userOrgType = getOrgBaseType(organizationInfo?.type);
         if (!userOrgType) {
@@ -77,37 +92,39 @@ export const useCommunityData = (profile) => {
           return;
         }
 
-        const { data, error } = await supabase
-          .from('posts')
-          .select(`*, profiles:profile_id(id, full_name, avatar_url, title, organization_name, role, organization_type)`)
-          .eq('channel', channelConfig.dbChannel)
-          .order('created_at', { ascending: false })
-          .range(pageNum * POSTS_PER_PAGE, (pageNum + 1) * POSTS_PER_PAGE - 1);
-        
-        if (error) throw error;
-        postsData = data;
+        // ✅ OPTIMIZED: Use globalDataManager for community posts
+        if (pageNum === 0) {
+          // First page - use globalDataManager
+          postsData = await globalDataManager.getPostsByChannel(channelConfig.dbChannel, POSTS_PER_PAGE);
+        } else {
+          // Subsequent pages - fallback to direct query
+          const { data, error } = await supabase
+            .from('posts')
+            .select(`*, profiles:profile_id(id, full_name, avatar_url, title, organization_name, role, organization_type)`)
+            .eq('channel', channelConfig.dbChannel)
+            .order('created_at', { ascending: false })
+            .range(pageNum * POSTS_PER_PAGE, (pageNum + 1) * POSTS_PER_PAGE - 1);
+          
+          if (error) throw error;
+          postsData = data;
+        }
       } else {
         postsData = [];
       }
 
       if (postsData && postsData.length > 0) {
+        // ✅ OPTIMIZED: Batch load reactions instead of individual queries
         const postIds = postsData.map(post => post.id);
-        const { data: allReactions } = await supabase
-          .from('post_likes')
-          .select('post_id, reaction_type')
-          .in('post_id', postIds);
+        
+        // Use globalDataManager for batched reactions loading
+        const reactionsData = await globalDataManager.getPostLikes(postIds);
 
         const enrichedPosts = postsData.map(post => {
-          const reactionsForPost = allReactions?.filter(r => r.post_id === post.id) || [];
-          const reactionSummary = reactionsForPost.reduce((acc, r) => {
-            const type = r.reaction_type || 'like';
-            acc[type] = (acc[type] || 0) + 1;
-            return acc;
-          }, {});
+          const postReactions = reactionsData[post.id];
           return {
             ...post,
             reactions: {
-              summary: Object.entries(reactionSummary).map(([type, count]) => ({ type, count })),
+              summary: postReactions?.reaction_summary || [],
               sample: []
             }
           };
