@@ -1,9 +1,8 @@
-// PostCard.jsx - Complete Optimized Version with Global Data Manager
+// PostCard.jsx - CORRECTED: Use batched data, eliminate individual queries
 import React, { useState, useEffect, useMemo, memo, lazy, Suspense, useCallback, useRef } from 'react';
 import { supabase } from '../supabaseClient';
 import { useOutletContext } from 'react-router-dom';
 import { addOrganizationEventListener } from '../utils/organizationEvents';
-import globalDataManager from '../utils/globalDataManager';
 import PostHeader from './post/PostHeader';
 import PostBody from './post/PostBody';
 import PostActions from './post/PostActions';
@@ -22,34 +21,38 @@ function PostCard({
   disabled = false, 
   showOrganizationAsAuthor = false, 
   organization,
-  pageData // NEW: Page-level batched data
+  pageData, // Batched page data
+  postsLikesData, // From ProfilePage context
+  onPostLike, // From ProfilePage context
+  userReaction, // Pre-loaded user reaction
+  batchedProfiles, // Pre-loaded profiles
+  batchedOrganizations // Pre-loaded organizations
 }) {
   const { profile: currentUserProfile } = useOutletContext();
   
-  // Use batched data if available, otherwise fall back to individual loading
-  const [likeCount, setLikeCount] = useState(() => {
-    if (pageData?.postLikes?.[post.id]) {
-      return pageData.postLikes[post.id].likes_count;
-    }
-    return post.likes_count || 0;
-  });
-  
+  // FIXED: Use batched data first, then fallback to individual data, then defaults
+  const initialLikeCount = postsLikesData?.[post.id]?.userReaction ? 
+    Object.values(postsLikesData[post.id].reaction_summary || {}).reduce((sum, count) => sum + count, 0) :
+    pageData?.postLikes?.[post.id]?.likes_count || post.likes_count || 0;
+    
+  const initialReactors = postsLikesData?.[post.id]?.reactors || 
+    pageData?.postLikes?.[post.id]?.reactors || 
+    [];
+    
+  const initialReactionSummary = postsLikesData?.[post.id]?.reaction_summary || 
+    pageData?.postLikes?.[post.id]?.reaction_summary || 
+    post.reactions?.summary || 
+    [];
+
+  const [likeCount, setLikeCount] = useState(initialLikeCount);
   const [commentCount, setCommentCount] = useState(post.comments_count || 0);
-  const [selectedReaction, setSelectedReaction] = useState(null);
-  
-  const [reactors, setReactors] = useState(() => {
-    if (pageData?.postLikes?.[post.id]) {
-      return pageData.postLikes[post.id].reactors || [];
-    }
-    return [];
-  });
-  
-  const [reactionSummary, setReactionSummary] = useState(() => {
-    if (pageData?.postLikes?.[post.id]) {
-      return pageData.postLikes[post.id].reaction_summary;
-    }
-    return post.reactions?.summary || [];
-  });
+  const [selectedReaction, setSelectedReaction] = useState(
+    userReaction || 
+    postsLikesData?.[post.id]?.userReaction || 
+    null
+  );
+  const [reactors, setReactors] = useState(initialReactors);
+  const [reactionSummary, setReactionSummary] = useState(initialReactionSummary);
   
   const [isEditing, setIsEditing] = useState(false);
   const [showComments, setShowComments] = useState(false);
@@ -68,7 +71,7 @@ function PostCard({
   const isAuthor = currentUserProfile?.id === individualAuthor?.id;
   const displayImages = image_urls && image_urls.length > 0 ? image_urls : (image_url ? [image_url] : []);
 
-  // Enhanced author with batched data
+  // FIXED: Enhanced author with batched data prioritization
   const displayAuthor = useMemo(() => {
     if (showOrganizationAsAuthor && organization) {
       return {
@@ -80,13 +83,19 @@ function PostCard({
     
     let author = { ...individualAuthor };
     
-    // Use batched profile data if available
-    if (pageData?.profiles?.[author.id]) {
+    // FIXED: Prioritize batched data sources
+    if (batchedProfiles?.[author.id]) {
+      author = { ...author, ...batchedProfiles[author.id] };
+    } else if (pageData?.profiles?.[author.id]) {
       author = { ...author, ...pageData.profiles[author.id] };
     }
     
-    // Use batched organization membership if available
-    if (pageData?.orgMemberships?.[author.id]) {
+    // Use batched organization data
+    if (batchedOrganizations?.[author.id]) {
+      const orgInfo = batchedOrganizations[author.id];
+      author.organization_name = orgInfo.name || author.organization_name;
+      author.organization_type = orgInfo.type || author.organization_type;
+    } else if (pageData?.orgMemberships?.[author.id]) {
       const membership = pageData.orgMemberships[author.id];
       author.organization_name = membership.organization?.name || author.organization_name;
       author.organization_type = membership.organization?.type || author.organization_type;
@@ -97,79 +106,27 @@ function PostCard({
     }
     
     return author;
-  }, [showOrganizationAsAuthor, organization, individualAuthor, pageData]);
+  }, [showOrganizationAsAuthor, organization, individualAuthor, batchedProfiles, pageData, batchedOrganizations]);
 
-  // Load post data only if not provided by pageData
-  useEffect(() => {
-    const loadPostData = async () => {
-      // Skip if we have pageData or if component unmounted
-      if (!mountedRef.current || pageData?.postLikes?.[post.id] || !post.id) return;
-      
-      try {
-        // Use global data manager for batched loading
-        const postData = await globalDataManager.getPostLikesForPost(post.id);
-        
-        if (!mountedRef.current) return;
-        
-        setLikeCount(postData.likes_count);
-        setReactionSummary(postData.reaction_summary);
-        setReactors(postData.reactors);
-      } catch (error) {
-        console.error('Error loading post data:', error);
-      }
-    };
+  // REMOVED: Individual post data loading - only use batched data
+  // No more individual useEffect for loading post likes
 
-    loadPostData();
-  }, [post.id, pageData]);
-
-  // Check user's reaction status
-  useEffect(() => {
-    const checkReactionStatus = async () => {
-      if (!currentUserProfile?.id || !post.id) return;
-      
-      try {
-        const { data, error } = await supabase
-          .from('post_likes')
-          .select('reaction_type')
-          .eq('post_id', post.id)
-          .eq('user_id', currentUserProfile.id)
-          .maybeSingle();
-
-        if (!error && mountedRef.current) {
-          setSelectedReaction(data?.reaction_type || null);
-        }
-      } catch (error) {
-        console.error('Error checking reaction status:', error);
-      }
-    };
-
-    checkReactionStatus();
-  }, [post.id, currentUserProfile?.id]);
-
-  // Organization change listener (only for authors)
-  useEffect(() => {
-    if (!isAuthor || !currentUserProfile?.id) return;
-    
-    const cleanup = addOrganizationEventListener('organizationChanged', (event) => {
-      const { profileId, organization } = event.detail;
-      if (profileId === currentUserProfile.id && mountedRef.current) {
-        // Update will be handled by displayAuthor memo
-      }
-    });
-
-    return cleanup;
-  }, [isAuthor, currentUserProfile?.id]);
-
-  // Handle reaction with debouncing and proper state management
+  // FIXED: Use context reaction handler if available, otherwise individual handler
   const handleReaction = useCallback(async (reactionType) => {
     if (!currentUserProfile || !post?.id || disabled || isProcessingReaction) return;
     
-    // Clear any pending debounced calls
+    // Use centralized handler if available (from ProfilePage)
+    if (onPostLike) {
+      onPostLike(post.id, selectedReaction, selectedReaction === reactionType ? null : reactionType);
+      setSelectedReaction(selectedReaction === reactionType ? null : reactionType);
+      return;
+    }
+    
+    // Fallback to individual handler
     if (reactionDebounceRef.current) {
       clearTimeout(reactionDebounceRef.current);
     }
     
-    // Debounce rapid clicks
     reactionDebounceRef.current = setTimeout(async () => {
       if (!mountedRef.current) return;
       
@@ -210,9 +167,6 @@ function PostCard({
             }
           }
         }
-
-        // Clear cached data to force refresh on next load
-        globalDataManager.clearCache(`post-likes-batch`);
         
       } catch (error) {
         console.error('Error handling reaction:', error);
@@ -223,8 +177,46 @@ function PostCard({
           }, 500);
         }
       }
-    }, 200); // 200ms debounce
-  }, [currentUserProfile, post?.id, disabled, selectedReaction, isProcessingReaction]);
+    }, 200);
+  }, [currentUserProfile, post?.id, disabled, selectedReaction, isProcessingReaction, onPostLike]);
+
+  // FIXED: Check user's reaction status only if not provided by batched data
+  useEffect(() => {
+    if (selectedReaction !== null || !currentUserProfile?.id || !post.id) return;
+    
+    const checkReactionStatus = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('post_likes')
+          .select('reaction_type')
+          .eq('post_id', post.id)
+          .eq('user_id', currentUserProfile.id)
+          .maybeSingle();
+
+        if (!error && mountedRef.current) {
+          setSelectedReaction(data?.reaction_type || null);
+        }
+      } catch (error) {
+        console.error('Error checking reaction status:', error);
+      }
+    };
+
+    checkReactionStatus();
+  }, [post.id, currentUserProfile?.id, selectedReaction]);
+
+  // Organization change listener (only for authors)
+  useEffect(() => {
+    if (!isAuthor || !currentUserProfile?.id) return;
+    
+    const cleanup = addOrganizationEventListener('organizationChanged', (event) => {
+      const { profileId, organization } = event.detail;
+      if (profileId === currentUserProfile.id && mountedRef.current) {
+        // Update will be handled by displayAuthor memo
+      }
+    });
+
+    return cleanup;
+  }, [isAuthor, currentUserProfile?.id]);
 
   const handleEditPost = async (editData) => {
     const { data: { user } } = await supabase.auth.getUser();

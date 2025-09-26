@@ -1,4 +1,4 @@
-// src/components/HelloWorldChannel.jsx - Optimized with Page Data Loader
+// src/components/HelloWorldChannel.jsx - CORRECTED: Use ProfilePage batched data
 import React, { useState, useEffect, useRef, useCallback, memo } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { supabase } from '../supabaseClient.js';
@@ -9,8 +9,6 @@ import { rssNewsService as newsService } from '../services/rssNewsService.js';
 import { addOrganizationEventListener } from '../utils/organizationEvents.js';
 import { getOrganizationInfoForDashboard } from '../utils/membershipQueries.js';
 import { realtimeManager } from '../utils/realtimeManager.js';
-import { getChannelInfo } from '../utils/channelUtils.js';
-import { usePageDataLoader } from '../hooks/usePageDataLoader';
 
 import PropTypes from 'prop-types';
 
@@ -24,7 +22,6 @@ const NewsCard = memo(({ title, timeAgo, image, url, category }) => {
       onClick={handleClick}
       className="relative w-80 h-80 bg-white rounded-xl overflow-hidden shadow-lg group cursor-pointer"
     >
-      {/* Image */}
       {image ? (
         <img 
           src={image} 
@@ -37,10 +34,8 @@ const NewsCard = memo(({ title, timeAgo, image, url, category }) => {
         </div>
       )}
       
-      {/* Dark Gradient Overlay */}
       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
       
-      {/* Source Tag - Top Left */}
       <div className="absolute top-3 left-3">
         <div className="flex items-center space-x-2">
           <span className="bg-white/20 backdrop-blur-sm text-white text-xs font-medium px-2 py-1 rounded-full border border-white/30">
@@ -53,14 +48,12 @@ const NewsCard = memo(({ title, timeAgo, image, url, category }) => {
         </div>
       </div>
       
-      {/* Title Overlay - Bottom */}
       <div className="absolute bottom-0 left-0 right-0 p-4">
         <h3 className="font-bold text-white text-lg leading-tight line-clamp-3 group-hover:text-blue-200 transition-colors">
           {title}
         </h3>
       </div>
       
-      {/* Hover Overlay */}
       <div className="absolute inset-0 bg-blue-600/0 group-hover:bg-blue-600/10 transition-colors duration-200"></div>
     </div>
   );
@@ -133,27 +126,33 @@ const HelloWorldEmptyState = () => (
   </div>
 );
 
-const HelloWorldChannelIdentifier = () => (
-  <div className="mb-6">
-    <div className="inline-flex items-center px-4 py-2 rounded-full text-sm font-medium bg-sky-50 text-sky-700 border border-sky-200">
-      <span className="mr-2">🌍</span>
-      <span>#hello-world</span>
-    </div>
-  </div>
-);
-
 const POSTS_PER_PAGE = 5;
 
 export default function HelloWorldChannel() {
-  const { profile } = useOutletContext() || {};
+  const { 
+    profile,
+    // CRITICAL: Get batched data from ProfilePage context
+    pageData,           // Batched profiles, likes, organizations
+    postsLikesData,     // Batched post likes data  
+    handlePostLike,     // Centralized like handler
+    handleNewPost: handleNewPostContext,  // From ProfilePage context
+    handleDeletePost: handleDeletePostContext  // From ProfilePage context
+  } = useOutletContext() || {};
+  
   const [posts, setPosts] = useState([]);
   const [page, setPage] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [organizationInfo, setOrganizationInfo] = useState(null);
 
-  // ✅ NEW: Add page data loader for batched API calls
-  const { pageData, loadPostsPageData, clearPageData } = usePageDataLoader();
+  // CRITICAL: Create enhanced pageData with all batched info
+  const enhancedPageData = React.useMemo(() => ({
+    ...pageData,
+    postLikes: postsLikesData || pageData?.postLikes || {},
+    profiles: pageData?.profiles || {},
+    orgMemberships: pageData?.orgMemberships || {},
+    organizations: pageData?.organizations || {}
+  }), [pageData, postsLikesData]);
 
   const observer = useRef();
   const loaderRef = useCallback(node => {
@@ -166,13 +165,6 @@ export default function HelloWorldChannel() {
     });
     if (node) observer.current.observe(node);
   }, [isLoading, hasMore]);
-
-  // ✅ NEW: Load batched data whenever posts change
-  useEffect(() => {
-    if (posts.length > 0) {
-      loadPostsPageData(posts);
-    }
-  }, [posts, loadPostsPageData]);
 
   // Organization event listener
   useEffect(() => {
@@ -207,7 +199,7 @@ export default function HelloWorldChannel() {
         const orgData = await getOrganizationInfoForDashboard(profile.id);
         setOrganizationInfo(orgData);
       } catch (err) {
-        console.error('❌ HelloWorldChannel: Error fetching organization info:', err);
+        console.error('Error fetching organization info:', err);
         setOrganizationInfo(null);
       }
     };
@@ -215,66 +207,54 @@ export default function HelloWorldChannel() {
     fetchOrganizationInfo();
   }, [profile?.id]);
 
-  // ✅ OPTIMIZED: Fetch posts without individual post_likes calls
+  // FIXED: Simplified post fetching - no individual enrichment
   useEffect(() => {
     const fetchPosts = async () => {
       if (!hasMore) return;
       setIsLoading(true);
       try {
-        const { data: postsData, error: postsError } = await supabase
-          .from('posts')
-          .select(`*, profiles:profile_id(id, full_name, avatar_url, title, organization_name, role, organization_type)`)
-          .eq('channel', 'hello-world')
-          .order('created_at', { ascending: false })
-          .range(page * POSTS_PER_PAGE, (page + 1) * POSTS_PER_PAGE - 1);
-
-        if (postsError) {
-          console.warn('⚠️ HelloWorldChannel: Direct query failed, falling back to RPC:', postsError);
-          const { data: newPosts, error: rpcError } = await supabase.rpc('get_ranked_feed', { 
+        // Try RPC first for optimized query
+        let postsData = [];
+        try {
+          const { data: rpcData, error: rpcError } = await supabase.rpc('get_ranked_feed', { 
             page_number: page, 
             page_size: POSTS_PER_PAGE 
           });
-          if (rpcError) throw rpcError;
-
-          if (newPosts && newPosts.length > 0) {
-            const userIds = [...new Set(newPosts.map(p => p.profile_id))];
-            const { data: profiles, error: profileError } = await supabase
-              .from('profiles')
-              .select('*')
-              .in('id', userIds);
-            if (profileError) throw profileError;
-
-            const profilesById = profiles.reduce((acc, p) => { 
-              acc[p.id] = p; 
-              return acc; 
-            }, {});
-            const enrichedPosts = newPosts.map(post => ({ 
-              ...post, 
-              profiles: profilesById[post.profile_id] 
-            }));
-            
-            setPosts(prevPosts => (page === 0 ? enrichedPosts : [...prevPosts, ...enrichedPosts]));
-            if (newPosts.length < POSTS_PER_PAGE) setHasMore(false);
-          } else {
-            setHasMore(false);
+          
+          if (!rpcError && rpcData?.length > 0) {
+            postsData = rpcData;
           }
+        } catch (rpcError) {
+          console.warn('RPC failed, using fallback:', rpcError);
+        }
+
+        // Fallback to direct query
+        if (postsData.length === 0) {
+          const { data, error: postsError } = await supabase
+            .from('posts')
+            .select(`*, profiles:profile_id(id, full_name, avatar_url, title, organization_name, role, organization_type)`)
+            .eq('channel', 'hello-world')
+            .order('created_at', { ascending: false })
+            .range(page * POSTS_PER_PAGE, (page + 1) * POSTS_PER_PAGE - 1);
+
+          if (postsError) throw postsError;
+          postsData = data || [];
+        }
+
+        if (postsData.length > 0) {
+          // CRITICAL: Don't do individual enrichment here - let pageData handle it
+          const basicPosts = postsData.map(post => ({
+            ...post,
+            reactions: { summary: [], sample: [] }
+          }));
+          
+          setPosts(prevPosts => (page === 0 ? basicPosts : [...prevPosts, ...basicPosts]));
+          if (postsData.length < POSTS_PER_PAGE) setHasMore(false);
         } else {
-          if (postsData && postsData.length > 0) {
-            // ✅ REMOVED: Individual post_likes loading - now handled by pageData
-            // Instead, just set basic post structure and let pageData provide likes
-            const basicPosts = postsData.map(post => ({
-              ...post,
-              reactions: { summary: [], sample: [] }
-            }));
-            
-            setPosts(prevPosts => (page === 0 ? basicPosts : [...prevPosts, ...basicPosts]));
-            if (postsData.length < POSTS_PER_PAGE) setHasMore(false);
-          } else {
-            setHasMore(false);
-          }
+          setHasMore(false);
         }
       } catch (error) {
-        console.error("❌ HelloWorldChannel: Error fetching posts:", error);
+        console.error("Error fetching posts:", error);
         setHasMore(false);
       } finally {
         setIsLoading(false);
@@ -290,9 +270,6 @@ export default function HelloWorldChannel() {
     const refreshPostCounts = async (postId) => {
       const isInCurrentPosts = posts.some(p => p.id === postId);
       if (!isInCurrentPosts) return;
-
-      // ✅ NEW: Clear page data cache when real-time updates occur
-      clearPageData();
 
       const { data: postData } = await supabase
         .from('posts')
@@ -329,19 +306,15 @@ export default function HelloWorldChannel() {
               if (currentPosts.some(p => p.id === newPostWithProfile.id)) return currentPosts;
               return [newPostWithProfile, ...currentPosts];
             });
-            // Clear page data to force refresh with new post
-            clearPageData();
           }
         },
         onPostDelete: (payload) => {
           setPosts(currentPosts => currentPosts.filter(p => p.id !== payload.old.id));
-          clearPageData();
         },
         onPostUpdate: (payload) => {
           setPosts(currentPosts => currentPosts.map(p => 
             p.id === payload.new.id ? { ...p, ...payload.new } : p
           ));
-          clearPageData();
         },
         onLikeChange: (payload) => {
           const postId = payload.new?.post_id || payload.old?.post_id;
@@ -357,9 +330,9 @@ export default function HelloWorldChannel() {
     return () => {
       realtimeManager.removeSubscription('hello-world', supabase);
     };
-  }, [posts, profile?.id, clearPageData]);
+  }, [posts, profile?.id]);
 
-  const handleNewPost = useCallback((newPost) => {
+  const handleNewPostLocal = useCallback((newPost) => {
     const postWithOrgInfo = { 
       ...newPost, 
       profiles: {
@@ -372,29 +345,33 @@ export default function HelloWorldChannel() {
       reactions: { summary: [], sample: [] } 
     };
     setPosts(p => [postWithOrgInfo, ...p]);
-    // Clear page data to include new post in next batch
-    clearPageData();
-  }, [profile, organizationInfo, clearPageData]);
+    
+    // Use ProfilePage handler if available
+    if (handleNewPostContext) {
+      handleNewPostContext(newPost);
+    }
+  }, [profile, organizationInfo, handleNewPostContext]);
   
-  const handleDeletePost = useCallback((postId) => {
+  const handleDeletePostLocal = useCallback((postId) => {
     setPosts(p => p.filter(post => post.id !== postId));
-    clearPageData();
-  }, [clearPageData]);
+    
+    // Use ProfilePage handler if available
+    if (handleDeletePostContext) {
+      handleDeletePostContext(postId);
+    }
+  }, [handleDeletePostContext]);
 
   return (
     <div className="space-y-6">
-      {/* Trending News */}
       <TrendingNewsSection />
 
-      {/* Create Post */}
       <CreatePost 
         profile={profile} 
-        onNewPost={handleNewPost} 
+        onNewPost={handleNewPostLocal} 
         channel="hello-world" 
         organizationType={organizationInfo?.type} 
       />
 
-      {/* Posts Feed */}
       <div className="space-y-6">
         {posts.length === 0 && !isLoading ? (
           <HelloWorldEmptyState />
@@ -404,12 +381,16 @@ export default function HelloWorldChannel() {
               <PostCard 
                 key={post.id} 
                 post={post} 
-                onDelete={handleDeletePost}
-                pageData={pageData}
+                onDelete={handleDeletePostLocal}
+                pageData={enhancedPageData}
+                postsLikesData={postsLikesData}
+                onPostLike={handlePostLike}
+                userReaction={enhancedPageData.postLikes?.[post.id]?.userReaction}
+                batchedProfiles={enhancedPageData.profiles}
+                batchedOrganizations={enhancedPageData.organizations}
               />
             ))}
             
-            {/* Load more trigger */}
             <div ref={loaderRef} className="h-10 text-center">
               {isLoading && <p className="text-slate-500">Loading...</p>}
               {!isLoading && !hasMore && posts.length > 0 && (

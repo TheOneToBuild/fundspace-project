@@ -1,4 +1,4 @@
-// src/components/dashboard/PostDetailModal.jsx
+// src/components/dashboard/PostDetailModal.jsx - CORRECTED: Use batched data
 import React, { useState, useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
 import { supabase } from '../../supabaseClient';
@@ -8,24 +8,61 @@ import CommentSection from '../CommentSection';
 import { reactions } from '../post/constants';
 import PropTypes from 'prop-types';
 
-const PostDetailModal = ({ post, isOpen, onClose, currentUserProfile }) => {
-    const [likeCount, setLikeCount] = useState(post?.likes_count || 0);
+const PostDetailModal = ({ post, isOpen, onClose, currentUserProfile, pageData, postsLikesData, onPostLike }) => {
+    // CRITICAL: Use batched data first, then fallback
+    const likesData = postsLikesData?.[post?.id] || pageData?.postLikes?.[post?.id];
+    const profileData = pageData?.profiles?.[post?.profile_id || post?.profiles?.id] || post?.profiles;
+    const orgMembership = pageData?.orgMemberships?.[post?.profile_id || post?.profiles?.id];
+
+    const [likeCount, setLikeCount] = useState(() => {
+        return likesData?.likes_count || post?.likes_count || 0;
+    });
     const [commentCount, setCommentCount] = useState(post?.comments_count || 0);
-    const [selectedReaction, setSelectedReaction] = useState(null);
-    const [reactors, setReactors] = useState([]);
-    const [reactionSummary, setReactionSummary] = useState(post?.reactions?.summary || []);
+    const [selectedReaction, setSelectedReaction] = useState(() => {
+        return likesData?.userReaction || null;
+    });
+    const [reactors, setReactors] = useState(() => {
+        return likesData?.reactors || [];
+    });
+    const [reactionSummary, setReactionSummary] = useState(() => {
+        return likesData?.reaction_summary || post?.reactions?.summary || [];
+    });
     const [showComments, setShowComments] = useState(false);
     const [showReactorsPreview, setShowReactorsPreview] = useState(false);
     const reactorsTimeoutRef = useRef(null);
 
-    // Update modal state when post prop changes (from real-time updates)
+    // Enhanced author with batched organization data
+    const displayAuthor = React.useMemo(() => ({
+        ...profileData,
+        organization_name: orgMembership?.organization?.name || profileData?.organization_name,
+        organization_type: orgMembership?.organization?.type || profileData?.organization_type,
+        role: orgMembership?.role || profileData?.role
+    }), [profileData, orgMembership]);
+
+    // Update when batched data changes
     useEffect(() => {
-        if (post) {
+        if (likesData?.likes_count !== undefined) {
+            setLikeCount(likesData.likes_count);
+        }
+        if (likesData?.userReaction !== undefined) {
+            setSelectedReaction(likesData.userReaction);
+        }
+        if (likesData?.reactors) {
+            setReactors(likesData.reactors);
+        }
+        if (likesData?.reaction_summary) {
+            setReactionSummary(likesData.reaction_summary);
+        }
+    }, [likesData]);
+
+    // Update modal state when post prop changes
+    useEffect(() => {
+        if (post && !likesData) {
             setLikeCount(post.likes_count || 0);
             setCommentCount(post.comments_count || 0);
             setReactionSummary(post.reactions?.summary || []);
         }
-    }, [post]);
+    }, [post, likesData]);
 
     const formatTimeAgo = (dateString) => {
         const now = new Date();
@@ -36,17 +73,18 @@ const PostDetailModal = ({ post, isOpen, onClose, currentUserProfile }) => {
         return `${Math.floor(diffInHours / 24)}d ago`;
     };
 
-    // Check user's reaction status - FIXED
+    // FIXED: Only check reaction status if not provided by batched data
     useEffect(() => {
+        if (selectedReaction !== null || !currentUserProfile || !post?.id || likesData?.userReaction !== undefined) return;
+        
         const checkReactionStatus = async () => {
-            if (!currentUserProfile || !post?.id) return;
             try {
                 const { data, error } = await supabase
                     .from('post_likes')
                     .select('reaction_type')
                     .eq('post_id', post.id)
                     .eq('user_id', currentUserProfile.id)
-                    .limit(1);  // Use limit instead of single()
+                    .limit(1);
                 
                 if (error) {
                     console.error('Error checking reaction status:', error);
@@ -64,12 +102,14 @@ const PostDetailModal = ({ post, isOpen, onClose, currentUserProfile }) => {
         if (isOpen && post) {
             checkReactionStatus();
         }
-    }, [currentUserProfile, post?.id, isOpen]);
+    }, [currentUserProfile, post?.id, isOpen, selectedReaction, likesData]);
 
-    // Fetch reactors - FIXED
+    // FIXED: Only fetch reactors if not provided by batched data
     useEffect(() => {
+        if (reactors.length > 0 || !post?.id || likesData?.reactors) return;
+        
         const fetchReactors = async () => {
-            if (likeCount <= 0 || !post?.id) {
+            if (likeCount <= 0) {
                 setReactors([]);
                 return;
             }
@@ -126,14 +166,22 @@ const PostDetailModal = ({ post, isOpen, onClose, currentUserProfile }) => {
         if (isOpen && post) {
             fetchReactors();
         }
-    }, [post?.id, likeCount, isOpen]);
+    }, [post?.id, likeCount, isOpen, reactors.length, likesData]);
 
+    // FIXED: Use centralized like handler if available
     const handleReaction = async (reactionType) => {
         if (!currentUserProfile || !post?.id) return;
         
+        // Use centralized handler from ProfilePage if available
+        if (onPostLike) {
+            onPostLike(post.id, selectedReaction, selectedReaction === reactionType ? null : reactionType);
+            setSelectedReaction(selectedReaction === reactionType ? null : reactionType);
+            return;
+        }
+        
+        // Fallback to individual handler
         try {
             if (selectedReaction === reactionType) {
-                // Remove reaction
                 const { error } = await supabase
                     .from('post_likes')
                     .delete()
@@ -148,7 +196,6 @@ const PostDetailModal = ({ post, isOpen, onClose, currentUserProfile }) => {
                 setSelectedReaction(null);
                 setLikeCount(prev => Math.max(0, prev - 1));
             } else {
-                // Add or update reaction
                 const { error } = await supabase
                     .from('post_likes')
                     .upsert({
@@ -184,7 +231,6 @@ const PostDetailModal = ({ post, isOpen, onClose, currentUserProfile }) => {
     };
 
     const handleImageClick = (index) => {
-        // Close modal and handle image viewing
         console.log('Image clicked:', index);
     };
 
@@ -199,17 +245,17 @@ const PostDetailModal = ({ post, isOpen, onClose, currentUserProfile }) => {
                 <div className="flex items-center justify-between p-6 border-b border-slate-200">
                     <div className="flex items-center space-x-3">
                         <img
-                            src={post.profiles?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(post.profiles?.full_name || 'User')}&background=6366f1&color=ffffff`}
-                            alt={post.profiles?.full_name || 'User'}
+                            src={displayAuthor?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(displayAuthor?.full_name || 'User')}&background=6366f1&color=ffffff`}
+                            alt={displayAuthor?.full_name || 'User'}
                             className="w-12 h-12 rounded-full object-cover"
                         />
                         <div>
                             <h3 className="font-semibold text-slate-900">
-                                {post.profiles?.full_name || 'Anonymous'}
+                                {displayAuthor?.full_name || 'Anonymous'}
                             </h3>
-                            {post.profiles?.organization_name && (
+                            {displayAuthor?.organization_name && (
                                 <p className="text-sm text-slate-500">
-                                    {post.profiles.organization_name}
+                                    {displayAuthor.organization_name}
                                 </p>
                             )}
                             <p className="text-xs text-slate-400">
@@ -227,7 +273,6 @@ const PostDetailModal = ({ post, isOpen, onClose, currentUserProfile }) => {
 
                 {/* Modal Content */}
                 <div className="p-6 max-h-[calc(90vh-180px)] overflow-y-auto">
-                    {/* Post Body using the same component as PostCard */}
                     <PostBody 
                         content={post.content || ''}
                         images={displayImages}
@@ -279,16 +324,15 @@ const PostDetailModal = ({ post, isOpen, onClose, currentUserProfile }) => {
                         )}
                     </div>
 
-                    {/* Post Actions */}
                     <PostActions 
                         onReaction={handleReaction}
                         onComment={() => setShowComments(!showComments)}
                         onShare={() => alert('Share functionality not implemented yet.')}
                         selectedReaction={selectedReaction}
                         disabled={false}
+                        postId={post.id}
                     />
 
-                    {/* Comments Section */}
                     {showComments && (
                         <div className="mt-4 border-t pt-4 max-h-96 overflow-y-auto">
                             <CommentSection 
@@ -309,7 +353,10 @@ PostDetailModal.propTypes = {
     post: PropTypes.object,
     isOpen: PropTypes.bool.isRequired,
     onClose: PropTypes.func.isRequired,
-    currentUserProfile: PropTypes.object
+    currentUserProfile: PropTypes.object,
+    pageData: PropTypes.object,
+    postsLikesData: PropTypes.object,
+    onPostLike: PropTypes.func
 };
 
 export default PostDetailModal;

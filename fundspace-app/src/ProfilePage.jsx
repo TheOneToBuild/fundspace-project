@@ -13,6 +13,7 @@ export default function ProfilePage() {
     trendingGrants: [],
     savedGrants: [],
     posts: [],
+    postsLikesData: {}, // NEW: Cache for batched likes data
     isDetailModalOpen: false,
     selectedGrant: null,
     dataLoading: false,
@@ -42,6 +43,7 @@ export default function ProfilePage() {
     trendingGrants,
     savedGrants,
     posts,
+    postsLikesData,
     isDetailModalOpen,
     selectedGrant,
     dataLoading,
@@ -58,12 +60,50 @@ export default function ProfilePage() {
     followingUsers,
   } = appState;
 
+  // NEW: Batch load post likes data
+  const batchLoadPostLikes = useCallback(async (postIds, userId) => {
+    if (!postIds.length || !userId) return {};
+
+    try {
+      // Single batch query instead of N individual queries
+      const { data: likesData, error } = await supabase
+        .from('post_likes')
+        .select('post_id, reaction_type, user_id, created_at')
+        .in('post_id', postIds)
+        .eq('user_id', userId);
+
+      if (error) {
+        console.error('Error fetching batch post likes:', error);
+        return {};
+      }
+
+      // Convert to lookup object: { postId: { userReaction: 'like|dislike', ... } }
+      const likesLookup = {};
+      postIds.forEach(postId => {
+        likesLookup[postId] = { userReaction: null };
+      });
+
+      (likesData || []).forEach(like => {
+        if (!likesLookup[like.post_id]) {
+          likesLookup[like.post_id] = {};
+        }
+        likesLookup[like.post_id].userReaction = like.reaction_type;
+      });
+
+      return likesLookup;
+    } catch (error) {
+      console.error('Error in batchLoadPostLikes:', error);
+      return {};
+    }
+  }, []);
+
   const fetchPageData = useCallback(async (userId) => {
     if (!userId) return;
 
     setAppState((prev) => ({ ...prev, dataLoading: true, error: null }));
 
     try {
+      // Load posts first
       const { data: postsData } = await supabase
         .from('posts')
         .select(`
@@ -75,12 +115,16 @@ export default function ProfilePage() {
         .limit(20);
 
       const posts = postsData || [];
+      const postIds = posts.map(p => p.id);
+
+      // FIXED: Batch load all post likes in single query instead of N+1
+      const likesData = await batchLoadPostLikes(postIds, userId);
 
       await loadProfilePageData(userId, posts);
 
+      // Continue with other parallel queries (unchanged)
       const [
         { data: savedGrantsData },
-        { data: placeholderGrantsData }, // This is just a placeholder now
         { data: followersData },
         { data: followingData },
         { data: communityMembersData },
@@ -90,8 +134,6 @@ export default function ProfilePage() {
           .select('*, grants:grant_id(*)')
           .eq('user_id', userId)
           .limit(10),
-        // Skip the grants query here - we'll fetch them separately below
-        Promise.resolve({ data: [] }),
         supabase
           .from('followers')
           .select('follower_id, profiles:follower_id(id, full_name, avatar_url, title, organization_name)')
@@ -109,14 +151,14 @@ export default function ProfilePage() {
           .limit(10),
       ]);
 
-      // FIXED: First fetch trending grants using correct column
+      // Trending grants with single batch query
       const { data: trendingGrantsData } = await supabase
         .from('grants')
         .select('*')
-        .order('id', { ascending: false })  // FIXED: Use 'id' instead of 'created_at'
+        .order('id', { ascending: false })
         .limit(15);
 
-      // Get organization IDs and fetch organizations separately
+      // Batch fetch organizations
       const orgIds = [...new Set(trendingGrantsData?.map(g => g.organization_id).filter(Boolean))];
       let orgsData = [];
       if (orgIds.length > 0) {
@@ -127,7 +169,6 @@ export default function ProfilePage() {
         orgsData = organizationsData || [];
       }
 
-      // Format trending grants with organization data
       const formattedTrendingGrants = (trendingGrantsData || []).map(grant => {
         const orgData = orgsData.find(o => o.id === grant.organization_id);
         return {
@@ -155,6 +196,7 @@ export default function ProfilePage() {
         ...prev,
         dataLoading: false,
         posts,
+        postsLikesData: likesData, // NEW: Store batched likes data
         savedGrants: savedGrantsData?.map((sg) => sg.grants) || [],
         trendingGrants: formattedTrendingGrants,
         totalPosts: posts.length,
@@ -175,7 +217,7 @@ export default function ProfilePage() {
         error: 'Failed to load data. Please try again.',
       }));
     }
-  }, [loadProfilePageData]);
+  }, [loadProfilePageData, batchLoadPostLikes]);
 
   const handleTabChange = useCallback((newTab) => {
     setAppState((prev) => ({ ...prev, activeTab: newTab }));
@@ -250,6 +292,11 @@ export default function ProfilePage() {
           ...prev.posts,
         ],
         totalPosts: prev.totalPosts + 1,
+        // Update likes data for new post
+        postsLikesData: {
+          ...prev.postsLikesData,
+          [newPostData.id]: { userReaction: null }
+        }
       }));
 
       clearPageData();
@@ -263,6 +310,10 @@ export default function ProfilePage() {
         ...prev,
         posts: prev.posts.filter((p) => p.id !== deletedPostId),
         totalPosts: Math.max(0, prev.totalPosts - 1),
+        // Remove from likes data
+        postsLikesData: Object.fromEntries(
+          Object.entries(prev.postsLikesData).filter(([postId]) => postId !== deletedPostId.toString())
+        )
       }));
 
       clearPageData();
@@ -333,14 +384,69 @@ export default function ProfilePage() {
     [session, fetchPageData, clearPageData]
   );
 
+  // NEW: Handle post like/unlike with optimistic updates
+  const handlePostLike = useCallback(async (postId, currentReaction, newReaction) => {
+    if (!session?.user?.id) return;
+
+    // Optimistic update
+    setAppState(prev => ({
+      ...prev,
+      postsLikesData: {
+        ...prev.postsLikesData,
+        [postId]: { userReaction: newReaction }
+      }
+    }));
+
+    try {
+      if (currentReaction) {
+        if (newReaction === null) {
+          // Remove reaction
+          await supabase
+            .from('post_likes')
+            .delete()
+            .eq('post_id', postId)
+            .eq('user_id', session.user.id);
+        } else {
+          // Update existing reaction
+          await supabase
+            .from('post_likes')
+            .update({ reaction_type: newReaction })
+            .eq('post_id', postId)
+            .eq('user_id', session.user.id);
+        }
+      } else {
+        // Insert new reaction
+        await supabase
+          .from('post_likes')
+          .insert({
+            post_id: postId,
+            user_id: session.user.id,
+            reaction_type: newReaction
+          });
+      }
+    } catch (error) {
+      console.error('Error updating post reaction:', error);
+      // Revert optimistic update on error
+      setAppState(prev => ({
+        ...prev,
+        postsLikesData: {
+          ...prev.postsLikesData,
+          [postId]: { userReaction: currentReaction }
+        }
+      }));
+    }
+  }, [session]);
+
   const outletContext = useMemo(
     () => ({
       ...appContext,
       profile,
       posts,
+      postsLikesData, // NEW: Provide batched likes data to components
       pageData,
       handleNewPost,
       handleDeletePost,
+      handlePostLike, // NEW: Provide like handler
       savedGrants,
       session,
       handleSaveGrant,
@@ -364,9 +470,11 @@ export default function ProfilePage() {
       appContext,
       profile,
       posts,
+      postsLikesData, // NEW
       pageData,
       handleNewPost,
       handleDeletePost,
+      handlePostLike, // NEW
       savedGrants,
       session,
       handleSaveGrant,

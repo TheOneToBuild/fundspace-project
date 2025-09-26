@@ -2,11 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useOutletContext, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import { rssNewsService as newsService } from '../services/rssNewsService.js';
-import { getOrganizationInfoForDashboard, getBulkOrganizationMemberships } from '../utils/membershipQueries.js';
-
-import { realtimeManager } from '../utils/realtimeManager.js';
-import { getChannelInfo } from '../utils/channelUtils.js';
-import { usePageDataLoader } from '../hooks/usePageDataLoader';
+import { getOrganizationInfoForDashboard } from '../utils/membershipQueries.js';
 
 import WelcomeBanner from './dashboard/WelcomeBanner.jsx';
 import ConnectionsAvatars from './dashboard/ConnectionsAvatars.jsx';
@@ -16,8 +12,6 @@ import TrendingGrantsSection from './dashboard/TrendingGrantsSection.jsx';
 import NewsCarousel from './dashboard/NewsCarousel.jsx';
 import PostDetailModal from './dashboard/PostDetailModal.jsx';
 import GrantDetailModal from '../GrantDetailModal.jsx';
-import QuickActions from './dashboard/QuickActions.jsx';
-import StatsCard from './dashboard/StatsCard.jsx';
 
 import { useHelloCommunityPosts } from '../hooks/useHelloCommunityPosts.jsx';
 
@@ -39,138 +33,45 @@ const useNews = () => {
     return news;
 };
 
-const useTrendingPosts = () => {
+// FIXED: Simplified trending posts - no individual enrichment
+const useSimpleTrendingPosts = () => {
     const [trendingPosts, setTrendingPosts] = useState([]);
-    const { profile } = useOutletContext() || {};
 
     useEffect(() => {
         const fetchTrendingPosts = async () => {
             try {
+                // Just get basic posts data - let pageData handle enrichment
                 const { data: postsData, error } = await supabase
                     .from('posts')
-                    .select('*')
+                    .select(`*, profiles:profile_id(id, full_name, avatar_url, title, organization_name, role, organization_type)`)
                     .eq('channel', 'hello-world')
                     .order('created_at', { ascending: false })
                     .limit(10);
 
                 if (error) throw error;
-
-                if (postsData && postsData.length > 0) {
-                    const profileIds = [...new Set(postsData.map(post => post.profile_id))];
-                    const { data: profilesData } = await supabase
-                        .from('profiles')
-                        .select('id, full_name, avatar_url')
-                        .in('id', profileIds);
-
-                    const membershipMap = await getBulkOrganizationMemberships(profileIds);
-
-                    const postIds = postsData.map(post => post.id);
-                    const { data: reactionsData } = await supabase
-                        .from('post_likes')
-                        .select('post_id, reaction_type')
-                        .in('post_id', postIds);
-
-                    const enrichedPosts = postsData.map(post => {
-                        const profile = profilesData?.find(p => p.id === post.profile_id);
-                        const membership = membershipMap[post.profile_id];
-                        const postReactions = reactionsData?.filter(r => r.post_id === post.id) || [];
-                        const reactionSummary = postReactions.reduce((acc, r) => {
-                            const type = r.reaction_type || 'like';
-                            acc[type] = (acc[type] || 0) + 1;
-                            return acc;
-                        }, {});
-                        
-                        return {
-                            ...post,
-                            profiles: {
-                                ...profile,
-                                organization_name: membership?.organization_name || null
-                            },
-                            reactions: {
-                                summary: Object.entries(reactionSummary).map(([type, count]) => ({ type, count }))
-                            }
-                        };
-                    });
-                    setTrendingPosts(enrichedPosts);
-                } else {
-                    setTrendingPosts([]);
-                }
+                setTrendingPosts(postsData || []);
             } catch {
                 setTrendingPosts([]);
             }
         };
 
         fetchTrendingPosts();
-
-        if (profile) {
-            const subscription = realtimeManager.createSubscription(
-                'hello-world', 
-                supabase, 
-                profile,
-                {
-                    onLikeChange: async (payload) => {
-                        const { new: newRecord, old: oldRecord } = payload;
-                        const affectedPostId = newRecord?.post_id || oldRecord?.post_id;
-                        
-                        if (!affectedPostId) return;
-                        
-                        try {
-                            const { data: reactionsData } = await supabase
-                                .from('post_likes')
-                                .select('reaction_type')
-                                .eq('post_id', affectedPostId);
-                            
-                            const reactionSummary = (reactionsData || []).reduce((acc, r) => {
-                                const type = r.reaction_type || 'like';
-                                acc[type] = (acc[type] || 0) + 1;
-                                return acc;
-                            }, {});
-                            
-                            const totalLikes = Object.values(reactionSummary).reduce((sum, count) => sum + count, 0);
-                            
-                            setTrendingPosts(currentPosts => 
-                                currentPosts.map(post => 
-                                    post.id === affectedPostId 
-                                        ? {
-                                            ...post,
-                                            likes_count: totalLikes,
-                                            reactions: {
-                                                summary: Object.entries(reactionSummary).map(([type, count]) => ({ type, count }))
-                                            }
-                                        }
-                                        : post
-                                )
-                            );
-                        } catch (error) {
-                            console.warn('Error updating post reactions:', error);
-                        }
-                    }
-                }
-            );
-        }
-
-        return () => {
-            if (profile) {
-                realtimeManager.removeSubscription('hello-world', supabase);
-            }
-        };
-    }, [profile?.id]);
+    }, []);
 
     return trendingPosts;
 };
 
-// FIXED: Corrected all database column references
+// FIXED: Corrected grants hook
 const useTrendingGrants = () => {
     const [trendingGrants, setTrendingGrants] = useState([]);
 
     useEffect(() => {
         const fetchTrendingGrants = async () => {
             try {
-                // FIXED: Use 'id' for ordering instead of non-existent 'created_at'
                 const { data: grantsData, error: grantsError } = await supabase
                     .from('grants')
                     .select('*')
-                    .order('id', { ascending: false })  // Changed from 'created_at' to 'id'
+                    .order('id', { ascending: false })
                     .limit(15);
                 
                 if (grantsError) {
@@ -184,7 +85,6 @@ const useTrendingGrants = () => {
                     return;
                 }
 
-                // Get organization IDs and fetch organizations separately
                 const orgIds = [...new Set(grantsData.map(g => g.organization_id).filter(Boolean))];
                 
                 let orgsData = [];
@@ -211,7 +111,7 @@ const useTrendingGrants = () => {
                         deadline: grant.deadline || grant.due_date || null,
                         location: grant.location || grant.geographic_focus || 'Location varies',
                         grant_type: grant.grant_type || grant.type || null,
-                        created_at: grant.date_added || grant.last_updated || new Date().toISOString(),  // FIXED: Use existing fields
+                        created_at: grant.date_added || grant.last_updated || new Date().toISOString(),
                         save_count: 0,
                         application_url: grant.application_url || grant.url || grant.website_url || '#',
                         url: grant.url || grant.application_url || grant.website_url || '#',
@@ -246,11 +146,11 @@ const useTrendingGrants = () => {
                             if (b.save_count !== a.save_count) {
                                 return b.save_count - a.save_count;
                             }
-                            return b.id - a.id;  // FIXED: Use id instead of created_at
+                            return b.id - a.id;
                         });
                     }
                 } catch {
-                    processedGrants.sort((a, b) => b.id - a.id);  // FIXED: Use id instead of created_at
+                    processedGrants.sort((a, b) => b.id - a.id);
                 }
 
                 setTrendingGrants(processedGrants.slice(0, 10));
@@ -268,12 +168,6 @@ const useTrendingGrants = () => {
 
 const useUserData = (profile) => {
     const [organizationInfo, setOrganizationInfo] = useState(null);
-    const [stats, setStats] = useState({
-        savedGrants: 0,
-        connections: 0,
-        followers: 0,
-        posts: 0
-    });
     const [loading, setLoading] = useState(true);
     const [refreshTrigger, setRefreshTrigger] = useState(0);
 
@@ -298,33 +192,46 @@ const useUserData = (profile) => {
         fetchUserData();
     }, [profile?.id, refreshTrigger]);
 
-    return { organizationInfo, stats, loading, refreshOrganizationData };
+    return { organizationInfo, loading, refreshOrganizationData };
 };
 
 export default function HomeDashboard() {
-    const { profile } = useOutletContext() || {};
-    const navigate = useNavigate();
+    const { 
+        profile,
+        // CRITICAL: Get batched data from ProfilePage context
+        pageData,           // Batched profiles, likes, organizations  
+        postsLikesData,     // Batched post likes data
+        handlePostLike,     // Centralized like handler
+        handleSaveGrant,    // From ProfilePage
+        handleUnsaveGrant,  // From ProfilePage
+        savedGrants         // From ProfilePage
+    } = useOutletContext() || {};
     
-    const { pageData, loadPostsPageData, clearPageData } = usePageDataLoader();
+    const navigate = useNavigate();
     
     const [selectedPost, setSelectedPost] = useState(null);
     const [isPostModalOpen, setIsPostModalOpen] = useState(false);
     const [selectedGrant, setSelectedGrant] = useState(null);
     const [isGrantModalOpen, setIsGrantModalOpen] = useState(false);
-    const [savedGrantIds, setSavedGrantIds] = useState(new Set());
 
-    const { organizationInfo, stats, loading, refreshOrganizationData } = useUserData(profile);
+    const { organizationInfo, loading, refreshOrganizationData } = useUserData(profile);
     const news = useNews();
-    const trendingPosts = useTrendingPosts();
+    const trendingPosts = useSimpleTrendingPosts();
     const { trendingGrants, setTrendingGrants } = useTrendingGrants();
     const helloCommunityPosts = useHelloCommunityPosts(organizationInfo);
 
-    useEffect(() => {
-        const allPosts = [...trendingPosts, ...helloCommunityPosts].filter(Boolean);
-        if (allPosts.length > 0) {
-            loadPostsPageData(allPosts);
-        }
-    }, [trendingPosts, helloCommunityPosts, loadPostsPageData]);
+    // CRITICAL: Create enhanced pageData with all batched info
+    const enhancedPageData = React.useMemo(() => ({
+        ...pageData,
+        postLikes: postsLikesData || pageData?.postLikes || {},
+        profiles: pageData?.profiles || {},
+        orgMemberships: pageData?.orgMemberships || {},
+        organizations: pageData?.organizations || {}
+    }), [pageData, postsLikesData]);
+
+    const savedGrantIds = React.useMemo(() => {
+        return new Set(savedGrants?.map(g => g.id) || []);
+    }, [savedGrants]);
 
     useEffect(() => {
         window.refreshDashboardOrganizationData = refreshOrganizationData;
@@ -332,26 +239,6 @@ export default function HomeDashboard() {
             delete window.refreshDashboardOrganizationData;
         };
     }, [refreshOrganizationData]);
-
-    useEffect(() => {
-        const fetchSavedGrants = async () => {
-            if (!profile?.id) return;
-            
-            try {
-                const { data: savedData, error } = await supabase
-                    .from('saved_grants')
-                    .select('grant_id')
-                    .eq('user_id', profile.id);
-                    
-                if (error) throw error;
-                setSavedGrantIds(new Set(savedData.map(g => g.grant_id)));
-            } catch {
-                // Handle error silently
-            }
-        };
-        
-        fetchSavedGrants();
-    }, [profile?.id]);
 
     const handlePostClick = (post) => {
         setSelectedPost(post);
@@ -368,42 +255,36 @@ export default function HomeDashboard() {
         setSelectedGrant(null);
     };
 
-    const handleSaveGrant = async (grantId) => {
+    const handleSaveGrantLocal = async (grantId) => {
         if (!profile?.id) return;
         
         try {
-            setSavedGrantIds(prev => new Set(prev).add(grantId));
             setTrendingGrants(prev => prev.map(grant => 
                 grant.id === grantId 
                     ? { ...grant, save_count: (grant.save_count || 0) + 1 }
                     : grant
             ));
             
-            const { error } = await supabase
-                .from('saved_grants')
-                .insert({ 
-                    user_id: profile.id, 
-                    grant_id: grantId 
-                });
-                
-            if (error) {
-                setSavedGrantIds(prev => {
-                    const newSet = new Set(prev);
-                    newSet.delete(grantId);
-                    return newSet;
-                });
-                setTrendingGrants(prev => prev.map(grant => 
-                    grant.id === grantId 
-                        ? { ...grant, save_count: Math.max((grant.save_count || 1) - 1, 0) }
-                        : grant
-                ));
+            // Use ProfilePage handler if available
+            if (handleSaveGrant) {
+                await handleSaveGrant(grantId);
+            } else {
+                const { error } = await supabase
+                    .from('saved_grants')
+                    .insert({ 
+                        user_id: profile.id, 
+                        grant_id: grantId 
+                    });
+                    
+                if (error) {
+                    setTrendingGrants(prev => prev.map(grant => 
+                        grant.id === grantId 
+                            ? { ...grant, save_count: Math.max((grant.save_count || 1) - 1, 0) }
+                            : grant
+                    ));
+                }
             }
         } catch {
-            setSavedGrantIds(prev => {
-                const newSet = new Set(prev);
-                newSet.delete(grantId);
-                return newSet;
-            });
             setTrendingGrants(prev => prev.map(grant => 
                 grant.id === grantId 
                     ? { ...grant, save_count: Math.max((grant.save_count || 1) - 1, 0) }
@@ -412,38 +293,35 @@ export default function HomeDashboard() {
         }
     };
 
-    const handleUnsaveGrant = async (grantId) => {
+    const handleUnsaveGrantLocal = async (grantId) => {
         if (!profile?.id) return;
         
         try {
-            setSavedGrantIds(prev => {
-                const newSet = new Set(prev);
-                newSet.delete(grantId);
-                return newSet;
-            });
-            
             setTrendingGrants(prev => prev.map(grant => 
                 grant.id === grantId 
                     ? { ...grant, save_count: Math.max((grant.save_count || 1) - 1, 0) }
                     : grant
             ));
             
-            const { error } = await supabase
-                .from('saved_grants')
-                .delete()
-                .eq('user_id', profile.id)
-                .eq('grant_id', grantId);
-                
-            if (error) {
-                setSavedGrantIds(prev => new Set(prev).add(grantId));
-                setTrendingGrants(prev => prev.map(grant => 
-                    grant.id === grantId 
-                        ? { ...grant, save_count: (grant.save_count || 0) + 1 }
-                        : grant
-                ));
+            // Use ProfilePage handler if available
+            if (handleUnsaveGrant) {
+                await handleUnsaveGrant(grantId);
+            } else {
+                const { error } = await supabase
+                    .from('saved_grants')
+                    .delete()
+                    .eq('user_id', profile.id)
+                    .eq('grant_id', grantId);
+                    
+                if (error) {
+                    setTrendingGrants(prev => prev.map(grant => 
+                        grant.id === grantId 
+                            ? { ...grant, save_count: (grant.save_count || 0) + 1 }
+                            : grant
+                    ));
+                }
             }
         } catch {
-            setSavedGrantIds(prev => new Set(prev).add(grantId));
             setTrendingGrants(prev => prev.map(grant => 
                 grant.id === grantId 
                     ? { ...grant, save_count: (grant.save_count || 0) + 1 }
@@ -458,26 +336,6 @@ export default function HomeDashboard() {
 
     const handleViewMoreCommunity = () => {
         navigate('/profile/hello-community');
-    };
-
-    const handleQuickAction = (action) => {
-        const routes = {
-            'grants': '/grants',
-            'hello-world': '/profile/hello-world',
-            'members': '/profile/members',
-            'notifications': '/profile/notifications'
-        };
-        navigate(routes[action] || '/profile');
-    };
-
-    const handleStatsClick = (type) => {
-        const routes = {
-            'savedGrants': '/profile/saved-grants',
-            'connections': '/profile/connections',
-            'followers': '/profile/followers',
-            'posts': '/profile/hello-world'
-        };
-        navigate(routes[type] || '/profile');
     };
 
     if (loading) {
@@ -505,11 +363,14 @@ export default function HomeDashboard() {
             
             <NewsCarousel news={news} />
             
+            {/* CRITICAL: Pass enhancedPageData to ALL child components */}
             <TrendingPostsSection
                 posts={trendingPosts}
                 onViewMore={handleViewMorePosts}
                 onPostClick={handlePostClick}
-                pageData={pageData}
+                pageData={enhancedPageData}
+                postsLikesData={postsLikesData}
+                onPostLike={handlePostLike}
             />
             
             <HelloCommunitySection
@@ -517,15 +378,17 @@ export default function HomeDashboard() {
                 onViewMore={handleViewMoreCommunity}
                 onPostClick={handlePostClick}
                 organizationInfo={organizationInfo}
-                pageData={pageData}
+                pageData={enhancedPageData}
+                postsLikesData={postsLikesData}
+                onPostLike={handlePostLike}
             />
             
             <TrendingGrantsSection 
                 currentUserProfile={profile} 
                 onOpenGrantModal={handleGrantClick}
                 trendingGrants={trendingGrants}
-                onSaveGrant={handleSaveGrant}
-                onUnsaveGrant={handleUnsaveGrant}
+                onSaveGrant={handleSaveGrantLocal}
+                onUnsaveGrant={handleUnsaveGrantLocal}
                 savedGrantIds={savedGrantIds}
             />
             
@@ -537,7 +400,9 @@ export default function HomeDashboard() {
                     setSelectedPost(null);
                 }}
                 currentUserProfile={profile}
-                pageData={pageData}
+                pageData={enhancedPageData}
+                postsLikesData={postsLikesData}
+                onPostLike={handlePostLike}
             />
 
             <GrantDetailModal
@@ -546,8 +411,8 @@ export default function HomeDashboard() {
                 onClose={handleCloseGrantModal}
                 session={{ user: profile }}
                 isSaved={selectedGrant ? savedGrantIds.has(selectedGrant.id) : false}
-                onSave={handleSaveGrant}
-                onUnsave={handleUnsaveGrant}
+                onSave={handleSaveGrantLocal}
+                onUnsave={handleUnsaveGrantLocal}
             />
         </div>
     );

@@ -1,8 +1,8 @@
-// src/pages/OrganizationProfilePage.jsx - Added pageData support
+// src/pages/OrganizationProfilePage.jsx - CORRECTED: Complete batched data support
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../supabaseClient.js';
-import { usePageDataLoader } from '../hooks/usePageDataLoader'; // NEW: Add page data loader
+import { usePageDataLoader } from '../hooks/usePageDataLoader';
 
 // Shared Components
 import PublicPageLayout from '../components/PublicPageLayout.jsx';
@@ -64,7 +64,6 @@ const OrganizationProfilePage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const hasInitialized = useRef(false);
   
-  // NEW: Add page data loader for batched API calls
   const { pageData, loadPostsPageData, clearPageData } = usePageDataLoader();
 
   const [organization, setOrganization] = useState(null);
@@ -73,9 +72,13 @@ const OrganizationProfilePage = () => {
   const [session, setSession] = useState(null);
   const [userMembership, setUserMembership] = useState(null);
   const [activeTab, setActiveTab] = useState('home');
-  const [organizationPosts, setOrganizationPosts] = useState([]); // NEW: Track organization posts
+  const [organizationPosts, setOrganizationPosts] = useState([]);
   
-  // Social features (follow/bookmark)
+  // CRITICAL: Add state for batched post data
+  const [postsLikesData, setPostsLikesData] = useState({});
+  const [batchedProfilesData, setBatchedProfilesData] = useState({});
+  const [batchedOrganizationsData, setBatchedOrganizationsData] = useState({});
+  
   const {
     isFollowing,
     followersCount,
@@ -85,10 +88,8 @@ const OrganizationProfilePage = () => {
     toggleBookmark
   } = useOrganizationSocial(organization?.id, session?.user?.id);
 
-  // Edit mode state
   const isEditMode = searchParams.get('edit') === 'true';
   
-  // Get organization type configuration
   const getOrgTypeFromType = (type) => {
     if (!type) return 'default';
     const baseType = type.split('.')[0];
@@ -97,7 +98,15 @@ const OrganizationProfilePage = () => {
   
   const orgConfig = organization ? ORG_TYPE_CONFIGS[getOrgTypeFromType(organization.type)] : ORG_TYPE_CONFIGS.default;
 
-  // Get active user session
+  // CRITICAL: Create enhanced pageData with all batched sources
+  const enhancedPageData = React.useMemo(() => ({
+    ...pageData,
+    postLikes: postsLikesData || pageData?.postLikes || {},
+    profiles: batchedProfilesData || pageData?.profiles || {},
+    orgMemberships: pageData?.orgMemberships || {},
+    organizations: batchedOrganizationsData || pageData?.organizations || {}
+  }), [pageData, postsLikesData, batchedProfilesData, batchedOrganizationsData]);
+
   useEffect(() => {
     const getSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -112,7 +121,6 @@ const OrganizationProfilePage = () => {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Check user's membership in this organization
   useEffect(() => {
     const checkMembership = async () => {
       if (!session?.user?.id || !organization?.id) {
@@ -138,7 +146,7 @@ const OrganizationProfilePage = () => {
     checkMembership();
   }, [session?.user?.id, organization?.id]);
 
-  // Load organization data
+  // FIXED: Load organization with complete batched data
   const loadOrganization = useCallback(async () => {
     if (!slug) {
       setError("Organization identifier is required");
@@ -150,7 +158,6 @@ const OrganizationProfilePage = () => {
     setError(null);
 
     try {
-      // Determine if slug is numeric (ID) or text (slug)
       const isNumeric = /^\d+$/.test(slug);
       const query = supabase
         .from('organizations')
@@ -164,23 +171,95 @@ const OrganizationProfilePage = () => {
       }
 
       const { data: orgData, error: orgError } = await query;
-
       if (orgError) throw orgError;
       if (!orgData) throw new Error("Organization not found");
 
       setOrganization(orgData);
       
-      // NEW: Load organization posts for batched data
+      // FIXED: Load organization posts with complete batching
       const { data: postsData, error: postsError } = await supabase
         .from('organization_posts')
-        .select('*')
+        .select('*, profiles:profile_id(id, full_name, avatar_url, title, organization_name, role, organization_type)')
         .eq('organization_id', orgData.id)
         .order('created_at', { ascending: false })
         .limit(20);
 
-      if (!postsError && postsData) {
+      if (!postsError && postsData?.length > 0) {
         setOrganizationPosts(postsData);
-        // Load batched data for organization posts
+        
+        // CRITICAL: Batch load all related data
+        const profileIds = [...new Set(postsData.map(p => p.profile_id))];
+        const postIds = postsData.map(p => p.id);
+        
+        const [likesResult, profilesResult, orgsResult] = await Promise.all([
+          // Batch post likes
+          supabase
+            .from('organization_post_likes')
+            .select('organization_post_id, user_id, reaction_type, created_at')
+            .in('organization_post_id', postIds),
+          
+          // Batch profiles (if not already loaded)
+          profileIds.length > 0 ? supabase
+            .from('profiles')
+            .select('id, full_name, avatar_url, title, organization_name, role, organization_type')
+            .in('id', profileIds) : Promise.resolve({ data: [] }),
+          
+          // Batch organizations
+          supabase
+            .from('organizations')
+            .select('id, name, image_url, type, slug')
+            .limit(50)
+        ]);
+
+        // Process batched likes data
+        if (likesResult.data) {
+          const likesMap = {};
+          likesResult.data.forEach(like => {
+            if (!likesMap[like.organization_post_id]) {
+              likesMap[like.organization_post_id] = [];
+            }
+            likesMap[like.organization_post_id].push(like);
+          });
+
+          const processedLikes = {};
+          Object.entries(likesMap).forEach(([postId, likes]) => {
+            const reactionCounts = {};
+            likes.forEach(like => {
+              const type = like.reaction_type || 'like';
+              reactionCounts[type] = (reactionCounts[type] || 0) + 1;
+            });
+
+            processedLikes[postId] = {
+              likes_count: likes.length,
+              reaction_summary: Object.entries(reactionCounts).map(([type, count]) => ({ type, count })),
+              reactors: likes.slice(0, 10),
+              userReaction: session?.user?.id ? 
+                likes.find(l => l.user_id === session.user.id)?.reaction_type || null : null
+            };
+          });
+
+          setPostsLikesData(processedLikes);
+        }
+
+        // Process batched profiles
+        if (profilesResult.data) {
+          const profilesMap = {};
+          profilesResult.data.forEach(profile => {
+            profilesMap[profile.id] = profile;
+          });
+          setBatchedProfilesData(profilesMap);
+        }
+
+        // Process batched organizations
+        if (orgsResult.data) {
+          const orgsMap = {};
+          orgsResult.data.forEach(org => {
+            orgsMap[org.id] = org;
+          });
+          setBatchedOrganizationsData(orgsMap);
+        }
+
+        // Load into page data loader
         loadPostsPageData(postsData);
       }
 
@@ -190,9 +269,8 @@ const OrganizationProfilePage = () => {
     } finally {
       setLoading(false);
     }
-  }, [slug, loadPostsPageData]);
+  }, [slug, loadPostsPageData, session?.user?.id]);
 
-  // Initial load
   useEffect(() => {
     if (!hasInitialized.current) {
       hasInitialized.current = true;
@@ -200,17 +278,64 @@ const OrganizationProfilePage = () => {
     }
   }, [loadOrganization]);
 
-  // Clear cache when organization changes
   useEffect(() => {
     return () => clearPageData();
   }, [clearPageData, organization?.id]);
 
-  // Handle organization updates (for edit mode)
   const handleUpdateOrganization = useCallback((updatedData) => {
     setOrganization(prev => ({ ...prev, ...updatedData }));
   }, []);
 
-  // Tab management
+  // CRITICAL: Add centralized handlers for organization posts
+  const handlePostLike = useCallback(async (postId, currentReaction, newReaction) => {
+    if (!session?.user?.id) return;
+
+    // Optimistic update
+    setPostsLikesData(prev => ({
+      ...prev,
+      [postId]: {
+        ...prev[postId],
+        userReaction: newReaction
+      }
+    }));
+
+    try {
+      if (currentReaction) {
+        if (newReaction === null) {
+          await supabase
+            .from('organization_post_likes')
+            .delete()
+            .eq('organization_post_id', postId)
+            .eq('user_id', session.user.id);
+        } else {
+          await supabase
+            .from('organization_post_likes')
+            .update({ reaction_type: newReaction })
+            .eq('organization_post_id', postId)
+            .eq('user_id', session.user.id);
+        }
+      } else {
+        await supabase
+          .from('organization_post_likes')
+          .insert({
+            organization_post_id: postId,
+            user_id: session.user.id,
+            reaction_type: newReaction
+          });
+      }
+    } catch (error) {
+      console.error('Error updating post reaction:', error);
+      // Revert optimistic update
+      setPostsLikesData(prev => ({
+        ...prev,
+        [postId]: {
+          ...prev[postId],
+          userReaction: currentReaction
+        }
+      }));
+    }
+  }, [session]);
+
   useEffect(() => {
     const tab = searchParams.get('tab');
     if (tab && ['home', 'team', 'northstar', 'programs', 'photos', 'grants'].includes(tab)) {
@@ -225,7 +350,6 @@ const OrganizationProfilePage = () => {
     setSearchParams(newSearchParams, { replace: true });
   }, [searchParams, setSearchParams]);
 
-  // Get available tabs based on organization type and permissions
   const getTabConfiguration = useCallback(() => {
     if (!organization) return [];
 
@@ -244,18 +368,22 @@ const OrganizationProfilePage = () => {
     return tabs.filter(tab => tab.available);
   }, [organization, orgConfig, userMembership]);
 
-  // Render active tab content with pageData
+  // CRITICAL: Pass ALL batched data props to tab components
   const renderActiveTab = () => {
     if (!organization) return null;
 
-    // Common props passed to all tab components - INCLUDING pageData
     const commonProps = {
       organization,
       userMembership,
       session,
       onUpdate: handleUpdateOrganization,
-      pageData, // NEW: Pass pageData to all tab components
-      organizationPosts // NEW: Pass organization posts
+      // CRITICAL: Pass all batched data
+      pageData: enhancedPageData,
+      postsLikesData,
+      onPostLike: handlePostLike,
+      organizationPosts,
+      batchedProfiles: batchedProfilesData,
+      batchedOrganizations: batchedOrganizationsData
     };
 
     switch (activeTab) {

@@ -1,4 +1,4 @@
-// src/components/dashboard/HelloCommunitySection.jsx - Fixed with pageData
+// src/components/dashboard/HelloCommunitySection.jsx - CORRECTED: Missing batched data props
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../supabaseClient';
@@ -6,42 +6,36 @@ import { ChevronLeft, ChevronRight, MessageCircle, Heart } from 'lucide-react';
 import { renderMentionsInText } from '../../utils/mentionUtils';
 import PropTypes from 'prop-types';
 
-// ✅ OPTIMIZED: TrendingPostCard now uses pageData
-const TrendingPostCard = ({ post, onClick, pageData }) => {
+// CORRECTED: TrendingPostCard with all required batched data props
+const TrendingPostCard = ({ post, onClick, pageData, postsLikesData, onPostLike }) => {
     const navigate = useNavigate();
     
-    // ✅ CRITICAL FIX: Use pageData for likes instead of post.reactions
-    const likesFromPageData = pageData?.postLikes?.[post.id]?.likes_count;
-    const commentsFromPageData = pageData?.comments?.[post.id]?.length;
+    // CRITICAL: Use batched data exclusively
+    const likesData = postsLikesData?.[post.id] || pageData?.postLikes?.[post.id];
+    const profileData = pageData?.profiles?.[post.profile_id || post.profiles?.id] || post.profiles;
+    const orgMembership = pageData?.orgMemberships?.[post.profile_id || post.profiles?.id];
     
     const [localLikes, setLocalLikes] = React.useState(
-        likesFromPageData ?? post?.reactions?.summary?.reduce((total, r) => total + r.count, 0) ?? post?.likes_count ?? 0
+        likesData?.likes_count || post?.reactions?.summary?.reduce((total, r) => total + r.count, 0) || post?.likes_count || 0
     );
     const [localComments, setLocalComments] = React.useState(
-        commentsFromPageData ?? post?.comments_count ?? 0
+        post?.comments_count || 0
     );
 
-    // ✅ CRITICAL FIX: Update when pageData changes
+    // Update when batched data changes
     React.useEffect(() => {
-        if (pageData?.postLikes?.[post.id]) {
-            setLocalLikes(pageData.postLikes[post.id].likes_count || 0);
+        if (likesData?.likes_count !== undefined) {
+            setLocalLikes(likesData.likes_count);
         }
-        if (pageData?.comments?.[post.id]) {
-            setLocalComments(pageData.comments[post.id].length || 0);
-        }
-    }, [pageData, post.id]);
+    }, [likesData]);
 
-    // Update local state when post prop changes (from real-time updates)
-    React.useEffect(() => {
-        // Only update if pageData doesn't have more recent info
-        if (!pageData?.postLikes?.[post.id]) {
-            const newLikeCount = post?.reactions?.summary?.reduce((total, r) => total + r.count, 0) || post?.likes_count || 0;
-            setLocalLikes(newLikeCount);
-        }
-        if (!pageData?.comments?.[post.id]) {
-            setLocalComments(post?.comments_count || 0);
-        }
-    }, [post?.reactions?.summary, post?.comments_count, post?.likes_count, pageData, post.id]);
+    // Enhanced profile with batched organization data
+    const displayAuthor = React.useMemo(() => ({
+        ...profileData,
+        organization_name: orgMembership?.organization?.name || profileData?.organization_name,
+        organization_type: orgMembership?.organization?.type || profileData?.organization_type,
+        role: orgMembership?.role || profileData?.role
+    }), [profileData, orgMembership]);
 
     const formatTimeAgo = (dateString) => {
         const now = new Date();
@@ -53,26 +47,20 @@ const TrendingPostCard = ({ post, onClick, pageData }) => {
     };
 
     const handleMentionClick = async (mention, event) => {
-        // Prevent the post click from firing when clicking a mention
         event?.stopPropagation();
         
         if (mention.entityType === 'user') {
-            // Navigate to user profile page - use the members route pattern
             navigate(`/profile/members/${mention.id}`);
         } else if (mention.entityType === 'organization') {
-            // For organizations, we need to get the slug from the database
             try {
-                // Try to parse the old format first (type-id)
                 let orgType, orgId;
                 if (mention.id.includes('-')) {
                     [orgType, orgId] = mention.id.split('-');
                 } else {
-                    // If it's just a number, we need to look it up
                     orgId = mention.id;
                 }
                 
                 if (orgId) {
-                    // Fetch organization details to get the slug
                     const { data: orgData } = await supabase
                         .from('organizations')
                         .select('slug, type')
@@ -94,13 +82,10 @@ const TrendingPostCard = ({ post, onClick, pageData }) => {
     };
 
     const renderTextWithMentions = (text, htmlContent) => {
-        // Use the HTML content if available, otherwise fall back to text
         const contentToRender = htmlContent || text;
         if (!contentToRender) return 'No text content';
         
-        // Check if we have HTML mentions
         if (htmlContent && htmlContent.includes('class="mention"')) {
-            // Parse HTML mentions
             const div = document.createElement('div');
             div.innerHTML = htmlContent;
             
@@ -112,7 +97,6 @@ const TrendingPostCard = ({ post, onClick, pageData }) => {
                     }
                 } else if (node.nodeType === Node.ELEMENT_NODE) {
                     if (node.classList.contains('mention') && node.hasAttribute('data-id')) {
-                        // This is a mention span
                         parts.push({
                             type: 'mention',
                             id: node.getAttribute('data-id'),
@@ -121,11 +105,9 @@ const TrendingPostCard = ({ post, onClick, pageData }) => {
                             key: `mention-${node.getAttribute('data-id')}-${parts.length}`
                         });
                     } else {
-                        // Regular element, process its children
                         for (const child of node.childNodes) {
                             walkNode(child);
                         }
-                        // Add line break for certain elements
                         if (['BR', 'P', 'DIV'].includes(node.tagName)) {
                             parts.push(' ');
                         }
@@ -133,13 +115,11 @@ const TrendingPostCard = ({ post, onClick, pageData }) => {
                 }
             };
             
-            // Process all child nodes
             for (const child of div.childNodes) {
                 walkNode(child);
             }
             
             const filteredParts = parts.filter(part => {
-                // Remove empty text parts
                 if (typeof part === 'string') {
                     return part.trim().length > 0;
                 }
@@ -166,7 +146,6 @@ const TrendingPostCard = ({ post, onClick, pageData }) => {
                 return null;
             });
         } else {
-            // Fallback to original text-based parsing using renderMentionsInText
             const parts = renderMentionsInText(text);
             
             if (typeof parts === 'string') {
@@ -203,9 +182,7 @@ const TrendingPostCard = ({ post, onClick, pageData }) => {
         const images = Array.from(imgElements).map(img => img.src).filter(src => src);
         imgElements.forEach(img => img.remove());
         
-        // Keep HTML content for mention processing
         const htmlText = div.innerHTML;
-        // Also get plain text version
         let text = div.innerHTML;
         text = text.replace(/<[^>]*>/g, '').trim();
         
@@ -221,17 +198,6 @@ const TrendingPostCard = ({ post, onClick, pageData }) => {
         ...(post.attachments || []).filter(att => att.type === 'image').map(att => att.url)
     ];
     const hasImages = allImages.length > 0;
-
-    // ✅ CRITICAL FIX: Use enhanced author data from pageData
-    const authorProfile = pageData?.profiles?.[post.profile_id || post.profiles?.id] || post.profiles;
-    const orgMembership = pageData?.orgMemberships?.[post.profile_id || post.profiles?.id];
-    
-    const displayAuthor = {
-        ...authorProfile,
-        organization_name: orgMembership?.organization?.name || authorProfile?.organization_name,
-        organization_type: orgMembership?.organization?.type || authorProfile?.organization_type,
-        role: orgMembership?.role || authorProfile?.role
-    };
 
     return (
         <div
@@ -297,7 +263,7 @@ const TrendingPostCard = ({ post, onClick, pageData }) => {
     );
 };
 
-// Organization channel configuration - same as HelloCommunity.jsx
+// Organization channel configuration
 const ORGANIZATION_CHANNELS = {
   'nonprofit': { 
     name: 'Nonprofit Community', 
@@ -352,8 +318,8 @@ const getChannelInfo = (channelType) => {
   return channelType && ORGANIZATION_CHANNELS[channelType] ? ORGANIZATION_CHANNELS[channelType] : null;
 };
 
-// ✅ CRITICAL FIX: Accept and pass pageData prop
-const HelloCommunitySection = ({ posts, onViewMore, onPostClick, organizationInfo, pageData }) => {
+// CORRECTED: Accept all required batched data props
+const HelloCommunitySection = ({ posts, onViewMore, onPostClick, organizationInfo, pageData, postsLikesData, onPostLike }) => {
     const userOrgType = getOrgBaseType(organizationInfo?.type);
     const channelInfo = getChannelInfo(userOrgType);
 
@@ -364,7 +330,6 @@ const HelloCommunitySection = ({ posts, onViewMore, onPostClick, organizationInf
         }
     };
 
-    // Don't show section if user has no organization
     if (!organizationInfo || !channelInfo) {
         return null;
     }
@@ -411,7 +376,9 @@ const HelloCommunitySection = ({ posts, onViewMore, onPostClick, organizationInf
                             key={post.id}
                             post={post}
                             onClick={() => onPostClick(post)}
-                            pageData={pageData} // ✅ CRITICAL FIX: Pass pageData to each card
+                            pageData={pageData}
+                            postsLikesData={postsLikesData}
+                            onPostLike={onPostLike}
                         />
                     ))}
                 </div>
@@ -432,13 +399,15 @@ const HelloCommunitySection = ({ posts, onViewMore, onPostClick, organizationInf
     );
 };
 
-// ✅ CRITICAL FIX: Add pageData to PropTypes
+// CORRECTED: Complete PropTypes with all batched data props
 HelloCommunitySection.propTypes = {
     posts: PropTypes.array.isRequired,
     onViewMore: PropTypes.func.isRequired,
     onPostClick: PropTypes.func.isRequired,
     organizationInfo: PropTypes.object,
-    pageData: PropTypes.object // ✅ ADD pageData prop type
+    pageData: PropTypes.object,
+    postsLikesData: PropTypes.object,
+    onPostLike: PropTypes.func
 };
 
 export default HelloCommunitySection;
