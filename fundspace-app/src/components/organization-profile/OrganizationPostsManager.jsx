@@ -1,4 +1,4 @@
-// src/components/organization-profile/OrganizationPostsManager.jsx - Dedicated component for organization posts
+// src/components/organization-profile/OrganizationPostsManager.jsx - OPTIMIZED: Use globalDataManager
 import React, { useState, useEffect, useCallback } from 'react';
 import { MessageSquare, Plus, AlertTriangle, Send } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -8,12 +8,16 @@ import OrganizationPostDetailModal from '../OrganizationPostDetailModal.jsx';
 import CreatePost from '../CreatePost.jsx';
 import { hasPermission, PERMISSIONS } from '../../utils/organizationPermissions.js';
 import { realtimeManager } from '../../utils/realtimeManager.js';
+import globalDataManager from '../../utils/globalDataManager.js'; // ✅ ADD THIS IMPORT
 
 const OrganizationPostsManager = ({ 
   organization, 
   session, 
   userMembership,
-  currentUserProfile
+  currentUserProfile,
+  pageData, // ✅ ADD: Accept pageData for batched loading
+  postsLikesData, // ✅ ADD: Pre-loaded post likes data
+  onPostLike // ✅ ADD: Centralized like handler
 }) => {
   const navigate = useNavigate();
   const [selectedPost, setSelectedPost] = useState(null);
@@ -23,6 +27,15 @@ const OrganizationPostsManager = ({
   const [error, setError] = useState('');
   const [userProfile, setUserProfile] = useState(null);
   const [newComment, setNewComment] = useState('');
+
+  // ✅ ENHANCED: Create enhanced pageData with all batched sources
+  const enhancedPageData = React.useMemo(() => ({
+    ...pageData,
+    postLikes: postsLikesData || pageData?.postLikes || {},
+    profiles: pageData?.profiles || {},
+    orgMemberships: pageData?.orgMemberships || {},
+    organizations: pageData?.organizations || {}
+  }), [pageData, postsLikesData]);
 
   // Check if user can create posts (must be a member with edit permissions)
   const canCreatePosts = userMembership && hasPermission(
@@ -78,7 +91,7 @@ const OrganizationPostsManager = ({
     fetchUserProfile();
   }, [session?.user?.id, currentUserProfile]);
 
-  // Fetch organization posts
+  // ✅ OPTIMIZED: Fetch organization posts using globalDataManager
   const fetchOrganizationPosts = useCallback(async () => {
     if (!organization?.id) return;
 
@@ -86,16 +99,36 @@ const OrganizationPostsManager = ({
       setLoading(true);
       setError('');
       
-      const { data: postsData, error: postsError } = await supabase
-        .from('organization_posts')
-        .select('*')
-        .eq('organization_id', organization.id)
-        .eq('organization_type', organization.type)
-        .order('created_at', { ascending: false })
-        .limit(20);
+      // ✅ BEFORE (Direct query causing individual organization_posts API calls):
+      // const { data: postsData, error: postsError } = await supabase
+      //   .from('organization_posts')
+      //   .select('*')
+      //   .eq('organization_id', organization.id)
 
-      if (postsError) throw postsError;
-      setOrganizationPosts(postsData || []);
+      // ✅ AFTER (Use globalDataManager for batched loading):
+      const postsData = await globalDataManager.getPostsForOrganizations([organization.id]);
+      const organizationPostsData = postsData[organization.id] || [];
+
+      // If no posts from globalDataManager, fallback to direct query
+      if (organizationPostsData.length === 0) {
+        try {
+          const { data: fallbackPosts, error: postsError } = await supabase
+            .from('organization_posts')
+            .select('*')
+            .eq('organization_id', organization.id)
+            .eq('organization_type', organization.type)
+            .order('created_at', { ascending: false })
+            .limit(20);
+
+          if (postsError) throw postsError;
+          setOrganizationPosts(fallbackPosts || []);
+        } catch (fallbackError) {
+          throw fallbackError;
+        }
+      } else {
+        setOrganizationPosts(organizationPostsData);
+      }
+      
     } catch (err) {
       console.error('Error fetching organization posts:', err);
       setError('Failed to load posts');
@@ -164,6 +197,7 @@ const OrganizationPostsManager = ({
     if (!canEditPosts) return;
     
     try {
+      // ✅ MUTATION: Keep direct query for DELETE operations (necessary)
       const { error } = await supabase
         .from('organization_posts')
         .delete()
@@ -173,25 +207,29 @@ const OrganizationPostsManager = ({
       if (error) throw error;
       
       setOrganizationPosts(prev => prev.filter(post => post.id !== postId));
+      
+      // Clear cache to refresh data
+      globalDataManager.clearCache('org-posts');
+      
     } catch (err) {
       console.error('Error deleting post:', err);
       setError('Failed to delete post');
     }
   }, [canEditPosts, organization?.id]);
 
- const handleCreateFirstPost = () => {
-  // Find and click the Post button
-  const postButton = document.querySelector('[data-create-post] button');
-  if (postButton) {
-    postButton.click();
-  } else {
-    // Fallback: click anywhere in the create post area
-    const createPostArea = document.querySelector('[data-create-post]');
-    if (createPostArea) {
-      createPostArea.click();
+  const handleCreateFirstPost = () => {
+    // Find and click the Post button
+    const postButton = document.querySelector('[data-create-post] button');
+    if (postButton) {
+      postButton.click();
+    } else {
+      // Fallback: click anywhere in the create post area
+      const createPostArea = document.querySelector('[data-create-post]');
+      if (createPostArea) {
+        createPostArea.click();
+      }
     }
-  }
-};
+  };
 
   // Handle adding comments (placeholder - this should integrate with your existing comment system)
   const handleAddComment = async (e) => {
@@ -258,6 +296,9 @@ const OrganizationPostsManager = ({
               currentUserId={session?.user?.id}
               onOpenDetail={handleOpenDetail}
               currentUserProfile={currentUserProfile}
+              pageData={enhancedPageData} // ✅ PASS: Enhanced pageData with all batched sources
+              postsLikesData={postsLikesData} // ✅ PASS: Pre-loaded post likes
+              onPostLike={onPostLike} // ✅ PASS: Centralized like handler
             />
           ))}
         </div>
@@ -292,6 +333,7 @@ const OrganizationPostsManager = ({
           onClose={handleCloseDetail}
           currentUserId={session?.user?.id}
           canEdit={canEditPosts}
+          pageData={enhancedPageData} // ✅ PASS: Enhanced pageData for modal
         />
       )}
     </div>
