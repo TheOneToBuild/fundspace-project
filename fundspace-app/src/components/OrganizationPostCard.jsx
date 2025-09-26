@@ -1,9 +1,10 @@
-// src/components/OrganizationPostCard.jsx - Simple fix to add pageData support
+// src/components/OrganizationPostCard.jsx - OPTIMIZED: All direct queries wrapped
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { useOutletContext } from 'react-router-dom';
 import { MoreHorizontal, Edit, Trash2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import { optimizedSupabaseQuery } from '../utils/apiRequestOptimizer'; // ✅ ADD THIS IMPORT
 
 // Import the same components used by PostCard
 import PostActions from './post/PostActions';
@@ -22,7 +23,7 @@ export default function OrganizationPostCard({
   currentUserId,
   onOpenDetail,
   currentUserProfile,
-  pageData // NEW: Accept pageData prop for batched loading
+  pageData // Accept pageData prop for batched loading
 }) {
   // FALLBACK: Use useOutletContext if currentUserProfile is not passed
   const outletContext = useOutletContext();
@@ -48,46 +49,62 @@ export default function OrganizationPostCard({
   const organizationAvatar = organization?.logo_url || organization?.image_url;
   const parsedTags = post?.tags ? JSON.parse(post.tags) : [];
 
-  // MODIFIED: Only load reactions if pageData doesn't exist
+  // ✅ OPTIMIZED: Load reactions using pageData first, fallback to optimizer
   useEffect(() => {
     const loadReactions = async () => {
       if (!post?.id) return;
       
-      // Skip loading if we have pageData for this post
+      // ✅ PRIORITY 1: Use pageData if available (best performance)
       if (pageData?.organizationPostLikes?.[post.id]) {
         const postData = pageData.organizationPostLikes[post.id];
         setTotalLikes(postData.likes_count || 0);
         setReactionSummary(postData.reaction_summary || []);
         setReactors(postData.reactors || []);
         
-        // Still need to check user's reaction
+        // Check user's reaction from pageData
         if (currentUserId) {
           const userReaction = postData.user_reaction || null;
           setSelectedReaction(userReaction);
         }
-        return; // Skip the API calls since we have cached data
+        return; // Skip API calls since we have cached data
       }
       
-      // Original loading logic when pageData is not available
+      // ✅ PRIORITY 2: Use API optimizer for batch loading
       try {
-        // Get user's current reaction
+        // ✅ BEFORE (Direct query causing individual API calls):
+        // const { data: userReaction } = await supabase
+        //   .from('organization_post_likes')
+        //   .select('reaction_type')
+        //   .eq('organization_post_id', post.id)
+
+        // ✅ AFTER (Optimized with batch loading):
         if (currentUserId) {
-          const { data: userReaction } = await supabase
-            .from('organization_post_likes')
-            .select('reaction_type')
-            .eq('organization_post_id', post.id)
-            .eq('user_id', currentUserId)
-            .maybeSingle();
+          const optimizedUserReactionQuery = optimizedSupabaseQuery(
+            supabase
+              .from('organization_post_likes')
+              .select('reaction_type')
+              .eq('organization_post_id', post.id)
+              .eq('user_id', currentUserId),
+            'organization_post_likes_single',
+            { postIds: [post.id], userId: currentUserId }
+          );
           
+          const { data: userReaction } = await optimizedUserReactionQuery.maybeSingle();
           setSelectedReaction(userReaction?.reaction_type || null);
         }
 
-        // Get reaction summary and reactors
-        const { data: reactionData } = await supabase
-          .from('organization_post_likes')
-          .select('reaction_type, user_id, created_at')
-          .eq('organization_post_id', post.id)
-          .order('created_at', { ascending: false });
+        // ✅ OPTIMIZED: Batch load reaction summary and reactors
+        const optimizedReactionsQuery = optimizedSupabaseQuery(
+          supabase
+            .from('organization_post_likes')
+            .select('reaction_type, user_id, created_at')
+            .eq('organization_post_id', post.id)
+            .order('created_at', { ascending: false }),
+          'organization_post_likes_single',
+          { postIds: [post.id] }
+        );
+
+        const { data: reactionData } = await optimizedReactionsQuery;
 
         if (reactionData && reactionData.length > 0) {
           // Count reactions by type
@@ -101,12 +118,18 @@ export default function OrganizationPostCard({
           setReactionSummary(summary);
           setTotalLikes(reactionData.length);
 
-          // Get profiles for reactors
+          // ✅ OPTIMIZED: Batch load profiles for reactors
           const userIds = reactionData.map(like => like.user_id);
-          const { data: profilesData } = await supabase
-            .from('profiles')
-            .select('id, full_name, avatar_url, title, organization_name, role')
-            .in('id', userIds);
+          const optimizedProfilesQuery = optimizedSupabaseQuery(
+            supabase
+              .from('profiles')
+              .select('id, full_name, avatar_url, title, organization_name, role')
+              .in('id', userIds),
+            'profiles_single',
+            { userIds }
+          );
+
+          const { data: profilesData } = await optimizedProfilesQuery;
 
           const transformedReactors = reactionData.map(like => {
             const profile = profilesData?.find(p => p.id === like.user_id);
@@ -135,14 +158,27 @@ export default function OrganizationPostCard({
     loadReactions();
   }, [post?.id, currentUserId, pageData]);
 
-  // Rest of your existing functions remain the same...
+  // ✅ OPTIMIZED: Refresh post data with optimizer
   const refreshPostData = async () => {
     if (!post?.id) return;
     try {
-      const { data: likesData, error: likesError } = await supabase
-        .from('organization_post_likes')
-        .select('user_id, reaction_type')
-        .eq('organization_post_id', post.id);
+      // ✅ BEFORE (Direct query):
+      // const { data: likesData, error: likesError } = await supabase
+      //   .from('organization_post_likes')
+      //   .select('user_id, reaction_type')
+      //   .eq('organization_post_id', post.id);
+
+      // ✅ AFTER (Optimized):
+      const optimizedLikesQuery = optimizedSupabaseQuery(
+        supabase
+          .from('organization_post_likes')
+          .select('user_id, reaction_type')
+          .eq('organization_post_id', post.id),
+        'organization_post_likes_single',
+        { postIds: [post.id] }
+      );
+
+      const { data: likesData, error: likesError } = await optimizedLikesQuery;
       if (likesError) throw likesError;
 
       const summary = {};
@@ -161,6 +197,8 @@ export default function OrganizationPostCard({
     if (!canInteract || !post?.id) return;
 
     try {
+      // ✅ CHECK: Keep direct queries for mutations (INSERT/UPDATE/DELETE operations)
+      // These don't need optimization as they're individual operations
       const { data: existingReaction } = await supabase
         .from('organization_post_likes')
         .select('id')
@@ -244,6 +282,7 @@ export default function OrganizationPostCard({
         updateData.image_urls = null;
       }
 
+      // ✅ MUTATION: Keep direct query for UPDATE operations
       const { data: updatedPost, error } = await supabase
         .from('organization_posts')
         .update(updateData)

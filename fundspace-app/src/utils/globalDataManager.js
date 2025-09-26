@@ -1,4 +1,4 @@
-// src/utils/globalDataManager.js - COMPLETE VERSION with all missing methods and notifications fix
+// src/utils/globalDataManager.js - COMPLETE VERSION with posts optimization methods
 import { supabase } from '../supabaseClient';
 
 class GlobalDataManager {
@@ -170,7 +170,7 @@ class GlobalDataManager {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, full_name, avatar_url, title, organization_name, organization_type, role, location') // ✅ Removed email
+        .select('id, full_name, avatar_url, title, organization_name, organization_type, role, location')
         .in('id', userIds);
 
       if (error) throw error;
@@ -219,7 +219,7 @@ class GlobalDataManager {
     try {
       let query = supabase
         .from('organizations')
-        .select('id, name, slug, type, image_url, banner_image_url, tagline, description, website_url, location')
+        .select('id, name, slug, type, image_url, banner_image_url, tagline, description, website, location')
         .in('id', orgIds);
 
       if (orgType) {
@@ -245,7 +245,7 @@ class GlobalDataManager {
     try {
       let query = supabase
         .from('organizations')
-        .select('id, name, slug, type, image_url, banner_image_url, tagline, description, website_url, location')
+        .select('id, name, slug, type, image_url, banner_image_url, tagline, description, website, location')
         .order('id', { ascending: false })
         .limit(100);
 
@@ -419,7 +419,7 @@ class GlobalDataManager {
     try {
       const { data, error } = await supabase
         .from('notifications')
-        .select('id, user_id, type, is_read, created_at') // ✅ Removed content - doesn't exist
+        .select('id, user_id, type, is_read, created_at')
         .in('user_id', userIds)
         .order('created_at', { ascending: false })
         .limit(50);
@@ -497,6 +497,104 @@ class GlobalDataManager {
       return postsByOrg;
     } catch (error) {
       console.error('Error fetching batch organization posts:', error);
+      return {};
+    }
+  }
+
+  // NEW: Batch posts by channel loading
+  async getPostsByChannel(channel, limit = 20) {
+    const cacheKey = this.getCacheKey('posts-by-channel', { channel, limit });
+    const cached = this.getCache(cacheKey);
+    if (cached) return cached;
+
+    if (this.pendingRequests.has(cacheKey)) {
+      return this.pendingRequests.get(cacheKey);
+    }
+
+    const promise = this._fetchPostsByChannel(channel, limit);
+    this.pendingRequests.set(cacheKey, promise);
+
+    try {
+      const result = await promise;
+      this.setCache(cacheKey, result);
+      return result;
+    } finally {
+      this.pendingRequests.delete(cacheKey);
+    }
+  }
+
+  async _fetchPostsByChannel(channel, limit) {
+    try {
+      const { data, error } = await supabase
+        .from('posts')
+        .select(`
+          id, content, created_at, likes_count, comments_count, channel, tags, image_urls,
+          profiles:profile_id(id, full_name, avatar_url, title, organization_name, role, organization_type)
+        `)
+        .eq('channel', channel)
+        .order('created_at', { ascending: false })
+        .limit(limit);
+
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      console.error('Error fetching posts by channel:', error);
+      return [];
+    }
+  }
+
+  // NEW: Batch posts for multiple users
+  async getPostsForUsers(userIds, limit = 20) {
+    const uniqueIds = [...new Set(userIds.filter(Boolean))];
+    const cacheKey = this.getCacheKey('posts-for-users', { userIds: uniqueIds.sort(), limit });
+    const cached = this.getCache(cacheKey);
+    if (cached) return cached;
+
+    if (this.pendingRequests.has(cacheKey)) {
+      return this.pendingRequests.get(cacheKey);
+    }
+
+    const promise = this._fetchPostsForUsers(uniqueIds, limit);
+    this.pendingRequests.set(cacheKey, promise);
+
+    try {
+      const result = await promise;
+      this.setCache(cacheKey, result);
+      return result;
+    } finally {
+      this.pendingRequests.delete(cacheKey);
+    }
+  }
+
+  async _fetchPostsForUsers(userIds, limit) {
+    try {
+      const { data, error } = await supabase
+        .from('posts')
+        .select(`
+          id, content, created_at, likes_count, comments_count, channel, tags, image_urls, profile_id,
+          profiles:profile_id(id, full_name, avatar_url, title, organization_name, role, organization_type)
+        `)
+        .in('profile_id', userIds)
+        .order('created_at', { ascending: false })
+        .limit(limit);
+
+      if (error) throw error;
+
+      // Group posts by user
+      const postsByUser = {};
+      userIds.forEach(userId => {
+        postsByUser[userId] = [];
+      });
+
+      (data || []).forEach(post => {
+        if (postsByUser[post.profile_id]) {
+          postsByUser[post.profile_id].push(post);
+        }
+      });
+
+      return postsByUser;
+    } catch (error) {
+      console.error('Error fetching posts for users:', error);
       return {};
     }
   }

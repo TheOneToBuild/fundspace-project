@@ -6,7 +6,6 @@ import { Users, UserCheck, UserX, ArrowLeft, Clock, Building, MapPin, Search, Fi
 import Avatar from './Avatar';
 import PublicPageLayout from './PublicPageLayout.jsx';
 import globalDataManager from '../utils/globalDataManager';
-import { optimizedSupabaseQuery } from '../utils/apiRequestOptimizer'; // ✅ CRITICAL IMPORT
 
 // ✅ FULLY OPTIMIZED ConnectionsDataManager - Uses globalDataManager instead of direct queries
 class ConnectionsDataManager {
@@ -185,7 +184,7 @@ class ConnectionsDataManager {
     }
   }
 
-  // ✅ OPTIMIZED: Use API optimizer for discovery queries
+  // ✅ FIXED: Discovery query - Don't use optimization for discovery
   async loadDiscoveryData(searchQuery = '', filterType = 'all', connectedProfileIds = new Set()) {
     const cacheKey = this.getCacheKey('discovery', { searchQuery, filterType });
     const cached = this.getCache(cacheKey);
@@ -196,10 +195,7 @@ class ConnectionsDataManager {
       const authUserId = await this.getCurrentAuthUserId();
       if (!authUserId) return [];
 
-      // ✅ BEFORE (Direct query):
-      // supabase.from('profiles').select(...).limit(20)
-
-      // ✅ AFTER (Optimized with API wrapper):
+      // ✅ FIXED: Direct query for discovery - Don't use optimizer
       let baseQuery = supabase
         .from('profiles')
         .select('id, full_name, title, avatar_url, location, organization_name, organization_type, role')
@@ -232,14 +228,9 @@ class ConnectionsDataManager {
         }
       }
 
-      // ✅ Wrap with API optimizer to batch profile queries
-      const optimizedQuery = optimizedSupabaseQuery(
-        baseQuery.order('updated_at', { ascending: false }),
-        'profiles_single',
-        { userIds: ['discovery_batch'], searchQuery, filterType }
-      );
-
-      const { data, error } = await optimizedQuery;
+      // ✅ REMOVED: Don't wrap discovery queries with optimizer
+      // Discovery queries are for finding new people, not optimizing known user lookups
+      const { data, error } = await baseQuery.order('updated_at', { ascending: false });
       
       if (error) throw error;
 
@@ -499,7 +490,7 @@ export default function ConnectionsPage() {
     return date.toLocaleDateString();
   }, []);
 
-  // Component rendering (UI components - unchanged from your original for brevity)
+  // Component rendering (UI components)
   const ConnectionCard = useCallback(({ connection, type = 'connection' }) => {
     let user, connectionDate, isActionInProgress;
     

@@ -3,6 +3,7 @@ import { useOutletContext, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import { rssNewsService as newsService } from '../services/rssNewsService.js';
 import { getOrganizationInfoForDashboard } from '../utils/membershipQueries.js';
+import globalDataManager from '../utils/globalDataManager';
 
 import WelcomeBanner from './dashboard/WelcomeBanner.jsx';
 import ConnectionsAvatars from './dashboard/ConnectionsAvatars.jsx';
@@ -33,23 +34,15 @@ const useNews = () => {
     return news;
 };
 
-// FIXED: Simplified trending posts - no individual enrichment
-const useSimpleTrendingPosts = () => {
+// OPTIMIZED: Use globalDataManager for trending posts
+const useOptimizedTrendingPosts = () => {
     const [trendingPosts, setTrendingPosts] = useState([]);
 
     useEffect(() => {
         const fetchTrendingPosts = async () => {
             try {
-                // Just get basic posts data - let pageData handle enrichment
-                const { data: postsData, error } = await supabase
-                    .from('posts')
-                    .select(`*, profiles:profile_id(id, full_name, avatar_url, title, organization_name, role, organization_type)`)
-                    .eq('channel', 'hello-world')
-                    .order('created_at', { ascending: false })
-                    .limit(10);
-
-                if (error) throw error;
-                setTrendingPosts(postsData || []);
+                const postsData = await globalDataManager.getPostsByChannel('hello-world', 10);
+                setTrendingPosts(postsData);
             } catch {
                 setTrendingPosts([]);
             }
@@ -216,7 +209,7 @@ export default function HomeDashboard() {
 
     const { organizationInfo, loading, refreshOrganizationData } = useUserData(profile);
     const news = useNews();
-    const trendingPosts = useSimpleTrendingPosts();
+    const trendingPosts = useOptimizedTrendingPosts();
     const { trendingGrants, setTrendingGrants } = useTrendingGrants();
     const helloCommunityPosts = useHelloCommunityPosts(organizationInfo);
 

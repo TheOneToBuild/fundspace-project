@@ -4,6 +4,7 @@ import { Outlet, useOutletContext } from 'react-router-dom';
 import PublicPageLayout from './components/PublicPageLayout.jsx';
 import GrantDetailModal from './GrantDetailModal.jsx';
 import { usePageDataLoader } from './hooks/usePageDataLoader';
+import globalDataManager from './utils/globalDataManager';
 
 export default function ProfilePage() {
   const appContext = useOutletContext();
@@ -103,18 +104,9 @@ export default function ProfilePage() {
     setAppState((prev) => ({ ...prev, dataLoading: true, error: null }));
 
     try {
-      // Load posts first
-      const { data: postsData } = await supabase
-        .from('posts')
-        .select(`
-          id, content, created_at, likes_count, comments_count, channel, tags, image_urls,
-          profiles:profile_id(id, full_name, avatar_url, title, organization_name, role, organization_type)
-        `)
-        .eq('profile_id', userId)
-        .order('created_at', { ascending: false })
-        .limit(20);
-
-      const posts = postsData || [];
+      // OPTIMIZED: Load posts using globalDataManager
+      const postsData = await globalDataManager.getPostsForUsers([userId], 20);
+      const posts = postsData[userId] || [];
       const postIds = posts.map(p => p.id);
 
       // FIXED: Batch load all post likes in single query instead of N+1
