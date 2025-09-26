@@ -1,9 +1,10 @@
-// src/components/dashboard/HelloCommunitySection.jsx - CORRECTED: Missing batched data props
+// src/components/dashboard/HelloCommunitySection.jsx - FIXED: Direct Supabase query wrapped with optimizer
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../supabaseClient';
 import { ChevronLeft, ChevronRight, MessageCircle, Heart } from 'lucide-react';
 import { renderMentionsInText } from '../../utils/mentionUtils';
+import { optimizedSupabaseQuery } from '../../utils/apiRequestOptimizer'; // ✅ ADD THIS IMPORT
 import PropTypes from 'prop-types';
 
 // CORRECTED: TrendingPostCard with all required batched data props
@@ -46,6 +47,7 @@ const TrendingPostCard = ({ post, onClick, pageData, postsLikesData, onPostLike 
         return `${Math.floor(diffInHours / 24)}d ago`;
     };
 
+    // ✅ CRITICAL FIX: Wrap the direct Supabase query with optimizer
     const handleMentionClick = async (mention, event) => {
         event?.stopPropagation();
         
@@ -61,11 +63,20 @@ const TrendingPostCard = ({ post, onClick, pageData, postsLikesData, onPostLike 
                 }
                 
                 if (orgId) {
-                    const { data: orgData } = await supabase
-                        .from('organizations')
-                        .select('slug, type')
-                        .eq('id', parseInt(orgId))
-                        .single();
+                    // ✅ BEFORE (Direct query causing organization API calls):
+                    // const { data: orgData } = await supabase
+                    //     .from('organizations')
+                    //     .select('slug, type')
+                    //     .eq('id', parseInt(orgId))
+                    //     .single();
+                    
+                    // ✅ AFTER (Optimized with API optimizer):
+                    const optimizedQuery = optimizedSupabaseQuery(
+                        supabase.from('organizations').select('slug, type').eq('id', parseInt(orgId)),
+                        'organizations_single',
+                        { orgIds: [parseInt(orgId)] }
+                    );
+                    const { data: orgData } = await optimizedQuery.single();
                     
                     if (orgData?.slug) {
                         navigate(`/organizations/${orgData.slug}`);
@@ -263,7 +274,7 @@ const TrendingPostCard = ({ post, onClick, pageData, postsLikesData, onPostLike 
     );
 };
 
-// Organization channel configuration
+// Organization channel configuration (unchanged)
 const ORGANIZATION_CHANNELS = {
   'nonprofit': { 
     name: 'Nonprofit Community', 

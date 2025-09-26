@@ -1,4 +1,4 @@
-// src/utils/globalDataManager.js - Enhanced with user connections and followers batching
+// src/utils/globalDataManager.js - COMPLETE VERSION with all missing methods and notifications fix
 import { supabase } from '../supabaseClient';
 
 class GlobalDataManager {
@@ -170,7 +170,7 @@ class GlobalDataManager {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, full_name, avatar_url, title, organization_name, organization_type, role')
+        .select('id, full_name, avatar_url, title, organization_name, organization_type, role, location') // ✅ Removed email
         .in('id', userIds);
 
       if (error) throw error;
@@ -187,8 +187,329 @@ class GlobalDataManager {
     }
   }
 
-  // NEW: Batch user connections loading
-  async getUserConnections(userIds, status = 'accepted') {
+  // Batch organizations loading
+  async getOrganizations(orgIds, orgType = null) {
+    const uniqueIds = [...new Set(orgIds.filter(Boolean))];
+    if (uniqueIds.length === 0) {
+      // Handle case where no specific IDs provided - get recent organizations
+      return this._fetchRecentOrganizations(orgType);
+    }
+
+    const cacheKey = this.getCacheKey('organizations-batch', { orgIds: uniqueIds.sort(), orgType });
+    const cached = this.getCache(cacheKey);
+    if (cached) return cached;
+
+    if (this.pendingRequests.has(cacheKey)) {
+      return this.pendingRequests.get(cacheKey);
+    }
+
+    const promise = this._fetchOrganizations(uniqueIds, orgType);
+    this.pendingRequests.set(cacheKey, promise);
+
+    try {
+      const result = await promise;
+      this.setCache(cacheKey, result);
+      return result;
+    } finally {
+      this.pendingRequests.delete(cacheKey);
+    }
+  }
+
+  async _fetchOrganizations(orgIds, orgType) {
+    try {
+      let query = supabase
+        .from('organizations')
+        .select('id, name, slug, type, image_url, banner_image_url, tagline, description, website_url, location')
+        .in('id', orgIds);
+
+      if (orgType) {
+        query = query.eq('type', orgType);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      const orgsMap = {};
+      data?.forEach(org => {
+        orgsMap[org.id] = org;
+      });
+
+      return orgsMap;
+    } catch (error) {
+      console.error('Error fetching batch organizations:', error);
+      return {};
+    }
+  }
+
+  async _fetchRecentOrganizations(orgType) {
+    try {
+      let query = supabase
+        .from('organizations')
+        .select('id, name, slug, type, image_url, banner_image_url, tagline, description, website_url, location')
+        .order('id', { ascending: false })
+        .limit(100);
+
+      if (orgType) {
+        query = query.eq('type', orgType);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      const orgsMap = {};
+      data?.forEach(org => {
+        orgsMap[org.id] = org;
+      });
+
+      return orgsMap;
+    } catch (error) {
+      console.error('Error fetching recent organizations:', error);
+      return {};
+    }
+  }
+
+  // Batch grants loading
+  async getGrants(grantIds) {
+    const uniqueIds = [...new Set(grantIds.filter(Boolean))];
+    if (uniqueIds.length === 0) {
+      // Handle case where no specific IDs provided - get recent grants
+      return this._fetchRecentGrants();
+    }
+
+    const cacheKey = this.getCacheKey('grants-batch', uniqueIds.sort());
+    const cached = this.getCache(cacheKey);
+    if (cached) return cached;
+
+    if (this.pendingRequests.has(cacheKey)) {
+      return this.pendingRequests.get(cacheKey);
+    }
+
+    const promise = this._fetchGrants(uniqueIds);
+    this.pendingRequests.set(cacheKey, promise);
+
+    try {
+      const result = await promise;
+      this.setCache(cacheKey, result);
+      return result;
+    } finally {
+      this.pendingRequests.delete(cacheKey);
+    }
+  }
+
+  async _fetchGrants(grantIds) {
+    try {
+      const { data, error } = await supabase
+        .from('grants')
+        .select('*')
+        .in('id', grantIds)
+        .order('id', { ascending: false });
+
+      if (error) throw error;
+
+      const grantsMap = {};
+      data?.forEach(grant => {
+        grantsMap[grant.id] = grant;
+      });
+
+      return grantsMap;
+    } catch (error) {
+      console.error('Error fetching batch grants:', error);
+      return {};
+    }
+  }
+
+  async _fetchRecentGrants() {
+    try {
+      const { data, error } = await supabase
+        .from('grants')
+        .select('*')
+        .order('id', { ascending: false })
+        .limit(100);
+
+      if (error) throw error;
+
+      const grantsMap = {};
+      data?.forEach(grant => {
+        grantsMap[grant.id] = grant;
+      });
+
+      return grantsMap;
+    } catch (error) {
+      console.error('Error fetching recent grants:', error);
+      return {};
+    }
+  }
+
+  // Batch saved grants loading
+  async getSavedGrants(userIds) {
+    const uniqueIds = [...new Set(userIds.filter(Boolean))];
+    const cacheKey = this.getCacheKey('saved-grants-batch', uniqueIds.sort());
+    const cached = this.getCache(cacheKey);
+    if (cached) return cached;
+
+    if (this.pendingRequests.has(cacheKey)) {
+      return this.pendingRequests.get(cacheKey);
+    }
+
+    const promise = this._fetchSavedGrants(uniqueIds);
+    this.pendingRequests.set(cacheKey, promise);
+
+    try {
+      const result = await promise;
+      this.setCache(cacheKey, result);
+      return result;
+    } finally {
+      this.pendingRequests.delete(cacheKey);
+    }
+  }
+
+  async _fetchSavedGrants(userIds) {
+    try {
+      const { data, error } = await supabase
+        .from('saved_grants')
+        .select('id, user_id, grant_id, created_at')
+        .in('user_id', userIds)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      // Group saved grants by user_id
+      const savedByUser = {};
+      userIds.forEach(userId => {
+        savedByUser[userId] = [];
+      });
+
+      data?.forEach(saved => {
+        if (savedByUser[saved.user_id]) {
+          savedByUser[saved.user_id].push(saved);
+        }
+      });
+
+      return savedByUser;
+    } catch (error) {
+      console.error('Error fetching batch saved grants:', error);
+      return {};
+    }
+  }
+
+  // FIXED: Batch notifications loading - Use correct column name
+  async getNotifications(userIds) {
+    const uniqueIds = [...new Set(userIds.filter(Boolean))];
+    const cacheKey = this.getCacheKey('notifications-batch', uniqueIds.sort());
+    const cached = this.getCache(cacheKey);
+    if (cached) return cached;
+
+    if (this.pendingRequests.has(cacheKey)) {
+      return this.pendingRequests.get(cacheKey);
+    }
+
+    const promise = this._fetchNotifications(uniqueIds);
+    this.pendingRequests.set(cacheKey, promise);
+
+    try {
+      const result = await promise;
+      this.setCache(cacheKey, result);
+      return result;
+    } finally {
+      this.pendingRequests.delete(cacheKey);
+    }
+  }
+
+  async _fetchNotifications(userIds) {
+    try {
+      const { data, error } = await supabase
+        .from('notifications')
+        .select('id, user_id, type, is_read, created_at') // ✅ Removed content - doesn't exist
+        .in('user_id', userIds)
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (error) throw error;
+
+      // Group notifications by user_id
+      const notificationsByUser = {};
+      userIds.forEach(userId => {
+        notificationsByUser[userId] = [];
+      });
+
+      data?.forEach(notification => {
+        if (notificationsByUser[notification.user_id]) {
+          notificationsByUser[notification.user_id].push(notification);
+        }
+      });
+
+      return notificationsByUser;
+    } catch (error) {
+      console.error('Error fetching batch notifications:', error);
+      return {};
+    }
+  }
+
+  // Batch posts for organizations loading
+  async getPostsForOrganizations(orgIds) {
+    const uniqueIds = [...new Set(orgIds.filter(Boolean))];
+    const cacheKey = this.getCacheKey('org-posts-batch', uniqueIds.sort());
+    const cached = this.getCache(cacheKey);
+    if (cached) return cached;
+
+    if (this.pendingRequests.has(cacheKey)) {
+      return this.pendingRequests.get(cacheKey);
+    }
+
+    const promise = this._fetchPostsForOrganizations(uniqueIds);
+    this.pendingRequests.set(cacheKey, promise);
+
+    try {
+      const result = await promise;
+      this.setCache(cacheKey, result);
+      return result;
+    } finally {
+      this.pendingRequests.delete(cacheKey);
+    }
+  }
+
+  async _fetchPostsForOrganizations(orgIds) {
+    try {
+      const { data, error } = await supabase
+        .from('posts')
+        .select(`
+          id, organization_id, profile_id, content, created_at, channel, likes_count, comments_count,
+          profiles:profile_id(id, full_name, avatar_url, title, organization_name)
+        `)
+        .in('organization_id', orgIds)
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (error) throw error;
+
+      // Group posts by organization_id
+      const postsByOrg = {};
+      orgIds.forEach(orgId => {
+        postsByOrg[orgId] = [];
+      });
+
+      data?.forEach(post => {
+        if (postsByOrg[post.organization_id]) {
+          postsByOrg[post.organization_id].push(post);
+        }
+      });
+
+      return postsByOrg;
+    } catch (error) {
+      console.error('Error fetching batch organization posts:', error);
+      return {};
+    }
+  }
+
+  // Batch post likes for multiple posts
+  async getPostLikesForPosts(postIds) {
+    const uniqueIds = [...new Set(postIds.filter(Boolean))];
+    // This just delegates to the existing getPostLikes method
+    return this.getPostLikes(uniqueIds);
+  }
+
+  // Batch user connections loading
+  async getUserConnections(userIds, status = null) {
     const uniqueIds = [...new Set(userIds)];
     const cacheKey = this.getCacheKey('user-connections-batch', { userIds: uniqueIds.sort(), status });
     const cached = this.getCache(cacheKey);
@@ -212,16 +533,24 @@ class GlobalDataManager {
 
   async _fetchUserConnections(userIds, status) {
     try {
-      // Build OR condition for all users
-      const orConditions = userIds.map(userId => 
-        `and(requester_id.eq.${userId},status.eq.${status}),and(recipient_id.eq.${userId},status.eq.${status})`
-      ).join(',');
-
-      const { data: connectionsData, error } = await supabase
+      let query = supabase
         .from('user_connections')
-        .select('id, requester_id, recipient_id, status, created_at')
-        .or(orConditions)
+        .select('id, requester_id, recipient_id, status, created_at, updated_at')
         .order('created_at', { ascending: false });
+
+      // Build OR conditions for all users
+      const orConditions = userIds.flatMap(userId => [
+        `requester_id.eq.${userId}`,
+        `recipient_id.eq.${userId}`
+      ]).join(',');
+
+      query = query.or(orConditions);
+
+      if (status) {
+        query = query.eq('status', status);
+      }
+
+      const { data: connectionsData, error } = await query;
 
       if (error) throw error;
 
@@ -256,7 +585,7 @@ class GlobalDataManager {
     }
   }
 
-  // NEW: Batch connection status checks (major performance improvement)
+  // Batch connection status checks (major performance improvement)
   async getBatchConnectionStatuses(currentUserId, targetUserIds) {
     const uniqueIds = [...new Set(targetUserIds)];
     const cacheKey = this.getCacheKey('connection-statuses-batch', { currentUserId, targetUserIds: uniqueIds.sort() });
@@ -327,7 +656,7 @@ class GlobalDataManager {
     }
   }
 
-  // NEW: Single connection status (with batching)
+  // Single connection status (with batching)
   async getConnectionStatus(currentUserId, targetUserId) {
     return new Promise((resolve) => {
       const key = `${currentUserId}-${targetUserId}`;
@@ -369,7 +698,7 @@ class GlobalDataManager {
     });
   }
 
-  // NEW: Batch followers loading
+  // Batch followers loading
   async getFollowers(userIds) {
     const uniqueIds = [...new Set(userIds)];
     const cacheKey = this.getCacheKey('followers-batch', uniqueIds.sort());
@@ -424,7 +753,7 @@ class GlobalDataManager {
     }
   }
 
-  // NEW: Batch following loading
+  // Batch following loading
   async getFollowing(userIds) {
     const uniqueIds = [...new Set(userIds)];
     const cacheKey = this.getCacheKey('following-batch', uniqueIds.sort());

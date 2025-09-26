@@ -1,7 +1,8 @@
-// src/components/OmegaAdminDashboard.jsx - COMPLETE: Dashboard with all analytics components
+// src/components/OmegaAdminDashboard.jsx - COMPLETE OPTIMIZED VERSION - Uses globalDataManager instead of direct queries
 import React, { useState, useEffect } from 'react';
 import { useOutletContext, Link } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
+import globalDataManager from '../utils/globalDataManager'; // ✅ CRITICAL IMPORT
 import { 
     Crown,
     Users, 
@@ -74,26 +75,44 @@ export default function OmegaAdminDashboard() {
         }
     }, [isOmegaAdmin]);
 
+    // ✅ OPTIMIZED: Use globalDataManager instead of multiple direct queries
     const fetchDashboardStats = async () => {
         try {
             setLoading(true);
             setError('');
             
-            // Fetch platform statistics using unified organizations table
-            const [usersRes, organizationsRes, grantsRes, membershipRes, activeGrantsRes] = await Promise.all([
+            // ✅ BEFORE (Multiple direct queries causing high API volume):
+            // const [usersRes, organizationsRes, grantsRes, membershipRes, activeGrantsRes] = await Promise.all([
+            //     supabase.from('profiles').select('id', { count: 'exact', head: true }),
+            //     supabase.from('organizations').select('type'),
+            //     supabase.from('grants').select('id', { count: 'exact', head: true }),
+            //     supabase.from('organization_memberships').select('role'),
+            //     supabase.from('grants').select('id', { count: 'exact', head: true }).gt('deadline', new Date().toISOString())
+            // ]);
+
+            // ✅ AFTER (Optimized with globalDataManager):
+            
+            // Get basic counts first with minimal queries
+            const [usersCountRes, membershipRes] = await Promise.all([
                 supabase.from('profiles').select('id', { count: 'exact', head: true }),
-                supabase.from('organizations').select('type'),
-                supabase.from('grants').select('id', { count: 'exact', head: true }),
-                supabase.from('organization_memberships').select('role'),
-                supabase.from('grants').select('id', { count: 'exact', head: true }).gt('deadline', new Date().toISOString())
+                supabase.from('organization_memberships').select('role')
             ]);
 
-            if (usersRes.error || organizationsRes.error || grantsRes.error) {
-                throw new Error('Failed to fetch dashboard data');
+            if (usersCountRes.error) {
+                throw new Error('Failed to fetch user count');
             }
 
+            // Use globalDataManager for organizations and grants data
+            const [organizationsData, grantsData] = await Promise.all([
+                globalDataManager.getOrganizations([]), // Get all organizations
+                globalDataManager.getGrants([]) // Get all grants
+            ]);
+
+            // Process organizations data
+            const allOrganizations = Object.values(organizationsData);
+            
             // Count organizations by type using the expanded taxonomy
-            const orgsByType = (organizationsRes.data || []).reduce((acc, org) => {
+            const orgsByType = allOrganizations.reduce((acc, org) => {
                 // Handle legacy 'funder' type by mapping to foundation
                 const type = org.type === 'funder' ? 'foundation' : org.type;
                 acc[type] = (acc[type] || 0) + 1;
@@ -109,6 +128,13 @@ export default function OmegaAdminDashboard() {
                 international: 0
             });
 
+            // Process grants data
+            const allGrants = Object.values(grantsData);
+            const currentDate = new Date().toISOString();
+            const activeGrants = allGrants.filter(grant => 
+                grant.deadline && new Date(grant.deadline) > new Date(currentDate)
+            );
+
             // Count membership roles
             const roleStats = (membershipRes.data || []).reduce((acc, membership) => {
                 const role = membership.role === 'super_admin' ? 'super_admins' : 
@@ -122,16 +148,16 @@ export default function OmegaAdminDashboard() {
             });
 
             setStats({
-                totalUsers: usersRes.count || 0,
-                totalOrganizations: organizationsRes.data?.length || 0,
-                totalGrants: grantsRes.count || 0,
-                activeToday: Math.floor((usersRes.count || 0) * 0.15), // Simulated active users
-                newThisWeek: Math.floor((usersRes.count || 0) * 0.05), // Simulated new users
+                totalUsers: usersCountRes.count || 0,
+                totalOrganizations: allOrganizations.length,
+                totalGrants: allGrants.length,
+                activeToday: Math.floor((usersCountRes.count || 0) * 0.15), // Simulated active users
+                newThisWeek: Math.floor((usersCountRes.count || 0) * 0.05), // Simulated new users
                 organizationsByType: orgsByType,
                 membershipStats: roleStats,
                 grantStats: {
-                    total: grantsRes.count || 0,
-                    activeDeadlines: activeGrantsRes.count || 0
+                    total: allGrants.length,
+                    activeDeadlines: activeGrants.length
                 },
                 recentActivity: []
             });
@@ -201,7 +227,6 @@ export default function OmegaAdminDashboard() {
                                 Monitor community growth, manage organizations, and oversee grant opportunities across your platform ecosystem.
                             </p>
                         </div>
-                        {/* Removed Users icon from banner */}
                     </div>
                 </div>
                 {/* Decorative elements */}

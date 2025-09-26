@@ -1,7 +1,8 @@
-// src/components/GrantsPortalPage.jsx
+// src/components/GrantsPortalPage.jsx - OPTIMIZED: All direct Supabase queries wrapped with API optimizer
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
+import { optimizedSupabaseQuery } from '../utils/apiRequestOptimizer'; // ✅ ADD THIS IMPORT
 import { hasPermission, PERMISSIONS } from '../utils/permissions.js';
 
 // Components
@@ -60,16 +61,21 @@ const GrantsPortalPage = () => {
         
         // Get user's organization membership if they have access
         if (canAccessPortal && session?.user?.id) {
-          const { data: membership } = await supabase
-            .from('organization_memberships')
-            .select(`
-              *,
-              organizations (*)
-            `)
-            .eq('user_id', session.user.id)
-            .eq('status', 'active')
-            .single();
+          // ✅ OPTIMIZED: Wrap organization_memberships query
+          const optimizedMembershipQuery = optimizedSupabaseQuery(
+            supabase
+              .from('organization_memberships')
+              .select(`
+                *,
+                organizations (*)
+              `)
+              .eq('user_id', session.user.id)
+              .eq('status', 'active'),
+            'organization_memberships_single',
+            { userIds: [session.user.id] }
+          );
           
+          const { data: membership } = await optimizedMembershipQuery.single();
           setUserMembership(membership);
         }
       } catch (error) {
@@ -83,7 +89,7 @@ const GrantsPortalPage = () => {
     checkAccess();
   }, [profile, session?.user?.id]);
 
-  // Load grants data
+  // Load grants data - ✅ CRITICAL FIX: This was causing 16 grants API calls
   useEffect(() => {
     const fetchGrants = async () => {
       if (!hasAccess) return;
@@ -91,10 +97,24 @@ const GrantsPortalPage = () => {
       setLoading(true);
       
       try {
-        const { data: grantsData, error: grantsError } = await supabase
-          .from('grants_with_taxonomy')
-          .select('*')
-          .order('id', { ascending: false });
+        // ✅ BEFORE (Direct query causing 16 grants API calls):
+        // const { data: grantsData, error: grantsError } = await supabase
+        //   .from('grants_with_taxonomy')
+        //   .select('*')
+        //   .order('id', { ascending: false });
+
+        // ✅ AFTER (Optimized with API optimizer):
+        const grantIds = []; // Could be populated with specific IDs if available
+        const optimizedGrantsQuery = optimizedSupabaseQuery(
+          supabase
+            .from('grants_with_taxonomy')
+            .select('*')
+            .order('id', { ascending: false }),
+          'grants_single',
+          { grantIds }
+        );
+        
+        const { data: grantsData, error: grantsError } = await optimizedGrantsQuery;
 
         if (grantsError) {
           console.error('Error fetching grants:', grantsError);
@@ -105,10 +125,17 @@ const GrantsPortalPage = () => {
           
           let orgsData = [];
           if (orgIds.length > 0) {
-            const { data: organizationsData } = await supabase
-              .from('organizations')
-              .select('id, name, image_url, banner_image_url, slug')
-              .in('id', orgIds);
+            // ✅ OPTIMIZED: Wrap organizations query
+            const optimizedOrgsQuery = optimizedSupabaseQuery(
+              supabase
+                .from('organizations')
+                .select('id, name, image_url, banner_image_url, slug')
+                .in('id', orgIds),
+              'organizations_single',
+              { orgIds }
+            );
+            
+            const { data: organizationsData } = await optimizedOrgsQuery;
             orgsData = organizationsData || [];
           }
 
@@ -141,7 +168,7 @@ const GrantsPortalPage = () => {
     fetchGrants();
   }, [hasAccess]);
 
-  // Load saved grants for current user
+  // Load saved grants for current user - ✅ OPTIMIZED: Wrap saved_grants query
   useEffect(() => {
     const loadSavedGrants = async () => {
       if (!session?.user?.id) {
@@ -150,11 +177,23 @@ const GrantsPortalPage = () => {
       }
 
       try {
-        const { data } = await supabase
-          .from('saved_grants')
-          .select('grant_id')
-          .eq('user_id', session.user.id);
+        // ✅ BEFORE (Direct query):
+        // const { data } = await supabase
+        //   .from('saved_grants')
+        //   .select('grant_id')
+        //   .eq('user_id', session.user.id);
 
+        // ✅ AFTER (Optimized):
+        const optimizedSavedQuery = optimizedSupabaseQuery(
+          supabase
+            .from('saved_grants')
+            .select('grant_id')
+            .eq('user_id', session.user.id),
+          'saved_grants_single',
+          { userId: session.user.id }
+        );
+        
+        const { data } = await optimizedSavedQuery;
         setSavedGrantIds(new Set(data?.map(sg => sg.grant_id) || []));
       } catch (error) {
         console.error('Error loading saved grants:', error);
@@ -176,11 +215,12 @@ const GrantsPortalPage = () => {
     setIsDetailModalOpen(false);
   }, []);
 
-  // Grant save/unsave handlers
+  // Grant save/unsave handlers - ✅ NOTE: Insert/Delete mutations don't need optimization
   const handleSaveGrant = useCallback(async (grantId) => {
     if (!session?.user?.id || !grantId) return;
 
     try {
+      // Mutations (INSERT/UPDATE/DELETE) don't need optimizer wrapping
       await supabase.from('saved_grants').insert({
         user_id: session.user.id,
         grant_id: grantId
@@ -197,6 +237,7 @@ const GrantsPortalPage = () => {
     if (!session?.user?.id || !grantId) return;
 
     try {
+      // Mutations (INSERT/UPDATE/DELETE) don't need optimizer wrapping
       await supabase
         .from('saved_grants')
         .delete()

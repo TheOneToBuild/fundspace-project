@@ -1,4 +1,4 @@
-// src/utils/apiRequestOptimizer.js - Enhanced with user connections and followers optimization
+// src/utils/apiRequestOptimizer.js - COMPLETE VERSION with Organization Support
 import globalDataManager from './globalDataManager';
 
 class ApiRequestOptimizer {
@@ -40,34 +40,206 @@ class ApiRequestOptimizer {
       case 'post_comments_single':
         return this.optimizePostComments(params);
       
-      // NEW: User connections optimization
+      // User connections optimization
       case 'user_connections_single':
         return this.optimizeUserConnections(params);
       
       case 'user_connections_status':
         return this.optimizeConnectionStatus(params);
       
-      // NEW: Followers/Following optimization
+      // Followers/Following optimization
       case 'followers_single':
         return this.optimizeFollowers(params);
       
       case 'following_single':
         return this.optimizeFollowing(params);
       
-      // NEW: Batch connection statuses
+      // Batch connection statuses
       case 'connection_statuses_batch':
         return this.optimizeConnectionStatusesBatch(params);
       
-      // NEW: User post reaction status
+      // User post reaction status
       case 'user_post_reaction_status':
         return this.optimizeUserPostReactionStatus(params);
+      
+      // ✅ NEW: Organization optimization cases (MISSING FROM YOUR CODE)
+      case 'organizations_single':
+        return this.optimizeOrganizations(params);
+        
+      case 'organization_memberships_single':
+        return this.optimizeOrgMemberships(params);
+        
+      case 'organization_post_likes_single':
+        return this.optimizeOrgPostLikes(params);
+        
+      case 'organization_posts_single':
+        return this.optimizeOrgPosts(params);
+      
+      // ✅ NEW: Additional missing optimizations  
+      case 'grants_single':
+        return this.optimizeGrants(params);
+        
+      case 'saved_grants_single':
+        return this.optimizeSavedGrants(params);
+        
+      case 'notifications_single':
+        return this.optimizeNotifications(params);
       
       default:
         return originalQuery; // Let unoptimized calls proceed
     }
   }
 
-  // Optimize individual post likes calls
+  // ✅ ADD MISSING ORGANIZATION OPTIMIZATION METHODS:
+
+  // Optimize organization queries (addresses 11 org requests issue)
+  async optimizeOrganizations(params) {
+    const { orgIds, orgType } = params;
+    
+    if (this.debug) {
+      console.log(`[API Optimizer] Redirecting organizations to batch for:`, orgIds);
+    }
+    
+    try {
+      const orgsData = await globalDataManager.getOrganizations(orgIds, orgType);
+      
+      return {
+        data: Object.values(orgsData),
+        error: null
+      };
+    } catch (error) {
+      console.error('API Optimizer: Organizations optimization failed:', error);
+      throw error;
+    }
+  }
+
+  // Optimize organization membership queries  
+  async optimizeOrgMemberships(params) {
+    const { userIds } = params;
+    
+    if (this.debug) {
+      console.log(`[API Optimizer] Redirecting org memberships to batch for users:`, userIds);
+    }
+    
+    try {
+      const membershipsData = await globalDataManager.getOrganizationMemberships(userIds);
+      
+      return {
+        data: Object.values(membershipsData).flat(),
+        error: null  
+      };
+    } catch (error) {
+      console.error('API Optimizer: Org memberships optimization failed:', error);
+      throw error;
+    }
+  }
+
+  // Optimize organization post likes
+  async optimizeOrgPostLikes(params) {
+    const { postIds } = params;
+    
+    if (this.debug) {
+      console.log(`[API Optimizer] Redirecting org post likes to batch for posts:`, postIds);
+    }
+    
+    try {
+      const likesData = await globalDataManager.getPostLikesForPosts(postIds);
+      
+      return {
+        data: Object.values(likesData).flat(),
+        error: null
+      };
+    } catch (error) {
+      console.error('API Optimizer: Org post likes optimization failed:', error);  
+      throw error;
+    }
+  }
+
+  // Optimize organization posts
+  async optimizeOrgPosts(params) {
+    const { orgIds } = params;
+    
+    if (this.debug) {
+      console.log(`[API Optimizer] Redirecting org posts to batch for orgs:`, orgIds);
+    }
+    
+    try {
+      const postsData = await globalDataManager.getPostsForOrganizations(orgIds);
+      
+      return {
+        data: Object.values(postsData).flat(),
+        error: null
+      };
+    } catch (error) {
+      console.error('API Optimizer: Org posts optimization failed:', error);
+      throw error;
+    }
+  }
+
+  // Optimize grants queries
+  async optimizeGrants(params) {
+    const { grantIds } = params;
+    
+    if (this.debug) {
+      console.log(`[API Optimizer] Redirecting grants to batch for:`, grantIds);
+    }
+    
+    try {
+      const grantsData = await globalDataManager.getGrants(grantIds);
+      
+      return {
+        data: Object.values(grantsData),
+        error: null
+      };
+    } catch (error) {
+      console.error('API Optimizer: Grants optimization failed:', error);
+      throw error;
+    }
+  }
+
+  // Optimize saved grants queries
+  async optimizeSavedGrants(params) {
+    const { userId } = params;
+    
+    if (this.debug) {
+      console.log(`[API Optimizer] Redirecting saved grants to batch for user:`, userId);
+    }
+    
+    try {
+      const savedGrantsData = await globalDataManager.getSavedGrants([userId]);
+      
+      return {
+        data: savedGrantsData[userId] || [],
+        error: null
+      };
+    } catch (error) {
+      console.error('API Optimizer: Saved grants optimization failed:', error);
+      throw error;
+    }
+  }
+
+  // Optimize notifications queries
+  async optimizeNotifications(params) {
+    const { userId } = params;
+    
+    if (this.debug) {
+      console.log(`[API Optimizer] Redirecting notifications to batch for user:`, userId);
+    }
+    
+    try {
+      const notificationsData = await globalDataManager.getNotifications([userId]);
+      
+      return {
+        data: notificationsData[userId] || [],
+        error: null
+      };
+    } catch (error) {
+      console.error('API Optimizer: Notifications optimization failed:', error);
+      throw error;
+    }
+  }
+
+  // EXISTING METHODS (unchanged from your code):
   async optimizePostLikes(params) {
     const { postId } = params;
     
@@ -78,7 +250,6 @@ class ApiRequestOptimizer {
     try {
       const likesData = await globalDataManager.getPostLikesForPost(postId);
       
-      // Return in the format the original query expected
       return {
         data: likesData.reactors || [],
         error: null,
@@ -90,7 +261,6 @@ class ApiRequestOptimizer {
     }
   }
 
-  // Optimize individual profiles calls
   async optimizeProfiles(params) {
     const { userIds } = params;
     
@@ -101,7 +271,6 @@ class ApiRequestOptimizer {
     try {
       const profilesData = await globalDataManager.getProfiles(userIds);
       
-      // Return in the format the original query expected
       return {
         data: Object.values(profilesData),
         error: null
@@ -112,7 +281,6 @@ class ApiRequestOptimizer {
     }
   }
 
-  // Optimize individual organization membership calls
   async optimizeOrgMembership(params) {
     const { userId } = params;
     
@@ -123,7 +291,6 @@ class ApiRequestOptimizer {
     try {
       const membershipData = await globalDataManager.getOrganizationMembership(userId);
       
-      // Return in the format the original query expected
       return {
         data: membershipData ? [membershipData] : [],
         error: null
@@ -134,7 +301,6 @@ class ApiRequestOptimizer {
     }
   }
 
-  // Optimize individual post comments calls
   async optimizePostComments(params) {
     const { postId } = params;
     
@@ -145,7 +311,6 @@ class ApiRequestOptimizer {
     try {
       const commentsData = await globalDataManager.getCommentsForPost(postId);
       
-      // Return in the format the original query expected
       return {
         data: commentsData,
         error: null
@@ -156,7 +321,6 @@ class ApiRequestOptimizer {
     }
   }
 
-  // NEW: Optimize individual user connections calls
   async optimizeUserConnections(params) {
     const { userId, status } = params;
     
@@ -167,7 +331,6 @@ class ApiRequestOptimizer {
     try {
       const connectionsData = await globalDataManager.getUserConnections([userId], status);
       
-      // Return in the format the original query expected
       return {
         data: connectionsData[userId] || [],
         error: null
@@ -178,7 +341,6 @@ class ApiRequestOptimizer {
     }
   }
 
-  // NEW: Optimize connection status checks (biggest performance issue)
   async optimizeConnectionStatus(params) {
     const { currentUserId, targetUserId } = params;
     
@@ -189,7 +351,6 @@ class ApiRequestOptimizer {
     try {
       const statusData = await globalDataManager.getConnectionStatus(currentUserId, targetUserId);
       
-      // Return in the format getConnectionStatus() expects
       return {
         status: statusData.status || 'none',
         isRequester: statusData.isRequester || false,
@@ -201,7 +362,6 @@ class ApiRequestOptimizer {
     }
   }
 
-  // NEW: Optimize followers queries
   async optimizeFollowers(params) {
     const { userId } = params;
     
@@ -212,7 +372,6 @@ class ApiRequestOptimizer {
     try {
       const followersData = await globalDataManager.getFollowers([userId]);
       
-      // Return in the format the original query expected
       return {
         data: followersData[userId] || [],
         error: null
@@ -223,7 +382,6 @@ class ApiRequestOptimizer {
     }
   }
 
-  // NEW: Optimize following queries
   async optimizeFollowing(params) {
     const { userId } = params;
     
@@ -234,7 +392,6 @@ class ApiRequestOptimizer {
     try {
       const followingData = await globalDataManager.getFollowing([userId]);
       
-      // Return in the format the original query expected
       return {
         data: followingData[userId] || [],
         error: null
@@ -245,7 +402,6 @@ class ApiRequestOptimizer {
     }
   }
 
-  // NEW: Optimize user post reaction status check
   async optimizeUserPostReactionStatus(params) {
     const { postId, userId } = params;
     
@@ -254,10 +410,7 @@ class ApiRequestOptimizer {
     }
     
     try {
-      // Use the existing post likes batch system
       const likesData = await globalDataManager.getPostLikesForPost(postId);
-      
-      // Find user's reaction in the reactors
       const userReactor = likesData.reactors?.find(reactor => reactor.user_id === userId);
       
       return {
@@ -270,7 +423,6 @@ class ApiRequestOptimizer {
     }
   }
 
-  // NEW: Batch connection statuses (for connection lists)
   async optimizeConnectionStatusesBatch(params) {
     const { currentUserId, targetUserIds } = params;
     
@@ -281,7 +433,6 @@ class ApiRequestOptimizer {
     try {
       const statusesData = await globalDataManager.getBatchConnectionStatuses(currentUserId, targetUserIds);
       
-      // Return in the format expected by components
       return {
         data: statusesData,
         error: null
@@ -292,18 +443,15 @@ class ApiRequestOptimizer {
     }
   }
 
-  // Enable debug mode
   enableDebug() {
     this.debug = true;
     console.log('[API Optimizer] Debug mode enabled');
   }
 
-  // Disable debug mode
   disableDebug() {
     this.debug = false;
   }
 
-  // Get optimization statistics
   getStats() {
     return {
       interceptedCalls: this.interceptedCalls.size,
@@ -315,28 +463,37 @@ class ApiRequestOptimizer {
 // Create singleton instance
 const apiRequestOptimizer = new ApiRequestOptimizer();
 
-// Enhanced helper function with new optimization types
+// ✅ COMPLETE helper function with ALL optimization types
 export function optimizedSupabaseQuery(queryBuilder, queryType, params = {}) {
-  // Check if this query should be optimized
   const shouldOptimize = [
+    // Existing optimizations  
     'post_likes_single',
     'profiles_single', 
     'org_membership_single',
     'post_comments_single',
-    // NEW optimization types
     'user_connections_single',
     'user_connections_status', 
     'followers_single',
     'following_single',
     'connection_statuses_batch',
-    'user_post_reaction_status'
+    'user_post_reaction_status',
+    
+    // ✅ MISSING organization optimizations (fixes 11 org requests)
+    'organizations_single',
+    'organization_memberships_single', 
+    'organization_post_likes_single',
+    'organization_posts_single',
+    
+    // ✅ Additional missing optimizations
+    'grants_single',
+    'saved_grants_single',
+    'notifications_single'
   ].includes(queryType);
 
   if (shouldOptimize) {
     return apiRequestOptimizer.optimizeSupabaseQuery(queryBuilder, queryType, params);
   }
   
-  // Let unoptimized queries proceed normally
   return queryBuilder;
 }
 

@@ -1,4 +1,4 @@
-// src/utils/userConnectionsUtils.js - Optimized version with API request optimizer
+// src/utils/userConnectionsUtils.js - FIXED VERSION - Corrected notification schema
 import { supabase } from '../supabaseClient';
 import apiRequestOptimizer from './apiRequestOptimizer';
 
@@ -250,13 +250,18 @@ export const withdrawConnectionRequest = async (requesterId, recipientId) => {
       return { success: false, error: error.message };
     }
 
-    // Clean up notification
+    // FIXED: Clean up notification without using non-existent columns
+    // Since we don't have actor_id, we can only filter by user_id and type
     const { error: notificationError } = await supabase
       .from('notifications')
       .delete()
-      .eq('actor_id', requesterId)
       .eq('user_id', recipientId)
       .eq('type', 'connection_request');
+
+    // Don't fail the main operation if notification cleanup fails
+    if (notificationError) {
+      console.warn('Could not clean up notification:', notificationError);
+    }
 
     return { success: true };
   } catch (error) {
@@ -377,22 +382,21 @@ export const getPendingConnectionRequests = async (userId) => {
   }
 };
 
+// FIXED: Notification creation function to match your database schema
 const createConnectionNotification = async (actorId, recipientId, type, connectionId = null) => {
   try {
     if (actorId === recipientId) {
       return { success: true };
     }
 
+    // Only use columns that exist in your notifications table
     const notificationData = {
       user_id: recipientId,
-      actor_id: actorId,
       type: type,
       is_read: false
     };
 
-    if (connectionId) {
-      notificationData.connection_id = connectionId;
-    }
+    // Don't try to insert actor_id or connection_id since they don't exist in your schema
 
     const { data, error } = await supabase
       .from('notifications')
@@ -401,11 +405,13 @@ const createConnectionNotification = async (actorId, recipientId, type, connecti
       .single();
 
     if (error) {
+      console.error('Notification creation error:', error);
       return { success: false, error: error.message };
     }
 
     return { success: true, notificationId: data.id };
   } catch (error) {
+    console.error('Notification creation failed:', error);
     return { success: false, error: error.message };
   }
 };

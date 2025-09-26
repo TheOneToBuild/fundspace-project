@@ -1,4 +1,4 @@
-// src/components/DashboardHeader.jsx - FIXED VERSION - Complete with all existing features
+// src/components/DashboardHeader.jsx - OPTIMIZED VERSION - Wrap all direct queries
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { 
@@ -6,6 +6,7 @@ import {
   Globe, Handshake, Users, Building, Settings, FileText, Crown, MapPin
 } from 'lucide-react';
 import { supabase } from '../supabaseClient';
+import { optimizedSupabaseQuery } from '../utils/apiRequestOptimizer'; // ✅ ADD THIS IMPORT
 import GlobalSearch from './GlobalSearch.jsx';
 import headerLogoImage from '../assets/fundspace-logo2.png';
 import { isPlatformAdmin } from '../utils/permissions.js';
@@ -47,25 +48,46 @@ export default function DashboardHeader({ profile }) {
     const omegaMenuRef = useRef(null);
     const mobileMenuRef = useRef(null);
     
-    // ✅ Add request deduplication
     const deduplicate = useRequestDeduplication();
     
-    // ✅ Add subscription tracking to prevent duplicates
     const activeSubscriptions = useRef(new Set());
     const notificationRefreshTimeoutRef = useRef(null);
     
     const isOmegaAdmin = isPlatformAdmin(profile?.is_omega_admin);
 
-    // ✅ FIXED - Only profile.id dependency, add deduplication
+    // ✅ CRITICAL FIX: Wrap all direct Supabase queries with optimizer
     const fetchProfileStats = useCallback(async () => {
         if (!profile?.id) return;
         
         return deduplicate(`profile-stats-${profile.id}`, async () => {
             try {
+                // ✅ BEFORE (Direct queries causing user_connections bottleneck):
+                // const [followersRes, followingRes, connectionsRes] = await Promise.all([
+                //     supabase.from('followers').select('id').eq('following_id', profile.id),
+                //     supabase.from('followers').select('id').eq('follower_id', profile.id),
+                //     supabase.from('user_connections').select('id').or(`requester_id.eq.${profile.id},recipient_id.eq.${profile.id}`).eq('status', 'accepted')
+                // ]);
+
+                // ✅ AFTER (Optimized with API optimizer):
                 const [followersRes, followingRes, connectionsRes] = await Promise.all([
-                    supabase.from('followers').select('id').eq('following_id', profile.id),
-                    supabase.from('followers').select('id').eq('follower_id', profile.id),
-                    supabase.from('user_connections').select('id').or(`requester_id.eq.${profile.id},recipient_id.eq.${profile.id}`).eq('status', 'accepted')
+                    // Optimize followers query
+                    optimizedSupabaseQuery(
+                        supabase.from('followers').select('id').eq('following_id', profile.id),
+                        'followers_single',
+                        { userId: profile.id }
+                    ),
+                    // Optimize following query  
+                    optimizedSupabaseQuery(
+                        supabase.from('followers').select('id').eq('follower_id', profile.id),
+                        'following_single',
+                        { userId: profile.id }
+                    ),
+                    // Optimize user connections query
+                    optimizedSupabaseQuery(
+                        supabase.from('user_connections').select('id').or(`requester_id.eq.${profile.id},recipient_id.eq.${profile.id}`).eq('status', 'accepted'),
+                        'user_connections_single',
+                        { userId: profile.id, status: 'accepted' }
+                    )
                 ]);
 
                 setStats({
@@ -79,17 +101,30 @@ export default function DashboardHeader({ profile }) {
         });
     }, [profile?.id, deduplicate]);
 
-    // ✅ FIXED - Add deduplication
+    // ✅ CRITICAL FIX: Wrap notifications query with optimizer
     const fetchNotificationStats = useCallback(async () => {
         if (!profile?.id) return;
         
         return deduplicate(`notifications-${profile.id}`, async () => {
             try {
-                const { count, error } = await supabase
-                    .from('notifications')
-                    .select('id', { count: 'exact', head: true })
-                    .eq('user_id', profile.id)
-                    .eq('is_read', false);
+                // ✅ BEFORE (Direct query):
+                // const { count, error } = await supabase
+                //     .from('notifications')
+                //     .select('id', { count: 'exact', head: true })
+                //     .eq('user_id', profile.id)
+                //     .eq('is_read', false);
+
+                // ✅ AFTER (Optimized):
+                const optimizedQuery = optimizedSupabaseQuery(
+                    supabase
+                        .from('notifications')
+                        .select('id', { count: 'exact', head: true })
+                        .eq('user_id', profile.id)
+                        .eq('is_read', false),
+                    'notifications_single',
+                    { userId: profile.id }
+                );
+                const { count, error } = await optimizedQuery;
                 
                 if (!error) {
                     setUnreadNotifications(count || 0);
@@ -100,17 +135,30 @@ export default function DashboardHeader({ profile }) {
         });
     }, [profile?.id, deduplicate]);
 
-    // ✅ FIXED - Add deduplication
+    // ✅ CRITICAL FIX: Wrap organization membership query with optimizer
     const checkOrganizationAccess = useCallback(async () => {
         if (!profile?.id) return;
         
         return deduplicate(`org-access-${profile.id}`, async () => {
             try {
-                const { data } = await supabase
-                    .from('organization_memberships')
-                    .select('id')
-                    .eq('profile_id', profile.id)
-                    .limit(1);
+                // ✅ BEFORE (Direct query):
+                // const { data } = await supabase
+                //     .from('organization_memberships')
+                //     .select('id')
+                //     .eq('profile_id', profile.id)
+                //     .limit(1);
+
+                // ✅ AFTER (Optimized):
+                const optimizedQuery = optimizedSupabaseQuery(
+                    supabase
+                        .from('organization_memberships')
+                        .select('id')
+                        .eq('profile_id', profile.id)
+                        .limit(1),
+                    'organization_memberships_single',
+                    { userIds: [profile.id] }
+                );
+                const { data } = await optimizedQuery;
                 
                 setHasOrganizationAccess(data && data.length > 0);
             } catch (error) {
@@ -120,7 +168,7 @@ export default function DashboardHeader({ profile }) {
         });
     }, [profile?.id, deduplicate]);
 
-    // ✅ FIXED - Only call when profile.id changes, not on every callback change
+    // Only call when profile.id changes, not on every callback change
     useEffect(() => {
         if (profile?.id) {
             fetchProfileStats();
@@ -129,7 +177,7 @@ export default function DashboardHeader({ profile }) {
         }
     }, [profile?.id]); // Remove the callback dependencies that cause infinite loops
 
-    // ✅ FIXED - Improved subscription with deduplication and debouncing
+    // Improved subscription with deduplication and debouncing
     useEffect(() => {
         if (!profile?.id) return;
 
@@ -152,7 +200,7 @@ export default function DashboardHeader({ profile }) {
                     filter: `user_id=eq.${profile.id}`
                 }, 
                 () => {
-                    // ✅ Debounce to prevent rapid fire requests
+                    // Debounce to prevent rapid fire requests
                     if (notificationRefreshTimeoutRef.current) {
                         clearTimeout(notificationRefreshTimeoutRef.current);
                     }
@@ -198,7 +246,7 @@ export default function DashboardHeader({ profile }) {
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
-    // ✅ Cleanup timeouts on unmount
+    // Cleanup timeouts on unmount
     useEffect(() => {
         return () => {
             if (notificationRefreshTimeoutRef.current) {
@@ -511,7 +559,7 @@ export default function DashboardHeader({ profile }) {
                 </div>
             </header>
 
-            {/* Mobile Menu Overlay */}
+            {/* Mobile Menu Overlay - Rest of component unchanged for brevity */}
             {isMobileMenuOpen && (
                 <div className="fixed inset-0 z-40 lg:hidden">
                     <div className="fixed inset-0 bg-black bg-opacity-25" onClick={closeMobileMenu}></div>
@@ -520,7 +568,7 @@ export default function DashboardHeader({ profile }) {
                         ref={mobileMenuRef}
                         className="fixed top-0 right-0 bottom-0 w-64 bg-white shadow-xl transform transition-transform duration-300 ease-in-out overflow-y-auto"
                     >
-                        {/* Header */}
+                        {/* Mobile menu content - unchanged for brevity */}
                         <div className="flex items-center justify-between p-4 border-b border-slate-200">
                             <span className="text-lg font-semibold text-slate-900">Menu</span>
                             <button
@@ -531,7 +579,6 @@ export default function DashboardHeader({ profile }) {
                             </button>
                         </div>
 
-                        {/* User Info */}
                         <div className="p-4 border-b border-slate-200">
                             <div className="flex items-center space-x-3">
                                 <div className="relative">
@@ -568,7 +615,6 @@ export default function DashboardHeader({ profile }) {
                                     </p>
                                 </div>
                             </div>
-                            {/* Stats in mobile */}
                             <div className="flex justify-between mt-3 pt-3 border-t border-slate-100 text-xs text-slate-500">
                                 <span>{stats.connectionsCount} Connections</span>
                                 <span>{stats.followersCount} Followers</span>
@@ -576,7 +622,6 @@ export default function DashboardHeader({ profile }) {
                             </div>
                         </div>
 
-                        {/* Mobile Navigation */}
                         <div className="p-4 space-y-2">
                             {mainNavItems.map((item) => {
                                 if (item.hide) return null;
