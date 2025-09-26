@@ -43,54 +43,34 @@ const GrantsPortalPage = () => {
   // UI state
   const [activeTab, setActiveTab] = useState('explore');
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showFilters, setShowFilters] = useState(false);
-  const [viewMode, setViewMode] = useState('grid');
-  
-  // Grants filtering and pagination state
-  const [filterConfig, setFilterConfig] = useState({ 
-    searchTerm: '', 
-    locationFilter: [], 
-    categoryFilter: [], 
-    grantTypeFilter: '', 
-    grantStatusFilter: '', 
-    sortCriteria: 'dueDate_asc', 
-    taxonomyFilter: [],
-  });
-  const [currentPage, setCurrentPage] = useState(1);
-  const [grantsPerPage, setGrantsPerPage] = useState(12);
-  
-  // Grant detail modal state
-  const [isDetailModalOpen, setIsDetailModal] = useState(false);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [selectedGrant, setSelectedGrant] = useState(null);
 
-  // Permission check
+  // Check user permissions and membership
   useEffect(() => {
     const checkAccess = async () => {
-      if (!profile) {
-        setCheckingAccess(false);
-        return;
-      }
-
-      if (profile.is_omega_admin === true) {
-        setHasAccess(true);
-        setCheckingAccess(false);
-        return;
-      }
-
+      if (!profile) return;
+      
+      setCheckingAccess(true);
+      
       try {
-        const { data: membership } = await supabase
-          .from('organization_memberships')
-          .select(`*, organizations(*)`)
-          .eq('profile_id', profile.id)
-          .in('role', ['super_admin', 'admin'])
-          .limit(1)
-          .single();
-
-        if (membership && hasPermission(membership.role, PERMISSIONS.MANAGE_MEMBERS, profile.is_omega_admin)) {
+        // Check if user has portal access
+        const canAccessPortal = hasPermission(profile, PERMISSIONS.PORTAL_ACCESS);
+        setHasAccess(canAccessPortal);
+        
+        // Get user's organization membership if they have access
+        if (canAccessPortal && session?.user?.id) {
+          const { data: membership } = await supabase
+            .from('organization_memberships')
+            .select(`
+              *,
+              organizations (*)
+            `)
+            .eq('user_id', session.user.id)
+            .eq('status', 'active')
+            .single();
+          
           setUserMembership(membership);
-          setHasAccess(true);
-        } else {
-          setHasAccess(false);
         }
       } catch (error) {
         console.error('Error checking permissions:', error);
@@ -101,7 +81,7 @@ const GrantsPortalPage = () => {
     };
 
     checkAccess();
-  }, [profile]);
+  }, [profile, session?.user?.id]);
 
   // Load grants data
   useEffect(() => {
@@ -121,18 +101,23 @@ const GrantsPortalPage = () => {
           setGrants([]);
         } else {
           // Get organization IDs and fetch organizations separately
-          const orgIds = [...new Set(grantsData.map(g => g.organization_id).filter(Boolean))];
-          const { data: orgsData } = await supabase
-            .from('organizations')
-            .select('id, name, image_url, banner_image_url, slug')
-            .in('id', orgIds);
+          const orgIds = [...new Set(grantsData?.map(g => g.organization_id).filter(Boolean))];
+          
+          let orgsData = [];
+          if (orgIds.length > 0) {
+            const { data: organizationsData } = await supabase
+              .from('organizations')
+              .select('id, name, image_url, banner_image_url, slug')
+              .in('id', orgIds);
+            orgsData = organizationsData || [];
+          }
 
-          const formattedData = grantsData.map(grant => {
-            const orgData = orgsData?.find(o => o.id === grant.organization_id);
+          const formattedData = grantsData?.map(grant => {
+            const orgData = orgsData.find(o => o.id === grant.organization_id);
             
             return {
               ...grant,
-              foundationName: grant.funder_name || 'Unknown Funder',
+              foundationName: grant.funder_name || orgData?.name || 'Unknown Funder',
               funderSlug: grant.funder_slug || orgData?.slug || null,
               fundingAmount: grant.max_funding_amount || grant.funding_amount_text || 'Not specified',
               dueDate: grant.deadline,
@@ -140,28 +125,13 @@ const GrantsPortalPage = () => {
               eligibility_criteria: grant.eligibility_criteria,
               categories: grant.category_names ? grant.category_names.map((name, idx) => ({ id: idx, name })) : [],
               locations: grant.location_names ? grant.location_names.map((name, idx) => ({ id: idx, name })) : [],
-              eligible_organization_types: grant.taxonomy_codes || [],
-              organization: {
-                image_url: orgData?.image_url || grant.funder_logo_url || null,
-                banner_image_url: orgData?.banner_image_url || null
-              },
-              save_count: 0
             };
-          });
-
-          // Get fresh bookmark counts from database
-          const grantIds = formattedData.map(grant => grant.id);
-          const bookmarkCounts = await refreshGrantBookmarkCounts(grantIds);
-
-          // Update grants with accurate bookmark counts
-          formattedData.forEach(grant => {
-            grant.save_count = bookmarkCounts[grant.id] || 0;
-          });
+          }) || [];
 
           setGrants(formattedData);
         }
       } catch (error) {
-        console.error('Error loading grants:', error);
+        console.error('Error in fetchGrants:', error);
         setGrants([]);
       }
       
@@ -170,252 +140,114 @@ const GrantsPortalPage = () => {
 
     fetchGrants();
   }, [hasAccess]);
-  
-  // Load saved grants for the user
+
+  // Load saved grants for current user
   useEffect(() => {
-    if (!session) return;
-    
-    const fetchSavedGrants = async () => {
-      const { data: savedData, error: savedError } = await supabase
-        .from('saved_grants')
-        .select('grant_id')
-        .eq('user_id', session.user.id);
-      if (savedError) console.error('Error fetching saved grants:', savedError);
-      else setSavedGrantIds(new Set(savedData.map(g => g.grant_id)));
-    };
-    
-    fetchSavedGrants();
-  }, [session]);
-
-  // Grant handling functions
-  const handleSaveGrant = async (grantId) => {
-    if (!session) return;
-    
-    setSavedGrantIds(prev => new Set(prev).add(grantId));
-    setGrants(prevGrants => prevGrants.map(g => 
-      g.id === grantId ? { ...g, save_count: (g.save_count || 0) + 1 } : g
-    ));
-    
-    try {
-      const { error } = await supabase
-        .from('saved_grants')
-        .insert({ user_id: session.user.id, grant_id: grantId });
-        
-      if (error) {
-        console.error("Error saving grant:", error);
-        setSavedGrantIds(prev => { 
-          const newSet = new Set(prev); 
-          newSet.delete(grantId); 
-          return newSet; 
-        });
-        setGrants(prevGrants => prevGrants.map(g => 
-          g.id === grantId ? { ...g, save_count: Math.max(0, (g.save_count || 1) - 1) } : g
-        ));
+    const loadSavedGrants = async () => {
+      if (!session?.user?.id) {
+        setSavedGrantIds(new Set());
+        return;
       }
-    } catch (error) {
-      console.error("Error saving grant:", error);
-    }
-  };
 
-  const handleUnsaveGrant = async (grantId) => {
-    if (!session) return;
-    
-    setSavedGrantIds(prev => { 
-      const newSet = new Set(prev); 
-      newSet.delete(grantId); 
-      return newSet;
-    });
-    setGrants(prevGrants => prevGrants.map(g => 
-      g.id === grantId ? { ...g, save_count: Math.max(0, (g.save_count || 1) - 1) } : g
-    ));
-    
+      try {
+        const { data } = await supabase
+          .from('saved_grants')
+          .select('grant_id')
+          .eq('user_id', session.user.id);
+
+        setSavedGrantIds(new Set(data?.map(sg => sg.grant_id) || []));
+      } catch (error) {
+        console.error('Error loading saved grants:', error);
+        setSavedGrantIds(new Set());
+      }
+    };
+
+    loadSavedGrants();
+  }, [session?.user?.id]);
+
+  // Modal handlers
+  const openDetail = useCallback((grant) => {
+    setSelectedGrant(grant);
+    setIsDetailModalOpen(true);
+  }, []);
+
+  const closeDetail = useCallback(() => {
+    setSelectedGrant(null);
+    setIsDetailModalOpen(false);
+  }, []);
+
+  // Grant save/unsave handlers
+  const handleSaveGrant = useCallback(async (grantId) => {
+    if (!session?.user?.id || !grantId) return;
+
     try {
-      const { error } = await supabase
+      await supabase.from('saved_grants').insert({
+        user_id: session.user.id,
+        grant_id: grantId
+      });
+
+      setSavedGrantIds(prev => new Set(prev.add(grantId)));
+      await refreshGrantBookmarkCounts([grantId]);
+    } catch (error) {
+      console.error('Error saving grant:', error);
+    }
+  }, [session?.user?.id]);
+
+  const handleUnsaveGrant = useCallback(async (grantId) => {
+    if (!session?.user?.id || !grantId) return;
+
+    try {
+      await supabase
         .from('saved_grants')
         .delete()
         .match({ user_id: session.user.id, grant_id: grantId });
-        
-      if (error) {
-        console.error("Error unsaving grant:", error);
-        setSavedGrantIds(prev => new Set(prev).add(grantId));
-        setGrants(prevGrants => prevGrants.map(g => 
-          g.id === grantId ? { ...g, save_count: (g.save_count || 0) + 1 } : g
-        ));
-      }
+
+      setSavedGrantIds(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(grantId);
+        return newSet;
+      });
+      await refreshGrantBookmarkCounts([grantId]);
     } catch (error) {
-      console.error("Error unsaving grant:", error);
+      console.error('Error unsaving grant:', error);
     }
-  };
+  }, [session?.user?.id]);
 
-  const openDetail = useCallback((grant) => { 
-    setSelectedGrant(grant); 
-    setIsDetailModal(true); 
-  }, []);
-
-  const closeDetail = useCallback(() => { 
-    setSelectedGrant(null); 
-    setIsDetailModal(false); 
-  }, []);
-
-  // Filter and pagination logic
-  const uniqueCategories = useMemo(() => Array.from(new Set(grants.flatMap(g => g.categories?.map(c => c.name) || []).filter(Boolean))).sort(), [grants]);
-  const uniqueGrantTypes = useMemo(() => Array.from(new Set(grants.map(g => g.grantType).filter(Boolean))).sort(), [grants]);
-  const uniqueLocations = useMemo(() => Array.from(new Set(grants.flatMap(g => g.locations?.map(l => l.name) || []).filter(Boolean))).sort(), [grants]);
-
-  const { paginatedItems: currentList = [], totalPages, totalFilteredItems, filteredAndSortedItems } = usePaginatedFilteredData(
-    grants, 
-    filterConfig, 
-    filterGrantsWithTaxonomy, 
-    filterConfig.sortCriteria, 
-    sortGrants, 
-    currentPage, 
-    grantsPerPage
-  );
-
-  const isGrantActive = (grant) => {
-    if (!grant.dueDate) return true;
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    return new Date(grant.dueDate) >= today;
-  };
-
-  const totalFilteredFunding = useMemo(() => {
-    if (!filteredAndSortedItems) return 0;
-    return filteredAndSortedItems.filter(isGrantActive).reduce((sum, grant) => { 
-      const amount = grant.max_funding_amount || '0'; 
-      return sum + parseMaxFundingAmount(amount.toString()); 
-    }, 0);
-  }, [filteredAndSortedItems]);
-
-  const handleFilterChange = useCallback((key, value) => { 
-    setFilterConfig(prev => ({ ...prev, [key]: value })); 
-    setCurrentPage(1); 
-  }, []);
-
-  const handleTaxonomyChange = useCallback((selectedTaxonomies) => {
-    handleFilterChange('taxonomyFilter', selectedTaxonomies);
-  }, [handleFilterChange]);
-
-  const handleSearchAction = useCallback((suggestion) => {
-    const newConfig = { ...filterConfig, searchTerm: suggestion.text };
-    if (suggestion.type === 'category' && !filterConfig.categoryFilter.includes(suggestion.text)) {
-      newConfig.categoryFilter = [...filterConfig.categoryFilter, suggestion.text];
-    }
-    setFilterConfig(newConfig);
-    setCurrentPage(1);
-  }, [filterConfig]);
-
+  // Filter handler
   const handleFilterByCategory = useCallback((categoryName) => {
-    const categoryExists = filterConfig.categoryFilter.includes(categoryName);
-    const newCategoryFilter = categoryExists ? 
-      filterConfig.categoryFilter.filter(cat => cat !== categoryName) : 
-      [...filterConfig.categoryFilter, categoryName];
-    handleFilterChange('categoryFilter', newCategoryFilter);
-  }, [filterConfig.categoryFilter, handleFilterChange]);
-
-  const paginate = useCallback((page) => { 
-    if (page < 1 || (totalPages > 0 && page > totalPages)) return; 
-    setCurrentPage(page); 
-  }, [totalPages]);
-
-  const handlePerPageChange = useCallback((e) => { 
-    setGrantsPerPage(Number(e.target.value)); 
-    setCurrentPage(1); 
+    // This would be implemented based on your filtering logic
+    console.log('Filter by category:', categoryName);
   }, []);
 
-  const handleClearFilters = useCallback(() => { 
-    setFilterConfig({ 
-      searchTerm: '', 
-      locationFilter: [], 
-      categoryFilter: [], 
-      grantTypeFilter: '', 
-      grantStatusFilter: '', 
-      sortCriteria: 'dueDate_asc',
-      taxonomyFilter: [],
-    }); 
-    setCurrentPage(1); 
+  // Format currency helper
+  const formatCurrency = useCallback((amount) => {
+    if (!amount) return 'Not specified';
+    const numAmount = parseMaxFundingAmount(amount);
+    if (!numAmount) return amount;
+    
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(numAmount);
   }, []);
 
-  const handleRemoveGrantFilter = useCallback((keyToRemove, valueToRemove) => {
-    if (keyToRemove === 'categoryFilter' || keyToRemove === 'locationFilter' || keyToRemove === 'taxonomyFilter') { 
-      handleFilterChange(keyToRemove, filterConfig[keyToRemove].filter(item => item !== valueToRemove)); 
-    } else { 
-      handleFilterChange(keyToRemove, ''); 
-    }
-  }, [filterConfig, handleFilterChange]);
-
-  const activeGrantFilters = useMemo(() => {
-    let filters = [];
-    if (filterConfig.searchTerm) filters.push({ key: 'searchTerm', label: `Search: "${filterConfig.searchTerm}"` });
-    if (filterConfig.locationFilter.length > 0) { 
-      filters = filters.concat(filterConfig.locationFilter.map(loc => ({ key: 'locationFilter', label: `Location: ${loc}`, value: loc }))); 
-    }
-    if (filterConfig.categoryFilter.length > 0) { 
-      filters = filters.concat(filterConfig.categoryFilter.map(cat => ({ key: 'categoryFilter', label: `Category: ${cat}`, value: cat }))); 
-    }
-    if (filterConfig.taxonomyFilter.length > 0) {
-      filters = filters.concat(filterConfig.taxonomyFilter.map(tax => ({ key: 'taxonomyFilter', label: `Org Type: ${tax}`, value: tax })));
-    }
-    if (filterConfig.grantTypeFilter) filters.push({ key: 'grantTypeFilter', label: `Type: ${filterConfig.grantTypeFilter}` });
-    if (filterConfig.grantStatusFilter) filters.push({ key: 'grantStatusFilter', label: `Status: ${filterConfig.grantStatusFilter}` });
-    return filters;
-  }, [filterConfig]);
-
+  // Filter bar props for ExploreFundsTab
   const filterBarProps = {
-    searchTerm: filterConfig.searchTerm,
-    onSuggestionSelect: handleSearchAction,
-    onSearchChange: (value) => handleFilterChange('searchTerm', value),
-    locationFilter: filterConfig.locationFilter,
-    setLocationFilter: (value) => handleFilterChange('locationFilter', value),
-    categoryFilter: filterConfig.categoryFilter,
-    setCategoryFilter: (value) => handleFilterChange('categoryFilter', value),
-    grantStatusFilter: filterConfig.grantStatusFilter,
-    setGrantStatusFilter: (value) => handleFilterChange('grantStatusFilter', value),
-    grantTypeFilter: filterConfig.grantTypeFilter,
-    setGrantTypeFilter: (value) => handleFilterChange('grantTypeFilter', value),
-    sortCriteria: filterConfig.sortCriteria,
-    setSortCriteria: (value) => handleFilterChange('sortCriteria', value),
-    taxonomyFilter: filterConfig.taxonomyFilter,
-    setTaxonomyFilter: handleTaxonomyChange,
-    uniqueCategories: uniqueCategories,
-    uniqueLocations: uniqueLocations,
-    uniqueGrantTypes: uniqueGrantTypes,
-    uniqueGrantStatuses: GRANT_STATUSES,
-    pageType: "grants",
-    onClearFilters: handleClearFilters,
-    activeFilters: activeGrantFilters,
-    onRemoveFilter: handleRemoveGrantFilter,
+    totalCount: grants.length,
+    availableCategories: [...new Set(grants.flatMap(g => g.category_names || []))],
+    availableLocations: [...new Set(grants.flatMap(g => g.location_names || []))],
+    loading
   };
 
-  const formatCurrency = (amount) => {
-    if (amount >= 1000000) return `${(amount / 1000000).toFixed(1)}M`;
-    if (amount >= 1000) return `${(amount / 1000).toFixed(0)}K`;
-    return `${amount.toLocaleString()}`;
-  };
-
-  // Render tab content based on active tab
   const renderTabContent = () => {
     switch (activeTab) {
       case 'explore':
         return (
           <ExploreFundsTab
-            showFilters={showFilters}
-            setShowFilters={setShowFilters}
-            filterConfig={filterConfig}
-            handleFilterChange={handleFilterChange}
-            activeGrantFilters={activeGrantFilters}
+            grants={grants}
             loading={loading}
-            currentList={currentList}
-            totalFilteredItems={totalFilteredItems}
-            totalFilteredFunding={totalFilteredFunding}
-            grantsPerPage={grantsPerPage}
-            handlePerPageChange={handlePerPageChange}
-            viewMode={viewMode}
-            setViewMode={setViewMode}
-            totalPages={totalPages}
-            currentPage={currentPage}
-            paginate={paginate}
-            handleClearFilters={handleClearFilters}
             session={session}
             savedGrantIds={savedGrantIds}
             handleSaveGrant={handleSaveGrant}

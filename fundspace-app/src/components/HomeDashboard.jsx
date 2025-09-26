@@ -159,73 +159,71 @@ const useTrendingPosts = () => {
     return trendingPosts;
 };
 
-// ✅ FIXED: Removed problematic grant_opportunities query
+// FIXED: Corrected all database column references
 const useTrendingGrants = () => {
     const [trendingGrants, setTrendingGrants] = useState([]);
 
     useEffect(() => {
         const fetchTrendingGrants = async () => {
             try {
-                let grantsData, grantsError;
-                
-                // ✅ REMOVED: No more is_active query
-                const { data: grantsWithOrgs, error: orgsError } = await supabase
+                // FIXED: Use 'id' for ordering instead of non-existent 'created_at'
+                const { data: grantsData, error: grantsError } = await supabase
                     .from('grants')
-                    .select(`
-                        *,
-                        organizations!inner (
-                            id,
-                            name,
-                            image_url,
-                            banner_image_url,
-                            slug
-                        )
-                    `)
-                    .order('created_at', { ascending: false })
+                    .select('*')
+                    .order('id', { ascending: false })  // Changed from 'created_at' to 'id'
                     .limit(15);
                 
-                if (orgsError) {
-                    const { data: grantsOnly, error: grantsOnlyError } = await supabase
-                        .from('grants')
-                        .select('*')
-                        .order('created_at', { ascending: false })
-                        .limit(15);
-                    grantsData = grantsOnly;
-                    grantsError = grantsOnlyError;
-                } else {
-                    grantsData = grantsWithOrgs;
-                    grantsError = orgsError;
-                }
-
-                if (grantsError || !grantsData || grantsData.length === 0) {
+                if (grantsError) {
+                    console.error('Error fetching grants:', grantsError);
                     setTrendingGrants([]);
                     return;
                 }
 
-                const processedGrants = grantsData.map(grant => ({
-                    id: grant.id,
-                    title: grant.title || 'Untitled Grant',
-                    description: grant.description || 'No description available',
-                    foundation_name: grant.organizations?.name || grant.foundation_name || grant.funder_name || grant.organization_name || 'Unknown Foundation',
-                    funder_name: grant.organizations?.name || grant.funder_name || grant.foundation_name || grant.organization_name || 'Unknown Foundation',
-                    funding_amount_text: grant.funding_amount_text || grant.amount || 'Amount varies',
-                    max_funding_amount: grant.max_funding_amount || grant.funding_amount || null,
-                    due_date: grant.due_date || grant.deadline || null,
-                    deadline: grant.deadline || grant.due_date || null,
-                    location: grant.location || grant.geographic_focus || 'Location varies',
-                    grant_type: grant.grant_type || grant.type || null,
-                    created_at: grant.created_at,
-                    save_count: 0,
-                    application_url: grant.application_url || grant.url || grant.website_url || '#',
-                    url: grant.url || grant.application_url || grant.website_url || '#',
-                    eligible_organization_types: grant.eligible_organization_types || grant.taxonomy_codes || [],
-                    organization: {
-                        name: grant.organizations?.name || grant.foundation_name || grant.funder_name || grant.organization_name || 'Unknown Foundation',
-                        image_url: grant.organizations?.image_url || grant.funder_logo_url || null,
-                        banner_image_url: grant.organizations?.banner_image_url || null
-                    },
-                    funder_logo_url: grant.funder_logo_url || grant.organizations?.image_url || null
-                }));
+                if (!grantsData || grantsData.length === 0) {
+                    setTrendingGrants([]);
+                    return;
+                }
+
+                // Get organization IDs and fetch organizations separately
+                const orgIds = [...new Set(grantsData.map(g => g.organization_id).filter(Boolean))];
+                
+                let orgsData = [];
+                if (orgIds.length > 0) {
+                    const { data: organizationsData } = await supabase
+                        .from('organizations')
+                        .select('id, name, image_url, banner_image_url, slug')
+                        .in('id', orgIds);
+                    orgsData = organizationsData || [];
+                }
+
+                const processedGrants = grantsData.map(grant => {
+                    const orgData = orgsData.find(o => o.id === grant.organization_id);
+                    
+                    return {
+                        id: grant.id,
+                        title: grant.title || 'Untitled Grant',
+                        description: grant.description || 'No description available',
+                        foundation_name: orgData?.name || grant.foundation_name || grant.funder_name || grant.organization_name || 'Unknown Foundation',
+                        funder_name: orgData?.name || grant.funder_name || grant.foundation_name || grant.organization_name || 'Unknown Foundation',
+                        funding_amount_text: grant.funding_amount_text || grant.amount || 'Amount varies',
+                        max_funding_amount: grant.max_funding_amount || grant.funding_amount || null,
+                        due_date: grant.due_date || grant.deadline || null,
+                        deadline: grant.deadline || grant.due_date || null,
+                        location: grant.location || grant.geographic_focus || 'Location varies',
+                        grant_type: grant.grant_type || grant.type || null,
+                        created_at: grant.date_added || grant.last_updated || new Date().toISOString(),  // FIXED: Use existing fields
+                        save_count: 0,
+                        application_url: grant.application_url || grant.url || grant.website_url || '#',
+                        url: grant.url || grant.application_url || grant.website_url || '#',
+                        eligible_organization_types: grant.eligible_organization_types || grant.taxonomy_codes || [],
+                        organization: {
+                            name: orgData?.name || grant.foundation_name || grant.funder_name || grant.organization_name || 'Unknown Foundation',
+                            image_url: orgData?.image_url || grant.funder_logo_url || null,
+                            banner_image_url: orgData?.banner_image_url || null
+                        },
+                        funder_logo_url: grant.funder_logo_url || orgData?.image_url || null
+                    };
+                });
 
                 try {
                     const grantIds = processedGrants.map(grant => grant.id);
@@ -248,15 +246,16 @@ const useTrendingGrants = () => {
                             if (b.save_count !== a.save_count) {
                                 return b.save_count - a.save_count;
                             }
-                            return new Date(b.created_at) - new Date(a.created_at);
+                            return b.id - a.id;  // FIXED: Use id instead of created_at
                         });
                     }
                 } catch {
-                    processedGrants.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+                    processedGrants.sort((a, b) => b.id - a.id);  // FIXED: Use id instead of created_at
                 }
 
                 setTrendingGrants(processedGrants.slice(0, 10));
-            } catch {
+            } catch (error) {
+                console.error('Error fetching trending grants:', error);
                 setTrendingGrants([]);
             }
         };
@@ -553,4 +552,3 @@ export default function HomeDashboard() {
         </div>
     );
 }
-                

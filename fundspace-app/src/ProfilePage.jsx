@@ -80,7 +80,7 @@ export default function ProfilePage() {
 
       const [
         { data: savedGrantsData },
-        { data: trendingGrantsData },
+        { data: placeholderGrantsData }, // This is just a placeholder now
         { data: followersData },
         { data: followingData },
         { data: communityMembersData },
@@ -90,11 +90,8 @@ export default function ProfilePage() {
           .select('*, grants:grant_id(*)')
           .eq('user_id', userId)
           .limit(10),
-        supabase
-          .from('grants')
-          .select('*, organization:organization_id(name, image_url, banner_image_url, slug)')
-          .order('created_at', { ascending: false })
-          .limit(15),
+        // Skip the grants query here - we'll fetch them separately below
+        Promise.resolve({ data: [] }),
         supabase
           .from('followers')
           .select('follower_id, profiles:follower_id(id, full_name, avatar_url, title, organization_name)')
@@ -111,6 +108,33 @@ export default function ProfilePage() {
           .neq('id', userId)
           .limit(10),
       ]);
+
+      // FIXED: First fetch trending grants using correct column
+      const { data: trendingGrantsData } = await supabase
+        .from('grants')
+        .select('*')
+        .order('id', { ascending: false })  // FIXED: Use 'id' instead of 'created_at'
+        .limit(15);
+
+      // Get organization IDs and fetch organizations separately
+      const orgIds = [...new Set(trendingGrantsData?.map(g => g.organization_id).filter(Boolean))];
+      let orgsData = [];
+      if (orgIds.length > 0) {
+        const { data: organizationsData } = await supabase
+          .from('organizations')
+          .select('id, name, image_url, banner_image_url, slug')
+          .in('id', orgIds);
+        orgsData = organizationsData || [];
+      }
+
+      // Format trending grants with organization data
+      const formattedTrendingGrants = (trendingGrantsData || []).map(grant => {
+        const orgData = orgsData.find(o => o.id === grant.organization_id);
+        return {
+          ...grant,
+          organization: orgData || null
+        };
+      });
 
       const impactMetrics = {
         grantsApplied: Math.floor(Math.random() * 15) + 5,
@@ -132,7 +156,7 @@ export default function ProfilePage() {
         dataLoading: false,
         posts,
         savedGrants: savedGrantsData?.map((sg) => sg.grants) || [],
-        trendingGrants: trendingGrantsData || [],
+        trendingGrants: formattedTrendingGrants,
         totalPosts: posts.length,
         followerUsers: followersData?.map((f) => f.profiles) || [],
         totalFollowers: followersData?.length || 0,
@@ -255,31 +279,35 @@ export default function ProfilePage() {
   }, []);
 
   const handleTrendingGrantClick = useCallback(async (grantId) => {
-    const { data } = await supabase
-      .from('grants')
-      .select(`*, grant_categories(categories(*)), grant_locations(locations(*))`)
-      .eq('id', grantId)
-      .single();
+    try {
+      const { data } = await supabase
+        .from('grants')
+        .select(`*, grant_categories(categories(*)), grant_locations(locations(*))`)
+        .eq('id', grantId)
+        .single();
 
-    if (data) {
-      let orgData = null;
-      if (data.organization_id) {
-        const { data: organizationData } = await supabase
-          .from('organizations')
-          .select('name, image_url')
-          .eq('id', data.organization_id)
-          .single();
-        orgData = organizationData;
+      if (data) {
+        let orgData = null;
+        if (data.organization_id) {
+          const { data: organizationData } = await supabase
+            .from('organizations')
+            .select('name, image_url')
+            .eq('id', data.organization_id)
+            .single();
+          orgData = organizationData;
+        }
+
+        openDetail({
+          ...data,
+          foundationName: orgData?.name || 'Unknown Organization',
+          funderLogoUrl: orgData?.image_url || null,
+          categories: data.grant_categories?.map((gc) => gc.categories) || [],
+          locations: data.grant_locations?.map((gl) => gl.locations) || [],
+          dueDate: data.deadline,
+        });
       }
-
-      openDetail({
-        ...data,
-        foundationName: orgData?.name || 'Unknown Organization',
-        funderLogoUrl: orgData?.image_url || null,
-        categories: data.grant_categories?.map((gc) => gc.categories) || [],
-        locations: data.grant_locations?.map((gl) => gl.locations) || [],
-        dueDate: data.deadline,
-      });
+    } catch (error) {
+      console.error('Error fetching grant details:', error);
     }
   }, [openDetail]);
 
