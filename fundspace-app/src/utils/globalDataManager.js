@@ -1,4 +1,4 @@
-// src/utils/globalDataManager.js - Centralized request batching and caching (Fixed)
+// src/utils/globalDataManager.js - Enhanced with user connections and followers batching
 import { supabase } from '../supabaseClient';
 
 class GlobalDataManager {
@@ -9,7 +9,12 @@ class GlobalDataManager {
       postLikes: new Map(),
       profiles: new Map(),
       orgMemberships: new Map(),
-      comments: new Map()
+      comments: new Map(),
+      // NEW batch queues
+      userConnections: new Map(),
+      connectionStatuses: new Map(),
+      followers: new Map(),
+      following: new Map()
     };
     this.batchTimeouts = {};
     
@@ -178,6 +183,298 @@ class GlobalDataManager {
       return profilesMap;
     } catch (error) {
       console.error('Error fetching batch profiles:', error);
+      return {};
+    }
+  }
+
+  // NEW: Batch user connections loading
+  async getUserConnections(userIds, status = 'accepted') {
+    const uniqueIds = [...new Set(userIds)];
+    const cacheKey = this.getCacheKey('user-connections-batch', { userIds: uniqueIds.sort(), status });
+    const cached = this.getCache(cacheKey);
+    if (cached) return cached;
+
+    if (this.pendingRequests.has(cacheKey)) {
+      return this.pendingRequests.get(cacheKey);
+    }
+
+    const promise = this._fetchUserConnections(uniqueIds, status);
+    this.pendingRequests.set(cacheKey, promise);
+
+    try {
+      const result = await promise;
+      this.setCache(cacheKey, result);
+      return result;
+    } finally {
+      this.pendingRequests.delete(cacheKey);
+    }
+  }
+
+  async _fetchUserConnections(userIds, status) {
+    try {
+      // Build OR condition for all users
+      const orConditions = userIds.map(userId => 
+        `and(requester_id.eq.${userId},status.eq.${status}),and(recipient_id.eq.${userId},status.eq.${status})`
+      ).join(',');
+
+      const { data: connectionsData, error } = await supabase
+        .from('user_connections')
+        .select('id, requester_id, recipient_id, status, created_at')
+        .or(orConditions)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      // Group connections by user
+      const connectionsByUser = {};
+      userIds.forEach(userId => {
+        connectionsByUser[userId] = [];
+      });
+
+      connectionsData?.forEach(conn => {
+        // Add to requester's connections
+        if (connectionsByUser[conn.requester_id]) {
+          connectionsByUser[conn.requester_id].push({
+            ...conn,
+            other_user_id: conn.recipient_id
+          });
+        }
+        
+        // Add to recipient's connections
+        if (connectionsByUser[conn.recipient_id]) {
+          connectionsByUser[conn.recipient_id].push({
+            ...conn,
+            other_user_id: conn.requester_id
+          });
+        }
+      });
+
+      return connectionsByUser;
+    } catch (error) {
+      console.error('Error fetching batch user connections:', error);
+      return {};
+    }
+  }
+
+  // NEW: Batch connection status checks (major performance improvement)
+  async getBatchConnectionStatuses(currentUserId, targetUserIds) {
+    const uniqueIds = [...new Set(targetUserIds)];
+    const cacheKey = this.getCacheKey('connection-statuses-batch', { currentUserId, targetUserIds: uniqueIds.sort() });
+    const cached = this.getCache(cacheKey);
+    if (cached) return cached;
+
+    if (this.pendingRequests.has(cacheKey)) {
+      return this.pendingRequests.get(cacheKey);
+    }
+
+    const promise = this._fetchBatchConnectionStatuses(currentUserId, uniqueIds);
+    this.pendingRequests.set(cacheKey, promise);
+
+    try {
+      const result = await promise;
+      this.setCache(cacheKey, result);
+      return result;
+    } finally {
+      this.pendingRequests.delete(cacheKey);
+    }
+  }
+
+  async _fetchBatchConnectionStatuses(currentUserId, targetUserIds) {
+    try {
+      // Build OR conditions for all target users
+      const orConditions = targetUserIds.flatMap(targetId => [
+        `and(requester_id.eq.${currentUserId},recipient_id.eq.${targetId})`,
+        `and(requester_id.eq.${targetId},recipient_id.eq.${currentUserId})`
+      ]).join(',');
+
+      const { data: connectionsData, error } = await supabase
+        .from('user_connections')
+        .select('requester_id, recipient_id, status')
+        .or(orConditions);
+
+      if (error) throw error;
+
+      // Process results
+      const statusMap = {};
+      targetUserIds.forEach(targetId => {
+        statusMap[targetId] = { status: 'none', isRequester: false };
+      });
+
+      connectionsData?.forEach(conn => {
+        let targetId;
+        let isRequester;
+        
+        if (conn.requester_id === currentUserId) {
+          targetId = conn.recipient_id;
+          isRequester = true;
+        } else {
+          targetId = conn.requester_id;
+          isRequester = false;
+        }
+        
+        if (statusMap[targetId]) {
+          statusMap[targetId] = {
+            status: conn.status,
+            isRequester
+          };
+        }
+      });
+
+      return statusMap;
+    } catch (error) {
+      console.error('Error fetching batch connection statuses:', error);
+      return {};
+    }
+  }
+
+  // NEW: Single connection status (with batching)
+  async getConnectionStatus(currentUserId, targetUserId) {
+    return new Promise((resolve) => {
+      const key = `${currentUserId}-${targetUserId}`;
+      this.batchQueues.connectionStatuses.set(key, { resolve, currentUserId, targetUserId });
+
+      if (this.batchTimeouts.connectionStatuses) {
+        clearTimeout(this.batchTimeouts.connectionStatuses);
+      }
+
+      this.batchTimeouts.connectionStatuses = setTimeout(async () => {
+        const requests = Array.from(this.batchQueues.connectionStatuses.values());
+        this.batchQueues.connectionStatuses.clear();
+
+        // Group requests by currentUserId for more efficient batching
+        const requestsByUser = {};
+        requests.forEach(req => {
+          if (!requestsByUser[req.currentUserId]) {
+            requestsByUser[req.currentUserId] = [];
+          }
+          requestsByUser[req.currentUserId].push(req);
+        });
+
+        // Process each user's requests
+        for (const [currentUserId, userRequests] of Object.entries(requestsByUser)) {
+          try {
+            const targetUserIds = userRequests.map(req => req.targetUserId);
+            const batchResult = await this.getBatchConnectionStatuses(currentUserId, targetUserIds);
+            
+            userRequests.forEach(req => {
+              const status = batchResult[req.targetUserId] || { status: 'none', isRequester: false };
+              req.resolve(status);
+            });
+          } catch (error) {
+            console.error('Batch connection status error:', error);
+            userRequests.forEach(req => req.resolve({ status: 'none', isRequester: false }));
+          }
+        }
+      }, this.BATCH_DELAY);
+    });
+  }
+
+  // NEW: Batch followers loading
+  async getFollowers(userIds) {
+    const uniqueIds = [...new Set(userIds)];
+    const cacheKey = this.getCacheKey('followers-batch', uniqueIds.sort());
+    const cached = this.getCache(cacheKey);
+    if (cached) return cached;
+
+    if (this.pendingRequests.has(cacheKey)) {
+      return this.pendingRequests.get(cacheKey);
+    }
+
+    const promise = this._fetchFollowers(uniqueIds);
+    this.pendingRequests.set(cacheKey, promise);
+
+    try {
+      const result = await promise;
+      this.setCache(cacheKey, result);
+      return result;
+    } finally {
+      this.pendingRequests.delete(cacheKey);
+    }
+  }
+
+  async _fetchFollowers(userIds) {
+    try {
+      const { data: followersData, error } = await supabase
+        .from('followers')
+        .select(`
+          id, follower_id, following_id, created_at,
+          follower:follower_id(id, full_name, avatar_url, title, organization_name)
+        `)
+        .in('following_id', userIds)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      // Group followers by following_id
+      const followersByUser = {};
+      userIds.forEach(userId => {
+        followersByUser[userId] = [];
+      });
+
+      followersData?.forEach(follow => {
+        if (followersByUser[follow.following_id]) {
+          followersByUser[follow.following_id].push(follow);
+        }
+      });
+
+      return followersByUser;
+    } catch (error) {
+      console.error('Error fetching batch followers:', error);
+      return {};
+    }
+  }
+
+  // NEW: Batch following loading
+  async getFollowing(userIds) {
+    const uniqueIds = [...new Set(userIds)];
+    const cacheKey = this.getCacheKey('following-batch', uniqueIds.sort());
+    const cached = this.getCache(cacheKey);
+    if (cached) return cached;
+
+    if (this.pendingRequests.has(cacheKey)) {
+      return this.pendingRequests.get(cacheKey);
+    }
+
+    const promise = this._fetchFollowing(uniqueIds);
+    this.pendingRequests.set(cacheKey, promise);
+
+    try {
+      const result = await promise;
+      this.setCache(cacheKey, result);
+      return result;
+    } finally {
+      this.pendingRequests.delete(cacheKey);
+    }
+  }
+
+  async _fetchFollowing(userIds) {
+    try {
+      const { data: followingData, error } = await supabase
+        .from('followers')
+        .select(`
+          id, follower_id, following_id, created_at,
+          following:following_id(id, full_name, avatar_url, title, organization_name)
+        `)
+        .in('follower_id', userIds)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      // Group following by follower_id
+      const followingByUser = {};
+      userIds.forEach(userId => {
+        followingByUser[userId] = [];
+      });
+
+      followingData?.forEach(follow => {
+        if (followingByUser[follow.follower_id]) {
+          followingByUser[follow.follower_id].push(follow);
+        }
+      });
+
+      return followingByUser;
+    } catch (error) {
+      console.error('Error fetching batch following:', error);
       return {};
     }
   }

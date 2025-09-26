@@ -1,5 +1,6 @@
-// src/utils/userConnectionsUtils.js - Clean version without debugging
+// src/utils/userConnectionsUtils.js - Optimized version with API request optimizer
 import { supabase } from '../supabaseClient';
+import apiRequestOptimizer from './apiRequestOptimizer';
 
 export const getConnectionStatus = async (userId1, userId2) => {
   try {
@@ -7,37 +8,38 @@ export const getConnectionStatus = async (userId1, userId2) => {
       return { status: 'none', isRequester: false };
     }
 
-    const [query1, query2] = await Promise.all([
-      supabase
-        .from('user_connections')
-        .select('status, requester_id, recipient_id')
-        .eq('requester_id', userId1)
-        .eq('recipient_id', userId2)
-        .maybeSingle(),
-      supabase
-        .from('user_connections')
-        .select('status, requester_id, recipient_id')
-        .eq('requester_id', userId2)
-        .eq('recipient_id', userId1)
-        .maybeSingle()
-    ]);
+    // OPTIMIZED: Use the API optimizer instead of direct Supabase calls
+    const result = await apiRequestOptimizer.optimizeSupabaseQuery(
+      null,
+      'user_connections_status',
+      { currentUserId: userId1, targetUserId: userId2 }
+    );
 
-    if (query1.error || query2.error) {
-      return { status: 'none', isRequester: false, error: query1.error?.message || query2.error?.message };
-    }
+    return result || { status: 'none', isRequester: false };
 
-    const data = query1.data || query2.data;
-
-    if (!data) {
-      return { status: 'none', isRequester: false };
-    }
-
-    return {
-      status: data.status,
-      isRequester: data.requester_id === userId1
-    };
   } catch (error) {
+    console.error('Error getting connection status:', error);
     return { status: 'none', isRequester: false, error: error.message };
+  }
+};
+
+// NEW: Batch connection status checking (for components that need multiple statuses)
+export const getBatchConnectionStatuses = async (currentUserId, targetUserIds) => {
+  try {
+    if (!currentUserId || !targetUserIds || targetUserIds.length === 0) {
+      return {};
+    }
+
+    const result = await apiRequestOptimizer.optimizeSupabaseQuery(
+      null,
+      'connection_statuses_batch',
+      { currentUserId, targetUserIds }
+    );
+
+    return result.data || {};
+  } catch (error) {
+    console.error('Error getting batch connection statuses:', error);
+    return {};
   }
 };
 

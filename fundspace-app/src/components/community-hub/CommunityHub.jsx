@@ -1,7 +1,8 @@
-// src/components/community-hub/CommunityHub.jsx - Optimized with Page Data Loader
-import React, { useState, useEffect } from 'react';
+// src/components/community-hub/CommunityHub.jsx - FIXED: Add missing user reactions data
+import React, { useState, useEffect, useCallback } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { Globe, Building, MapPin } from 'lucide-react';
+import { supabase } from '../../supabaseClient';
 import CreatePost from '../CreatePost.jsx';
 import PostCard from '../PostCard.jsx';
 import TrendingNews from './TrendingNews';
@@ -14,6 +15,9 @@ import { BAY_AREA_COUNTIES, ORGANIZATION_CHANNELS, getOrgBaseType } from './cons
 export default function CommunityHub() {
   const { profile } = useOutletContext();
   const [activeChannel, setActiveChannel] = useState('hello-world');
+  
+  // NEW: Add state for user-specific reaction data
+  const [postsLikesData, setPostsLikesData] = useState({});
   
   const {
     posts,
@@ -28,11 +32,103 @@ export default function CommunityHub() {
     setPage
   } = useCommunityData(profile);
 
-  // ✅ NEW: Add page data loader for batched API calls
+  // Add page data loader for batched API calls
   const { pageData, loadPostsPageData, clearPageData } = usePageDataLoader();
 
   // Mock county for now
   const userCounty = 'santa-clara';
+
+  // NEW: Batch load user-specific post reaction data (copied from ProfilePage)
+  const batchLoadPostLikes = useCallback(async (postIds, userId) => {
+    if (!postIds.length || !userId) return {};
+
+    try {
+      // Single batch query instead of N individual queries
+      const { data: likesData, error } = await supabase
+        .from('post_likes')
+        .select('post_id, reaction_type, user_id, created_at')
+        .in('post_id', postIds)
+        .eq('user_id', userId);
+
+      if (error) {
+        console.error('Error fetching batch post likes:', error);
+        return {};
+      }
+
+      // Convert to lookup object: { postId: { userReaction: 'like|dislike', ... } }
+      const likesLookup = {};
+      postIds.forEach(postId => {
+        likesLookup[postId] = { userReaction: null };
+      });
+
+      (likesData || []).forEach(like => {
+        if (!likesLookup[like.post_id]) {
+          likesLookup[like.post_id] = {};
+        }
+        likesLookup[like.post_id].userReaction = like.reaction_type;
+      });
+
+      return likesLookup;
+    } catch (error) {
+      console.error('Error in batchLoadPostLikes:', error);
+      return {};
+    }
+  }, []);
+
+  // NEW: Enhanced data loading that includes user reactions
+  const loadAllPostData = useCallback(async () => {
+    if (posts.length === 0 || !profile?.id) return;
+
+    const postIds = posts.map(p => p.id);
+    
+    // Load both general post data AND user-specific reactions
+    const [generalPageData, userLikesData] = await Promise.all([
+      loadPostsPageData(posts),
+      batchLoadPostLikes(postIds, profile.id)
+    ]);
+
+    setPostsLikesData(userLikesData);
+  }, [posts, profile?.id, loadPostsPageData, batchLoadPostLikes]);
+
+  // NEW: Centralized post like handler (prevents individual API calls)
+  const handlePostLike = useCallback(async (postId, currentReaction, newReaction) => {
+    if (!profile?.id) return;
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      if (currentReaction && currentReaction === newReaction) {
+        // Remove reaction
+        await supabase
+          .from('post_likes')
+          .delete()
+          .eq('post_id', postId)
+          .eq('user_id', user.id);
+      } else {
+        // Add or update reaction
+        await supabase
+          .from('post_likes')
+          .upsert({
+            post_id: postId,
+            user_id: user.id,
+            reaction_type: newReaction
+          }, { onConflict: 'post_id,user_id' });
+      }
+
+      // Update local state to reflect changes immediately
+      setPostsLikesData(prev => ({
+        ...prev,
+        [postId]: {
+          ...prev[postId],
+          userReaction: newReaction === currentReaction ? null : newReaction
+        }
+      }));
+
+    } catch (error) {
+      console.error('Error handling post reaction:', error);
+    }
+  }, [profile?.id]);
 
   // Get channel configuration
   const getChannelConfig = () => {
@@ -94,17 +190,15 @@ export default function CommunityHub() {
   const channels = getChannelConfig();
   const activeChannelConfig = channels.find(c => c.id === activeChannel);
 
-  // ✅ NEW: Load batched data whenever posts change
+  // UPDATED: Load all post data when posts change
   useEffect(() => {
-    if (posts.length > 0) {
-      loadPostsPageData(posts);
-    }
-  }, [posts, loadPostsPageData]);
+    loadAllPostData();
+  }, [loadAllPostData]);
 
   // Reset posts when channel changes
   useEffect(() => {
-    // ✅ NEW: Clear page data when changing channels
     clearPageData();
+    setPostsLikesData({}); // NEW: Clear user reaction data
     resetPosts();
     fetchPosts(0, activeChannelConfig);
   }, [activeChannel, activeChannelConfig?.dbChannel, clearPageData]);
@@ -133,7 +227,7 @@ export default function CommunityHub() {
     }
   };
 
-  // ✅ NEW: Enhanced load more that triggers data loading
+  // Enhanced load more that triggers data loading
   const handleLoadMore = async () => {
     const nextPage = page + 1;
     setPage(nextPage);
@@ -243,11 +337,14 @@ export default function CommunityHub() {
                   ) : posts.length > 0 ? (
                     posts.map(post => (
                       <div key={post.id} id={`post-${post.id}`} className="transition-all duration-300">
-                        {/* ✅ NEW: Pass pageData to PostCard */}
+                        {/* FIXED: Pass all required batch data to PostCard */}
                         <PostCard 
                           post={post} 
                           onDelete={handleDeletePost}
                           pageData={pageData}
+                          postsLikesData={postsLikesData}
+                          onPostLike={handlePostLike}
+                          userReaction={postsLikesData[post.id]?.userReaction}
                         />
                       </div>
                     ))

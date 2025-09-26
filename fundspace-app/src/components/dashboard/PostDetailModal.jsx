@@ -1,7 +1,8 @@
-// src/components/dashboard/PostDetailModal.jsx - CORRECTED: Use batched data
+// src/components/dashboard/PostDetailModal.jsx - OPTIMIZED: Use API optimizer
 import React, { useState, useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
 import { supabase } from '../../supabaseClient';
+import apiRequestOptimizer from '../../utils/apiRequestOptimizer';
 import PostBody from '../post/PostBody';
 import PostActions from '../post/PostActions';
 import CommentSection from '../CommentSection';
@@ -9,7 +10,7 @@ import { reactions } from '../post/constants';
 import PropTypes from 'prop-types';
 
 const PostDetailModal = ({ post, isOpen, onClose, currentUserProfile, pageData, postsLikesData, onPostLike }) => {
-    // CRITICAL: Use batched data first, then fallback
+    // Use batched data first, then fallback
     const likesData = postsLikesData?.[post?.id] || pageData?.postLikes?.[post?.id];
     const profileData = pageData?.profiles?.[post?.profile_id || post?.profiles?.id] || post?.profiles;
     const orgMembership = pageData?.orgMemberships?.[post?.profile_id || post?.profiles?.id];
@@ -73,26 +74,20 @@ const PostDetailModal = ({ post, isOpen, onClose, currentUserProfile, pageData, 
         return `${Math.floor(diffInHours / 24)}d ago`;
     };
 
-    // FIXED: Only check reaction status if not provided by batched data
+    // OPTIMIZED: Use API optimizer for individual reaction status check
     useEffect(() => {
         if (selectedReaction !== null || !currentUserProfile || !post?.id || likesData?.userReaction !== undefined) return;
         
         const checkReactionStatus = async () => {
             try {
-                const { data, error } = await supabase
-                    .from('post_likes')
-                    .select('reaction_type')
-                    .eq('post_id', post.id)
-                    .eq('user_id', currentUserProfile.id)
-                    .limit(1);
+                // Use API optimizer instead of direct Supabase call
+                const result = await apiRequestOptimizer.optimizeSupabaseQuery(
+                    null,
+                    'user_post_reaction_status',
+                    { postId: post.id, userId: currentUserProfile.id }
+                );
                 
-                if (error) {
-                    console.error('Error checking reaction status:', error);
-                    setSelectedReaction(null);
-                    return;
-                }
-                
-                setSelectedReaction(data && data.length > 0 ? data[0].reaction_type : null);
+                setSelectedReaction(result?.userReaction || null);
             } catch (error) {
                 console.error('Error in checkReactionStatus:', error);
                 setSelectedReaction(null);
@@ -104,7 +99,7 @@ const PostDetailModal = ({ post, isOpen, onClose, currentUserProfile, pageData, 
         }
     }, [currentUserProfile, post?.id, isOpen, selectedReaction, likesData]);
 
-    // FIXED: Only fetch reactors if not provided by batched data
+    // OPTIMIZED: Use API optimizer for fetching reactors
     useEffect(() => {
         if (reactors.length > 0 || !post?.id || likesData?.reactors) return;
         
@@ -114,49 +109,14 @@ const PostDetailModal = ({ post, isOpen, onClose, currentUserProfile, pageData, 
                 return;
             }
             try {
-                const { data: likesData, error: likesError } = await supabase
-                    .from('post_likes')
-                    .select('user_id, reaction_type, created_at')
-                    .eq('post_id', post.id)
-                    .order('created_at', { ascending: false });
-
-                if (likesError) {
-                    console.error('Error fetching likes:', likesError);
-                    setReactors([]);
-                    return;
-                }
-
-                if (likesData && likesData.length > 0) {
-                    const userIds = likesData.map(like => like.user_id);
-                    const { data: profilesData, error: profilesError } = await supabase
-                        .from('profiles')
-                        .select('id, full_name, avatar_url, title, organization_name, role')
-                        .in('id', userIds);
-
-                    if (profilesError) {
-                        console.error('Error fetching profiles:', profilesError);
-                        setReactors([]);
-                        return;
-                    }
-
-                    const transformedReactors = likesData.map(like => {
-                        const profile = profilesData?.find(p => p.id === like.user_id);
-                        return {
-                            user_id: like.user_id,
-                            profile_id: profile?.id,
-                            full_name: profile?.full_name,
-                            avatar_url: profile?.avatar_url,
-                            title: profile?.title,
-                            organization_name: profile?.organization_name,
-                            role: profile?.role,
-                            reaction_type: like.reaction_type,
-                            created_at: like.created_at
-                        };
-                    }).filter(reactor => reactor.full_name);
-                    setReactors(transformedReactors);
-                } else {
-                    setReactors([]);
-                }
+                // Use API optimizer instead of individual post_likes query
+                const result = await apiRequestOptimizer.optimizeSupabaseQuery(
+                    null,
+                    'post_likes_single',
+                    { postId: post.id }
+                );
+                
+                setReactors(result.data || []);
             } catch (error) {
                 console.error('Error fetching reactors:', error);
                 setReactors([]);
@@ -168,7 +128,7 @@ const PostDetailModal = ({ post, isOpen, onClose, currentUserProfile, pageData, 
         }
     }, [post?.id, likeCount, isOpen, reactors.length, likesData]);
 
-    // FIXED: Use centralized like handler if available
+    // Use centralized like handler if available
     const handleReaction = async (reactionType) => {
         if (!currentUserProfile || !post?.id) return;
         
@@ -179,38 +139,37 @@ const PostDetailModal = ({ post, isOpen, onClose, currentUserProfile, pageData, 
             return;
         }
         
-        // Fallback to individual handler
+        // Fallback to individual handler (but still optimized)
         try {
-            if (selectedReaction === reactionType) {
-                const { error } = await supabase
-                    .from('post_likes')
-                    .delete()
-                    .eq('post_id', post.id)
-                    .eq('user_id', currentUserProfile.id);
-                
-                if (error) {
-                    console.error('Error removing reaction:', error);
-                    return;
-                }
-                
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return;
+
+            const { data: existingReaction } = await supabase
+                .from('post_likes')
+                .select('id, reaction_type')
+                .eq('post_id', post.id)
+                .eq('user_id', user.id)
+                .maybeSingle();
+
+            if (existingReaction && selectedReaction === reactionType) {
+                // Remove reaction
+                await supabase.from('post_likes').delete().eq('id', existingReaction.id);
                 setSelectedReaction(null);
                 setLikeCount(prev => Math.max(0, prev - 1));
             } else {
-                const { error } = await supabase
+                // Add or update reaction
+                await supabase
                     .from('post_likes')
-                    .upsert({
+                    .upsert({ 
                         post_id: post.id,
-                        user_id: currentUserProfile.id,
-                        reaction_type: reactionType
-                    }, { onConflict: 'post_id,user_id' });
+                        user_id: user.id,
+                        reaction_type: reactionType 
+                    });
                 
-                if (error) {
-                    console.error('Error adding reaction:', error);
-                    return;
-                }
-                
+                const prevReaction = selectedReaction;
                 setSelectedReaction(reactionType);
-                if (!selectedReaction) {
+                
+                if (!prevReaction) {
                     setLikeCount(prev => prev + 1);
                 }
             }
@@ -220,7 +179,9 @@ const PostDetailModal = ({ post, isOpen, onClose, currentUserProfile, pageData, 
     };
 
     const handleReactorsEnter = () => {
-        clearTimeout(reactorsTimeoutRef.current);
+        if (reactorsTimeoutRef.current) {
+            clearTimeout(reactorsTimeoutRef.current);
+        }
         setShowReactorsPreview(true);
     };
 
@@ -230,58 +191,62 @@ const PostDetailModal = ({ post, isOpen, onClose, currentUserProfile, pageData, 
         }, 300);
     };
 
-    const handleImageClick = (index) => {
-        console.log('Image clicked:', index);
-    };
-
     if (!isOpen || !post) return null;
-
-    const displayImages = post.image_urls && post.image_urls.length > 0 ? post.image_urls : (post.image_url ? [post.image_url] : []);
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden">
-                {/* Modal Header */}
-                <div className="flex items-center justify-between p-6 border-b border-slate-200">
-                    <div className="flex items-center space-x-3">
-                        <img
-                            src={displayAuthor?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(displayAuthor?.full_name || 'User')}&background=6366f1&color=ffffff`}
-                            alt={displayAuthor?.full_name || 'User'}
-                            className="w-12 h-12 rounded-full object-cover"
-                        />
-                        <div>
-                            <h3 className="font-semibold text-slate-900">
-                                {displayAuthor?.full_name || 'Anonymous'}
-                            </h3>
-                            {displayAuthor?.organization_name && (
-                                <p className="text-sm text-slate-500">
-                                    {displayAuthor.organization_name}
-                                </p>
-                            )}
-                            <p className="text-xs text-slate-400">
-                                {formatTimeAgo(post.created_at)}
-                            </p>
-                        </div>
-                    </div>
+            <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+                <div className="sticky top-0 bg-white border-b border-slate-200 p-4 flex justify-between items-center">
+                    <h2 className="text-lg font-semibold text-slate-800">Post</h2>
                     <button
                         onClick={onClose}
-                        className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                        className="p-2 hover:bg-slate-100 rounded-full transition-colors"
                     >
-                        <X size={20} />
+                        <X size={20} className="text-slate-600" />
                     </button>
                 </div>
+                
+                <div className="p-6">
+                    <div className="flex items-start space-x-3 mb-4">
+                        <div className="w-12 h-12 rounded-full overflow-hidden bg-slate-200 flex-shrink-0">
+                            {displayAuthor?.avatar_url ? (
+                                <img 
+                                    src={displayAuthor.avatar_url} 
+                                    alt={displayAuthor.full_name}
+                                    className="w-full h-full object-cover"
+                                />
+                            ) : (
+                                <div className="w-full h-full flex items-center justify-center text-slate-400">
+                                    {displayAuthor?.full_name?.[0] || 'U'}
+                                </div>
+                            )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <div className="flex items-center space-x-2">
+                                <h3 className="font-medium text-slate-900 truncate">
+                                    {displayAuthor?.full_name || 'Unknown User'}
+                                </h3>
+                                <span className="text-slate-400">•</span>
+                                <span className="text-sm text-slate-500">
+                                    {formatTimeAgo(post.created_at)}
+                                </span>
+                            </div>
+                            {displayAuthor?.title && (
+                                <p className="text-sm text-slate-600">{displayAuthor.title}</p>
+                            )}
+                            {displayAuthor?.organization_name && (
+                                <p className="text-sm text-slate-500">{displayAuthor.organization_name}</p>
+                            )}
+                        </div>
+                    </div>
 
-                {/* Modal Content */}
-                <div className="p-6 max-h-[calc(90vh-180px)] overflow-y-auto">
                     <PostBody 
-                        content={post.content || ''}
-                        images={displayImages}
+                        content={post.content}
+                        imageUrls={post.image_urls}
                         tags={post.tags}
-                        onImageClick={handleImageClick}
                     />
 
-                    {/* Reaction Summary and Comment Count */}
-                    <div className="flex items-center justify-between text-sm text-slate-500 my-4 min-h-[20px]">
+                    <div className="flex items-center justify-between text-sm text-slate-500 mb-4 pt-4 border-t border-slate-100">
                         <div 
                             className="relative"
                             onMouseEnter={handleReactorsEnter}
@@ -308,7 +273,7 @@ const PostDetailModal = ({ post, isOpen, onClose, currentUserProfile, pageData, 
                             {showReactorsPreview && likeCount > 0 && (
                                 <div className="absolute top-full left-0 mt-2 p-3 bg-white rounded-lg shadow-lg border border-slate-200 z-10">
                                     <div className="text-xs text-slate-600">
-                                        {reactors.slice(0, 3).map(reactor => reactor.full_name).join(', ')}
+                                        {reactors.slice(0, 3).map(reactor => reactor.profile?.full_name || reactor.full_name).join(', ')}
                                         {reactors.length > 3 && ` and ${reactors.length - 3} others`}
                                     </div>
                                 </div>
@@ -330,16 +295,15 @@ const PostDetailModal = ({ post, isOpen, onClose, currentUserProfile, pageData, 
                         onShare={() => alert('Share functionality not implemented yet.')}
                         selectedReaction={selectedReaction}
                         disabled={false}
-                        postId={post.id}
                     />
 
                     {showComments && (
-                        <div className="mt-4 border-t pt-4 max-h-96 overflow-y-auto">
-                            <CommentSection 
-                                post={post}
+                        <div className="mt-6 pt-6 border-t border-slate-200">
+                            <CommentSection
+                                postId={post.id}
                                 currentUserProfile={currentUserProfile}
-                                onCommentAdded={() => setCommentCount(prev => prev + 1)}
-                                onCommentDeleted={() => setCommentCount(prev => Math.max(0, prev - 1))}
+                                onCommentCountChange={setCommentCount}
+                                pageData={pageData}
                             />
                         </div>
                     )}

@@ -1,16 +1,16 @@
-// components/member-profile/MemberProfileConnections.jsx
+// components/member-profile/MemberProfileConnections.jsx - Optimized version
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../../supabaseClient';
 import { User, Users, Heart, UserPlus, UserCheck, UserX, Clock } from 'lucide-react';
 import { 
     sendConnectionRequest, 
-    getConnectionStatus, 
     acceptConnectionRequest, 
     declineConnectionRequest,
     withdrawConnectionRequest,
     removeConnection 
 } from '../../utils/userConnectionsUtils';
+import apiRequestOptimizer from '../../utils/apiRequestOptimizer';
 
 const MemberProfileConnections = ({ member, loading, currentUserId, isCurrentUser }) => {
     const [activeSubTab, setActiveSubTab] = useState('connections');
@@ -142,22 +142,33 @@ const MemberProfileConnections = ({ member, loading, currentUserId, isCurrentUse
         }
     };
 
+    // OPTIMIZED: Replace individual API calls with batch call
     const fetchConnectionStatuses = async (allUsers) => {
-        const statuses = {};
+        // Extract all user IDs we need to check
+        const targetUserIds = allUsers
+            .filter(item => item.user?.id && item.user.id !== currentUserId)
+            .map(item => item.user.id);
         
-        for (const item of allUsers) {
-            if (item.user?.id && item.user.id !== currentUserId) {
-                try {
-                    const status = await getConnectionStatus(currentUserId, item.user.id);
-                    statuses[item.user.id] = status;
-                } catch (error) {
-                    console.error(`Error fetching connection status for user ${item.user.id}:`, error);
-                    statuses[item.user.id] = { status: 'none', isRequester: false };
-                }
-            }
+        if (targetUserIds.length === 0) return;
+
+        try {
+            // Use the batch optimizer instead of individual calls in a loop
+            const batchStatuses = await apiRequestOptimizer.optimizeSupabaseQuery(
+                null, 
+                'connection_statuses_batch', 
+                { currentUserId, targetUserIds }
+            );
+            
+            setConnectionActions(batchStatuses.data || {});
+        } catch (error) {
+            console.error('Error fetching batch connection statuses:', error);
+            // Fallback to empty statuses
+            const fallbackStatuses = {};
+            targetUserIds.forEach(userId => {
+                fallbackStatuses[userId] = { status: 'none', isRequester: false };
+            });
+            setConnectionActions(fallbackStatuses);
         }
-        
-        setConnectionActions(statuses);
     };
 
     const handleConnectionAction = async (targetUserId, action) => {
