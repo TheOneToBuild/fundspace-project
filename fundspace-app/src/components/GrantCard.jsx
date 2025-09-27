@@ -1,10 +1,8 @@
-// src/components/GrantCard.jsx
 import React, { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { IconBriefcase, MapPin, DollarSign, Calendar, ExternalLink, ShieldCheck, Bookmark, Users, Building2, Clock, Zap, Target, ChevronRight, Sparkles } from './Icons.jsx';
 import { formatDate, getPillClasses, getGrantTypePillClasses, formatFundingDisplay } from '../utils.js';
 
-// Taxonomy code to display name mapping
 const TAXONOMY_DISPLAY_NAMES = {
   'nonprofit.501c3': '501(c)(3) Nonprofits',
   'nonprofit.501c4': '501(c)(4) Organizations',
@@ -26,7 +24,6 @@ const TAXONOMY_DISPLAY_NAMES = {
   'religious.church': 'Religious Organizations'
 };
 
-// Enhanced gradient pill classes for categories - each with unique colors
 const getEnhancedPillClasses = (categoryName) => {
   const categoryMap = {
     'Arts': 'bg-gradient-to-r from-purple-100 to-pink-100 text-purple-700 border-purple-200',
@@ -50,8 +47,6 @@ const getEnhancedPillClasses = (categoryName) => {
     'Pediatric Health': 'bg-gradient-to-r from-yellow-100 to-lime-100 text-yellow-700 border-yellow-200',
     'Child Health Research': 'bg-gradient-to-r from-lime-100 to-green-100 text-lime-700 border-lime-200',
     'Pediatric Education': 'bg-gradient-to-r from-sky-100 to-blue-100 text-sky-700 border-sky-200',
-    
-    // Environmental and Climate Focus Areas
     'Flood Management': 'bg-gradient-to-r from-blue-100 to-cyan-100 text-blue-700 border-blue-200',
     'Habitat Restoration': 'bg-gradient-to-r from-green-100 to-emerald-100 text-green-700 border-green-200',
     'Climate Justice': 'bg-gradient-to-r from-teal-100 to-green-100 text-teal-700 border-teal-200',
@@ -60,14 +55,10 @@ const getEnhancedPillClasses = (categoryName) => {
     'Sustainability': 'bg-gradient-to-r from-emerald-100 to-lime-100 text-emerald-700 border-emerald-200',
     'Conservation': 'bg-gradient-to-r from-green-100 to-teal-100 text-green-700 border-green-200',
     'Wildlife': 'bg-gradient-to-r from-teal-100 to-cyan-100 text-teal-700 border-teal-200',
-    
-    // Worker and Labor Rights
     'Food Production Workers\' Health and Safety': 'bg-gradient-to-r from-orange-100 to-red-100 text-orange-700 border-orange-200',
     'Worker Safety': 'bg-gradient-to-r from-red-100 to-orange-100 text-red-700 border-red-200',
     'Labor Rights': 'bg-gradient-to-r from-purple-100 to-indigo-100 text-purple-700 border-purple-200',
     'Workplace Safety': 'bg-gradient-to-r from-amber-100 to-orange-100 text-amber-700 border-amber-200',
-    
-    // Additional Categories
     'Sports': 'bg-gradient-to-r from-orange-100 to-red-100 text-orange-700 border-orange-200',
     'Recreation': 'bg-gradient-to-r from-pink-100 to-rose-100 text-pink-700 border-pink-200',
     'Youth Development': 'bg-gradient-to-r from-green-100 to-emerald-100 text-green-700 border-green-200',
@@ -87,11 +78,9 @@ const getEnhancedPillClasses = (categoryName) => {
     'Emergency Services': 'bg-gradient-to-r from-orange-100 to-amber-100 text-orange-700 border-orange-200',
     'Public Safety': 'bg-gradient-to-r from-amber-100 to-yellow-100 text-amber-700 border-amber-200'
   };
-  
   return categoryMap[categoryName] || 'bg-gradient-to-r from-slate-100 to-zinc-100 text-slate-700 border-slate-200';
 };
 
-// Organization type colors for pills
 const getOrgTypePillClasses = (taxonomyCode) => {
   const typeMap = {
     'nonprofit': 'bg-gradient-to-r from-rose-100 to-red-100 text-rose-700 border-rose-200',
@@ -103,15 +92,12 @@ const getOrgTypePillClasses = (taxonomyCode) => {
     'religious': 'bg-gradient-to-r from-amber-100 to-yellow-100 text-amber-700 border-amber-200',
     'international': 'bg-gradient-to-r from-cyan-100 to-teal-100 text-cyan-700 border-cyan-200'
   };
-  
   const prefix = taxonomyCode.split('.')[0];
   return typeMap[prefix] || 'bg-gradient-to-r from-slate-100 to-gray-100 text-slate-700 border-slate-200';
 };
 
-// Location-specific colors for different counties and regions
 const getLocationPillClasses = (locationName) => {
   const locationMap = {
-    // Bay Area Counties - each with unique colors
     'San Francisco': 'bg-gradient-to-r from-red-100 to-rose-100 text-red-700 border-red-200',
     'San Francisco County': 'bg-gradient-to-r from-red-100 to-rose-100 text-red-700 border-red-200',
     'Alameda': 'bg-gradient-to-r from-orange-100 to-amber-100 text-orange-700 border-orange-200',
@@ -130,8 +116,6 @@ const getLocationPillClasses = (locationName) => {
     'Solano County': 'bg-gradient-to-r from-indigo-100 to-purple-100 text-indigo-700 border-indigo-200',
     'Napa': 'bg-gradient-to-r from-purple-100 to-pink-100 text-purple-700 border-purple-200',
     'Napa County': 'bg-gradient-to-r from-purple-100 to-pink-100 text-purple-700 border-purple-200',
-    
-    // Major Cities - unique colors
     'Oakland': 'bg-gradient-to-r from-amber-100 to-orange-100 text-amber-700 border-amber-200',
     'Berkeley': 'bg-gradient-to-r from-blue-100 to-indigo-100 text-blue-700 border-blue-200',
     'San Jose': 'bg-gradient-to-r from-green-100 to-emerald-100 text-green-700 border-green-200',
@@ -142,8 +126,6 @@ const getLocationPillClasses = (locationName) => {
     'Mountain View': 'bg-gradient-to-r from-teal-100 to-emerald-100 text-teal-700 border-teal-200',
     'Palo Alto': 'bg-gradient-to-r from-lime-100 to-green-100 text-lime-700 border-lime-200',
     'Redwood City': 'bg-gradient-to-r from-green-100 to-lime-100 text-green-700 border-green-200',
-    
-    // Regional descriptors
     'Bay Area': 'bg-gradient-to-r from-blue-100 to-cyan-100 text-blue-700 border-blue-200',
     'San Francisco Bay Area': 'bg-gradient-to-r from-blue-100 to-cyan-100 text-blue-700 border-blue-200',
     'Northern California': 'bg-gradient-to-r from-indigo-100 to-blue-100 text-indigo-700 border-indigo-200',
@@ -152,21 +134,15 @@ const getLocationPillClasses = (locationName) => {
     'National': 'bg-gradient-to-r from-slate-100 to-zinc-100 text-slate-700 border-slate-200',
     'International': 'bg-gradient-to-r from-teal-100 to-cyan-100 text-teal-700 border-teal-200'
   };
-  
-  // Try exact match first
   if (locationMap[locationName]) {
     return locationMap[locationName];
   }
-  
-  // Try partial matches for flexibility
   const locationLower = locationName.toLowerCase();
   for (const [key, value] of Object.entries(locationMap)) {
     if (locationLower.includes(key.toLowerCase())) {
       return value;
     }
   }
-  
-  // Default fallback
   return locationMap[locationName] || 'bg-gradient-to-r from-slate-100 to-gray-100 text-slate-700 border-slate-200';
 };
 
@@ -237,9 +213,7 @@ const GrantCard = ({ grant, onOpenDetailModal, onFilterByCategory, onSave, onUns
             onMouseLeave={() => setIsHovered(false)}
             onClick={() => onOpenDetailModal(grant)}
         >
-            {/* Banner & Avatar */}
             <div className="relative">
-                {/* Banner - Updated to use organization banner */}
                 <div className="h-28 bg-gradient-to-br from-slate-100 via-white to-slate-100">
                     {grant.organization?.banner_image_url && (
                         <img
@@ -249,8 +223,6 @@ const GrantCard = ({ grant, onOpenDetailModal, onFilterByCategory, onSave, onUns
                         />
                     )}
                 </div>
-
-                {/* Avatar - Updated to use organization image */}
                 <div
                     className="absolute bottom-0 left-4 translate-y-1/2 transform transition-transform duration-300 group-hover:scale-105 cursor-pointer"
                     onClick={(e) => { e.stopPropagation(); navigate(`/organizations/${grant.funderSlug}`); }}
@@ -268,11 +240,7 @@ const GrantCard = ({ grant, onOpenDetailModal, onFilterByCategory, onSave, onUns
                     )}
                 </div>
             </div>
-            
-            {/* Reduced gradient overlay */}
             <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 via-purple-500/5 to-pink-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-
-            {/* Compact status badges */}
             <div className="absolute top-3 right-3 z-10 flex flex-col gap-1">
                 {!isEligibleForUser && (
                     <div className="bg-gradient-to-r from-amber-400 to-orange-500 text-white text-xs font-bold px-2 py-0.5 rounded-full shadow-sm flex items-center gap-1">
@@ -280,13 +248,11 @@ const GrantCard = ({ grant, onOpenDetailModal, onFilterByCategory, onSave, onUns
                         Check
                     </div>
                 )}
-                
                 {isExpired && (
                     <div className="bg-gradient-to-r from-slate-400 to-slate-500 text-white text-xs font-bold px-2 py-0.5 rounded-full shadow-sm">
                         EXPIRED
                     </div>
                 )}
-                
                 {isEndingSoon && !isExpired && (
                     <div className="bg-gradient-to-r from-red-400 to-orange-500 text-white text-xs font-bold px-2 py-0.5 rounded-full shadow-sm">
                         {daysUntilDue === 1 ? 'DUE TOMORROW' : 
@@ -294,18 +260,12 @@ const GrantCard = ({ grant, onOpenDetailModal, onFilterByCategory, onSave, onUns
                          `${daysUntilDue}d left`}
                     </div>
                 )}
-                
-                {/* Bookmark count */}
                 <div className="bg-gradient-to-r from-indigo-500 to-purple-600 text-white text-xs font-bold px-2 py-0.5 rounded-full shadow-sm flex items-center gap-1">
                     <Bookmark size={10} fill="currentColor" />
                     {grant.save_count || 0}
                 </div>
             </div>
-
-            {/* Main content - Added pt-12 for avatar overlap */}
             <div className="p-4 pt-12 relative z-0 flex-grow flex flex-col">
-                
-                {/* Funder Name & Grant Type */}
                 <div className="mb-3">
                     <Link 
                         to={`/organizations/${grant.funderSlug}`} 
@@ -320,18 +280,12 @@ const GrantCard = ({ grant, onOpenDetailModal, onFilterByCategory, onSave, onUns
                         </span>
                     )}
                 </div>
-
-                {/* Compact title */}
                 <h3 className="text-lg font-bold text-slate-800 mb-2 group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r group-hover:from-blue-600 group-hover:to-purple-600 transition-all duration-300 line-clamp-2 leading-tight">
                     {grant.title}
                 </h3>
-
-                {/* Adjusted height for 3-line description */}
                 <p className="text-slate-600 text-sm leading-relaxed mb-3 line-clamp-3 h-[4.25rem]">
                     {grant.description}
                 </p>
-
-                {/* Compact key metrics in horizontal layout */}
                 <div className="flex gap-2 mb-3">
                     <div className="bg-gradient-to-br from-green-50 to-emerald-50 p-2 rounded-lg border border-green-100 flex-1">
                         <div className="flex items-center gap-1 mb-1">
@@ -342,7 +296,6 @@ const GrantCard = ({ grant, onOpenDetailModal, onFilterByCategory, onSave, onUns
                             {formatFunding(grant.fundingAmount)}
                         </div>
                     </div>
-                    
                     <div className="bg-gradient-to-br from-red-50 to-orange-50 p-2 rounded-lg border border-red-100 flex-1">
                         <div className="flex items-center gap-1 mb-1">
                             <Calendar size={12} className="text-red-600" />
@@ -353,8 +306,6 @@ const GrantCard = ({ grant, onOpenDetailModal, onFilterByCategory, onSave, onUns
                         </div>
                     </div>
                 </div>
-
-                {/* Compact location */}
                 {grant.locations && grant.locations.length > 0 && (
                     <div className="mb-3">
                         <div className="flex items-center gap-1 mb-1">
@@ -378,8 +329,6 @@ const GrantCard = ({ grant, onOpenDetailModal, onFilterByCategory, onSave, onUns
                         </div>
                     </div>
                 )}
-
-                {/* Compact categories */}
                 {grant.categories && grant.categories.length > 0 && (
                     <div className="mb-3">
                         <div className="flex items-center gap-1 mb-1">
@@ -411,8 +360,6 @@ const GrantCard = ({ grant, onOpenDetailModal, onFilterByCategory, onSave, onUns
                         </div>
                     </div>
                 )}
-
-                {/* Compact eligible organizations */}
                 {grant.eligible_organization_types && grant.eligible_organization_types.length > 0 && (
                     <div className="mb-3">
                         <div className="flex items-center gap-1 mb-1">
@@ -423,7 +370,6 @@ const GrantCard = ({ grant, onOpenDetailModal, onFilterByCategory, onSave, onUns
                             {grant.eligible_organization_types.slice(0, 3).map((taxonomyCode, index) => {
                                 const displayName = TAXONOMY_DISPLAY_NAMES[taxonomyCode] || taxonomyCode;
                                 const isUserEligible = userOrganizationType && taxonomyCode.startsWith(userOrganizationType);
-                                
                                 return (
                                     <span 
                                         key={index}
@@ -447,8 +393,6 @@ const GrantCard = ({ grant, onOpenDetailModal, onFilterByCategory, onSave, onUns
                     </div>
                 )}
             </div>
-
-            {/* Compact action footer */}
             <div className="px-4 pb-4 flex justify-between items-center relative z-0 mt-auto">
                 <button
                     onClick={(e) => {
@@ -465,7 +409,6 @@ const GrantCard = ({ grant, onOpenDetailModal, onFilterByCategory, onSave, onUns
                     <Sparkles size={14} className="group-hover/btn:animate-pulse" />
                     Details
                 </button>
-                
                 <button
                     onClick={handleSaveClick}
                     disabled={isExpired}

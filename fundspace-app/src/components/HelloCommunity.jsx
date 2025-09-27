@@ -1,4 +1,3 @@
-// src/components/HelloCommunity.jsx - FINAL OPTIMIZED: Complete globalDataManager integration with user reactions
 import React, { useState, useEffect, useCallback, memo, useRef } from 'react';
 import { useOutletContext, useLocation, useNavigate } from 'react-router-dom';
 import PropTypes from 'prop-types';
@@ -10,9 +9,8 @@ import { rssNewsService as newsService } from '../services/rssNewsService.js';
 import { addOrganizationEventListener } from '../utils/organizationEvents';
 import { getOrganizationInfoForCommunity } from '../utils/membershipQueries.js';
 import { usePageDataLoader } from '../hooks/usePageDataLoader';
-import globalDataManager from '../utils/globalDataManager.js'; // ✅ CRITICAL IMPORT
+import { getDashboardData } from '../utils/rpcClientFunctions';
 
-// Organization channel configuration - now maps to actual database channels
 const ORGANIZATION_CHANNELS = {
   'nonprofit': { 
     name: 'Nonprofit Community', 
@@ -80,12 +78,8 @@ const NewsCard = memo(({ title, timeAgo, image, url, category }) => {
   const handleClick = () => {
     if (url) window.open(url, '_blank', 'noopener,noreferrer');
   };
-
   return (
-    <div 
-      onClick={handleClick}
-      className="relative w-80 h-80 bg-white rounded-xl overflow-hidden shadow-lg group cursor-pointer"
-    >
+    <div onClick={handleClick} className="relative w-80 h-80 bg-white rounded-xl overflow-hidden shadow-lg group cursor-pointer">
       {image ? (
         <img src={image} alt="" className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300" />
       ) : (
@@ -94,7 +88,7 @@ const NewsCard = memo(({ title, timeAgo, image, url, category }) => {
         </div>
       )}
       <div className="absolute top-3 right-3">
-        <span className={`px-2 py-1 text-xs font-medium rounded-full bg-white/90 text-slate-700`}>
+        <span className="px-2 py-1 text-xs font-medium rounded-full bg-white/90 text-slate-700">
           {category}
         </span>
       </div>
@@ -121,7 +115,6 @@ export default function HelloCommunity() {
   const location = useLocation();
   const navigate = useNavigate();
   
-  // Page data loader for batched API calls
   const { pageData, loadPostsPageData, clearPageData } = usePageDataLoader();
   
   const [posts, setPosts] = useState([]);
@@ -130,13 +123,11 @@ export default function HelloCommunity() {
   const [currentNewsIndex, setCurrentNewsIndex] = useState(0);
   const [news, setNews] = useState([]);
   const [isLoadingNews, setIsLoadingNews] = useState(true);
-  const [postsLikesData, setPostsLikesData] = useState({}); // ✅ ADD user reaction state
+  const [postsLikesData, setPostsLikesData] = useState({});
   const isMountedRef = useRef(true);
 
-  // Determine current channel from URL or default to community
   const currentChannel = location.pathname.includes('/hello-community') ? 'community' : 'hello-world';
 
-  // Get organization type for channel configuration
   const getOrgType = (orgType) => {
     if (!orgType) return null;
     const baseType = orgType.split('.')[0];
@@ -146,30 +137,21 @@ export default function HelloCommunity() {
   const organizationType = getOrgType(organizationInfo?.type);
   const channelConfig = organizationType ? ORGANIZATION_CHANNELS[organizationType] : null;
 
-  // ✅ NEW: Batch load user-specific post reaction data (like CommunityHub)
   const batchLoadPostLikes = useCallback(async (postIds, userId) => {
     if (!postIds.length || !userId) return {};
-
     try {
-      // Use globalDataManager for batch post likes
-      const likesData = await globalDataManager.getPostLikes(postIds);
-      
-      // Convert to lookup object for user-specific reactions
+      const dashboardData = await getDashboardData(userId);
       const likesLookup = {};
       postIds.forEach(postId => {
         likesLookup[postId] = { userReaction: null };
       });
-
-      // Extract user's specific reactions from the batch data
-      Object.entries(likesData).forEach(([postId, postLikesInfo]) => {
-        if (postLikesInfo.reactors) {
-          const userReactor = postLikesInfo.reactors.find(reactor => reactor.user_id === userId);
-          if (userReactor) {
-            likesLookup[postId].userReaction = userReactor.reaction_type;
+      if (dashboardData?.post_likes) {
+        dashboardData.post_likes.forEach(like => {
+          if (postIds.includes(like.post_id) && like.user_id === userId) {
+            likesLookup[like.post_id].userReaction = like.reaction_type;
           }
-        }
-      });
-
+        });
+      }
       return likesLookup;
     } catch (error) {
       console.error('Error in batchLoadPostLikes:', error);
@@ -177,33 +159,20 @@ export default function HelloCommunity() {
     }
   }, []);
 
-  // ✅ NEW: Centralized post like handler
   const handlePostLike = useCallback(async (postId, currentReaction, newReaction) => {
     if (!profile?.id) return;
-
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
-
       if (currentReaction && currentReaction === newReaction) {
-        // Remove reaction
-        await supabase
-          .from('post_likes')
-          .delete()
-          .eq('post_id', postId)
-          .eq('user_id', user.id);
+        await supabase.from('post_likes').delete().eq('post_id', postId).eq('user_id', user.id);
       } else {
-        // Add or update reaction
-        await supabase
-          .from('post_likes')
-          .upsert({
-            post_id: postId,
-            user_id: user.id,
-            reaction_type: newReaction
-          }, { onConflict: 'post_id,user_id' });
+        await supabase.from('post_likes').upsert({
+          post_id: postId,
+          user_id: user.id,
+          reaction_type: newReaction
+        }, { onConflict: 'post_id,user_id' });
       }
-
-      // Update local state immediately
       setPostsLikesData(prev => ({
         ...prev,
         [postId]: {
@@ -211,20 +180,14 @@ export default function HelloCommunity() {
           userReaction: newReaction === currentReaction ? null : newReaction
         }
       }));
-
-      // Clear cache for fresh data
-      globalDataManager.clearCache('post-likes');
-
     } catch (error) {
       console.error('Error handling post reaction:', error);
     }
   }, [profile?.id]);
 
-  // Fetch organization info
   useEffect(() => {
     const fetchOrganizationInfo = async () => {
       if (!profile?.id) return;
-      
       try {
         const info = await getOrganizationInfoForCommunity(profile.id);
         if (isMountedRef.current) {
@@ -234,39 +197,22 @@ export default function HelloCommunity() {
         console.error('Error fetching organization info:', error);
       }
     };
-
     fetchOrganizationInfo();
   }, [profile?.id]);
 
-  // ✅ FULLY OPTIMIZED: Fetch posts using globalDataManager instead of direct queries
   const fetchPosts = useCallback(async () => {
     if (!profile?.id) return;
-
     setLoading(true);
     try {
+      const dashboardData = await getDashboardData(profile.id);
       let postsData = [];
-
-      // ✅ BEFORE (Direct query causing multiple posts API calls):
-      // let query = supabase
-      //   .from('posts')
-      //   .select(`
-      //     *,
-      //     profiles (
-      //       id, full_name, avatar_url, title, organizational_role
-      //     )
-      //   `)
-
-      // ✅ AFTER (Use globalDataManager for batched loading):
       if (currentChannel === 'community' && channelConfig) {
-        // Use globalDataManager for community posts
-        postsData = await globalDataManager.getPostsByChannel(channelConfig.dbChannel, 20);
+        postsData = dashboardData?.posts?.filter(post => post.channel === channelConfig.dbChannel) || [];
       } else {
-        // Use globalDataManager for hello-world posts
-        postsData = await globalDataManager.getPostsByChannel('hello-world', 20);
+        postsData = dashboardData?.posts?.filter(post => post.channel === 'hello-world') || [];
       }
-
       if (isMountedRef.current) {
-        setPosts(postsData || []);
+        setPosts(postsData);
       }
     } catch (error) {
       console.error('Error fetching posts:', error);
@@ -277,40 +223,31 @@ export default function HelloCommunity() {
     }
   }, [profile?.id, currentChannel, channelConfig]);
 
-  // ✅ NEW: Enhanced data loading that includes user reactions
   const loadAllPostData = useCallback(async () => {
     if (posts.length === 0 || !profile?.id) return;
-
     const postIds = posts.map(p => p.id);
-    
-    // Load both general post data AND user-specific reactions
     const [generalPageData, userLikesData] = await Promise.all([
       loadPostsPageData(posts),
       batchLoadPostLikes(postIds, profile.id)
     ]);
-
     setPostsLikesData(userLikesData);
   }, [posts, profile?.id, loadPostsPageData, batchLoadPostLikes]);
 
-  // Load batched data when posts change
   useEffect(() => {
     loadAllPostData();
   }, [loadAllPostData]);
 
-  // Clear cache when component unmounts or channel changes
   useEffect(() => {
     return () => {
       clearPageData();
-      setPostsLikesData({}); // Clear user reaction data
+      setPostsLikesData({});
     };
   }, [clearPageData, currentChannel]);
 
-  // Fetch posts when dependencies change
   useEffect(() => {
     fetchPosts();
   }, [fetchPosts]);
 
-  // Fetch news
   useEffect(() => {
     const loadNews = async () => {
       setIsLoadingNews(true);
@@ -327,11 +264,9 @@ export default function HelloCommunity() {
         }
       }
     };
-
     loadNews();
   }, []);
 
-  // News carousel handlers
   const nextNews = useCallback(() => {
     if (news.length > 0) {
       setCurrentNewsIndex((prev) => (prev + 1) % Math.max(1, news.length - 2));
@@ -344,26 +279,21 @@ export default function HelloCommunity() {
     }
   }, [news.length]);
 
-  // Auto-advance news carousel
   useEffect(() => {
     if (news.length <= 3) return;
-    
     const interval = setInterval(nextNews, 8000);
     return () => clearInterval(interval);
   }, [nextNews, news.length]);
 
-  // Cleanup
   useEffect(() => {
     return () => {
       isMountedRef.current = false;
     };
   }, []);
 
-  // Handle new post creation
   const handleNewPost = useCallback(async (newPost) => {
     if (newPost && isMountedRef.current) {
       setPosts(prevPosts => [newPost, ...prevPosts]);
-      // Trigger page data reload for the new post
       setTimeout(() => {
         if (isMountedRef.current) {
           loadAllPostData();
@@ -372,11 +302,10 @@ export default function HelloCommunity() {
     }
   }, [loadAllPostData]);
 
-  // Handle post deletion
   const handleDeletePost = useCallback(async (deletedPostId) => {
     if (isMountedRef.current) {
       setPosts(prevPosts => prevPosts.filter(post => post.id !== deletedPostId));
-      clearPageData(); // Clear cache when posts change
+      clearPageData();
       setPostsLikesData(prev => {
         const updated = { ...prev };
         delete updated[deletedPostId];
@@ -385,7 +314,6 @@ export default function HelloCommunity() {
     }
   }, [clearPageData]);
 
-  // Get channel display info
   const getChannelInfo = () => {
     if (currentChannel === 'community' && channelConfig) {
       return {
@@ -397,7 +325,6 @@ export default function HelloCommunity() {
         tag: channelConfig.channelTag
       };
     }
-    
     return {
       title: 'Hello Platform-Wide',
       description: 'Connect and collaborate with the entire Fundspace community',
@@ -423,18 +350,13 @@ export default function HelloCommunity() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
-      {/* Header Section */}
       <div className={`bg-gradient-to-r ${channelInfo.gradient} relative overflow-hidden`}>
         <div className="absolute inset-0 bg-black/10"></div>
         <div className="relative container mx-auto px-4 sm:px-6 lg:px-8 py-16">
           <div className="text-center text-white">
             <div className="text-6xl mb-4">{channelInfo.icon}</div>
-            <h1 className="text-4xl md:text-5xl font-bold mb-4">
-              {channelInfo.title}
-            </h1>
-            <p className="text-xl opacity-90 max-w-2xl mx-auto">
-              {channelInfo.description}
-            </p>
+            <h1 className="text-4xl md:text-5xl font-bold mb-4">{channelInfo.title}</h1>
+            <p className="text-xl opacity-90 max-w-2xl mx-auto">{channelInfo.description}</p>
             <div className="mt-6">
               <span className="inline-block px-4 py-2 bg-white/20 rounded-full text-sm font-medium backdrop-blur-sm">
                 {channelInfo.tag}
@@ -443,12 +365,9 @@ export default function HelloCommunity() {
           </div>
         </div>
       </div>
-
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-          {/* Main Content */}
           <div className="lg:col-span-3 space-y-6">
-            {/* Create Post */}
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
               <CreatePost 
                 profile={profile}
@@ -458,8 +377,6 @@ export default function HelloCommunity() {
                 placeholder={`What would you like to share with the ${currentChannel === 'community' && channelConfig ? channelConfig.name.toLowerCase() : 'community'}?`}
               />
             </div>
-
-            {/* Posts */}
             <div className="space-y-6">
               {posts.length > 0 ? (
                 posts.map(post => (
@@ -489,10 +406,7 @@ export default function HelloCommunity() {
               )}
             </div>
           </div>
-
-          {/* Sidebar */}
           <div className="space-y-6">
-            {/* Community Stats */}
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
               <h3 className="font-semibold text-slate-900 mb-4 flex items-center">
                 <Users className="w-5 h-5 mr-2 text-blue-600" />
@@ -521,15 +435,12 @@ export default function HelloCommunity() {
                 </div>
               </div>
             </div>
-
-            {/* Trending News */}
             {!isLoadingNews && news.length > 0 && (
               <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
                 <h3 className="font-semibold text-slate-900 mb-4 flex items-center">
                   <TrendingUp className="w-5 h-5 mr-2 text-orange-600" />
                   Trending News
                 </h3>
-                
                 {news.length > 3 ? (
                   <div className="relative">
                     <div className="flex items-center justify-between mb-4">
@@ -590,15 +501,9 @@ export default function HelloCommunity() {
                 )}
               </div>
             )}
-
-            {/* Channel Info */}
             <div className={`bg-gradient-to-br ${channelConfig?.bgGradient || 'from-blue-50 to-indigo-50'} rounded-xl border ${channelConfig?.borderColor || 'border-blue-200'} p-6`}>
-              <h3 className="font-semibold text-slate-900 mb-3">
-                About {channelInfo.title}
-              </h3>
-              <p className="text-slate-700 text-sm leading-relaxed mb-4">
-                {channelInfo.description}
-              </p>
+              <h3 className="font-semibold text-slate-900 mb-3">About {channelInfo.title}</h3>
+              <p className="text-slate-700 text-sm leading-relaxed mb-4">{channelInfo.description}</p>
               <div className="flex items-center justify-between">
                 <span className={`px-3 py-1 ${channelConfig?.tagColor || 'bg-blue-50 text-blue-700 border-blue-200'} text-xs font-medium rounded-full border`}>
                   {channelInfo.tag}

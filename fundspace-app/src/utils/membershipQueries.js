@@ -1,25 +1,17 @@
-// src/utils/membershipQueries.js - FINAL VERSION with complete deduplication
 import { supabase } from '../supabaseClient.js';
 
-// ✅ GLOBAL REQUEST DEDUPLICATION for membership queries
 const membershipRequestCache = new Map();
-const CACHE_TTL = 30000; // 30 seconds
+const CACHE_TTL = 30000;
 
 function deduplicateMembershipRequest(key, requestFunction) {
   const now = Date.now();
-  
-  // Check if we have a recent cached result
   const cached = membershipRequestCache.get(key);
   if (cached && (now - cached.timestamp) < CACHE_TTL) {
     return Promise.resolve(cached.data);
   }
-  
-  // Check if request is already in progress
   if (cached && cached.promise) {
     return cached.promise;
   }
-  
-  // Make new request
   const promise = requestFunction()
     .then(result => {
       membershipRequestCache.set(key, {
@@ -33,29 +25,21 @@ function deduplicateMembershipRequest(key, requestFunction) {
       membershipRequestCache.delete(key);
       throw error;
     });
-  
-  // Store the promise while request is in progress
   membershipRequestCache.set(key, {
     data: null,
     timestamp: now,
     promise
   });
-  
   return promise;
 }
 
-// Circuit breaker to prevent cascade failures
 let cacheFailureCount = 0;
 const MAX_CACHE_FAILURES = 3;
-const CACHE_COOLDOWN = 60000; // 1 minute
+const CACHE_COOLDOWN = 60000;
 let lastCacheFailure = 0;
 
-/**
- * Get current user's primary organization info with full deduplication
- */
 export async function getOrganizationInfoForDashboard(profileId) {
   if (!profileId) return null;
-  
   return deduplicateMembershipRequest(`dashboard-${profileId}`, async () => {
     try {
       const now = Date.now();
@@ -64,7 +48,6 @@ export async function getOrganizationInfoForDashboard(profileId) {
 
       if (!shouldSkipCache) {
         try {
-          // Try cache table first
           const { data: cacheData, error } = await supabase
             .from('organization_membership_cache')
             .select('*')
@@ -74,8 +57,7 @@ export async function getOrganizationInfoForDashboard(profileId) {
 
           if (!error && cacheData && cacheData.length > 0) {
             const cache = cacheData[0];
-            cacheFailureCount = 0; // Reset on success
-            
+            cacheFailureCount = 0;
             return {
               id: cache.organization_id,
               name: cache.organization_name,
@@ -102,7 +84,6 @@ export async function getOrganizationInfoForDashboard(profileId) {
         }
       }
 
-      // Fallback: Use RPC function with strict deduplication
       try {
         const { data: funcData, error: funcError } = await supabase
           .rpc('get_user_organization_membership', { 
@@ -128,7 +109,6 @@ export async function getOrganizationInfoForDashboard(profileId) {
         console.warn('RPC function failed:', rpcError.message);
       }
 
-      // Final fallback: Direct queries
       const { data: membership, error: membershipError } = await supabase
         .from('organization_memberships')
         .select('*')
@@ -138,7 +118,6 @@ export async function getOrganizationInfoForDashboard(profileId) {
 
       if (!membershipError && membership && membership.length > 0) {
         const membershipData = membership[0];
-        
         const { data: org, error: orgError } = await supabase
           .from('organizations')
           .select('id, name, type, tagline, image_url, slug')
@@ -155,7 +134,6 @@ export async function getOrganizationInfoForDashboard(profileId) {
           };
         }
       }
-
       return null;
     } catch (error) {
       console.warn('Organization query completely failed:', error.message);
@@ -164,12 +142,8 @@ export async function getOrganizationInfoForDashboard(profileId) {
   });
 }
 
-/**
- * Get organization info for profile navigation - with deduplication
- */
 export async function getOrganizationForProfileNav(profileId) {
   if (!profileId) return [];
-  
   return deduplicateMembershipRequest(`nav-${profileId}`, async () => {
     try {
       const { data: cacheData, error } = await supabase
@@ -188,7 +162,6 @@ export async function getOrganizationForProfileNav(profileId) {
         }];
       }
 
-      // Fallback logic
       const { data: membership, error: membershipError } = await supabase
         .from('organization_memberships')
         .select('organization_id')
@@ -211,7 +184,6 @@ export async function getOrganizationForProfileNav(profileId) {
           }];
         }
       }
-
       return [];
     } catch (error) {
       console.warn('Error fetching organization for nav:', error.message);
@@ -220,14 +192,9 @@ export async function getOrganizationForProfileNav(profileId) {
   });
 }
 
-/**
- * Get organization memberships for multiple users - with deduplication
- */
 export async function getBulkOrganizationMemberships(profileIds) {
   if (!profileIds || profileIds.length === 0) return {};
-  
   const cacheKey = `bulk-${profileIds.sort().join(',')}`;
-  
   return deduplicateMembershipRequest(cacheKey, async () => {
     try {
       const { data: cacheData, error } = await supabase
@@ -250,7 +217,6 @@ export async function getBulkOrganizationMemberships(profileIds) {
         return membershipMap;
       }
 
-      // Fallback to direct query
       const { data: memberships, error: directError } = await supabase
         .from('organization_memberships')
         .select('profile_id, organization_id, organization_type, role')
@@ -269,7 +235,6 @@ export async function getBulkOrganizationMemberships(profileIds) {
         });
         return membershipMap;
       }
-
       return {};
     } catch (error) {
       console.warn('Error fetching bulk memberships:', error.message);
@@ -278,12 +243,8 @@ export async function getBulkOrganizationMemberships(profileIds) {
   });
 }
 
-/**
- * Check if user has access to organization management - with deduplication
- */
 export async function checkOrganizationAccess(organizationId, userId) {
   if (!organizationId || !userId) return false;
-  
   return deduplicateMembershipRequest(`access-${organizationId}-${userId}`, async () => {
     try {
       const { data, error } = await supabase
@@ -297,7 +258,6 @@ export async function checkOrganizationAccess(organizationId, userId) {
         return ['admin', 'super_admin'].includes(data[0].role);
       }
 
-      // Fallback query
       const { data: directData, error: directError } = await supabase
         .from('organization_memberships')
         .select('role')
@@ -308,7 +268,6 @@ export async function checkOrganizationAccess(organizationId, userId) {
       if (!directError && directData && directData.length > 0) {
         return ['admin', 'super_admin'].includes(directData[0].role);
       }
-
       return false;
     } catch (error) {
       console.warn('Error checking organization access:', error.message);
@@ -317,22 +276,14 @@ export async function checkOrganizationAccess(organizationId, userId) {
   });
 }
 
-/**
- * Get organization info for community data - alias with deduplication
- */
 export async function getOrganizationInfoForCommunity(profileId) {
   return getOrganizationInfoForDashboard(profileId);
 }
 
-/**
- * Direct membership query with deduplication
- */
 export async function getUserOrganizationMembership(profileId) {
   if (!profileId) return null;
-  
   return deduplicateMembershipRequest(`membership-${profileId}`, async () => {
     try {
-      // Try RPC function first with deduplication
       const { data: funcData, error: funcError } = await supabase
         .rpc('get_user_organization_membership', { 
           user_id: profileId 
@@ -359,7 +310,6 @@ export async function getUserOrganizationMembership(profileId) {
         };
       }
 
-      // Fallback to split queries
       const { data: memberships, error } = await supabase
         .from('organization_memberships')
         .select('*')
@@ -387,7 +337,6 @@ export async function getUserOrganizationMembership(profileId) {
           image_url: null
         }
       };
-
     } catch (err) {
       console.warn('Error getting organization membership:', err.message);
       return null;
@@ -395,7 +344,6 @@ export async function getUserOrganizationMembership(profileId) {
   });
 }
 
-// Clean up old cache entries periodically
 setInterval(() => {
   const now = Date.now();
   for (const [key, value] of membershipRequestCache.entries()) {

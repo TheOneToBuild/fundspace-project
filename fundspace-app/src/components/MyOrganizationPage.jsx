@@ -16,9 +16,7 @@ const OrganizationJoinPrompt = ({ onStartOnboarding }) => {
       <div className="max-w-2xl mx-auto text-center">
         <div className="p-12 rounded-xl shadow-sm bg-slate-50">
           <Users className="w-16 h-16 mx-auto text-slate-400 mb-6" />
-          <h1 className="text-2xl font-bold text-slate-900 mb-4">
-            Join Your Organization
-          </h1>
+          <h1 className="text-2xl font-bold text-slate-900 mb-4">Join Your Organization</h1>
           <p className="text-slate-600 mb-8">
             Connect with your colleagues and team by joining your organization on Fundspace. You can search for existing organizations or create a new organization profile.
           </p>
@@ -71,7 +69,6 @@ export default function MyOrganizationPage() {
   const [isConfirmingLeave, setIsConfirmingLeave] = useState(false);
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
   
-  // Use optimized organization data hook instead of the original
   const {
     organization,
     members,

@@ -1,4 +1,3 @@
-// src/components/discover/components/DashboardBanner.jsx
 import React from 'react';
 import { ChevronDown, BarChart3, Building, DollarSign, MessageSquare, MapPin, Users } from 'lucide-react';
 import { BAY_AREA_COUNTIES, MAJOR_CITIES } from '../data/locationData.js';
@@ -18,10 +17,7 @@ export default function DashboardBanner({
     setSearchQuery,
     isVisible 
 }) {
-    // Fetch live dashboard statistics
     const dashboardStats = useDashboardStats(selectedLocation);
-
-    // Determine if current selection is a county or city
     const isCountySelected = selectedLocation === 'bay-area' || Object.keys(BAY_AREA_COUNTIES).includes(selectedLocation);
     const selectedCounty = isCountySelected ? 
         selectedLocation : 
@@ -34,17 +30,17 @@ export default function DashboardBanner({
         if (Object.keys(BAY_AREA_COUNTIES).includes(location)) {
             return BAY_AREA_COUNTIES[location]?.name;
         }
-        return location; // City name
+        return location;
     };
 
     const handleCountyChange = (countySlug) => {
         setSelectedLocation(countySlug);
-        setViewType('counties'); // Set to counties when selecting a county
+        setViewType('counties');
     };
 
     const handleCityChange = (city) => {
         setSelectedLocation(city);
-        setViewType('cities'); // Set to cities when selecting a city
+        setViewType('cities');
     };
 
     const tabs = [
@@ -56,7 +52,6 @@ export default function DashboardBanner({
 
     const communityImage = COMMUNITY_IMAGES[selectedLocation] || DEFAULT_COMMUNITY_IMAGE;
 
-    // Helper function to format monetary values
     const formatMonetaryValue = (value) => {
         if (value >= 1000000000) return `$${(value / 1000000000).toFixed(1)}B`;
         if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
@@ -64,12 +59,10 @@ export default function DashboardBanner({
         return `$${value.toLocaleString()}`;
     };
 
-    // Helper function to format regular numbers
     const formatRegularValue = (value) => {
         return value.toLocaleString();
     };
 
-    // Prepare metrics data with live stats
     const metricsData = [
         { 
             label: 'Total Funding', 
@@ -108,16 +101,13 @@ export default function DashboardBanner({
                 animation: isVisible ? 'slideInUp 0.6s ease-out both' : 'none'
             }}
         >
-            {/* Top Section - Location Selector */}
             <div className="bg-slate-50 px-8 py-4 border-b border-slate-200">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
                     <div className="flex items-center gap-2">
                         <MapPin className="w-5 h-5 text-blue-600" />
                         <span className="font-medium text-slate-900">Community:</span>
                     </div>
-                    
                     <div className="flex items-center gap-3 flex-1 flex-wrap">
-                        {/* County Dropdown */}
                         <div className="relative min-w-48">
                             <select
                                 value={selectedCounty || 'bay-area'}
@@ -133,8 +123,6 @@ export default function DashboardBanner({
                             </select>
                             <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4 pointer-events-none" />
                         </div>
-
-                        {/* City Dropdown - Only show if a specific county is selected */}
                         {selectedCounty && selectedCounty !== 'bay-area' && MAJOR_CITIES[selectedCounty] && (
                             <>
                                 <span className="text-slate-400">→</span>
@@ -161,8 +149,6 @@ export default function DashboardBanner({
                                 </div>
                             </>
                         )}
-
-                        {/* Selected Location Display */}
                         {selectedLocation && selectedLocation !== 'bay-area' && (
                             <div className="flex items-center gap-2 px-3 py-1 bg-blue-50 text-blue-700 rounded-lg text-sm">
                                 <span className="font-medium">
@@ -180,11 +166,8 @@ export default function DashboardBanner({
                     </div>
                 </div>
             </div>
-
-            {/* Main Banner Content */}
             <div className="p-8">
                 <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-8">
-                    {/* Left Side - Community Info */}
                     <div className="flex items-center gap-6">
                         <div className="w-32 h-32 rounded-3xl shadow-lg relative overflow-hidden">
                             <img 
@@ -192,7 +175,6 @@ export default function DashboardBanner({
                                 alt={locationName}
                                 className="w-full h-full object-cover rounded-3xl"
                                 onError={(e) => {
-                                    // Fallback to gradient background if image fails
                                     e.target.style.display = 'none';
                                     e.target.nextElementSibling.style.display = 'flex';
                                 }}
@@ -205,8 +187,6 @@ export default function DashboardBanner({
                         <div>
                             <h1 className="text-4xl font-bold text-slate-900 mb-2">{locationName}</h1>
                             <p className="text-slate-600 text-lg">Community impact dashboard</p>
-                            
-                            {/* Quick Stats Pills */}
                             <div className="flex items-center gap-4 mt-4">
                                 <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 rounded-full">
                                     <div className={`w-2 h-2 rounded-full ${dashboardStats.loading ? 'bg-yellow-500 animate-pulse' : 'bg-blue-500 animate-pulse'}`} />
@@ -221,8 +201,6 @@ export default function DashboardBanner({
                             </div>
                         </div>
                     </div>
-                    
-                    {/* Right Side - Tab Navigation */}
                     <div className="flex-shrink-0">
                         <div className="flex bg-slate-100 rounded-2xl p-2 gap-2">
                             {tabs.map((tab) => (
@@ -235,11 +213,9 @@ export default function DashboardBanner({
                                             : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
                                     }`}
                                 >
-                                    {/* Active tab background gradient */}
                                     {activeTab === tab.id && (
                                         <div className="absolute inset-0 bg-gradient-to-r from-blue-50 to-purple-50 opacity-50" />
                                     )}
-                                    
                                     <div className="relative z-10 flex items-center gap-3">
                                         <tab.icon className="w-4 h-4" />
                                         {tab.label}
@@ -258,8 +234,6 @@ export default function DashboardBanner({
                         </div>
                     </div>
                 </div>
-
-                {/* Bottom Section - Key Metrics Summary */}
                 <div className="mt-8 pt-6 border-t border-slate-100">
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
                         {metricsData.map((metric, index) => {

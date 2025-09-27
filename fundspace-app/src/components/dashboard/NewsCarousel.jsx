@@ -1,4 +1,3 @@
-// src/components/dashboard/NewsCarousel.jsx
 import React from 'react';
 import { Globe, ChevronLeft, ChevronRight } from 'lucide-react';
 import PropTypes from 'prop-types';
@@ -19,11 +18,7 @@ const NewsCard = ({ title, timeAgo, image, url, category }) => (
                 <Globe size={32} className="text-slate-400" />
             </div>
         )}
-        
-        {/* Dark Gradient Overlay */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
-        
-        {/* Source Tag - Top Left */}
         <div className="absolute top-3 left-3">
             <div className="flex items-center space-x-2">
                 <span className="bg-white/20 backdrop-blur-sm text-white text-xs font-medium px-2 py-1 rounded-full border border-white/30">
@@ -35,15 +30,11 @@ const NewsCard = ({ title, timeAgo, image, url, category }) => (
                 </div>
             </div>
         </div>
-        
-        {/* Title Overlay - Bottom */}
         <div className="absolute bottom-0 left-0 right-0 p-4">
             <h3 className="font-bold text-white text-lg leading-tight line-clamp-3 group-hover:text-blue-200 transition-colors">
                 {title}
             </h3>
         </div>
-        
-        {/* Hover Overlay */}
         <div className="absolute inset-0 bg-blue-600/0 group-hover:bg-blue-600/10 transition-colors duration-200"></div>
     </div>
 );
@@ -60,7 +51,7 @@ const NewsCarousel = ({ news }) => {
     const scrollNews = (direction) => {
         const container = document.getElementById('dashboard-news-scroll');
         if (container) {
-            const scrollAmount = 280; // Width of card (256px) + gap (24px)
+            const scrollAmount = 280;
             container.scrollBy({ 
                 left: direction === 'left' ? -scrollAmount : scrollAmount, 
                 behavior: 'smooth' 

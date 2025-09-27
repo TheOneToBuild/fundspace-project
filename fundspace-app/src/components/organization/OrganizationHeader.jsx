@@ -1,4 +1,3 @@
-// components/organization/OrganizationHeader.jsx - Enhanced banner implementation with positioning
 import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -32,27 +31,21 @@ export default function OrganizationHeader({
     const isOmegaAdmin = profile?.is_omega_admin === true;
     const userRole = userMembership?.role;
     
-    // Permission checks
     const canEditOrg = hasPermission(userRole, PERMISSIONS.EDIT_ORGANIZATION, isOmegaAdmin);
     const canDeleteOrg = hasPermission(userRole, PERMISSIONS.DELETE_ORGANIZATION, isOmegaAdmin);
     const canLeave = !isOmegaAdmin && userMembership;
 
     const handleEditOrganization = () => {
         setShowDropdown(false);
-        
-        // For Omega Admins, store the organization info in sessionStorage
         if (isOmegaAdmin) {
             sessionStorage.setItem('omegaAdminEditOrg', JSON.stringify({
                 id: organization.id,
                 type: organization.type
             }));
         }
-        
-        // Navigate to the organization profile page with edit mode
         if (organization.slug) {
             navigate(`/organizations/${organization.slug}?edit=true`);
         } else {
-            // Fallback if no slug
             navigate(`/organizations/${organization.id}?edit=true`);
         }
     };
@@ -70,14 +63,11 @@ export default function OrganizationHeader({
 
     if (!organization) return null;
 
-    // Get banner position from organization data
     const bannerPosition = organization.banner_position || { x: 50, y: 50 };
 
     return (
         <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-            {/* Enhanced Banner Section */}
             <div className="relative">
-                {/* Banner Image */}
                 <div className="aspect-[6/1] overflow-hidden bg-gradient-to-br from-slate-100 via-white to-slate-100">
                     {organization.banner_url || organization.banner_image_url ? (
                         <img 
@@ -89,7 +79,6 @@ export default function OrganizationHeader({
                             }}
                         />
                     ) : (
-                        // Default gradient banner if no image
                         <div className="w-full h-full bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center">
                             <div className="text-6xl opacity-20">
                                 {getOrgTypeIcon(organization.type)}
@@ -97,16 +86,11 @@ export default function OrganizationHeader({
                         </div>
                     )}
                 </div>
-                
-                {/* Banner Overlay for better text readability */}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent" />
             </div>
-            
             <div className="p-6">
-                {/* Header Section */}
                 <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
                     <div className="flex items-start space-x-4">
-                        {/* Organization Logo - positioned to overlap banner */}
                         <div className="relative group flex-shrink-0 -mt-12">
                             <div className="w-20 h-20 bg-white rounded-xl flex items-center justify-center overflow-hidden border-4 border-white shadow-lg">
                                 {organization.image_url || organization.logo_url ? (
@@ -120,9 +104,7 @@ export default function OrganizationHeader({
                                 )}
                             </div>
                         </div>
-                        
                         <div className="min-w-0 flex-1">
-                            {/* Organization Name & Type */}
                             <div className="flex items-center flex-wrap gap-2 mb-2">
                                 <h1 className="text-2xl font-bold text-slate-900 truncate">
                                     {organization.name}
@@ -132,8 +114,6 @@ export default function OrganizationHeader({
                                     {getOrgTypeLabel(organization.type)}
                                 </span>
                             </div>
-
-                            {/* Organization Meta Info */}
                             <div className="flex flex-wrap items-center gap-4 text-sm text-slate-600">
                                 <span className="flex items-center">
                                     {userRole === ROLES.SUPER_ADMIN && <Crown className="w-3 h-3 mr-1.5" />}
@@ -168,10 +148,7 @@ export default function OrganizationHeader({
                             </div>
                         </div>
                     </div>
-
-                    {/* Action Buttons */}
                     <div className="flex items-center space-x-3">
-                        {/* View Public Profile Button */}
                         {organization.slug && (
                             <a
                                 href={`/organizations/${organization.slug}`}
@@ -183,8 +160,6 @@ export default function OrganizationHeader({
                                 View Public Profile
                             </a>
                         )}
-
-                        {/* Management Dropdown */}
                         {(canEditOrg || canLeave || canDeleteOrg) && (
                             <div className="relative">
                                 <button
@@ -196,16 +171,12 @@ export default function OrganizationHeader({
                                     Manage
                                     <MoreVertical className="w-4 h-4 ml-2" />
                                 </button>
-
                                 {showDropdown && (
                                     <>
-                                        {/* Backdrop */}
                                         <div 
                                             className="fixed inset-0 z-40" 
                                             onClick={() => setShowDropdown(false)}
                                         />
-                                        
-                                        {/* Dropdown Menu - positioned with calculated coordinates */}
                                         <div 
                                             className="fixed z-50 w-64 bg-white rounded-lg shadow-xl border border-slate-200 py-2"
                                             style={{
@@ -268,8 +239,6 @@ export default function OrganizationHeader({
                         )}
                     </div>
                 </div>
-
-                {/* Description/Mission */}
                 {organization.description && (
                     <div className="mt-6 pt-6 border-t border-slate-200">
                         <h3 className="text-sm font-medium text-slate-700 mb-2">Mission</h3>

@@ -4,7 +4,7 @@ import { Outlet, useOutletContext } from 'react-router-dom';
 import PublicPageLayout from './components/PublicPageLayout.jsx';
 import GrantDetailModal from './GrantDetailModal.jsx';
 import { usePageDataLoader } from './hooks/usePageDataLoader';
-import globalDataManager from './utils/globalDataManager';
+import { getUserProfileComplete, trackRPCUsage } from './utils/rpcClientFunctions';
 
 export default function ProfilePage() {
   const appContext = useOutletContext();
@@ -14,7 +14,7 @@ export default function ProfilePage() {
     trendingGrants: [],
     savedGrants: [],
     posts: [],
-    postsLikesData: {}, // NEW: Cache for batched likes data
+    postsLikesData: {},
     isDetailModalOpen: false,
     selectedGrant: null,
     dataLoading: false,
@@ -61,81 +61,28 @@ export default function ProfilePage() {
     followingUsers,
   } = appState;
 
-  // NEW: Batch load post likes data
-  const batchLoadPostLikes = useCallback(async (postIds, userId) => {
-    if (!postIds.length || !userId) return {};
-
-    try {
-      // Single batch query instead of N individual queries
-      const { data: likesData, error } = await supabase
-        .from('post_likes')
-        .select('post_id, reaction_type, user_id, created_at')
-        .in('post_id', postIds)
-        .eq('user_id', userId);
-
-      if (error) {
-        console.error('Error fetching batch post likes:', error);
-        return {};
-      }
-
-      // Convert to lookup object: { postId: { userReaction: 'like|dislike', ... } }
-      const likesLookup = {};
-      postIds.forEach(postId => {
-        likesLookup[postId] = { userReaction: null };
-      });
-
-      (likesData || []).forEach(like => {
-        if (!likesLookup[like.post_id]) {
-          likesLookup[like.post_id] = {};
-        }
-        likesLookup[like.post_id].userReaction = like.reaction_type;
-      });
-
-      return likesLookup;
-    } catch (error) {
-      console.error('Error in batchLoadPostLikes:', error);
-      return {};
-    }
-  }, []);
-
   const fetchPageData = useCallback(async (userId) => {
     if (!userId) return;
 
     setAppState((prev) => ({ ...prev, dataLoading: true, error: null }));
 
     try {
-      // OPTIMIZED: Load posts using globalDataManager
-      const postsData = await globalDataManager.getPostsForUsers([userId], 20);
-      const posts = postsData[userId] || [];
-      const postIds = posts.map(p => p.id);
-
-      // FIXED: Batch load all post likes in single query instead of N+1
-      const likesData = await batchLoadPostLikes(postIds, userId);
-
-      await loadProfilePageData(userId, posts);
-
-      // Continue with other parallel queries (unchanged)
+      console.log('Loading profile page with RPC optimization...');
+      
+      const rpcData = await getUserProfileComplete(userId, userId);
+      
+      const posts = rpcData.posts || [];
+      const postsLikesData = rpcData.post_likes_lookup || {};
+      
       const [
-        { data: savedGrantsData },
-        { data: followersData },
-        { data: followingData },
+        { data: trendingGrantsData },
         { data: communityMembersData },
       ] = await Promise.all([
         supabase
-          .from('saved_grants')
-          .select('*, grants:grant_id(*)')
-          .eq('user_id', userId)
-          .limit(10),
-        supabase
-          .from('followers')
-          .select('follower_id, profiles:follower_id(id, full_name, avatar_url, title, organization_name)')
-          .eq('following_id', userId)
-          .limit(20),
-        supabase
-          .from('followers')
-          .select('following_id, profiles:following_id(id, full_name, avatar_url, title, organization_name)')
-          .eq('follower_id', userId)
-          .limit(20),
+          .from('grants')
+          .select('*')
+          .order('id', { ascending: false })
+          .limit(15),
         supabase
           .from('profiles')
           .select('id, full_name, avatar_url, title, organization_name')
@@ -143,14 +90,6 @@ export default function ProfilePage() {
           .limit(10),
       ]);
 
-      // Trending grants with single batch query
-      const { data: trendingGrantsData } = await supabase
-        .from('grants')
-        .select('*')
-        .order('id', { ascending: false })
-        .limit(15);
-
-      // Batch fetch organizations
       const orgIds = [...new Set(trendingGrantsData?.map(g => g.organization_id).filter(Boolean))];
       let orgsData = [];
       if (orgIds.length > 0) {
@@ -173,9 +112,9 @@ export default function ProfilePage() {
         grantsApplied: Math.floor(Math.random() * 15) + 5,
         grantsReceived: Math.floor(Math.random() * 5) + 1,
         totalFunding: Math.floor(Math.random() * 500000) + 50000,
-        communitiesHelped: followersData?.length || 0,
+        communitiesHelped: rpcData.follower_count || 0,
         postsShared: posts.length,
-        connectionsGrown: (followersData?.length || 0) + (followingData?.length || 0),
+        connectionsGrown: (rpcData.follower_count || 0) + (rpcData.following_count || 0),
       };
 
       const stories = [
@@ -184,32 +123,45 @@ export default function ProfilePage() {
         { id: 3, type: 'team_update', title: 'Team News', image: null, viewed: false },
       ];
 
+      await loadProfilePageData(userId, posts);
+
       setAppState((prev) => ({
         ...prev,
         dataLoading: false,
         posts,
-        postsLikesData: likesData, // NEW: Store batched likes data
-        savedGrants: savedGrantsData?.map((sg) => sg.grants) || [],
+        postsLikesData,
+        savedGrants: rpcData.saved_grants || [],
         trendingGrants: formattedTrendingGrants,
         totalPosts: posts.length,
-        followerUsers: followersData?.map((f) => f.profiles) || [],
-        totalFollowers: followersData?.length || 0,
-        followingUsers: followingData?.map((f) => f.profiles) || [],
-        totalFollowing: followingData?.length || 0,
+        followerUsers: rpcData.followers || [],
+        totalFollowers: rpcData.follower_count || 0,
+        followingUsers: rpcData.following || [],
+        totalFollowing: rpcData.following_count || 0,
         communityMembers: communityMembersData || [],
         suggestedConnections: (communityMembersData || []).slice(0, 5),
         impactMetrics,
         stories,
       }));
+
+      trackRPCUsage('get_user_profile_complete', true);
+      
+      console.log('Profile page RPC loaded:', {
+        posts: posts.length,
+        followers: rpcData.follower_count || 0,
+        following: rpcData.following_count || 0,
+        saved_grants: rpcData.saved_grants?.length || 0
+      });
+
     } catch (error) {
-      console.error('Error fetching page data:', error);
+      console.error('Error loading profile page RPC:', error);
+      trackRPCUsage('get_user_profile_complete', false);
       setAppState((prev) => ({
         ...prev,
         dataLoading: false,
         error: 'Failed to load data. Please try again.',
       }));
     }
-  }, [loadProfilePageData, batchLoadPostLikes]);
+  }, [loadProfilePageData]);
 
   const handleTabChange = useCallback((newTab) => {
     setAppState((prev) => ({ ...prev, activeTab: newTab }));
@@ -284,7 +236,6 @@ export default function ProfilePage() {
           ...prev.posts,
         ],
         totalPosts: prev.totalPosts + 1,
-        // Update likes data for new post
         postsLikesData: {
           ...prev.postsLikesData,
           [newPostData.id]: { userReaction: null }
@@ -302,7 +253,6 @@ export default function ProfilePage() {
         ...prev,
         posts: prev.posts.filter((p) => p.id !== deletedPostId),
         totalPosts: Math.max(0, prev.totalPosts - 1),
-        // Remove from likes data
         postsLikesData: Object.fromEntries(
           Object.entries(prev.postsLikesData).filter(([postId]) => postId !== deletedPostId.toString())
         )
@@ -376,11 +326,9 @@ export default function ProfilePage() {
     [session, fetchPageData, clearPageData]
   );
 
-  // NEW: Handle post like/unlike with optimistic updates
   const handlePostLike = useCallback(async (postId, currentReaction, newReaction) => {
     if (!session?.user?.id) return;
 
-    // Optimistic update
     setAppState(prev => ({
       ...prev,
       postsLikesData: {
@@ -392,14 +340,12 @@ export default function ProfilePage() {
     try {
       if (currentReaction) {
         if (newReaction === null) {
-          // Remove reaction
           await supabase
             .from('post_likes')
             .delete()
             .eq('post_id', postId)
             .eq('user_id', session.user.id);
         } else {
-          // Update existing reaction
           await supabase
             .from('post_likes')
             .update({ reaction_type: newReaction })
@@ -407,7 +353,6 @@ export default function ProfilePage() {
             .eq('user_id', session.user.id);
         }
       } else {
-        // Insert new reaction
         await supabase
           .from('post_likes')
           .insert({
@@ -418,7 +363,6 @@ export default function ProfilePage() {
       }
     } catch (error) {
       console.error('Error updating post reaction:', error);
-      // Revert optimistic update on error
       setAppState(prev => ({
         ...prev,
         postsLikesData: {
@@ -434,11 +378,11 @@ export default function ProfilePage() {
       ...appContext,
       profile,
       posts,
-      postsLikesData, // NEW: Provide batched likes data to components
+      postsLikesData,
       pageData,
       handleNewPost,
       handleDeletePost,
-      handlePostLike, // NEW: Provide like handler
+      handlePostLike,
       savedGrants,
       session,
       handleSaveGrant,
@@ -462,11 +406,11 @@ export default function ProfilePage() {
       appContext,
       profile,
       posts,
-      postsLikesData, // NEW
+      postsLikesData,
       pageData,
       handleNewPost,
       handleDeletePost,
-      handlePostLike, // NEW
+      handlePostLike,
       savedGrants,
       session,
       handleSaveGrant,
@@ -520,6 +464,17 @@ export default function ProfilePage() {
   return (
     <PublicPageLayout bgColor="bg-[#faf7f4]">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 min-h-screen flex flex-col">
+        {process.env.NODE_ENV === 'development' && posts.length > 0 && (
+          <div className="p-4 bg-green-50 border border-green-200 rounded-lg mb-6">
+            <h3 className="text-green-800 font-semibold mb-2">Profile Page RPC Optimization Active!</h3>
+            <p className="text-green-600 text-sm">
+              Profile page loaded with 1 RPC call instead of 8+ individual API calls.
+              Posts: {posts.length}, Followers: {totalFollowers}, Following: {totalFollowing}, 
+              Saved Grants: {savedGrants.length}
+            </p>
+          </div>
+        )}
+        
         <Outlet context={outletContext} />
         {isDetailModalOpen && selectedGrant && (
           <GrantDetailModal

@@ -1,17 +1,13 @@
-// src/components/dashboard/HelloCommunitySection.jsx - FIXED: Direct Supabase query wrapped with optimizer
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../supabaseClient';
 import { ChevronLeft, ChevronRight, MessageCircle, Heart } from 'lucide-react';
 import { renderMentionsInText } from '../../utils/mentionUtils';
-import { optimizedSupabaseQuery } from '../../utils/apiRequestOptimizer'; // ✅ ADD THIS IMPORT
 import PropTypes from 'prop-types';
 
-// CORRECTED: TrendingPostCard with all required batched data props
 const TrendingPostCard = ({ post, onClick, pageData, postsLikesData, onPostLike }) => {
     const navigate = useNavigate();
     
-    // CRITICAL: Use batched data exclusively
     const likesData = postsLikesData?.[post.id] || pageData?.postLikes?.[post.id];
     const profileData = pageData?.profiles?.[post.profile_id || post.profiles?.id] || post.profiles;
     const orgMembership = pageData?.orgMemberships?.[post.profile_id || post.profiles?.id];
@@ -23,14 +19,12 @@ const TrendingPostCard = ({ post, onClick, pageData, postsLikesData, onPostLike 
         post?.comments_count || 0
     );
 
-    // Update when batched data changes
     React.useEffect(() => {
         if (likesData?.likes_count !== undefined) {
             setLocalLikes(likesData.likes_count);
         }
     }, [likesData]);
 
-    // Enhanced profile with batched organization data
     const displayAuthor = React.useMemo(() => ({
         ...profileData,
         organization_name: orgMembership?.organization?.name || profileData?.organization_name,
@@ -47,10 +41,8 @@ const TrendingPostCard = ({ post, onClick, pageData, postsLikesData, onPostLike 
         return `${Math.floor(diffInHours / 24)}d ago`;
     };
 
-    // ✅ CRITICAL FIX: Wrap the direct Supabase query with optimizer
     const handleMentionClick = async (mention, event) => {
         event?.stopPropagation();
-        
         if (mention.entityType === 'user') {
             navigate(`/profile/members/${mention.id}`);
         } else if (mention.entityType === 'organization') {
@@ -61,23 +53,12 @@ const TrendingPostCard = ({ post, onClick, pageData, postsLikesData, onPostLike 
                 } else {
                     orgId = mention.id;
                 }
-                
                 if (orgId) {
-                    // ✅ BEFORE (Direct query causing organization API calls):
-                    // const { data: orgData } = await supabase
-                    //     .from('organizations')
-                    //     .select('slug, type')
-                    //     .eq('id', parseInt(orgId))
-                    //     .single();
-                    
-                    // ✅ AFTER (Optimized with API optimizer):
-                    const optimizedQuery = optimizedSupabaseQuery(
-                        supabase.from('organizations').select('slug, type').eq('id', parseInt(orgId)),
-                        'organizations_single',
-                        { orgIds: [parseInt(orgId)] }
-                    );
-                    const { data: orgData } = await optimizedQuery.single();
-                    
+                    const { data: orgData } = await supabase
+                        .from('organizations')
+                        .select('slug, type')
+                        .eq('id', parseInt(orgId))
+                        .single();
                     if (orgData?.slug) {
                         navigate(`/organizations/${orgData.slug}`);
                     } else {
@@ -99,7 +80,6 @@ const TrendingPostCard = ({ post, onClick, pageData, postsLikesData, onPostLike 
         if (htmlContent && htmlContent.includes('class="mention"')) {
             const div = document.createElement('div');
             div.innerHTML = htmlContent;
-            
             const parts = [];
             const walkNode = (node) => {
                 if (node.nodeType === Node.TEXT_NODE) {
@@ -125,18 +105,15 @@ const TrendingPostCard = ({ post, onClick, pageData, postsLikesData, onPostLike 
                     }
                 }
             };
-            
             for (const child of div.childNodes) {
                 walkNode(child);
             }
-            
             const filteredParts = parts.filter(part => {
                 if (typeof part === 'string') {
                     return part.trim().length > 0;
                 }
                 return true;
             });
-            
             return filteredParts.map((part, index) => {
                 if (typeof part === 'string') {
                     return part;
@@ -158,11 +135,9 @@ const TrendingPostCard = ({ post, onClick, pageData, postsLikesData, onPostLike 
             });
         } else {
             const parts = renderMentionsInText(text);
-            
             if (typeof parts === 'string') {
                 return parts;
             }
-            
             return parts.map((part, index) => {
                 if (typeof part === 'string') {
                     return part;
@@ -192,11 +167,9 @@ const TrendingPostCard = ({ post, onClick, pageData, postsLikesData, onPostLike 
         const imgElements = div.querySelectorAll('img');
         const images = Array.from(imgElements).map(img => img.src).filter(src => src);
         imgElements.forEach(img => img.remove());
-        
         const htmlText = div.innerHTML;
         let text = div.innerHTML;
         text = text.replace(/<[^>]*>/g, '').trim();
-        
         return { text, htmlText, images };
     };
 
@@ -274,7 +247,6 @@ const TrendingPostCard = ({ post, onClick, pageData, postsLikesData, onPostLike 
     );
 };
 
-// Organization channel configuration (unchanged)
 const ORGANIZATION_CHANNELS = {
   'nonprofit': { 
     name: 'Nonprofit Community', 
@@ -329,7 +301,6 @@ const getChannelInfo = (channelType) => {
   return channelType && ORGANIZATION_CHANNELS[channelType] ? ORGANIZATION_CHANNELS[channelType] : null;
 };
 
-// CORRECTED: Accept all required batched data props
 const HelloCommunitySection = ({ posts, onViewMore, onPostClick, organizationInfo, pageData, postsLikesData, onPostLike }) => {
     const userOrgType = getOrgBaseType(organizationInfo?.type);
     const channelInfo = getChannelInfo(userOrgType);
@@ -410,7 +381,6 @@ const HelloCommunitySection = ({ posts, onViewMore, onPostClick, organizationInf
     );
 };
 
-// CORRECTED: Complete PropTypes with all batched data props
 HelloCommunitySection.propTypes = {
     posts: PropTypes.array.isRequired,
     onViewMore: PropTypes.func.isRequired,

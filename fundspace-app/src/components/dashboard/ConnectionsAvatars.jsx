@@ -1,9 +1,8 @@
-// src/components/dashboard/ConnectionsAvatars.jsx - FULLY OPTIMIZED: Use globalDataManager for all data
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, Plus, Users, UserCheck } from 'lucide-react';
 import { supabase } from '../../supabaseClient';
-import globalDataManager from '../../utils/globalDataManager'; // ✅ CRITICAL IMPORT
+import { getDashboardData } from '../../utils/rpcClientFunctions';
 import PropTypes from 'prop-types';
 
 const ConnectionAvatar = ({ person, hasRecentPost, type, onClick }) => {
@@ -17,7 +16,6 @@ const ConnectionAvatar = ({ person, hasRecentPost, type, onClick }) => {
         }
     };
 
-    // Get the user data regardless of whether it's a connection or following
     const userData = person.user || person;
 
     return (
@@ -26,7 +24,6 @@ const ConnectionAvatar = ({ person, hasRecentPost, type, onClick }) => {
             onClick={handleClick}
         >
             <div className="relative">
-                {/* Avatar with gradient ring for recent posts or different colors for different types */}
                 <div className={`p-0.5 rounded-full ${hasRecentPost 
                     ? 'bg-gradient-to-tr from-pink-500 via-purple-500 to-blue-500' 
                     : type === 'connection' 
@@ -41,8 +38,6 @@ const ConnectionAvatar = ({ person, hasRecentPost, type, onClick }) => {
                         />
                     </div>
                 </div>
-                
-                {/* Indicator icons */}
                 <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-white border-2 border-white rounded-full flex items-center justify-center">
                     {hasRecentPost ? (
                         <div className="w-3 h-3 bg-green-500 rounded-full"></div>
@@ -53,8 +48,6 @@ const ConnectionAvatar = ({ person, hasRecentPost, type, onClick }) => {
                     )}
                 </div>
             </div>
-            
-            {/* Name */}
             <div className="text-center max-w-[80px]">
                 <span className="text-xs text-slate-700 font-medium truncate block group-hover:text-blue-600 transition-colors">
                     {userData.full_name?.split(' ')[0] || 'User'}
@@ -81,31 +74,16 @@ const ConnectionsAvatars = ({ currentUserProfile }) => {
     useEffect(() => {
         const loadNetworkData = async () => {
             if (!currentUserProfile?.id) return;
-
             try {
                 setLoading(true);
+                const dashboardData = await getDashboardData(currentUserProfile.id);
+                const connections = dashboardData?.connections || [];
+                const following = dashboardData?.following || [];
+                const profiles = dashboardData?.profiles || {};
                 
-                // ✅ BEFORE (Multiple direct queries causing API spikes):
-                // const { data: connectionsData } = await supabase.from('user_connections')...
-                // const { data: followingData } = await supabase.from('followers')...
-                // const { data: profilesData } = await supabase.from('profiles')...
-
-                // ✅ AFTER (Single globalDataManager batch operations):
-                
-                // 1. Get connections and following data in parallel batches
-                const [connectionsData, followingData] = await Promise.all([
-                    globalDataManager.getUserConnections([currentUserProfile.id], 'accepted'),
-                    globalDataManager.getFollowing([currentUserProfile.id])
-                ]);
-
-                const connections = connectionsData[currentUserProfile.id] || [];
-                const following = followingData[currentUserProfile.id] || [];
-
-                // 2. Extract all user IDs for batch profile loading
                 const connectionUserIds = new Set();
                 const followingUserIds = new Set();
 
-                // Process connections to get other user IDs
                 connections.forEach(conn => {
                     const otherUserId = conn.requester_id === currentUserProfile.id 
                         ? conn.recipient_id 
@@ -113,12 +91,10 @@ const ConnectionsAvatars = ({ currentUserProfile }) => {
                     connectionUserIds.add(otherUserId);
                 });
 
-                // Process following to get user IDs
                 following.forEach(follow => {
                     followingUserIds.add(follow.following_id);
                 });
 
-                // 3. Combine all unique user IDs for single batch profile load
                 const allUserIds = [...new Set([...connectionUserIds, ...followingUserIds])];
 
                 if (allUserIds.length === 0) {
@@ -128,20 +104,14 @@ const ConnectionsAvatars = ({ currentUserProfile }) => {
                     return;
                 }
 
-                // 4. Single batch load for all profile data
-                const profilesData = await globalDataManager.getProfiles(allUserIds);
-
-                // 5. Check for recent posts using direct query (since method doesn't exist yet)
                 let usersWithRecentPosts = new Set();
                 try {
                     const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-                    
                     const { data: recentPosts, error } = await supabase
                         .from('posts')
                         .select('profile_id')
                         .in('profile_id', allUserIds)
                         .gte('created_at', twentyFourHoursAgo);
-                    
                     if (!error && recentPosts) {
                         usersWithRecentPosts = new Set(recentPosts.map(post => post.profile_id));
                     }
@@ -151,18 +121,15 @@ const ConnectionsAvatars = ({ currentUserProfile }) => {
 
                 setRecentPostUsers(usersWithRecentPosts);
 
-                // 6. Process network members with batched profile data
                 const networkData = [];
                 const seenUserIds = new Set();
 
-                // Add connections first (priority over following)
                 connectionUserIds.forEach(userId => {
-                    const profile = profilesData[userId];
+                    const profile = profiles[userId];
                     if (profile && !seenUserIds.has(userId)) {
                         const connectionInfo = connections.find(c => 
                             (c.requester_id === userId || c.recipient_id === userId)
                         );
-                        
                         networkData.push({
                             type: 'connection',
                             id: `connection-${userId}`,
@@ -173,12 +140,10 @@ const ConnectionsAvatars = ({ currentUserProfile }) => {
                     }
                 });
 
-                // Add following (only if not already connected)
                 followingUserIds.forEach(userId => {
-                    const profile = profilesData[userId];
+                    const profile = profiles[userId];
                     if (profile && !seenUserIds.has(userId)) {
                         const followInfo = following.find(f => f.following_id === userId);
-                        
                         networkData.push({
                             type: 'following',
                             id: `following-${userId}`,
@@ -189,23 +154,15 @@ const ConnectionsAvatars = ({ currentUserProfile }) => {
                     }
                 });
 
-                // 7. Sort by activity and type
                 const sortedMembers = networkData.sort((a, b) => {
                     const aUserId = a.user.id;
                     const bUserId = b.user.id;
-                    
-                    // Prioritize users with recent posts
                     const aHasRecent = usersWithRecentPosts.has(aUserId);
                     const bHasRecent = usersWithRecentPosts.has(bUserId);
-                    
                     if (aHasRecent && !bHasRecent) return -1;
                     if (!aHasRecent && bHasRecent) return 1;
-                    
-                    // Then by connection type (connections before following)
                     if (a.type === 'connection' && b.type === 'following') return -1;
                     if (a.type === 'following' && b.type === 'connection') return 1;
-                    
-                    // Finally by date
                     const aDate = new Date(a.connected_at || a.followed_at || 0);
                     const bDate = new Date(b.connected_at || b.followed_at || 0);
                     return bDate - aDate;
@@ -213,7 +170,6 @@ const ConnectionsAvatars = ({ currentUserProfile }) => {
 
                 setNetworkMembers(sortedMembers);
 
-                // Calculate stats
                 const connectionsCount = connectionUserIds.size;
                 const followingCount = followingUserIds.size;
                 const uniqueFollowingCount = followingUserIds.size - 
@@ -229,7 +185,6 @@ const ConnectionsAvatars = ({ currentUserProfile }) => {
                 setLoading(false);
             }
         };
-
         loadNetworkData();
     }, [currentUserProfile?.id]);
 
@@ -270,7 +225,6 @@ const ConnectionsAvatars = ({ currentUserProfile }) => {
         );
     }
 
-    // Don't show the section if user has no network
     if (networkMembers.length === 0) {
         return (
             <div className="mb-8">
@@ -383,7 +337,6 @@ const ConnectionsAvatars = ({ currentUserProfile }) => {
                     </div>
                 </div>
             </div>
-            
             <div id="network-avatars-scroll" className="flex space-x-4 overflow-x-auto scrollbar-hide pb-2">
                 {networkMembers.map(networkMember => {
                     const userId = networkMember.user ? networkMember.user.id : networkMember.id;

@@ -1,8 +1,6 @@
-// src/components/HelloWorldChannel.jsx - FULLY OPTIMIZED: Use globalDataManager for posts
 import React, { useState, useEffect, useRef, useCallback, memo } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { supabase } from '../supabaseClient.js';
-import { optimizedSupabaseQuery } from '../utils/apiRequestOptimizer'; // ✅ CRITICAL IMPORT
 import { ChevronLeft, ChevronRight, Users, MessageCircle, Globe } from 'lucide-react';
 import PostCard from './PostCard.jsx';
 import CreatePost from './CreatePost.jsx';
@@ -10,34 +8,23 @@ import { rssNewsService as newsService } from '../services/rssNewsService.js';
 import { addOrganizationEventListener } from '../utils/organizationEvents.js';
 import { getOrganizationInfoForDashboard } from '../utils/membershipQueries.js';
 import { realtimeManager } from '../utils/realtimeManager.js';
-import globalDataManager from '../utils/globalDataManager.js';
-
+import { getDashboardData } from '../utils/rpcClientFunctions';
 import PropTypes from 'prop-types';
 
 const NewsCard = memo(({ title, timeAgo, image, url, category }) => {
   const handleClick = () => {
     if (url) window.open(url, '_blank', 'noopener,noreferrer');
   };
-
   return (
-    <div 
-      onClick={handleClick}
-      className="relative w-80 h-80 bg-white rounded-xl overflow-hidden shadow-lg group cursor-pointer"
-    >
+    <div onClick={handleClick} className="relative w-80 h-80 bg-white rounded-xl overflow-hidden shadow-lg group cursor-pointer">
       {image ? (
-        <img 
-          src={image} 
-          alt={title} 
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" 
-        />
+        <img src={image} alt={title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
       ) : (
         <div className="w-full h-full bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center">
           <Globe size={32} className="text-slate-400" />
         </div>
       )}
-      
       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
-      
       <div className="absolute top-3 left-3">
         <div className="flex items-center space-x-2">
           <span className="bg-white/20 backdrop-blur-sm text-white text-xs font-medium px-2 py-1 rounded-full border border-white/30">
@@ -49,13 +36,11 @@ const NewsCard = memo(({ title, timeAgo, image, url, category }) => {
           </div>
         </div>
       </div>
-      
       <div className="absolute bottom-0 left-0 right-0 p-4">
         <h3 className="font-bold text-white text-lg leading-tight line-clamp-3 group-hover:text-blue-200 transition-colors">
           {title}
         </h3>
       </div>
-      
       <div className="absolute inset-0 bg-blue-600/0 group-hover:bg-blue-600/10 transition-colors duration-200"></div>
     </div>
   );
@@ -133,7 +118,6 @@ const POSTS_PER_PAGE = 5;
 export default function HelloWorldChannel() {
   const { 
     profile,
-    // Get batched data from ProfilePage context
     pageData,           
     postsLikesData,     
     handlePostLike,     
@@ -147,7 +131,6 @@ export default function HelloWorldChannel() {
   const [hasMore, setHasMore] = useState(true);
   const [organizationInfo, setOrganizationInfo] = useState(null);
 
-  // Create enhanced pageData with all batched info
   const enhancedPageData = React.useMemo(() => ({
     ...pageData,
     postLikes: postsLikesData || pageData?.postLikes || {},
@@ -168,7 +151,6 @@ export default function HelloWorldChannel() {
     if (node) observer.current.observe(node);
   }, [isLoading, hasMore]);
 
-  // Organization event listener
   useEffect(() => {
     if (!profile?.id) return;
     const cleanup = addOrganizationEventListener('organizationChanged', (event) => {
@@ -188,15 +170,12 @@ export default function HelloWorldChannel() {
         }
       }
     });
-
     return cleanup;
   }, [profile?.id]);
 
-  // Fetch organization info
   useEffect(() => {
     const fetchOrganizationInfo = async () => {
       if (!profile?.id) return;
-      
       try {
         const orgData = await getOrganizationInfoForDashboard(profile.id);
         setOrganizationInfo(orgData);
@@ -205,47 +184,30 @@ export default function HelloWorldChannel() {
         setOrganizationInfo(null);
       }
     };
-    
     fetchOrganizationInfo();
   }, [profile?.id]);
 
-  // ✅ FULLY OPTIMIZED: Use globalDataManager for posts instead of direct queries
   useEffect(() => {
     const fetchPosts = async () => {
       if (!hasMore) return;
       setIsLoading(true);
       try {
-        // ✅ BEFORE (Direct query causing 10+ posts API calls):
-        // const { data, error: postsError } = await supabase
-        //   .from('posts')
-        //   .select(`*, profiles:profile_id(...)`)
-        //   .eq('channel', 'hello-world')
-
-        // ✅ AFTER (Use globalDataManager for batched loading):
         if (page === 0) {
-          // First page - use globalDataManager for optimal batching
-          const postsData = await globalDataManager.getPostsByChannel('hello-world', POSTS_PER_PAGE);
-          
-          if (postsData && postsData.length > 0) {
-            setPosts(postsData);
-            if (postsData.length < POSTS_PER_PAGE) setHasMore(false);
+          const dashboardData = await getDashboardData(profile?.id);
+          const helloWorldPosts = dashboardData?.posts?.filter(post => post.channel === 'hello-world') || [];
+          if (helloWorldPosts.length > 0) {
+            setPosts(helloWorldPosts);
+            if (helloWorldPosts.length < POSTS_PER_PAGE) setHasMore(false);
           } else {
             setHasMore(false);
           }
         } else {
-          // Subsequent pages - use optimized query wrapper
-          const optimizedPostsQuery = optimizedSupabaseQuery(
-            supabase
-              .from('posts')
-              .select(`*, profiles:profile_id(id, full_name, avatar_url, title, organization_name, role, organization_type)`)
-              .eq('channel', 'hello-world')
-              .order('created_at', { ascending: false })
-              .range(page * POSTS_PER_PAGE, (page + 1) * POSTS_PER_PAGE - 1),
-            'posts_single',
-            { channel: 'hello-world', page, limit: POSTS_PER_PAGE }
-          );
-
-          const { data: postsData, error: postsError } = await optimizedPostsQuery;
+          const { data: postsData, error: postsError } = await supabase
+            .from('posts')
+            .select(`*, profiles:profile_id(id, full_name, avatar_url, title, organization_name, role, organization_type)`)
+            .eq('channel', 'hello-world')
+            .order('created_at', { ascending: false })
+            .range(page * POSTS_PER_PAGE, (page + 1) * POSTS_PER_PAGE - 1);
 
           if (postsError) throw postsError;
 
@@ -254,14 +216,12 @@ export default function HelloWorldChannel() {
               ...post,
               reactions: { summary: [], sample: [] }
             }));
-            
             setPosts(prevPosts => [...prevPosts, ...basicPosts]);
             if (postsData.length < POSTS_PER_PAGE) setHasMore(false);
           } else {
             setHasMore(false);
           }
         }
-        
       } catch (error) {
         console.error("Error fetching posts:", error);
         setHasMore(false);
@@ -270,29 +230,18 @@ export default function HelloWorldChannel() {
       }
     };
     fetchPosts();
-  }, [page, hasMore]);
+  }, [page, hasMore, profile?.id]);
 
-  // Real-time subscription
   useEffect(() => {
     if (!profile) return;
-
     const refreshPostCounts = async (postId) => {
       const isInCurrentPosts = posts.some(p => p.id === postId);
       if (!isInCurrentPosts) return;
-
-      // ✅ OPTIMIZE: Wrap the post count refresh query
-      const optimizedCountQuery = optimizedSupabaseQuery(
-        supabase
-          .from('posts')
-          .select('likes_count, comments_count')
-          .eq('id', postId)
-          .single(),
-        'posts_single',
-        { postIds: [postId] }
-      );
-
-      const { data: postData } = await optimizedCountQuery;
-        
+      const { data: postData } = await supabase
+        .from('posts')
+        .select('likes_count, comments_count')
+        .eq('id', postId)
+        .single();
       if (postData) {
         setPosts(currentPosts => currentPosts.map(p => 
           p.id === postId ? { ...p, likes_count: postData.likes_count, comments_count: postData.comments_count } : p
@@ -306,19 +255,11 @@ export default function HelloWorldChannel() {
       profile,
       {
         onPostInsert: async (payload) => {
-          // ✅ OPTIMIZE: Wrap profile fetch query
-          const optimizedProfileQuery = optimizedSupabaseQuery(
-            supabase
-              .from('profiles')
-              .select('*')
-              .eq('id', payload.new.profile_id)
-              .single(),
-            'profiles_single',
-            { userIds: [payload.new.profile_id] }
-          );
-
-          const { data: profileData } = await optimizedProfileQuery;
-            
+          const { data: profileData } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', payload.new.profile_id)
+            .single();
           if (profileData) {
             const newPostWithProfile = { 
               ...payload.new, 
@@ -349,7 +290,6 @@ export default function HelloWorldChannel() {
         }
       }
     );
-
     return () => {
       realtimeManager.removeSubscription('hello-world', supabase);
     };
@@ -368,8 +308,6 @@ export default function HelloWorldChannel() {
       reactions: { summary: [], sample: [] } 
     };
     setPosts(p => [postWithOrgInfo, ...p]);
-    
-    // Use ProfilePage handler if available
     if (handleNewPostContext) {
       handleNewPostContext(newPost);
     }
@@ -377,8 +315,6 @@ export default function HelloWorldChannel() {
   
   const handleDeletePostLocal = useCallback((postId) => {
     setPosts(p => p.filter(post => post.id !== postId));
-    
-    // Use ProfilePage handler if available
     if (handleDeletePostContext) {
       handleDeletePostContext(postId);
     }
@@ -387,14 +323,12 @@ export default function HelloWorldChannel() {
   return (
     <div className="space-y-6">
       <TrendingNewsSection />
-
       <CreatePost 
         profile={profile} 
         onNewPost={handleNewPostLocal} 
         channel="hello-world" 
         organizationType={organizationInfo?.type} 
       />
-
       <div className="space-y-6">
         {posts.length === 0 && !isLoading ? (
           <HelloWorldEmptyState />
@@ -413,7 +347,6 @@ export default function HelloWorldChannel() {
                 batchedOrganizations={enhancedPageData.organizations}
               />
             ))}
-            
             <div ref={loaderRef} className="h-10 text-center">
               {isLoading && <p className="text-slate-500">Loading...</p>}
               {!isLoading && !hasMore && posts.length > 0 && (

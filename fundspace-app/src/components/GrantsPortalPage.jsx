@@ -1,11 +1,8 @@
-// src/components/GrantsPortalPage.jsx - OPTIMIZED: All direct Supabase queries wrapped with API optimizer
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
-import { optimizedSupabaseQuery } from '../utils/apiRequestOptimizer'; // ✅ ADD THIS IMPORT
+import { getGrantsWithDetails } from '../utils/rpcClientFunctions';
 import { hasPermission, PERMISSIONS } from '../utils/permissions.js';
-
-// Components
 import PortalAccessControl from './portal/PortalAccessControl.jsx';
 import PortalBanner from './portal/PortalBanner.jsx';
 import PortalActionCards from './portal/PortalActionCards.jsx';
@@ -19,192 +16,92 @@ import {
 } from './portal/PortalPlaceholderTabs.jsx';
 import CreateGrantModal from './portal/CreateGrantModal.jsx';
 import GrantDetailModal from '../GrantDetailModal.jsx';
-
-// Hooks and utilities
-import { filterGrantsWithTaxonomy } from '../filtering.js';
-import { sortGrants } from '../sorting.js';
-import usePaginatedFilteredData from '../hooks/usePaginatedFilteredData.js';
 import { refreshGrantBookmarkCounts } from '../utils/grantUtils.js';
-import { GRANT_STATUSES } from '../constants.js';
 import { parseMaxFundingAmount } from '../utils.js';
 
 const GrantsPortalPage = () => {
   const { profile, session } = useOutletContext();
   
-  // Access control state
   const [hasAccess, setHasAccess] = useState(false);
   const [checkingAccess, setCheckingAccess] = useState(true);
   const [userMembership, setUserMembership] = useState(null);
-  
-  // Data state
   const [grants, setGrants] = useState([]);
   const [loading, setLoading] = useState(true);
   const [savedGrantIds, setSavedGrantIds] = useState(new Set());
-  
-  // UI state
   const [activeTab, setActiveTab] = useState('explore');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [selectedGrant, setSelectedGrant] = useState(null);
 
-  // Check user permissions and membership
   useEffect(() => {
     const checkAccess = async () => {
       if (!profile) return;
-      
       setCheckingAccess(true);
-      
       try {
-        // Check if user has portal access
         const canAccessPortal = hasPermission(profile, PERMISSIONS.PORTAL_ACCESS);
         setHasAccess(canAccessPortal);
-        
-        // Get user's organization membership if they have access
         if (canAccessPortal && session?.user?.id) {
-          // ✅ OPTIMIZED: Wrap organization_memberships query
-          const optimizedMembershipQuery = optimizedSupabaseQuery(
-            supabase
-              .from('organization_memberships')
-              .select(`
-                *,
-                organizations (*)
-              `)
-              .eq('user_id', session.user.id)
-              .eq('status', 'active'),
-            'organization_memberships_single',
-            { userIds: [session.user.id] }
-          );
-          
-          const { data: membership } = await optimizedMembershipQuery.single();
+          const { data: membership } = await supabase
+            .from('organization_memberships')
+            .select(`*, organizations (*)`)
+            .eq('user_id', session.user.id)
+            .eq('status', 'active')
+            .single();
           setUserMembership(membership);
         }
       } catch (error) {
         console.error('Error checking permissions:', error);
         setHasAccess(false);
       }
-      
       setCheckingAccess(false);
     };
-
     checkAccess();
   }, [profile, session?.user?.id]);
 
-  // Load grants data - ✅ CRITICAL FIX: This was causing 16 grants API calls
   useEffect(() => {
     const fetchGrants = async () => {
       if (!hasAccess) return;
-      
       setLoading(true);
-      
       try {
-        // ✅ BEFORE (Direct query causing 16 grants API calls):
-        // const { data: grantsData, error: grantsError } = await supabase
-        //   .from('grants_with_taxonomy')
-        //   .select('*')
-        //   .order('id', { ascending: false });
-
-        // ✅ AFTER (Optimized with API optimizer):
-        const grantIds = []; // Could be populated with specific IDs if available
-        const optimizedGrantsQuery = optimizedSupabaseQuery(
-          supabase
-            .from('grants_with_taxonomy')
-            .select('*')
-            .order('id', { ascending: false }),
-          'grants_single',
-          { grantIds }
-        );
+        const rpcData = await getGrantsWithDetails({
+          userId: session?.user?.id,
+          limit: 100,
+          offset: 0,
+          searchTerm: null,
+          organizationTypes: null,
+          minAmount: null,
+          maxAmount: null,
+          deadlineAfter: null,
+          grantType: null,
+          savedOnly: false
+        });
         
-        const { data: grantsData, error: grantsError } = await optimizedGrantsQuery;
+        const formattedGrants = (rpcData.grants || []).map(grant => ({
+          ...grant,
+          foundationName: grant.funder_name || grant.organization?.name || 'Unknown Funder',
+          funderSlug: grant.funder_slug || grant.organization?.slug || null,
+          fundingAmount: grant.max_funding_amount || grant.funding_amount_text || 'Not specified',
+          dueDate: grant.deadline,
+          grantType: grant.grant_type,
+          eligibility_criteria: grant.eligibility_criteria,
+          categories: grant.category_names ? grant.category_names.map((name, idx) => ({ id: idx, name })) : [],
+          locations: grant.location_names ? grant.location_names.map((name, idx) => ({ id: idx, name })) : [],
+          is_saved: grant.is_saved || false
+        }));
 
-        if (grantsError) {
-          console.error('Error fetching grants:', grantsError);
-          setGrants([]);
-        } else {
-          // Get organization IDs and fetch organizations separately
-          const orgIds = [...new Set(grantsData?.map(g => g.organization_id).filter(Boolean))];
-          
-          let orgsData = [];
-          if (orgIds.length > 0) {
-            // ✅ OPTIMIZED: Wrap organizations query
-            const optimizedOrgsQuery = optimizedSupabaseQuery(
-              supabase
-                .from('organizations')
-                .select('id, name, image_url, banner_image_url, slug')
-                .in('id', orgIds),
-              'organizations_single',
-              { orgIds }
-            );
-            
-            const { data: organizationsData } = await optimizedOrgsQuery;
-            orgsData = organizationsData || [];
-          }
-
-          const formattedData = grantsData?.map(grant => {
-            const orgData = orgsData.find(o => o.id === grant.organization_id);
-            
-            return {
-              ...grant,
-              foundationName: grant.funder_name || orgData?.name || 'Unknown Funder',
-              funderSlug: grant.funder_slug || orgData?.slug || null,
-              fundingAmount: grant.max_funding_amount || grant.funding_amount_text || 'Not specified',
-              dueDate: grant.deadline,
-              grantType: grant.grant_type,
-              eligibility_criteria: grant.eligibility_criteria,
-              categories: grant.category_names ? grant.category_names.map((name, idx) => ({ id: idx, name })) : [],
-              locations: grant.location_names ? grant.location_names.map((name, idx) => ({ id: idx, name })) : [],
-            };
-          }) || [];
-
-          setGrants(formattedData);
-        }
+        setGrants(formattedGrants);
+        const savedIds = new Set(formattedGrants.filter(g => g.is_saved).map(g => g.id));
+        setSavedGrantIds(savedIds);
       } catch (error) {
-        console.error('Error in fetchGrants:', error);
+        console.error('Error loading grants portal RPC:', error);
         setGrants([]);
+        setSavedGrantIds(new Set());
       }
-      
       setLoading(false);
     };
-
     fetchGrants();
-  }, [hasAccess]);
+  }, [hasAccess, session?.user?.id]);
 
-  // Load saved grants for current user - ✅ OPTIMIZED: Wrap saved_grants query
-  useEffect(() => {
-    const loadSavedGrants = async () => {
-      if (!session?.user?.id) {
-        setSavedGrantIds(new Set());
-        return;
-      }
-
-      try {
-        // ✅ BEFORE (Direct query):
-        // const { data } = await supabase
-        //   .from('saved_grants')
-        //   .select('grant_id')
-        //   .eq('user_id', session.user.id);
-
-        // ✅ AFTER (Optimized):
-        const optimizedSavedQuery = optimizedSupabaseQuery(
-          supabase
-            .from('saved_grants')
-            .select('grant_id')
-            .eq('user_id', session.user.id),
-          'saved_grants_single',
-          { userId: session.user.id }
-        );
-        
-        const { data } = await optimizedSavedQuery;
-        setSavedGrantIds(new Set(data?.map(sg => sg.grant_id) || []));
-      } catch (error) {
-        console.error('Error loading saved grants:', error);
-        setSavedGrantIds(new Set());
-      }
-    };
-
-    loadSavedGrants();
-  }, [session?.user?.id]);
-
-  // Modal handlers
   const openDetail = useCallback((grant) => {
     setSelectedGrant(grant);
     setIsDetailModalOpen(true);
@@ -215,57 +112,72 @@ const GrantsPortalPage = () => {
     setIsDetailModalOpen(false);
   }, []);
 
-  // Grant save/unsave handlers - ✅ NOTE: Insert/Delete mutations don't need optimization
   const handleSaveGrant = useCallback(async (grantId) => {
     if (!session?.user?.id || !grantId) return;
-
+    setSavedGrantIds(prev => new Set([...prev, grantId]));
+    setGrants(prev => prev.map(grant => 
+      grant.id === grantId 
+        ? { ...grant, is_saved: true, save_count: (grant.save_count || 0) + 1 }
+        : grant
+    ));
     try {
-      // Mutations (INSERT/UPDATE/DELETE) don't need optimizer wrapping
       await supabase.from('saved_grants').insert({
         user_id: session.user.id,
         grant_id: grantId
       });
-
-      setSavedGrantIds(prev => new Set(prev.add(grantId)));
       await refreshGrantBookmarkCounts([grantId]);
     } catch (error) {
       console.error('Error saving grant:', error);
-    }
-  }, [session?.user?.id]);
-
-  const handleUnsaveGrant = useCallback(async (grantId) => {
-    if (!session?.user?.id || !grantId) return;
-
-    try {
-      // Mutations (INSERT/UPDATE/DELETE) don't need optimizer wrapping
-      await supabase
-        .from('saved_grants')
-        .delete()
-        .match({ user_id: session.user.id, grant_id: grantId });
-
       setSavedGrantIds(prev => {
         const newSet = new Set(prev);
         newSet.delete(grantId);
         return newSet;
       });
-      await refreshGrantBookmarkCounts([grantId]);
-    } catch (error) {
-      console.error('Error unsaving grant:', error);
+      setGrants(prev => prev.map(grant => 
+        grant.id === grantId 
+          ? { ...grant, is_saved: false, save_count: Math.max((grant.save_count || 1) - 1, 0) }
+          : grant
+      ));
     }
   }, [session?.user?.id]);
 
-  // Filter handler
+  const handleUnsaveGrant = useCallback(async (grantId) => {
+    if (!session?.user?.id || !grantId) return;
+    setSavedGrantIds(prev => {
+      const newSet = new Set(prev);
+      newSet.delete(grantId);
+      return newSet;
+    });
+    setGrants(prev => prev.map(grant => 
+      grant.id === grantId 
+        ? { ...grant, is_saved: false, save_count: Math.max((grant.save_count || 1) - 1, 0) }
+        : grant
+    ));
+    try {
+      await supabase
+        .from('saved_grants')
+        .delete()
+        .match({ user_id: session.user.id, grant_id: grantId });
+      await refreshGrantBookmarkCounts([grantId]);
+    } catch (error) {
+      console.error('Error unsaving grant:', error);
+      setSavedGrantIds(prev => new Set([...prev, grantId]));
+      setGrants(prev => prev.map(grant => 
+        grant.id === grantId 
+          ? { ...grant, is_saved: true, save_count: (grant.save_count || 0) + 1 }
+          : grant
+      ));
+    }
+  }, [session?.user?.id]);
+
   const handleFilterByCategory = useCallback((categoryName) => {
-    // This would be implemented based on your filtering logic
     console.log('Filter by category:', categoryName);
   }, []);
 
-  // Format currency helper
   const formatCurrency = useCallback((amount) => {
     if (!amount) return 'Not specified';
     const numAmount = parseMaxFundingAmount(amount);
     if (!numAmount) return amount;
-    
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
@@ -274,13 +186,12 @@ const GrantsPortalPage = () => {
     }).format(numAmount);
   }, []);
 
-  // Filter bar props for ExploreFundsTab
-  const filterBarProps = {
+  const filterBarProps = useMemo(() => ({
     totalCount: grants.length,
     availableCategories: [...new Set(grants.flatMap(g => g.category_names || []))],
     availableLocations: [...new Set(grants.flatMap(g => g.location_names || []))],
     loading
-  };
+  }), [grants, loading]);
 
   const renderTabContent = () => {
     switch (activeTab) {
@@ -326,12 +237,10 @@ const GrantsPortalPage = () => {
           />
           {renderTabContent()}
         </div>
-
         <CreateGrantModal 
           showCreateModal={showCreateModal} 
           setShowCreateModal={setShowCreateModal} 
         />
-
         {isDetailModalOpen && selectedGrant && (
           <GrantDetailModal
             grant={selectedGrant}

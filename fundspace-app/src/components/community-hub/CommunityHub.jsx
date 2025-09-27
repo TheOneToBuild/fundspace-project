@@ -1,4 +1,3 @@
-// src/components/community-hub/CommunityHub.jsx - FULLY OPTIMIZED: Use globalDataManager instead of direct queries
 import React, { useState, useEffect, useCallback } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { Globe, Building, MapPin } from 'lucide-react';
@@ -10,14 +9,12 @@ import EmptyState from './EmptyState';
 import Sidebar from './Sidebar';
 import { useCommunityData } from './useCommunityData';
 import { usePageDataLoader } from '../../hooks/usePageDataLoader';
-import globalDataManager from '../../utils/globalDataManager'; // ✅ ADD THIS IMPORT
+import { getDashboardData } from '../../utils/rpcClientFunctions';
 import { BAY_AREA_COUNTIES, ORGANIZATION_CHANNELS, getOrgBaseType } from './constants';
 
 export default function CommunityHub() {
   const { profile } = useOutletContext();
   const [activeChannel, setActiveChannel] = useState('hello-world');
-  
-  // NEW: Add state for user-specific reaction data
   const [postsLikesData, setPostsLikesData] = useState({});
   
   const {
@@ -33,43 +30,24 @@ export default function CommunityHub() {
     setPage
   } = useCommunityData(profile);
 
-  // Add page data loader for batched API calls
   const { pageData, loadPostsPageData, clearPageData } = usePageDataLoader();
-
-  // Mock county for now
   const userCounty = 'santa-clara';
 
-  // ✅ OPTIMIZED: Use globalDataManager for batch post likes instead of direct queries
   const batchLoadPostLikes = useCallback(async (postIds, userId) => {
     if (!postIds.length || !userId) return {};
-
     try {
-      // ✅ BEFORE (Direct query causing API calls):
-      // const { data: likesData, error } = await supabase
-      //   .from('post_likes')
-      //   .select('post_id, reaction_type, user_id, created_at')
-      //   .in('post_id', postIds)
-      //   .eq('user_id', userId);
-
-      // ✅ AFTER (Use globalDataManager batch operation):
-      const likesData = await globalDataManager.getPostLikes(postIds);
-      
-      // Convert to lookup object for user-specific reactions
+      const dashboardData = await getDashboardData(userId);
       const likesLookup = {};
       postIds.forEach(postId => {
         likesLookup[postId] = { userReaction: null };
       });
-
-      // Extract user's specific reactions from the batch data
-      Object.entries(likesData).forEach(([postId, postLikesInfo]) => {
-        if (postLikesInfo.reactors) {
-          const userReactor = postLikesInfo.reactors.find(reactor => reactor.user_id === userId);
-          if (userReactor) {
-            likesLookup[postId].userReaction = userReactor.reaction_type;
+      if (dashboardData?.post_likes) {
+        dashboardData.post_likes.forEach(like => {
+          if (postIds.includes(like.post_id) && like.user_id === userId) {
+            likesLookup[like.post_id].userReaction = like.reaction_type;
           }
-        }
-      });
-
+        });
+      }
       return likesLookup;
     } catch (error) {
       console.error('Error in batchLoadPostLikes:', error);
@@ -77,48 +55,30 @@ export default function CommunityHub() {
     }
   }, []);
 
-  // NEW: Enhanced data loading that includes user reactions
   const loadAllPostData = useCallback(async () => {
     if (posts.length === 0 || !profile?.id) return;
-
     const postIds = posts.map(p => p.id);
-    
-    // Load both general post data AND user-specific reactions
     const [generalPageData, userLikesData] = await Promise.all([
       loadPostsPageData(posts),
       batchLoadPostLikes(postIds, profile.id)
     ]);
-
     setPostsLikesData(userLikesData);
   }, [posts, profile?.id, loadPostsPageData, batchLoadPostLikes]);
 
-  // NEW: Centralized post like handler (prevents individual API calls)
   const handlePostLike = useCallback(async (postId, currentReaction, newReaction) => {
     if (!profile?.id) return;
-
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
-
       if (currentReaction && currentReaction === newReaction) {
-        // Remove reaction
-        await supabase
-          .from('post_likes')
-          .delete()
-          .eq('post_id', postId)
-          .eq('user_id', user.id);
+        await supabase.from('post_likes').delete().eq('post_id', postId).eq('user_id', user.id);
       } else {
-        // Add or update reaction
-        await supabase
-          .from('post_likes')
-          .upsert({
-            post_id: postId,
-            user_id: user.id,
-            reaction_type: newReaction
-          }, { onConflict: 'post_id,user_id' });
+        await supabase.from('post_likes').upsert({
+          post_id: postId,
+          user_id: user.id,
+          reaction_type: newReaction
+        }, { onConflict: 'post_id,user_id' });
       }
-
-      // Update local state to reflect changes immediately
       setPostsLikesData(prev => ({
         ...prev,
         [postId]: {
@@ -126,20 +86,14 @@ export default function CommunityHub() {
           userReaction: newReaction === currentReaction ? null : newReaction
         }
       }));
-
-      // Clear cache to ensure fresh data on next load
-      globalDataManager.clearCache('post-likes');
-
     } catch (error) {
       console.error('Error handling post reaction:', error);
     }
   }, [profile?.id]);
 
-  // Get channel configuration
   const getChannelConfig = () => {
     const userOrgType = organizationInfo ? getOrgBaseType(organizationInfo.type) : null;
-    
-    const channels = [
+    return [
       {
         id: 'hello-world',
         name: 'Hello Platform-Wide',
@@ -188,27 +142,22 @@ export default function CommunityHub() {
         disabled: true
       }
     ];
-
-    return channels;
   };
 
   const channels = getChannelConfig();
   const activeChannelConfig = channels.find(c => c.id === activeChannel);
 
-  // UPDATED: Load all post data when posts change
   useEffect(() => {
     loadAllPostData();
   }, [loadAllPostData]);
 
-  // Reset posts when channel changes
   useEffect(() => {
     clearPageData();
-    setPostsLikesData({}); // NEW: Clear user reaction data
+    setPostsLikesData({});
     resetPosts();
     fetchPosts(0, activeChannelConfig);
   }, [activeChannel, activeChannelConfig?.dbChannel, clearPageData]);
 
-  // Channel change handler
   const handleChannelChange = (channelId) => {
     const channel = channels.find(c => c.id === channelId);
     if (channel && !channel.disabled) {
@@ -216,15 +165,10 @@ export default function CommunityHub() {
     }
   };
 
-  // Handle clicking on trending post to scroll to it
   const handleTrendingPostClick = (postId) => {
     const postElement = document.getElementById(`post-${postId}`);
     if (postElement) {
-      postElement.scrollIntoView({ 
-        behavior: 'smooth', 
-        block: 'center' 
-      });
-      // Add highlight effect
+      postElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
       postElement.classList.add('ring-2', 'ring-blue-300', 'ring-opacity-50');
       setTimeout(() => {
         postElement.classList.remove('ring-2', 'ring-blue-300', 'ring-opacity-50');
@@ -232,23 +176,17 @@ export default function CommunityHub() {
     }
   };
 
-  // Enhanced load more that triggers data loading
   const handleLoadMore = async () => {
     const nextPage = page + 1;
     setPage(nextPage);
     await fetchPosts(nextPage, activeChannelConfig);
-    // Data will be automatically loaded by the useEffect above when posts change
   };
 
   return (
     <div className="min-h-screen">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* News Section */}
         <TrendingNews channelType={activeChannel} />
-
-        {/* Three Column Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          {/* Left Column - Community Selector */}
           <div className="lg:col-span-3 space-y-6">
             <div className="bg-white rounded-2xl shadow-lg border border-slate-100 p-4 sticky top-24">
               <h3 className="font-bold text-base text-slate-900 mb-4">Communities</h3>
@@ -257,7 +195,6 @@ export default function CommunityHub() {
                   const IconComponent = channel.icon;
                   const isActive = activeChannel === channel.id;
                   const isDisabled = channel.disabled;
-                  
                   return (
                     <button
                       key={channel.id}
@@ -305,20 +242,15 @@ export default function CommunityHub() {
               </div>
             </div>
           </div>
-
-          {/* Middle Column - Posts Feed */}
           <div className="lg:col-span-6 space-y-6">
             {activeChannelConfig && !activeChannelConfig.disabled ? (
               <>
-                {/* Create Post */}
                 <CreatePost 
                   profile={profile}
                   onNewPost={handleNewPost}
                   channel={activeChannelConfig.dbChannel}
                   organizationType={organizationInfo?.type}
                 />
-
-                {/* Posts Feed */}
                 <div className="space-y-6">
                   {loading && posts.length === 0 ? (
                     <div className="space-y-6">
@@ -342,7 +274,6 @@ export default function CommunityHub() {
                   ) : posts.length > 0 ? (
                     posts.map(post => (
                       <div key={post.id} id={`post-${post.id}`} className="transition-all duration-300">
-                        {/* ✅ OPTIMIZED: Pass all required batch data to PostCard */}
                         <PostCard 
                           post={post} 
                           onDelete={handleDeletePost}
@@ -362,8 +293,6 @@ export default function CommunityHub() {
                     />
                   )}
                 </div>
-
-                {/* Load more */}
                 {hasMore && posts.length > 0 && (
                   <div className="text-center">
                     <button 
@@ -413,8 +342,6 @@ export default function CommunityHub() {
               </div>
             )}
           </div>
-
-          {/* Right Column - Sidebar */}
           <Sidebar
             activeChannel={activeChannel}
             activeChannelConfig={activeChannelConfig}

@@ -1,4 +1,3 @@
-// src/components/DashboardHeader.jsx - OPTIMIZED VERSION - Wrap all direct queries
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { 
@@ -6,13 +5,11 @@ import {
   Globe, Handshake, Users, Building, Settings, FileText, Crown, MapPin
 } from 'lucide-react';
 import { supabase } from '../supabaseClient';
-import { optimizedSupabaseQuery } from '../utils/apiRequestOptimizer'; // ✅ ADD THIS IMPORT
 import GlobalSearch from './GlobalSearch.jsx';
 import headerLogoImage from '../assets/fundspace-logo2.png';
 import { isPlatformAdmin } from '../utils/permissions.js';
 import { getOrganizationForProfileNav } from '../utils/membershipQueries.js';
 
-// ✅ REQUEST DEDUPLICATION HOOK
 function useRequestDeduplication() {
     const pendingRequests = useRef(new Map());
 
@@ -55,39 +52,15 @@ export default function DashboardHeader({ profile }) {
     
     const isOmegaAdmin = isPlatformAdmin(profile?.is_omega_admin);
 
-    // ✅ CRITICAL FIX: Wrap all direct Supabase queries with optimizer
     const fetchProfileStats = useCallback(async () => {
         if (!profile?.id) return;
         
         return deduplicate(`profile-stats-${profile.id}`, async () => {
             try {
-                // ✅ BEFORE (Direct queries causing user_connections bottleneck):
-                // const [followersRes, followingRes, connectionsRes] = await Promise.all([
-                //     supabase.from('followers').select('id').eq('following_id', profile.id),
-                //     supabase.from('followers').select('id').eq('follower_id', profile.id),
-                //     supabase.from('user_connections').select('id').or(`requester_id.eq.${profile.id},recipient_id.eq.${profile.id}`).eq('status', 'accepted')
-                // ]);
-
-                // ✅ AFTER (Optimized with API optimizer):
                 const [followersRes, followingRes, connectionsRes] = await Promise.all([
-                    // Optimize followers query
-                    optimizedSupabaseQuery(
-                        supabase.from('followers').select('id').eq('following_id', profile.id),
-                        'followers_single',
-                        { userId: profile.id }
-                    ),
-                    // Optimize following query  
-                    optimizedSupabaseQuery(
-                        supabase.from('followers').select('id').eq('follower_id', profile.id),
-                        'following_single',
-                        { userId: profile.id }
-                    ),
-                    // Optimize user connections query
-                    optimizedSupabaseQuery(
-                        supabase.from('user_connections').select('id').or(`requester_id.eq.${profile.id},recipient_id.eq.${profile.id}`).eq('status', 'accepted'),
-                        'user_connections_single',
-                        { userId: profile.id, status: 'accepted' }
-                    )
+                    supabase.from('followers').select('id').eq('following_id', profile.id),
+                    supabase.from('followers').select('id').eq('follower_id', profile.id),
+                    supabase.from('user_connections').select('id').or(`requester_id.eq.${profile.id},recipient_id.eq.${profile.id}`).eq('status', 'accepted')
                 ]);
 
                 setStats({
@@ -101,30 +74,16 @@ export default function DashboardHeader({ profile }) {
         });
     }, [profile?.id, deduplicate]);
 
-    // ✅ CRITICAL FIX: Wrap notifications query with optimizer
     const fetchNotificationStats = useCallback(async () => {
         if (!profile?.id) return;
         
         return deduplicate(`notifications-${profile.id}`, async () => {
             try {
-                // ✅ BEFORE (Direct query):
-                // const { count, error } = await supabase
-                //     .from('notifications')
-                //     .select('id', { count: 'exact', head: true })
-                //     .eq('user_id', profile.id)
-                //     .eq('is_read', false);
-
-                // ✅ AFTER (Optimized):
-                const optimizedQuery = optimizedSupabaseQuery(
-                    supabase
-                        .from('notifications')
-                        .select('id', { count: 'exact', head: true })
-                        .eq('user_id', profile.id)
-                        .eq('is_read', false),
-                    'notifications_single',
-                    { userId: profile.id }
-                );
-                const { count, error } = await optimizedQuery;
+                const { count, error } = await supabase
+                    .from('notifications')
+                    .select('id', { count: 'exact', head: true })
+                    .eq('user_id', profile.id)
+                    .eq('is_read', false);
                 
                 if (!error) {
                     setUnreadNotifications(count || 0);
@@ -135,30 +94,16 @@ export default function DashboardHeader({ profile }) {
         });
     }, [profile?.id, deduplicate]);
 
-    // ✅ CRITICAL FIX: Wrap organization membership query with optimizer
     const checkOrganizationAccess = useCallback(async () => {
         if (!profile?.id) return;
         
         return deduplicate(`org-access-${profile.id}`, async () => {
             try {
-                // ✅ BEFORE (Direct query):
-                // const { data } = await supabase
-                //     .from('organization_memberships')
-                //     .select('id')
-                //     .eq('profile_id', profile.id)
-                //     .limit(1);
-
-                // ✅ AFTER (Optimized):
-                const optimizedQuery = optimizedSupabaseQuery(
-                    supabase
-                        .from('organization_memberships')
-                        .select('id')
-                        .eq('profile_id', profile.id)
-                        .limit(1),
-                    'organization_memberships_single',
-                    { userIds: [profile.id] }
-                );
-                const { data } = await optimizedQuery;
+                const { data } = await supabase
+                    .from('organization_memberships')
+                    .select('id')
+                    .eq('profile_id', profile.id)
+                    .limit(1);
                 
                 setHasOrganizationAccess(data && data.length > 0);
             } catch (error) {
@@ -168,22 +113,19 @@ export default function DashboardHeader({ profile }) {
         });
     }, [profile?.id, deduplicate]);
 
-    // Only call when profile.id changes, not on every callback change
     useEffect(() => {
         if (profile?.id) {
             fetchProfileStats();
             fetchNotificationStats();
             checkOrganizationAccess();
         }
-    }, [profile?.id]); // Remove the callback dependencies that cause infinite loops
+    }, [profile?.id]);
 
-    // Improved subscription with deduplication and debouncing
     useEffect(() => {
         if (!profile?.id) return;
 
         const subscriptionKey = `notifications-${profile.id}`;
         
-        // Prevent duplicate subscriptions
         if (activeSubscriptions.current.has(subscriptionKey)) {
             return;
         }
@@ -200,7 +142,6 @@ export default function DashboardHeader({ profile }) {
                     filter: `user_id=eq.${profile.id}`
                 }, 
                 () => {
-                    // Debounce to prevent rapid fire requests
                     if (notificationRefreshTimeoutRef.current) {
                         clearTimeout(notificationRefreshTimeoutRef.current);
                     }
@@ -226,7 +167,6 @@ export default function DashboardHeader({ profile }) {
         navigate('/login');
     };
 
-    // Close menus when clicking outside
     useEffect(() => {
         function handleClickOutside(event) {
             if (userMenuRef.current && !userMenuRef.current.contains(event.target)) {
@@ -246,7 +186,6 @@ export default function DashboardHeader({ profile }) {
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
-    // Cleanup timeouts on unmount
     useEffect(() => {
         return () => {
             if (notificationRefreshTimeoutRef.current) {
@@ -255,7 +194,6 @@ export default function DashboardHeader({ profile }) {
         };
     }, []);
 
-    // Navigation items
     const grantsPortalItem = {
         label: 'Fund Portal',
         to: '/profile/grants-portal',
@@ -291,7 +229,6 @@ export default function DashboardHeader({ profile }) {
             to: '/profile/community-hub',
             icon: <Globe size={16} />
         },
-        // Grants Portal (conditionally)
         ...(isOmegaAdmin || hasOrganizationAccess ? [grantsPortalItem] : []),
         {
             label: 'Discover',
@@ -308,7 +245,6 @@ export default function DashboardHeader({ profile }) {
             to: '/profile/my-organization',
             icon: <Building size={16} />,
         },
-        // Omega Admin Panel (only for omega admins)
         ...(isOmegaAdmin ? [omegaAdminItem] : [])
     ];
 
@@ -320,14 +256,12 @@ export default function DashboardHeader({ profile }) {
             <header className="bg-white shadow-sm sticky top-0 z-50 border-b border-slate-200">
                 <div className="w-full max-w-none px-6 lg:px-12 xl:px-16 h-16 flex items-center justify-between">
                     
-                    {/* Left side - Logo */}
                     <div className="flex items-center">
                         <Link to="/profile" aria-label="fundspace Home">
                             <img src={headerLogoImage} alt="Fundspace Logo" className="h-10 sm:h-12 w-auto" />
                         </Link>
                     </div>
 
-                    {/* Center - Main Navigation (hidden on mobile) */}
                     <nav className="hidden lg:flex items-center space-x-6">
                         {mainNavItems.map((item) => {
                             if (item.hide) return null;
@@ -406,17 +340,14 @@ export default function DashboardHeader({ profile }) {
                         })}
                     </nav>
 
-                    {/* Right side - Search, Actions and Profile */}
                     <div className="flex items-center space-x-2 md:space-x-4">
                         
-                        {/* Search Bar (hidden on mobile) */}
                         <div className="hidden md:block">
                             <div className="w-64 lg:w-80">
                                 <GlobalSearch />
                             </div>
                         </div>
 
-                        {/* Submit Grant Button */}
                         <Link 
                             to="/submit-grant" 
                             className="inline-flex items-center justify-center px-3 md:px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 transition-colors"
@@ -426,7 +357,6 @@ export default function DashboardHeader({ profile }) {
                             <span className="sm:hidden">Submit</span>
                         </Link>
 
-                        {/* Notifications with indicator */}
                         <Link 
                             to="/profile/notifications"
                             className="p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors relative"
@@ -440,7 +370,6 @@ export default function DashboardHeader({ profile }) {
                             )}
                         </Link>
 
-                        {/* Profile Dropdown */}
                         <div className="relative" ref={userMenuRef}>
                             <button 
                                 onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
@@ -522,7 +451,6 @@ export default function DashboardHeader({ profile }) {
                                         >
                                             <Settings size={14} className="mr-2" /> Settings
                                         </Link>
-                                        {/* Stats display in dropdown */}
                                         <div className="px-4 py-2 border-t border-slate-100">
                                             <div className="flex justify-between text-xs text-slate-500">
                                                 <span>{stats.connectionsCount} Connections</span>
@@ -542,7 +470,6 @@ export default function DashboardHeader({ profile }) {
                             )}
                         </div>
 
-                        {/* Mobile Menu Button */}
                         <button
                             onClick={toggleMobileMenu}
                             className="lg:hidden p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors"
@@ -553,13 +480,11 @@ export default function DashboardHeader({ profile }) {
                     </div>
                 </div>
 
-                {/* Mobile Search Bar */}
                 <div className="md:hidden border-t border-slate-200 p-4">
                     <GlobalSearch />
                 </div>
             </header>
 
-            {/* Mobile Menu Overlay - Rest of component unchanged for brevity */}
             {isMobileMenuOpen && (
                 <div className="fixed inset-0 z-40 lg:hidden">
                     <div className="fixed inset-0 bg-black bg-opacity-25" onClick={closeMobileMenu}></div>
@@ -568,7 +493,6 @@ export default function DashboardHeader({ profile }) {
                         ref={mobileMenuRef}
                         className="fixed top-0 right-0 bottom-0 w-64 bg-white shadow-xl transform transition-transform duration-300 ease-in-out overflow-y-auto"
                     >
-                        {/* Mobile menu content - unchanged for brevity */}
                         <div className="flex items-center justify-between p-4 border-b border-slate-200">
                             <span className="text-lg font-semibold text-slate-900">Menu</span>
                             <button
