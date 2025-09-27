@@ -1,4 +1,4 @@
-// src/components/OrganizationPosts.jsx
+// src/components/OrganizationPosts.jsx - OPTIMIZED: Use globalDataManager instead of direct queries
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../supabaseClient';
@@ -7,6 +7,7 @@ import CreatePost from './CreatePost.jsx';
 import OrganizationPostCard from './OrganizationPostCard.jsx';
 import OrganizationPostDetailModal from './OrganizationPostDetailModal.jsx';
 import { hasPermission, PERMISSIONS } from '../utils/permissions.js';
+import globalDataManager from '../utils/globalDataManager.js'; // ✅ ADD THIS IMPORT
 
 export default function OrganizationPosts({ 
   organization, 
@@ -35,16 +36,22 @@ export default function OrganizationPosts({
       setLoading(true);
       setError('');
       
-      const { data: postsData, error: postsError } = await supabase
-        .from('organization_posts')
-        .select('*')
-        .eq('organization_id', organization.id)
-        .eq('organization_type', organizationType)
-        .order('created_at', { ascending: false })
-        .limit(20);
+      // ✅ BEFORE (Direct query causing 4 organization_posts API calls):
+      // const { data: postsData, error: postsError } = await supabase
+      //   .from('organization_posts')
+      //   .select('*')
+      //   .eq('organization_id', organization.id)
 
-      if (postsError) throw postsError;
-      setPosts(postsData || []);
+      // ✅ AFTER (Use globalDataManager for batched loading):
+      const postsData = await globalDataManager.getPostsForOrganizations([organization.id]);
+      const organizationPosts = postsData[organization.id] || [];
+      
+      // Filter by organization type if needed
+      const filteredPosts = organizationPosts.filter(post => 
+        post.organization_type === organizationType
+      );
+
+      setPosts(filteredPosts);
     } catch (err) {
       console.error('Error fetching organization posts:', err);
       setError('Failed to load organization posts');
@@ -106,6 +113,9 @@ export default function OrganizationPosts({
       comments_count: 0,
     };
     setPosts(prev => [postWithMetadata, ...prev]);
+    
+    // Clear globalDataManager cache to ensure fresh data on next load
+    globalDataManager.clearCache();
   }, []);
 
   const handleDeletePost = useCallback(async (postId) => {
@@ -121,6 +131,9 @@ export default function OrganizationPosts({
       if (error) throw error;
       
       setPosts(prev => prev.filter(post => post.id !== postId));
+      
+      // Clear globalDataManager cache to ensure fresh data on next load
+      globalDataManager.clearCache();
     } catch (err) {
       console.error('Error deleting post:', err);
       setError('Failed to delete post');

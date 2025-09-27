@@ -1,4 +1,4 @@
-// src/components/HelloCommunity.jsx - OPTIMIZED: Use pageData instead of direct queries
+// src/components/HelloCommunity.jsx - FINAL OPTIMIZED: Complete globalDataManager integration with user reactions
 import React, { useState, useEffect, useCallback, memo, useRef } from 'react';
 import { useOutletContext, useLocation, useNavigate } from 'react-router-dom';
 import PropTypes from 'prop-types';
@@ -10,7 +10,7 @@ import { rssNewsService as newsService } from '../services/rssNewsService.js';
 import { addOrganizationEventListener } from '../utils/organizationEvents';
 import { getOrganizationInfoForCommunity } from '../utils/membershipQueries.js';
 import { usePageDataLoader } from '../hooks/usePageDataLoader';
-import globalDataManager from '../utils/globalDataManager.js'; // ✅ ADD THIS IMPORT
+import globalDataManager from '../utils/globalDataManager.js'; // ✅ CRITICAL IMPORT
 
 // Organization channel configuration - now maps to actual database channels
 const ORGANIZATION_CHANNELS = {
@@ -130,6 +130,7 @@ export default function HelloCommunity() {
   const [currentNewsIndex, setCurrentNewsIndex] = useState(0);
   const [news, setNews] = useState([]);
   const [isLoadingNews, setIsLoadingNews] = useState(true);
+  const [postsLikesData, setPostsLikesData] = useState({}); // ✅ ADD user reaction state
   const isMountedRef = useRef(true);
 
   // Determine current channel from URL or default to community
@@ -144,6 +145,80 @@ export default function HelloCommunity() {
 
   const organizationType = getOrgType(organizationInfo?.type);
   const channelConfig = organizationType ? ORGANIZATION_CHANNELS[organizationType] : null;
+
+  // ✅ NEW: Batch load user-specific post reaction data (like CommunityHub)
+  const batchLoadPostLikes = useCallback(async (postIds, userId) => {
+    if (!postIds.length || !userId) return {};
+
+    try {
+      // Use globalDataManager for batch post likes
+      const likesData = await globalDataManager.getPostLikes(postIds);
+      
+      // Convert to lookup object for user-specific reactions
+      const likesLookup = {};
+      postIds.forEach(postId => {
+        likesLookup[postId] = { userReaction: null };
+      });
+
+      // Extract user's specific reactions from the batch data
+      Object.entries(likesData).forEach(([postId, postLikesInfo]) => {
+        if (postLikesInfo.reactors) {
+          const userReactor = postLikesInfo.reactors.find(reactor => reactor.user_id === userId);
+          if (userReactor) {
+            likesLookup[postId].userReaction = userReactor.reaction_type;
+          }
+        }
+      });
+
+      return likesLookup;
+    } catch (error) {
+      console.error('Error in batchLoadPostLikes:', error);
+      return {};
+    }
+  }, []);
+
+  // ✅ NEW: Centralized post like handler
+  const handlePostLike = useCallback(async (postId, currentReaction, newReaction) => {
+    if (!profile?.id) return;
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      if (currentReaction && currentReaction === newReaction) {
+        // Remove reaction
+        await supabase
+          .from('post_likes')
+          .delete()
+          .eq('post_id', postId)
+          .eq('user_id', user.id);
+      } else {
+        // Add or update reaction
+        await supabase
+          .from('post_likes')
+          .upsert({
+            post_id: postId,
+            user_id: user.id,
+            reaction_type: newReaction
+          }, { onConflict: 'post_id,user_id' });
+      }
+
+      // Update local state immediately
+      setPostsLikesData(prev => ({
+        ...prev,
+        [postId]: {
+          ...prev[postId],
+          userReaction: newReaction === currentReaction ? null : newReaction
+        }
+      }));
+
+      // Clear cache for fresh data
+      globalDataManager.clearCache('post-likes');
+
+    } catch (error) {
+      console.error('Error handling post reaction:', error);
+    }
+  }, [profile?.id]);
 
   // Fetch organization info
   useEffect(() => {
@@ -163,7 +238,7 @@ export default function HelloCommunity() {
     fetchOrganizationInfo();
   }, [profile?.id]);
 
-  // ✅ OPTIMIZED: Fetch posts using globalDataManager instead of direct queries
+  // ✅ FULLY OPTIMIZED: Fetch posts using globalDataManager instead of direct queries
   const fetchPosts = useCallback(async () => {
     if (!profile?.id) return;
 
@@ -202,16 +277,32 @@ export default function HelloCommunity() {
     }
   }, [profile?.id, currentChannel, channelConfig]);
 
+  // ✅ NEW: Enhanced data loading that includes user reactions
+  const loadAllPostData = useCallback(async () => {
+    if (posts.length === 0 || !profile?.id) return;
+
+    const postIds = posts.map(p => p.id);
+    
+    // Load both general post data AND user-specific reactions
+    const [generalPageData, userLikesData] = await Promise.all([
+      loadPostsPageData(posts),
+      batchLoadPostLikes(postIds, profile.id)
+    ]);
+
+    setPostsLikesData(userLikesData);
+  }, [posts, profile?.id, loadPostsPageData, batchLoadPostLikes]);
+
   // Load batched data when posts change
   useEffect(() => {
-    if (posts.length > 0) {
-      loadPostsPageData(posts);
-    }
-  }, [posts, loadPostsPageData]);
+    loadAllPostData();
+  }, [loadAllPostData]);
 
   // Clear cache when component unmounts or channel changes
   useEffect(() => {
-    return () => clearPageData();
+    return () => {
+      clearPageData();
+      setPostsLikesData({}); // Clear user reaction data
+    };
   }, [clearPageData, currentChannel]);
 
   // Fetch posts when dependencies change
@@ -275,17 +366,22 @@ export default function HelloCommunity() {
       // Trigger page data reload for the new post
       setTimeout(() => {
         if (isMountedRef.current) {
-          loadPostsPageData([newPost, ...posts]);
+          loadAllPostData();
         }
       }, 100);
     }
-  }, [posts, loadPostsPageData]);
+  }, [loadAllPostData]);
 
   // Handle post deletion
   const handleDeletePost = useCallback(async (deletedPostId) => {
     if (isMountedRef.current) {
       setPosts(prevPosts => prevPosts.filter(post => post.id !== deletedPostId));
       clearPageData(); // Clear cache when posts change
+      setPostsLikesData(prev => {
+        const updated = { ...prev };
+        delete updated[deletedPostId];
+        return updated;
+      });
     }
   }, [clearPageData]);
 
@@ -355,9 +451,11 @@ export default function HelloCommunity() {
             {/* Create Post */}
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
               <CreatePost 
-                onPostCreated={handleNewPost}
+                profile={profile}
+                onNewPost={handleNewPost}
+                channel={currentChannel === 'community' && channelConfig ? channelConfig.dbChannel : 'hello-world'}
+                organizationType={organizationInfo?.type}
                 placeholder={`What would you like to share with the ${currentChannel === 'community' && channelConfig ? channelConfig.name.toLowerCase() : 'community'}?`}
-                defaultChannel={currentChannel === 'community' && channelConfig ? channelConfig.dbChannel : 'hello-world'}
               />
             </div>
 
@@ -369,8 +467,13 @@ export default function HelloCommunity() {
                     key={post.id} 
                     post={post} 
                     pageData={pageData} 
+                    postsLikesData={postsLikesData}
+                    onPostLike={handlePostLike}
+                    userReaction={postsLikesData[post.id]?.userReaction}
                     onDelete={handleDeletePost}
                     disabled={loading}
+                    batchedProfiles={pageData?.profiles}
+                    batchedOrganizations={pageData?.organizations}
                   />
                 ))
               ) : (

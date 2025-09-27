@@ -1,4 +1,4 @@
-// src/components/community-hub/CommunityHub.jsx - FIXED: Add missing user reactions data
+// src/components/community-hub/CommunityHub.jsx - FULLY OPTIMIZED: Use globalDataManager instead of direct queries
 import React, { useState, useEffect, useCallback } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { Globe, Building, MapPin } from 'lucide-react';
@@ -10,6 +10,7 @@ import EmptyState from './EmptyState';
 import Sidebar from './Sidebar';
 import { useCommunityData } from './useCommunityData';
 import { usePageDataLoader } from '../../hooks/usePageDataLoader';
+import globalDataManager from '../../utils/globalDataManager'; // ✅ ADD THIS IMPORT
 import { BAY_AREA_COUNTIES, ORGANIZATION_CHANNELS, getOrgBaseType } from './constants';
 
 export default function CommunityHub() {
@@ -38,34 +39,35 @@ export default function CommunityHub() {
   // Mock county for now
   const userCounty = 'santa-clara';
 
-  // NEW: Batch load user-specific post reaction data (copied from ProfilePage)
+  // ✅ OPTIMIZED: Use globalDataManager for batch post likes instead of direct queries
   const batchLoadPostLikes = useCallback(async (postIds, userId) => {
     if (!postIds.length || !userId) return {};
 
     try {
-      // Single batch query instead of N individual queries
-      const { data: likesData, error } = await supabase
-        .from('post_likes')
-        .select('post_id, reaction_type, user_id, created_at')
-        .in('post_id', postIds)
-        .eq('user_id', userId);
+      // ✅ BEFORE (Direct query causing API calls):
+      // const { data: likesData, error } = await supabase
+      //   .from('post_likes')
+      //   .select('post_id, reaction_type, user_id, created_at')
+      //   .in('post_id', postIds)
+      //   .eq('user_id', userId);
 
-      if (error) {
-        console.error('Error fetching batch post likes:', error);
-        return {};
-      }
-
-      // Convert to lookup object: { postId: { userReaction: 'like|dislike', ... } }
+      // ✅ AFTER (Use globalDataManager batch operation):
+      const likesData = await globalDataManager.getPostLikes(postIds);
+      
+      // Convert to lookup object for user-specific reactions
       const likesLookup = {};
       postIds.forEach(postId => {
         likesLookup[postId] = { userReaction: null };
       });
 
-      (likesData || []).forEach(like => {
-        if (!likesLookup[like.post_id]) {
-          likesLookup[like.post_id] = {};
+      // Extract user's specific reactions from the batch data
+      Object.entries(likesData).forEach(([postId, postLikesInfo]) => {
+        if (postLikesInfo.reactors) {
+          const userReactor = postLikesInfo.reactors.find(reactor => reactor.user_id === userId);
+          if (userReactor) {
+            likesLookup[postId].userReaction = userReactor.reaction_type;
+          }
         }
-        likesLookup[like.post_id].userReaction = like.reaction_type;
       });
 
       return likesLookup;
@@ -124,6 +126,9 @@ export default function CommunityHub() {
           userReaction: newReaction === currentReaction ? null : newReaction
         }
       }));
+
+      // Clear cache to ensure fresh data on next load
+      globalDataManager.clearCache('post-likes');
 
     } catch (error) {
       console.error('Error handling post reaction:', error);
@@ -337,7 +342,7 @@ export default function CommunityHub() {
                   ) : posts.length > 0 ? (
                     posts.map(post => (
                       <div key={post.id} id={`post-${post.id}`} className="transition-all duration-300">
-                        {/* FIXED: Pass all required batch data to PostCard */}
+                        {/* ✅ OPTIMIZED: Pass all required batch data to PostCard */}
                         <PostCard 
                           post={post} 
                           onDelete={handleDeletePost}
@@ -345,6 +350,8 @@ export default function CommunityHub() {
                           postsLikesData={postsLikesData}
                           onPostLike={handlePostLike}
                           userReaction={postsLikesData[post.id]?.userReaction}
+                          batchedProfiles={pageData?.profiles}
+                          batchedOrganizations={pageData?.organizations}
                         />
                       </div>
                     ))
