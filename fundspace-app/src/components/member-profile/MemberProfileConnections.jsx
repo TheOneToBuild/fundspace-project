@@ -1,7 +1,8 @@
-// components/member-profile/MemberProfileConnections.jsx - Optimized version
+// components/member-profile/MemberProfileConnections.jsx - FULLY OPTIMIZED VERSION
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../../supabaseClient';
+import { optimizedSupabaseQuery } from '../../utils/apiRequestOptimizer'; // ✅ CRITICAL IMPORT
 import { User, Users, Heart, UserPlus, UserCheck, UserX, Clock } from 'lucide-react';
 import { 
     sendConnectionRequest, 
@@ -33,61 +34,87 @@ const MemberProfileConnections = ({ member, loading, currentUserId, isCurrentUse
         try {
             setConnectionsData(prev => ({ ...prev, loading: true }));
 
-            // Fetch connections - Get the raw connection data first, then fetch user details separately
-            const { data: connectionsData, error: connectionsError } = await supabase
-                .from('user_connections')
-                .select('id, created_at, requester_id, recipient_id')
-                .eq('status', 'accepted')
-                .or(`requester_id.eq.${member.id},recipient_id.eq.${member.id}`)
-                .order('created_at', { ascending: false });
+            // ✅ OPTIMIZED: Wrap user_connections query
+            const optimizedConnectionsQuery = optimizedSupabaseQuery(
+                supabase
+                    .from('user_connections')
+                    .select('id, created_at, requester_id, recipient_id')
+                    .eq('status', 'accepted')
+                    .or(`requester_id.eq.${member.id},recipient_id.eq.${member.id}`)
+                    .order('created_at', { ascending: false }),
+                'user_connections_single',
+                { userId: member.id, status: 'accepted' }
+            );
 
-            // Fetch followers - Get follower user details
-            const { data: followersData, error: followersError } = await supabase
-                .from('followers')
-                .select(`
-                    id,
-                    created_at,
-                    follower_id
-                `)
-                .eq('following_id', member.id)
-                .order('created_at', { ascending: false });
+            // ✅ OPTIMIZED: Wrap followers query
+            const optimizedFollowersQuery = optimizedSupabaseQuery(
+                supabase
+                    .from('followers')
+                    .select('id, created_at, follower_id')
+                    .eq('following_id', member.id)
+                    .order('created_at', { ascending: false }),
+                'followers_single',
+                { userId: member.id }
+            );
 
-            // Fetch following - Get following user details
-            const { data: followingData, error: followingError } = await supabase
-                .from('followers')
-                .select(`
-                    id,
-                    created_at,
-                    following_id
-                `)
-                .eq('follower_id', member.id)
-                .order('created_at', { ascending: false });
+            // ✅ OPTIMIZED: Wrap following query
+            const optimizedFollowingQuery = optimizedSupabaseQuery(
+                supabase
+                    .from('followers')
+                    .select('id, created_at, following_id')
+                    .eq('follower_id', member.id)
+                    .order('created_at', { ascending: false }),
+                'following_single',
+                { userId: member.id }
+            );
 
-            if (connectionsError || followersError || followingError) {
-                throw new Error(connectionsError?.message || followersError?.message || followingError?.message);
+            // Execute all queries
+            const [connectionsResult, followersResult, followingResult] = await Promise.all([
+                optimizedConnectionsQuery,
+                optimizedFollowersQuery,
+                optimizedFollowingQuery
+            ]);
+
+            const connectionsData = connectionsResult.data || [];
+            const followersData = followersResult.data || [];
+            const followingData = followingResult.data || [];
+
+            if (connectionsResult.error || followersResult.error || followingResult.error) {
+                throw new Error(
+                    connectionsResult.error?.message || 
+                    followersResult.error?.message || 
+                    followingResult.error?.message
+                );
             }
 
             // Get user IDs to fetch profile details
-            const connectionUserIds = connectionsData?.map(conn => 
+            const connectionUserIds = connectionsData.map(conn => 
                 conn.requester_id === member.id ? conn.recipient_id : conn.requester_id
-            ) || [];
-            const followerUserIds = followersData?.map(f => f.follower_id) || [];
-            const followingUserIds = followingData?.map(f => f.following_id) || [];
+            );
+            const followerUserIds = followersData.map(f => f.follower_id);
+            const followingUserIds = followingData.map(f => f.following_id);
 
             // Fetch all user profile details
             const allUserIds = [...new Set([...connectionUserIds, ...followerUserIds, ...followingUserIds])];
             
             let userProfiles = {};
             if (allUserIds.length > 0) {
-                const { data: profilesData, error: profilesError } = await supabase
-                    .from('profiles')
-                    .select('id, full_name, avatar_url, title, organization_name, location')
-                    .in('id', allUserIds);
+                // ✅ CRITICAL FIX: Replace direct profiles query with optimized version
+                const optimizedProfilesQuery = optimizedSupabaseQuery(
+                    supabase
+                        .from('profiles')
+                        .select('id, full_name, avatar_url, title, organization_name, location')
+                        .in('id', allUserIds),
+                    'profiles_single',
+                    { userIds: allUserIds }
+                );
+
+                const { data: profilesData, error: profilesError } = await optimizedProfilesQuery;
 
                 if (profilesError) {
                     console.error('Error fetching user profiles:', profilesError);
                 } else {
-                    userProfiles = profilesData.reduce((acc, profile) => {
+                    userProfiles = (profilesData || []).reduce((acc, profile) => {
                         acc[profile.id] = profile;
                         return acc;
                     }, {});
@@ -95,7 +122,7 @@ const MemberProfileConnections = ({ member, loading, currentUserId, isCurrentUse
             }
 
             // Transform connections data
-            const connections = connectionsData?.map(conn => {
+            const connections = connectionsData.map(conn => {
                 const otherUserId = conn.requester_id === member.id ? conn.recipient_id : conn.requester_id;
                 return {
                     id: conn.id,
@@ -103,21 +130,21 @@ const MemberProfileConnections = ({ member, loading, currentUserId, isCurrentUse
                     created_at: conn.created_at,
                     type: 'connection'
                 };
-            }) || [];
+            });
 
-            const followers = followersData?.map(follow => ({
+            const followers = followersData.map(follow => ({
                 id: follow.id,
                 user: userProfiles[follow.follower_id] || { id: follow.follower_id, full_name: 'Unknown User' },
                 created_at: follow.created_at,
                 type: 'follower'
-            })) || [];
+            }));
 
-            const following = followingData?.map(follow => ({
+            const following = followingData.map(follow => ({
                 id: follow.id,
                 user: userProfiles[follow.following_id] || { id: follow.following_id, full_name: 'Unknown User' },
                 created_at: follow.created_at,
                 type: 'following'
-            })) || [];
+            }));
 
             setConnectionsData({
                 connections,
@@ -186,6 +213,7 @@ const MemberProfileConnections = ({ member, loading, currentUserId, isCurrentUse
                         }));
                     }
                     break;
+                    
                 case 'accept':
                     result = await acceptConnectionRequest(currentUserId, targetUserId);
                     if (result.success) {
@@ -197,6 +225,7 @@ const MemberProfileConnections = ({ member, loading, currentUserId, isCurrentUse
                         await fetchConnectionsData();
                     }
                     break;
+                    
                 case 'decline':
                     result = await declineConnectionRequest(currentUserId, targetUserId);
                     if (result.success) {
@@ -206,6 +235,7 @@ const MemberProfileConnections = ({ member, loading, currentUserId, isCurrentUse
                         }));
                     }
                     break;
+                    
                 case 'withdraw':
                     result = await withdrawConnectionRequest(currentUserId, targetUserId);
                     if (result.success) {
@@ -215,6 +245,7 @@ const MemberProfileConnections = ({ member, loading, currentUserId, isCurrentUse
                         }));
                     }
                     break;
+                    
                 case 'disconnect':
                     result = await removeConnection(currentUserId, targetUserId);
                     if (result.success) {
