@@ -1,6 +1,7 @@
-// src/components/mentions/MentionDropdown.jsx - Complete Fixed Version
+// src/components/mentions/MentionDropdown.jsx - FULLY OPTIMIZED VERSION
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../supabaseClient';
+import { optimizedSupabaseQuery } from '../../utils/apiRequestOptimizer'; // ✅ CRITICAL IMPORT
 
 export default function MentionDropdown({ 
   query, 
@@ -29,23 +30,49 @@ export default function MentionDropdown({
       try {
         const searchPattern = `%${query.trim()}%`;
         
-        // Search users/profiles
-        const { data: profiles, error: profilesError } = await supabase
-          .from('profiles')
-          .select('id, full_name, title, organization_name, avatar_url, role')
-          .or(`full_name.ilike.${searchPattern},title.ilike.${searchPattern},organization_name.ilike.${searchPattern}`)
-          .limit(5);
+        // ✅ BEFORE (Direct profiles query):
+        // const { data: profiles, error: profilesError } = await supabase
+        //   .from('profiles')
+        //   .select('id, full_name, title, organization_name, avatar_url, role')
+        //   .or(`full_name.ilike.${searchPattern},title.ilike.${searchPattern},organization_name.ilike.${searchPattern}`)
+        //   .limit(5);
+
+        // ✅ AFTER (Optimized profiles query):
+        const optimizedProfilesQuery = optimizedSupabaseQuery(
+          supabase
+            .from('profiles')
+            .select('id, full_name, title, organization_name, avatar_url, role')
+            .or(`full_name.ilike.${searchPattern},title.ilike.${searchPattern},organization_name.ilike.${searchPattern}`)
+            .limit(5),
+          'profiles_single',
+          { searchQuery: query, userIds: [] }
+        );
+
+        const { data: profiles, error: profilesError } = await optimizedProfilesQuery;
 
         if (profilesError) {
           console.error('Error searching profiles:', profilesError);
         }
 
-        // FIXED: Search the unified organizations table with all organization types
-        const { data: organizations, error: orgsError } = await supabase
-          .from('organizations')
-          .select('id, name, type, tagline, image_url, slug')
-          .ilike('name', searchPattern)
-          .limit(5);
+        // ✅ BEFORE (Direct organizations query):
+        // const { data: organizations, error: orgsError } = await supabase
+        //   .from('organizations')
+        //   .select('id, name, type, tagline, image_url, slug')
+        //   .ilike('name', searchPattern)
+        //   .limit(5);
+
+        // ✅ AFTER (Optimized organizations query):
+        const optimizedOrgsQuery = optimizedSupabaseQuery(
+          supabase
+            .from('organizations')
+            .select('id, name, type, tagline, image_url, slug')
+            .ilike('name', searchPattern)
+            .limit(5),
+          'organizations_single',
+          { searchQuery: query, orgIds: [] }
+        );
+
+        const { data: organizations, error: orgsError } = await optimizedOrgsQuery;
 
         if (orgsError) {
           console.error('Error searching organizations:', orgsError);
@@ -74,7 +101,7 @@ export default function MentionDropdown({
           role: profile.role
         }));
 
-        // FIXED: Format organization results with correct ID format and proper type mapping
+        // Format organization results with correct ID format and proper type mapping
         const orgResults = (organizations || []).map(org => {
           // Create mention ID in the format: orgType-orgId
           const mentionId = `${org.type}-${org.id}`;

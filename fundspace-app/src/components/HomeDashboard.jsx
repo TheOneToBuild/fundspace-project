@@ -1,6 +1,8 @@
+// src/components/HomeDashboard.jsx - FULLY OPTIMIZED: All direct queries wrapped with optimizer
 import React, { useState, useEffect } from 'react';
 import { useOutletContext, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
+import { optimizedSupabaseQuery } from '../utils/apiRequestOptimizer'; // ✅ CRITICAL IMPORT
 import { rssNewsService as newsService } from '../services/rssNewsService.js';
 import { getOrganizationInfoForDashboard } from '../utils/membershipQueries.js';
 import globalDataManager from '../utils/globalDataManager';
@@ -54,18 +56,32 @@ const useOptimizedTrendingPosts = () => {
     return trendingPosts;
 };
 
-// FIXED: Corrected grants hook
+// ✅ OPTIMIZED: Wrap all direct grants and organizations queries
 const useTrendingGrants = () => {
     const [trendingGrants, setTrendingGrants] = useState([]);
 
     useEffect(() => {
         const fetchTrendingGrants = async () => {
             try {
-                const { data: grantsData, error: grantsError } = await supabase
-                    .from('grants')
-                    .select('*')
-                    .order('id', { ascending: false })
-                    .limit(15);
+                // ✅ BEFORE (Direct query causing 3+ grants API calls):
+                // const { data: grantsData, error: grantsError } = await supabase
+                //     .from('grants')
+                //     .select('*')
+                //     .order('id', { ascending: false })
+                //     .limit(15);
+
+                // ✅ AFTER (Optimized grants query):
+                const optimizedGrantsQuery = optimizedSupabaseQuery(
+                    supabase
+                        .from('grants')
+                        .select('*')
+                        .order('id', { ascending: false })
+                        .limit(15),
+                    'grants_single',
+                    { grantIds: [] }
+                );
+                
+                const { data: grantsData, error: grantsError } = await optimizedGrantsQuery;
                 
                 if (grantsError) {
                     console.error('Error fetching grants:', grantsError);
@@ -82,10 +98,23 @@ const useTrendingGrants = () => {
                 
                 let orgsData = [];
                 if (orgIds.length > 0) {
-                    const { data: organizationsData } = await supabase
-                        .from('organizations')
-                        .select('id, name, image_url, banner_image_url, slug')
-                        .in('id', orgIds);
+                    // ✅ BEFORE (Direct organizations query):
+                    // const { data: organizationsData } = await supabase
+                    //     .from('organizations')
+                    //     .select('id, name, image_url, banner_image_url, slug')
+                    //     .in('id', orgIds);
+
+                    // ✅ AFTER (Optimized organizations query):
+                    const optimizedOrgsQuery = optimizedSupabaseQuery(
+                        supabase
+                            .from('organizations')
+                            .select('id, name, image_url, banner_image_url, slug')
+                            .in('id', orgIds),
+                        'organizations_single',
+                        { orgIds }
+                    );
+                    
+                    const { data: organizationsData } = await optimizedOrgsQuery;
                     orgsData = organizationsData || [];
                 }
 
@@ -120,10 +149,24 @@ const useTrendingGrants = () => {
 
                 try {
                     const grantIds = processedGrants.map(grant => grant.id);
-                    const { data: bookmarksData, error: bookmarksError } = await supabase
-                        .from('saved_grants')
-                        .select('grant_id')
-                        .in('grant_id', grantIds);
+                    
+                    // ✅ BEFORE (Direct saved_grants query):
+                    // const { data: bookmarksData, error: bookmarksError } = await supabase
+                    //     .from('saved_grants')
+                    //     .select('grant_id')
+                    //     .in('grant_id', grantIds);
+
+                    // ✅ AFTER (Optimized saved_grants query):
+                    const optimizedSavedQuery = optimizedSupabaseQuery(
+                        supabase
+                            .from('saved_grants')
+                            .select('grant_id')
+                            .in('grant_id', grantIds),
+                        'saved_grants_single',
+                        { userId: null, grantIds } // No specific user, just getting counts
+                    );
+                    
+                    const { data: bookmarksData, error: bookmarksError } = await optimizedSavedQuery;
 
                     if (!bookmarksError && bookmarksData) {
                         const bookmarkCounts = {};
@@ -262,6 +305,7 @@ export default function HomeDashboard() {
             if (handleSaveGrant) {
                 await handleSaveGrant(grantId);
             } else {
+                // Direct mutation (doesn't need optimization wrapper)
                 const { error } = await supabase
                     .from('saved_grants')
                     .insert({ 
@@ -300,6 +344,7 @@ export default function HomeDashboard() {
             if (handleUnsaveGrant) {
                 await handleUnsaveGrant(grantId);
             } else {
+                // Direct mutation (doesn't need optimization wrapper)
                 const { error } = await supabase
                     .from('saved_grants')
                     .delete()

@@ -1,7 +1,8 @@
-// src/components/organization-profile/OrganizationSearch.jsx
+// src/components/organization-profile/OrganizationSearch.jsx - OPTIMIZED VERSION
 import React, { useState, useEffect, useRef } from 'react';
 import { Search, X, Building2, Check } from 'lucide-react';
 import { supabase } from '../../supabaseClient.js';
+import { optimizedSupabaseQuery } from '../../utils/apiRequestOptimizer'; // ✅ CRITICAL IMPORT
 
 const OrganizationSearch = ({ 
   selectedOrganizations = [], 
@@ -46,13 +47,27 @@ const OrganizationSearch = ({
     try {
       setIsSearching(true);
       
-      // Search across all organizations (both funders and nonprofits)
-      const { data, error } = await supabase
-        .from('organizations')
-        .select('id, name, type, tagline, image_url')
-        .or(`name.ilike.%${query}%,tagline.ilike.%${query}%`)
-        .limit(10)
-        .order('name');
+      // ✅ BEFORE (Direct organizations query):
+      // const { data, error } = await supabase
+      //   .from('organizations')
+      //   .select('id, name, type, tagline, image_url')
+      //   .or(`name.ilike.%${query}%,tagline.ilike.%${query}%`)
+      //   .limit(10)
+      //   .order('name');
+
+      // ✅ AFTER (Optimized organizations query):
+      const optimizedSearchQuery = optimizedSupabaseQuery(
+        supabase
+          .from('organizations')
+          .select('id, name, type, tagline, image_url')
+          .or(`name.ilike.%${query}%,tagline.ilike.%${query}%`)
+          .limit(10)
+          .order('name'),
+        'organizations_single',
+        { searchQuery: query, orgIds: [] }
+      );
+
+      const { data, error } = await optimizedSearchQuery;
 
       if (error) throw error;
 

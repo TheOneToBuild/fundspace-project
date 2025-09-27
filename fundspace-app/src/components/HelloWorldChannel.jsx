@@ -1,7 +1,8 @@
-// src/components/HelloWorldChannel.jsx - OPTIMIZED: Use globalDataManager for posts
+// src/components/HelloWorldChannel.jsx - FULLY OPTIMIZED: Use globalDataManager for posts
 import React, { useState, useEffect, useRef, useCallback, memo } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { supabase } from '../supabaseClient.js';
+import { optimizedSupabaseQuery } from '../utils/apiRequestOptimizer'; // ✅ CRITICAL IMPORT
 import { ChevronLeft, ChevronRight, Users, MessageCircle, Globe } from 'lucide-react';
 import PostCard from './PostCard.jsx';
 import CreatePost from './CreatePost.jsx';
@@ -9,7 +10,7 @@ import { rssNewsService as newsService } from '../services/rssNewsService.js';
 import { addOrganizationEventListener } from '../utils/organizationEvents.js';
 import { getOrganizationInfoForDashboard } from '../utils/membershipQueries.js';
 import { realtimeManager } from '../utils/realtimeManager.js';
-import globalDataManager from '../utils/globalDataManager.js'; // ✅ ADD THIS IMPORT
+import globalDataManager from '../utils/globalDataManager.js';
 
 import PropTypes from 'prop-types';
 
@@ -208,13 +209,13 @@ export default function HelloWorldChannel() {
     fetchOrganizationInfo();
   }, [profile?.id]);
 
-  // ✅ OPTIMIZED: Use globalDataManager for posts instead of direct queries
+  // ✅ FULLY OPTIMIZED: Use globalDataManager for posts instead of direct queries
   useEffect(() => {
     const fetchPosts = async () => {
       if (!hasMore) return;
       setIsLoading(true);
       try {
-        // ✅ BEFORE (Direct query causing 23 posts API calls):
+        // ✅ BEFORE (Direct query causing 10+ posts API calls):
         // const { data, error: postsError } = await supabase
         //   .from('posts')
         //   .select(`*, profiles:profile_id(...)`)
@@ -222,7 +223,7 @@ export default function HelloWorldChannel() {
 
         // ✅ AFTER (Use globalDataManager for batched loading):
         if (page === 0) {
-          // First page - use globalDataManager
+          // First page - use globalDataManager for optimal batching
           const postsData = await globalDataManager.getPostsByChannel('hello-world', POSTS_PER_PAGE);
           
           if (postsData && postsData.length > 0) {
@@ -232,13 +233,19 @@ export default function HelloWorldChannel() {
             setHasMore(false);
           }
         } else {
-          // Subsequent pages - still need direct query but with optimization
-          const { data: postsData, error: postsError } = await supabase
-            .from('posts')
-            .select(`*, profiles:profile_id(id, full_name, avatar_url, title, organization_name, role, organization_type)`)
-            .eq('channel', 'hello-world')
-            .order('created_at', { ascending: false })
-            .range(page * POSTS_PER_PAGE, (page + 1) * POSTS_PER_PAGE - 1);
+          // Subsequent pages - use optimized query wrapper
+          const optimizedPostsQuery = optimizedSupabaseQuery(
+            supabase
+              .from('posts')
+              .select(`*, profiles:profile_id(id, full_name, avatar_url, title, organization_name, role, organization_type)`)
+              .eq('channel', 'hello-world')
+              .order('created_at', { ascending: false })
+              .range(page * POSTS_PER_PAGE, (page + 1) * POSTS_PER_PAGE - 1),
+            'posts_single',
+            { channel: 'hello-world', page, limit: POSTS_PER_PAGE }
+          );
+
+          const { data: postsData, error: postsError } = await optimizedPostsQuery;
 
           if (postsError) throw postsError;
 
@@ -273,11 +280,18 @@ export default function HelloWorldChannel() {
       const isInCurrentPosts = posts.some(p => p.id === postId);
       if (!isInCurrentPosts) return;
 
-      const { data: postData } = await supabase
-        .from('posts')
-        .select('likes_count, comments_count')
-        .eq('id', postId)
-        .single();
+      // ✅ OPTIMIZE: Wrap the post count refresh query
+      const optimizedCountQuery = optimizedSupabaseQuery(
+        supabase
+          .from('posts')
+          .select('likes_count, comments_count')
+          .eq('id', postId)
+          .single(),
+        'posts_single',
+        { postIds: [postId] }
+      );
+
+      const { data: postData } = await optimizedCountQuery;
         
       if (postData) {
         setPosts(currentPosts => currentPosts.map(p => 
@@ -292,11 +306,18 @@ export default function HelloWorldChannel() {
       profile,
       {
         onPostInsert: async (payload) => {
-          const { data: profileData } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', payload.new.profile_id)
-            .single();
+          // ✅ OPTIMIZE: Wrap profile fetch query
+          const optimizedProfileQuery = optimizedSupabaseQuery(
+            supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', payload.new.profile_id)
+              .single(),
+            'profiles_single',
+            { userIds: [payload.new.profile_id] }
+          );
+
+          const { data: profileData } = await optimizedProfileQuery;
             
           if (profileData) {
             const newPostWithProfile = { 
