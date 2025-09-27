@@ -50,6 +50,7 @@ import ResetPasswordForm from './components/auth/ResetPasswordForm';
 import AuthLayout from './components/auth/AuthLayout';
 import ConnectionsPage from './components/ConnectionsPage.jsx';
 import GrantsPortalPage from './components/GrantsPortalPage.jsx';
+import RPCTestPage from './components/RPCTestPage.jsx';
 
 // ✅ CRITICAL FIX: Import and enable API Request Optimizer
 import apiRequestOptimizer from './utils/apiRequestOptimizer';
@@ -354,6 +355,7 @@ export default function App() {
     <BrowserRouter>
       <ScrollToTop />
       <Routes>
+        
         <Route element={<Outlet context={outletContext} />}>
           <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
           <Route path="/signup" element={<PublicRoute><SignUpWizard /></PublicRoute>} />
@@ -362,6 +364,7 @@ export default function App() {
             <Route index element={<AuthRedirect><HomePage /></AuthRedirect>} />
             <Route path="grants" element={<GrantsPageContent />} />
             <Route path="organizations" element={<ExploreOrganizations />} />
+              <Route path="test-rpc" element={<RPCTestPage />} />  
             <Route path="spotlight" element={<SpotlightLandingPage />} />
             <Route path="spotlight/:countySlug" element={<CountySpotlightPage />} />
             <Route path="spotlight/:countySlug/:citySlug" element={<CitySpotlightPage />} />
