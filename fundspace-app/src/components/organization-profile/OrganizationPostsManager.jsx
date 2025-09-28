@@ -9,6 +9,7 @@ import CreatePost from '../CreatePost.jsx';
 import { hasPermission, PERMISSIONS } from '../../utils/organizationPermissions.js';
 import { realtimeManager } from '../../utils/realtimeManager.js';
 import globalDataManager from '../../utils/globalDataManager.js'; // ✅ ADD THIS IMPORT
+import { getOrganizationData, getUserProfileComplete } from '../../utils/rpcClientFunctions.js'; // ✅ ADD THIS IMPORT
 
 const OrganizationPostsManager = ({ 
   organization, 
@@ -63,18 +64,14 @@ const OrganizationPostsManager = ({
         setUserProfile(currentUserProfile);
         return;
       }
-
+      
+      // ✅ FIX: Use getUserProfileComplete for RPC optimization
       try {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('id, full_name, avatar_url')
-          .eq('id', session.user.id)
-          .maybeSingle();
-
-        if (data && !error) {
+        const profileData = await getUserProfileComplete(session.user.id);
+        if (profileData?.profile) {
           setUserProfile({
-            ...data,
-            avatar_url: data.avatar_url || session.user.user_metadata?.avatar_url || session.user.user_metadata?.picture,
+            ...profileData.profile,
+            avatar_url: profileData.profile.avatar_url || session.user.user_metadata?.avatar_url || session.user.user_metadata?.picture,
           });
         } else {
           setUserProfile({
@@ -85,13 +82,18 @@ const OrganizationPostsManager = ({
         }
       } catch (err) {
         console.error('Error fetching user profile:', err);
+        setUserProfile({
+          id: session.user.id,
+          full_name: session.user.user_metadata?.full_name || session.user.user_metadata?.name,
+          avatar_url: session.user.user_metadata?.avatar_url || session.user.user_metadata?.picture,
+        });
       }
     };
 
     fetchUserProfile();
   }, [session?.user?.id, currentUserProfile]);
 
-  // ✅ OPTIMIZED: Fetch organization posts using globalDataManager
+  // ✅ OPTIMIZED: Fetch organization posts using RPC function
   const fetchOrganizationPosts = useCallback(async () => {
     if (!organization?.id) return;
 
@@ -99,34 +101,12 @@ const OrganizationPostsManager = ({
       setLoading(true);
       setError('');
       
-      // ✅ BEFORE (Direct query causing individual organization_posts API calls):
-      // const { data: postsData, error: postsError } = await supabase
-      //   .from('organization_posts')
-      //   .select('*')
-      //   .eq('organization_id', organization.id)
-
-      // ✅ AFTER (Use globalDataManager for batched loading):
-      const postsData = await globalDataManager.getPostsForOrganizations([organization.id]);
-      const organizationPostsData = postsData[organization.id] || [];
-
-      // If no posts from globalDataManager, fallback to direct query
-      if (organizationPostsData.length === 0) {
-        try {
-          const { data: fallbackPosts, error: postsError } = await supabase
-            .from('organization_posts')
-            .select('*')
-            .eq('organization_id', organization.id)
-            .eq('organization_type', organization.type)
-            .order('created_at', { ascending: false })
-            .limit(20);
-
-          if (postsError) throw postsError;
-          setOrganizationPosts(fallbackPosts || []);
-        } catch (fallbackError) {
-          throw fallbackError;
-        }
+      // ✅ FIX: Use getOrganizationData for batched loading without fallback
+      const orgData = await getOrganizationData(organization.id, session?.user?.id);
+      if (orgData?.posts) {
+        setOrganizationPosts(orgData.posts);
       } else {
-        setOrganizationPosts(organizationPostsData);
+        setOrganizationPosts([]);
       }
       
     } catch (err) {
@@ -135,7 +115,7 @@ const OrganizationPostsManager = ({
     } finally {
       setLoading(false);
     }
-  }, [organization?.id, organization?.type]);
+  }, [organization?.id, organization?.type, session?.user?.id]);
 
   useEffect(() => {
     fetchOrganizationPosts();

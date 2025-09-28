@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { supabase } from '../../supabaseClient';
 import { User, Users, Heart, UserPlus, UserCheck, UserX, Clock } from 'lucide-react';
 import { 
     sendConnectionRequest, 
@@ -9,7 +8,7 @@ import {
     withdrawConnectionRequest,
     removeConnection 
 } from '../../utils/userConnectionsUtils';
-import { getBatchConnectionStatus } from '../../utils/rpcClientFunctions';
+import { getUserProfileComplete, getBatchConnectionStatus } from '../../utils/rpcClientFunctions';
 
 const MemberProfileConnections = ({ member, loading, currentUserId, isCurrentUser }) => {
     const [activeSubTab, setActiveSubTab] = useState('connections');
@@ -32,82 +31,29 @@ const MemberProfileConnections = ({ member, loading, currentUserId, isCurrentUse
         try {
             setConnectionsData(prev => ({ ...prev, loading: true }));
 
-            const [connectionsResult, followersResult, followingResult] = await Promise.all([
-                supabase
-                    .from('user_connections')
-                    .select('id, created_at, requester_id, recipient_id')
-                    .eq('status', 'accepted')
-                    .or(`requester_id.eq.${member.id},recipient_id.eq.${member.id}`)
-                    .order('created_at', { ascending: false }),
-                supabase
-                    .from('followers')
-                    .select('id, created_at, follower_id')
-                    .eq('following_id', member.id)
-                    .order('created_at', { ascending: false }),
-                supabase
-                    .from('followers')
-                    .select('id, created_at, following_id')
-                    .eq('follower_id', member.id)
-                    .order('created_at', { ascending: false })
-            ]);
+            const profileData = await getUserProfileComplete(member.id, currentUserId);
 
-            const connectionsData = connectionsResult.data || [];
-            const followersData = followersResult.data || [];
-            const followingData = followingResult.data || [];
-
-            if (connectionsResult.error || followersResult.error || followingResult.error) {
-                throw new Error(
-                    connectionsResult.error?.message || 
-                    followersResult.error?.message || 
-                    followingResult.error?.message
-                );
+            if (!profileData) {
+                throw new Error('Failed to load profile data');
             }
 
-            const connectionUserIds = connectionsData.map(conn => 
-                conn.requester_id === member.id ? conn.recipient_id : conn.requester_id
-            );
-            const followerUserIds = followersData.map(f => f.follower_id);
-            const followingUserIds = followingData.map(f => f.following_id);
+            const connections = (profileData.connections || []).map(conn => ({
+                id: conn.id,
+                user: conn.profile || { id: conn.user_id, full_name: 'Unknown User' },
+                created_at: conn.created_at,
+                type: 'connection'
+            }));
 
-            const allUserIds = [...new Set([...connectionUserIds, ...followerUserIds, ...followingUserIds])];
-            
-            let userProfiles = {};
-            if (allUserIds.length > 0) {
-                const { data: profilesData, error: profilesError } = await supabase
-                    .from('profiles')
-                    .select('id, full_name, avatar_url, title, organization_name, location')
-                    .in('id', allUserIds);
-
-                if (profilesError) {
-                    console.error('Error fetching user profiles:', profilesError);
-                } else {
-                    userProfiles = (profilesData || []).reduce((acc, profile) => {
-                        acc[profile.id] = profile;
-                        return acc;
-                    }, {});
-                }
-            }
-
-            const connections = connectionsData.map(conn => {
-                const otherUserId = conn.requester_id === member.id ? conn.recipient_id : conn.requester_id;
-                return {
-                    id: conn.id,
-                    user: userProfiles[otherUserId] || { id: otherUserId, full_name: 'Unknown User' },
-                    created_at: conn.created_at,
-                    type: 'connection'
-                };
-            });
-
-            const followers = followersData.map(follow => ({
+            const followers = (profileData.followers || []).map(follow => ({
                 id: follow.id,
-                user: userProfiles[follow.follower_id] || { id: follow.follower_id, full_name: 'Unknown User' },
+                user: follow.profile || { id: follow.follower_id, full_name: 'Unknown User' },
                 created_at: follow.created_at,
                 type: 'follower'
             }));
 
-            const following = followingData.map(follow => ({
+            const following = (profileData.following || []).map(follow => ({
                 id: follow.id,
-                user: userProfiles[follow.following_id] || { id: follow.following_id, full_name: 'Unknown User' },
+                user: follow.profile || { id: follow.following_id, full_name: 'Unknown User' },
                 created_at: follow.created_at,
                 type: 'following'
             }));

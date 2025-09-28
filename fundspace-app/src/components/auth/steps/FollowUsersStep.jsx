@@ -2,82 +2,48 @@
 import React, { useState, useEffect } from 'react';
 import { Search } from 'lucide-react';
 import { supabase } from '../../../supabaseClient';
+import { getDashboardData } from '../../../utils/rpcClientFunctions'; // ✅ ADD THIS IMPORT
 
 export default function FollowUsersStep({ formData, updateFormData }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Fetch real users from database
+  // ✅ OPTIMIZED: Fetch users using a single RPC call
   const fetchUsers = async () => {
     setLoading(true);
     
     try {
-      // Simplified query without complex filtering to avoid RLS issues
-      let query = supabase
-        .from('profiles')
-        .select('id, full_name, role, title, organization_name, avatar_url, location')
-        .not('full_name', 'is', null)
-        .limit(20);
-
-      // Add search filter if provided
+      const dashboardData = await getDashboardData();
+      let suggestedUsers = dashboardData?.suggested_users || [];
+      
       if (searchQuery.trim()) {
-        const searchTerm = `%${searchQuery}%`;
-        query = query.or(`full_name.ilike.${searchTerm},role.ilike.${searchTerm},title.ilike.${searchTerm},organization_name.ilike.${searchTerm}`);
+        const query = searchQuery.toLowerCase();
+        suggestedUsers = suggestedUsers.filter(user => 
+          user.full_name?.toLowerCase().includes(query) ||
+          user.role?.toLowerCase().includes(query) ||
+          user.title?.toLowerCase().includes(query) ||
+          user.organization_name?.toLowerCase().includes(query)
+        );
       }
-
-      const { data, error } = await query;
-
-      if (error) {
-        console.error('Supabase error:', error);
-        setUsers([]);
-        return;
-      }
-
-      if (!data || data.length === 0) {
-        setUsers([]);
-        return;
-      }
-
-      // Process users and add follower counts
-      const usersWithData = await Promise.all(
-        data.map(async (user) => {
-          // Get follower count
-          let followerCount = 0;
-          try {
-            const { count, error: followerError } = await supabase
-              .from('followers')
-              .select('*', { count: 'exact', head: true })
-              .eq('following_id', user.id);
-            
-            if (!followerError) {
-              followerCount = count || 0;
-            }
-          } catch (err) {
-            // Silent fallback - follower count will remain 0
-          }
-
-          return {
-            id: user.id,
-            full_name: user.full_name,
-            role: user.role,
-            title: user.title,
-            organization_name: user.organization_name,
-            avatar_url: user.avatar_url,
-            location: user.location,
-            followers: followerCount,
-            interests: [] // Empty for now, can be populated later
-          };
-        })
-      );
-
-      // Sort by follower count (descending)
+      
+      const usersWithData = suggestedUsers.map(user => ({
+        id: user.id,
+        full_name: user.full_name,
+        role: user.role,
+        title: user.title,
+        organization_name: user.organization_name,
+        avatar_url: user.avatar_url,
+        location: user.location,
+        followers: user.followers_count || 0,
+        interests: []
+      }));
+      
       usersWithData.sort((a, b) => b.followers - a.followers);
-
-      setUsers(usersWithData);
+      setUsers(usersWithData.slice(0, 20));
       
     } catch (error) {
-      console.error('Unexpected error:', error);
+      console.error('Error fetching users:', error);
       setUsers([]);
     } finally {
       setLoading(false);
