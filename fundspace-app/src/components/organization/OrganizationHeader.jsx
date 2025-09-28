@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
-    MapPin, Globe, Mail, Edit, LogOut, Trash2, Settings, 
+    MapPin, Globe, Edit, LogOut, Trash2, Settings, 
     Crown, Shield, Users, Star, MoreVertical, ExternalLink
 } from 'lucide-react';
 import { 
@@ -9,7 +9,6 @@ import {
     PERMISSIONS, 
     ROLES, 
     getRoleDisplayName, 
-    getRoleBadgeColor,
     getOrgTypeIcon,
     getOrgTypeLabel
 } from '../../utils/organizationPermissions.js';

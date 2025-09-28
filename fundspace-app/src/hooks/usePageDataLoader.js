@@ -1,41 +1,50 @@
-// src/hooks/usePageDataLoader.js - Coordinates all page-level data loading
 import { useState, useEffect, useCallback } from 'react';
-import globalDataManager from '../utils/globalDataManager';
+import { getDashboardData, getUserProfileComplete, getBatchConnectionStatus } from '../utils/rpcClientFunctions';
 
 export function usePageDataLoader() {
   const [pageData, setPageData] = useState({});
   const [loading, setLoading] = useState(false);
 
-  // Load data for posts page (community hub, profile feed, etc)
   const loadPostsPageData = useCallback(async (posts) => {
     if (!posts || posts.length === 0) return {};
 
     setLoading(true);
     
     try {
-      // Extract all the data we need to fetch
-      const postIds = posts.map(p => p.id);
-      const authorIds = posts.map(p => p.profile_id || p.user_id).filter(Boolean);
-      const uniqueAuthorIds = [...new Set(authorIds)];
+      const uniqueAuthorIds = [...new Set(posts.map(p => p.profile_id || p.user_id).filter(Boolean))];
 
-      // Batch load all data simultaneously
-      const [postLikesData, profilesData, orgMembershipsData, commentsData] = await Promise.all([
-        globalDataManager.getPostLikes(postIds),
-        globalDataManager.getProfiles(uniqueAuthorIds),
-        globalDataManager.getOrganizationMemberships(uniqueAuthorIds),
-        globalDataManager.getPostComments(postIds)
-      ]);
+      if (uniqueAuthorIds.length > 0) {
+        const profilesData = await Promise.all(
+          uniqueAuthorIds.map(id => getUserProfileComplete(id))
+        );
 
-      const combinedData = {
-        postLikes: postLikesData,
-        profiles: profilesData,
-        orgMemberships: orgMembershipsData,
-        comments: commentsData
-      };
+        const combinedData = {
+          profiles: {},
+          postLikes: {},
+          orgMemberships: {}
+        };
 
-      setPageData(combinedData);
-      return combinedData;
+        profilesData.forEach((data, index) => {
+          if (data) {
+            const userId = uniqueAuthorIds[index];
+            combinedData.profiles[userId] = data.profile;
+            combinedData.orgMemberships[userId] = data.organization_membership;
+            
+            if (data.posts) {
+              data.posts.forEach(post => {
+                if (post.likes_data) {
+                  combinedData.postLikes[post.id] = post.likes_data;
+                }
+              });
+            }
+          }
+        });
 
+        setPageData(combinedData);
+        return combinedData;
+      }
+
+      return {};
     } catch (error) {
       console.error('Error loading posts page data:', error);
       return {};
@@ -44,8 +53,7 @@ export function usePageDataLoader() {
     }
   }, []);
 
-  // Load data for connections page
-  const loadConnectionsPageData = useCallback(async (connections, pendingRequests) => {
+  const loadConnectionsPageData = useCallback(async (connections, pendingRequests, currentUserId) => {
     setLoading(true);
     
     try {
@@ -55,19 +63,27 @@ export function usePageDataLoader() {
       ];
       const uniqueUserIds = [...new Set(allUserIds)];
 
-      const [profilesData, orgMembershipsData] = await Promise.all([
-        globalDataManager.getProfiles(uniqueUserIds),
-        globalDataManager.getOrganizationMemberships(uniqueUserIds)
+      const [profilesData, connectionStatusData] = await Promise.all([
+        Promise.all(uniqueUserIds.map(id => getUserProfileComplete(id))),
+        currentUserId && uniqueUserIds.length > 0 ? getBatchConnectionStatus(currentUserId, uniqueUserIds) : Promise.resolve({})
       ]);
 
       const combinedData = {
-        profiles: profilesData,
-        orgMemberships: orgMembershipsData
+        profiles: {},
+        orgMemberships: {},
+        connectionStatuses: connectionStatusData?.connections || {}
       };
+
+      profilesData.forEach((data, index) => {
+        if (data) {
+          const userId = uniqueUserIds[index];
+          combinedData.profiles[userId] = data.profile;
+          combinedData.orgMemberships[userId] = data.organization_membership;
+        }
+      });
 
       setPageData(combinedData);
       return combinedData;
-
     } catch (error) {
       console.error('Error loading connections page data:', error);
       return {};
@@ -76,30 +92,33 @@ export function usePageDataLoader() {
     }
   }, []);
 
-  // Load data for profile page
   const loadProfilePageData = useCallback(async (profileId, posts) => {
     setLoading(true);
     
     try {
-      const postIds = posts?.map(p => p.id) || [];
-      const authorIds = posts?.map(p => p.profile_id || p.user_id).filter(Boolean) || [];
-      const allUserIds = [...new Set([profileId, ...authorIds])];
-
-      const [postLikesData, profilesData, orgMembershipsData] = await Promise.all([
-        postIds.length > 0 ? globalDataManager.getPostLikes(postIds) : Promise.resolve({}),
-        globalDataManager.getProfiles(allUserIds),
-        globalDataManager.getOrganizationMemberships([profileId])
-      ]);
+      const profileData = await getUserProfileComplete(profileId);
+      
+      if (!profileData) {
+        return {};
+      }
 
       const combinedData = {
-        postLikes: postLikesData,
-        profiles: profilesData,
-        orgMemberships: orgMembershipsData
+        profiles: { [profileId]: profileData.profile },
+        orgMemberships: { [profileId]: profileData.organization_membership },
+        postLikes: {},
+        posts: profileData.posts || []
       };
+
+      if (profileData.posts) {
+        profileData.posts.forEach(post => {
+          if (post.likes_data) {
+            combinedData.postLikes[post.id] = post.likes_data;
+          }
+        });
+      }
 
       setPageData(combinedData);
       return combinedData;
-
     } catch (error) {
       console.error('Error loading profile page data:', error);
       return {};
@@ -108,10 +127,47 @@ export function usePageDataLoader() {
     }
   }, []);
 
-  // Clear page data when navigating away
+  const loadDashboardPageData = useCallback(async (userId) => {
+    setLoading(true);
+    
+    try {
+      const dashboardData = await getDashboardData(userId);
+      
+      if (!dashboardData) {
+        return {};
+      }
+
+      const combinedData = {
+        posts: dashboardData.posts || [],
+        grants: dashboardData.recent_grants || [],
+        organizations: dashboardData.trending_organizations || [],
+        profiles: {},
+        postLikes: {}
+      };
+
+      if (dashboardData.posts) {
+        dashboardData.posts.forEach(post => {
+          if (post.profile) {
+            combinedData.profiles[post.profile.id] = post.profile;
+          }
+          if (post.likes_data) {
+            combinedData.postLikes[post.id] = post.likes_data;
+          }
+        });
+      }
+
+      setPageData(combinedData);
+      return combinedData;
+    } catch (error) {
+      console.error('Error loading dashboard page data:', error);
+      return {};
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   const clearPageData = useCallback(() => {
     setPageData({});
-    globalDataManager.clearCache(); // Clear global cache
   }, []);
 
   return {
@@ -120,11 +176,11 @@ export function usePageDataLoader() {
     loadPostsPageData,
     loadConnectionsPageData,
     loadProfilePageData,
+    loadDashboardPageData,
     clearPageData
   };
 }
 
-// Enhanced PostCard hook that uses page data
 export function useEnhancedPostCard(post, pageData) {
   const [enhancedPost, setEnhancedPost] = useState(post);
 
@@ -134,7 +190,6 @@ export function useEnhancedPostCard(post, pageData) {
       return;
     }
 
-    // Enhance post with batched data
     const postLikes = pageData.postLikes?.[post.id] || {
       likes_count: post.likes_count || 0,
       reaction_summary: post.reactions?.summary || [],
@@ -151,7 +206,6 @@ export function useEnhancedPostCard(post, pageData) {
         summary: postLikes.reaction_summary,
         sample: postLikes.reactors.slice(0, 3)
       },
-      // Enhanced author info
       profiles: authorProfile ? {
         ...post.profiles,
         ...authorProfile,
@@ -159,7 +213,6 @@ export function useEnhancedPostCard(post, pageData) {
         organization_type: authorOrgMembership?.organization?.type || authorProfile.organization_type,
         role: authorOrgMembership?.role || authorProfile.role
       } : post.profiles,
-      // Preload reactors to avoid separate API calls
       _reactors: postLikes.reactors
     };
 

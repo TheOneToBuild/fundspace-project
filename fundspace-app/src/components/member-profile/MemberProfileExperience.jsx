@@ -1,4 +1,3 @@
-// components/member-profile/MemberProfileExperience.jsx
 import React, { useState, useEffect } from 'react';
 import { 
     Plus, 
@@ -10,11 +9,7 @@ import {
     MapPin,
     Calendar,
     Building2,
-    Award,
-    Linkedin,
-    Twitter,
-    Globe,
-    ExternalLink
+    Award
 } from 'lucide-react';
 import { supabase } from '../../supabaseClient';
 import { useNavigate } from 'react-router-dom';
@@ -22,7 +17,6 @@ import { useNavigate } from 'react-router-dom';
 const MemberProfileExperience = ({ member, loading, currentUserId, isCurrentUser }) => {
     const navigate = useNavigate();
     
-    // All state variables properly declared
     const [experiences, setExperiences] = useState([]);
     const [experiencesLoading, setExperiencesLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('work');
@@ -31,18 +25,15 @@ const MemberProfileExperience = ({ member, loading, currentUserId, isCurrentUser
     const [saveLoading, setSaveLoading] = useState(false);
     const [deleteConfirm, setDeleteConfirm] = useState(null);
     
-    // Location autocomplete
     const [locationSuggestions, setLocationSuggestions] = useState([]);
     const [filteredLocations, setFilteredLocations] = useState([]);
     const [showLocationSuggestions, setShowLocationSuggestions] = useState(false);
     
-    // Organization autocomplete
     const [organizationSuggestions, setOrganizationSuggestions] = useState([]);
     const [filteredOrganizations, setFilteredOrganizations] = useState([]);
     const [showOrganizationSuggestions, setShowOrganizationSuggestions] = useState(false);
     const [selectedOrganization, setSelectedOrganization] = useState(null);
     
-    // Position title autocomplete
     const [titleSuggestions, setTitleSuggestions] = useState([]);
     const [filteredTitles, setFilteredTitles] = useState([]);
     const [showTitleSuggestions, setShowTitleSuggestions] = useState(false);
@@ -65,12 +56,10 @@ const MemberProfileExperience = ({ member, loading, currentUserId, isCurrentUser
         achievements: []
     });
 
-    // Handle organization click - DEFINED EARLY
     const handleOrganizationClick = async (organization) => {
         if (!organization?.id) return;
         
         try {
-            // Get the organization slug from the database
             const { data: orgData, error } = await supabase
                 .from('organizations')
                 .select('slug')
@@ -81,7 +70,6 @@ const MemberProfileExperience = ({ member, loading, currentUserId, isCurrentUser
                 navigate(`/organizations/${orgData.slug}`);
             } else {
                 console.warn('Organization slug not found, using ID fallback');
-                // Fallback to ID-based route if no slug
                 navigate(`/organizations/${organization.id}`);
             }
         } catch (error) {
@@ -89,19 +77,16 @@ const MemberProfileExperience = ({ member, loading, currentUserId, isCurrentUser
         }
     };
 
-    // Fetch experiences
     useEffect(() => {
         fetchExperiences();
     }, [member?.id]);
 
-    // Update form type when activeTab changes
     useEffect(() => {
         if (showAddForm && !editingExperience) {
             setFormData(prev => ({ ...prev, type: activeTab }));
         }
     }, [activeTab, showAddForm, editingExperience]);
 
-    // Fetch unique locations from database for autocomplete
     useEffect(() => {
         const fetchLocationSuggestions = async () => {
             try {
@@ -123,7 +108,6 @@ const MemberProfileExperience = ({ member, loading, currentUserId, isCurrentUser
         fetchLocationSuggestions();
     }, []);
 
-    // Fetch organizations for autocomplete
     useEffect(() => {
         const fetchOrganizationSuggestions = async () => {
             try {
@@ -142,7 +126,6 @@ const MemberProfileExperience = ({ member, loading, currentUserId, isCurrentUser
         fetchOrganizationSuggestions();
     }, []);
 
-    // Fetch position titles for autocomplete
     useEffect(() => {
         const fetchTitleSuggestions = async () => {
             try {
@@ -169,7 +152,6 @@ const MemberProfileExperience = ({ member, loading, currentUserId, isCurrentUser
         
         setExperiencesLoading(true);
         try {
-            // Fetch experiences with organization data
             const { data, error } = await supabase
                 .from('user_experiences')
                 .select(`
@@ -320,7 +302,6 @@ const MemberProfileExperience = ({ member, loading, currentUserId, isCurrentUser
             achievements: experience.achievements || []
         });
         
-        // Set selected organization if it exists
         if (experience.organization) {
             setSelectedOrganization(experience.organization);
         }
@@ -451,7 +432,6 @@ const MemberProfileExperience = ({ member, loading, currentUserId, isCurrentUser
 
     return (
         <div className="max-w-7xl mx-auto px-8 py-8">
-            {/* Tab Navigation */}
             <div className="flex items-center justify-between mb-6">
                 <div className="flex space-x-1 bg-slate-100 rounded-lg p-1">
                     {[
@@ -494,7 +474,6 @@ const MemberProfileExperience = ({ member, loading, currentUserId, isCurrentUser
                 )}
             </div>
 
-            {/* Add/Edit Form */}
             {showAddForm && isCurrentUser && (
                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
                     <h3 className="text-lg font-semibold text-slate-800 mb-4">
@@ -503,7 +482,6 @@ const MemberProfileExperience = ({ member, loading, currentUserId, isCurrentUser
                     
                     <form onSubmit={handleSubmit} className="space-y-4">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {/* Position Title with Autocomplete */}
                             <div className="relative">
                                 <label className="block text-sm font-medium text-slate-700 mb-1">
                                     {activeTab === 'education' ? 'Degree/Program' : 'Position Title'} *
@@ -522,7 +500,6 @@ const MemberProfileExperience = ({ member, loading, currentUserId, isCurrentUser
                                         setTimeout(() => setShowTitleSuggestions(false), 150);
                                     }}
                                     className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                    placeholder=""
                                 />
                                 
                                 {showTitleSuggestions && filteredTitles.length > 0 && (
@@ -544,7 +521,6 @@ const MemberProfileExperience = ({ member, loading, currentUserId, isCurrentUser
                                 )}
                             </div>
 
-                            {/* Organization with Autocomplete */}
                             <div className="relative">
                                 <label className="block text-sm font-medium text-slate-700 mb-1">
                                     {activeTab === 'education' ? 'School/Institution' : 'Company/Organization'} *
@@ -563,7 +539,6 @@ const MemberProfileExperience = ({ member, loading, currentUserId, isCurrentUser
                                         setTimeout(() => setShowOrganizationSuggestions(false), 150);
                                     }}
                                     className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                    placeholder=""
                                 />
                                 
                                 {showOrganizationSuggestions && filteredOrganizations.length > 0 && (
@@ -602,29 +577,26 @@ const MemberProfileExperience = ({ member, loading, currentUserId, isCurrentUser
                         </div>
 
                         {activeTab === 'education' && (
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">Field of Study</label>
-                                <input
-                                    type="text"
-                                    value={formData.field_of_study}
-                                    onChange={(e) => setFormData(prev => ({ ...prev, field_of_study: e.target.value }))}
-                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                    placeholder=""
-                                />
-                            </div>
-                        )}
-
-                        {activeTab === 'education' && (
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">Grade/GPA</label>
-                                <input
-                                    type="text"
-                                    value={formData.grade}
-                                    onChange={(e) => setFormData(prev => ({ ...prev, grade: e.target.value }))}
-                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                    placeholder=""
-                                />
-                            </div>
+                            <>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Field of Study</label>
+                                    <input
+                                        type="text"
+                                        value={formData.field_of_study}
+                                        onChange={(e) => setFormData(prev => ({ ...prev, field_of_study: e.target.value }))}
+                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Grade/GPA</label>
+                                    <input
+                                        type="text"
+                                        value={formData.grade}
+                                        onChange={(e) => setFormData(prev => ({ ...prev, grade: e.target.value }))}
+                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    />
+                                </div>
+                            </>
                         )}
 
                         {activeTab === 'work' && (
@@ -659,7 +631,6 @@ const MemberProfileExperience = ({ member, loading, currentUserId, isCurrentUser
                                     setTimeout(() => setShowLocationSuggestions(false), 150);
                                 }}
                                 className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                placeholder=""
                             />
                             
                             {showLocationSuggestions && filteredLocations.length > 0 && (
@@ -725,7 +696,6 @@ const MemberProfileExperience = ({ member, loading, currentUserId, isCurrentUser
                                 value={formData.description}
                                 onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
                                 className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                placeholder=""
                             />
                         </div>
 
@@ -753,7 +723,6 @@ const MemberProfileExperience = ({ member, loading, currentUserId, isCurrentUser
                 </div>
             )}
 
-            {/* Experiences List */}
             <div className="space-y-4">
                 {getTabExperiences(activeTab).map((experience) => {
                     const Icon = getTabIcon(experience.type);
@@ -886,7 +855,6 @@ const MemberProfileExperience = ({ member, loading, currentUserId, isCurrentUser
                 )}
             </div>
 
-            {/* Delete Confirmation Modal */}
             {deleteConfirm && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                     <div className="bg-white rounded-xl shadow-xl max-w-md w-full mx-4 p-6">

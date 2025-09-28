@@ -1,9 +1,6 @@
-// hooks/useOrganizationMembership.js - OPTIMIZED with API Request Optimizer
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../supabaseClient';
-import apiRequestOptimizer from '../utils/apiRequestOptimizer';
 
-// Request deduplication to prevent duplicate queries
 const pendingRequests = new Map();
 
 function useRequestDeduplication() {
@@ -24,10 +21,9 @@ function useRequestDeduplication() {
   return deduplicate;
 }
 
-// Circuit breaker to prevent cascade failures
 let cacheFailureCount = 0;
 const MAX_CACHE_FAILURES = 3;
-const CACHE_COOLDOWN = 60000; // 1 minute
+const CACHE_COOLDOWN = 60000;
 let lastCacheFailure = 0;
 
 export function useOrganizationMembership(profileId) {
@@ -65,7 +61,6 @@ export function useOrganizationMembership(profileId) {
         const shouldSkipCache = cacheFailureCount >= MAX_CACHE_FAILURES && 
                                (now - lastCacheFailure) < CACHE_COOLDOWN;
 
-        // Try the stored procedure first (most reliable)
         if (!shouldSkipCache) {
           try {
             const { data: funcData, error: funcError } = await supabase
@@ -96,7 +91,7 @@ export function useOrganizationMembership(profileId) {
               if (isMountedRef.current) {
                 setMembership(result);
                 setLoading(false);
-                cacheFailureCount = 0; // Reset on success
+                cacheFailureCount = 0;
               }
               return;
             }
@@ -105,18 +100,36 @@ export function useOrganizationMembership(profileId) {
           }
         }
 
-        // OPTIMIZED: Use API optimizer instead of direct Supabase calls
-        const optimizedResult = await apiRequestOptimizer.optimizeSupabaseQuery(
-          null,
-          'org_membership_single',
-          { userId: profileId }
-        );
+        const { data: membershipData, error: membershipError } = await supabase
+          .from('organization_memberships')
+          .select('*')
+          .eq('user_id', profileId)
+          .limit(1);
 
-        if (optimizedResult?.data?.length > 0) {
-          const membershipRecord = optimizedResult.data[0];
+        if (membershipError) throw membershipError;
+
+        if (membershipData && membershipData.length > 0) {
+          const membership = membershipData[0];
           
-          if (isMountedRef.current) {
-            setMembership(membershipRecord);
+          const { data: orgData, error: orgError } = await supabase
+            .from('organizations')
+            .select('id, name, tagline, image_url')
+            .eq('id', membership.organization_id)
+            .single();
+
+          if (!orgError && orgData) {
+            const result = {
+              ...membership,
+              organization: orgData
+            };
+            
+            if (isMountedRef.current) {
+              setMembership(result);
+            }
+          } else {
+            if (isMountedRef.current) {
+              setMembership(membership);
+            }
           }
         } else {
           if (isMountedRef.current) {
@@ -132,7 +145,6 @@ export function useOrganizationMembership(profileId) {
           setMembership(null);
         }
         
-        // Increment cache failure count for circuit breaker
         cacheFailureCount++;
         lastCacheFailure = Date.now();
       }
@@ -155,7 +167,6 @@ export function useOrganizationMembership(profileId) {
   };
 }
 
-// OPTIMIZED: Use API optimizer for direct queries
 export async function getOrganizationMembership(profileId) {
   if (!profileId) return null;
 
@@ -167,7 +178,6 @@ export async function getOrganizationMembership(profileId) {
 
   const promise = (async () => {
     try {
-      // Try stored procedure first
       const { data: funcData, error: funcError } = await supabase
         .rpc('get_user_organization_membership', { 
           user_id: profileId 
@@ -194,15 +204,31 @@ export async function getOrganizationMembership(profileId) {
         };
       }
 
-      // OPTIMIZED: Use API optimizer instead of individual queries
-      const optimizedResult = await apiRequestOptimizer.optimizeSupabaseQuery(
-        null,
-        'org_membership_single',
-        { userId: profileId }
-      );
+      const { data: membershipData, error: membershipError } = await supabase
+        .from('organization_memberships')
+        .select('*')
+        .eq('user_id', profileId)
+        .limit(1);
 
-      if (optimizedResult?.data?.length > 0) {
-        return optimizedResult.data[0];
+      if (membershipError) throw membershipError;
+
+      if (membershipData && membershipData.length > 0) {
+        const membership = membershipData[0];
+        
+        const { data: orgData, error: orgError } = await supabase
+          .from('organizations')
+          .select('id, name, tagline, image_url')
+          .eq('id', membership.organization_id)
+          .single();
+
+        if (!orgError && orgData) {
+          return {
+            ...membership,
+            organization: orgData
+          };
+        }
+        
+        return membership;
       }
 
       return null;
@@ -219,7 +245,6 @@ export async function getOrganizationMembership(profileId) {
   return promise;
 }
 
-// OPTIMIZED: Use global data manager for bulk memberships
 export async function getBulkOrganizationMemberships(profileIds) {
   if (!profileIds || profileIds.length === 0) return {};
 
@@ -231,11 +256,35 @@ export async function getBulkOrganizationMemberships(profileIds) {
 
   const promise = (async () => {
     try {
-      // OPTIMIZED: Use global data manager's batch system
-      const { globalDataManager } = await import('../utils/globalDataManager');
-      const membershipMap = await globalDataManager.getOrganizationMemberships(profileIds);
+      const { data: membershipData, error: membershipError } = await supabase
+        .from('organization_memberships')
+        .select('user_id, role, organization_id')
+        .in('user_id', profileIds);
+
+      if (membershipError) throw membershipError;
+
+      if (membershipData && membershipData.length > 0) {
+        const orgIds = [...new Set(membershipData.map(m => m.organization_id))];
+        
+        const { data: orgData, error: orgError } = await supabase
+          .from('organizations')
+          .select('id, name, type')
+          .in('id', orgIds);
+
+        if (!orgError && orgData) {
+          const membershipMap = {};
+          membershipData.forEach(membership => {
+            const org = orgData.find(o => o.id === membership.organization_id);
+            membershipMap[membership.user_id] = {
+              ...membership,
+              organizations: org
+            };
+          });
+          return membershipMap;
+        }
+      }
       
-      return membershipMap;
+      return {};
     } catch (err) {
       console.error('Error getting bulk memberships:', err);
       return {};

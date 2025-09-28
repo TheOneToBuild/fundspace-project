@@ -1,7 +1,5 @@
-// src/components/mentions/MentionDropdown.jsx - FULLY OPTIMIZED VERSION
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../supabaseClient';
-import { optimizedSupabaseQuery } from '../../utils/apiRequestOptimizer'; // ✅ CRITICAL IMPORT
 
 export default function MentionDropdown({ 
   query, 
@@ -16,7 +14,6 @@ export default function MentionDropdown({
   const [internalSelectedIndex, setInternalSelectedIndex] = useState(-1);
   const dropdownRef = useRef(null);
 
-  // Use external selectedIndex if provided, otherwise use internal
   const currentSelectedIndex = selectedIndex >= 0 ? selectedIndex : internalSelectedIndex;
 
   useEffect(() => {
@@ -30,67 +27,26 @@ export default function MentionDropdown({
       try {
         const searchPattern = `%${query.trim()}%`;
         
-        // ✅ BEFORE (Direct profiles query):
-        // const { data: profiles, error: profilesError } = await supabase
-        //   .from('profiles')
-        //   .select('id, full_name, title, organization_name, avatar_url, role')
-        //   .or(`full_name.ilike.${searchPattern},title.ilike.${searchPattern},organization_name.ilike.${searchPattern}`)
-        //   .limit(5);
-
-        // ✅ AFTER (Optimized profiles query):
-        const optimizedProfilesQuery = optimizedSupabaseQuery(
-          supabase
-            .from('profiles')
-            .select('id, full_name, title, organization_name, avatar_url, role')
-            .or(`full_name.ilike.${searchPattern},title.ilike.${searchPattern},organization_name.ilike.${searchPattern}`)
-            .limit(5),
-          'profiles_single',
-          { searchQuery: query, userIds: [] }
-        );
-
-        const { data: profiles, error: profilesError } = await optimizedProfilesQuery;
+        const { data: profiles, error: profilesError } = await supabase
+          .from('profiles')
+          .select('id, full_name, title, organization_name, avatar_url, role')
+          .or(`full_name.ilike.${searchPattern},title.ilike.${searchPattern},organization_name.ilike.${searchPattern}`)
+          .limit(5);
 
         if (profilesError) {
           console.error('Error searching profiles:', profilesError);
         }
 
-        // ✅ BEFORE (Direct organizations query):
-        // const { data: organizations, error: orgsError } = await supabase
-        //   .from('organizations')
-        //   .select('id, name, type, tagline, image_url, slug')
-        //   .ilike('name', searchPattern)
-        //   .limit(5);
-
-        // ✅ AFTER (Optimized organizations query):
-        const optimizedOrgsQuery = optimizedSupabaseQuery(
-          supabase
-            .from('organizations')
-            .select('id, name, type, tagline, image_url, slug')
-            .ilike('name', searchPattern)
-            .limit(5),
-          'organizations_single',
-          { searchQuery: query, orgIds: [] }
-        );
-
-        const { data: organizations, error: orgsError } = await optimizedOrgsQuery;
+        const { data: organizations, error: orgsError } = await supabase
+          .from('organizations')
+          .select('id, name, type, tagline, image_url, slug')
+          .ilike('name', searchPattern)
+          .limit(5);
 
         if (orgsError) {
           console.error('Error searching organizations:', orgsError);
         }
 
-        console.log('MentionDropdown: Search results:', {
-          query,
-          profiles: profiles?.length || 0,
-          organizations: organizations?.length || 0,
-          orgData: organizations?.map(org => ({ 
-            id: org.id, 
-            name: org.name, 
-            type: org.type,
-            slug: org.slug 
-          }))
-        });
-
-        // Format results to match expected structure
         const userResults = (profiles || []).map(profile => ({
           id: profile.id,
           name: profile.full_name,
@@ -101,12 +57,9 @@ export default function MentionDropdown({
           role: profile.role
         }));
 
-        // Format organization results with correct ID format and proper type mapping
         const orgResults = (organizations || []).map(org => {
-          // Create mention ID in the format: orgType-orgId
           const mentionId = `${org.type}-${org.id}`;
           
-          // Map organization type to display label
           const getOrgTypeLabel = (type) => {
             const typeLabels = {
               'nonprofit': 'Nonprofit',
@@ -122,30 +75,22 @@ export default function MentionDropdown({
           };
 
           return {
-            id: mentionId, // This is the key fix - proper format for mention ID
+            id: mentionId,
             name: org.name,
             type: 'organization',
             avatar_url: org.image_url,
             title: org.tagline || `${getOrgTypeLabel(org.type)} Organization`,
             organization_name: getOrgTypeLabel(org.type),
-            role: org.type, // Store the actual org type
-            _orgType: org.type, // Additional metadata
+            role: org.type,
+            _orgType: org.type,
             _orgId: org.id,
             _slug: org.slug
           };
         });
 
         const allResults = [...userResults, ...orgResults];
-        
-        console.log('MentionDropdown: Formatted results:', allResults.map(r => ({
-          id: r.id,
-          name: r.name,
-          type: r.type,
-          role: r.role
-        })));
-        
         setSuggestions(allResults);
-        setInternalSelectedIndex(-1); // Reset selection when results change
+        setInternalSelectedIndex(-1);
       } catch (error) {
         console.error('Error searching mentions:', error);
         setSuggestions([]);
@@ -158,9 +103,8 @@ export default function MentionDropdown({
     return () => clearTimeout(debounceTimer);
   }, [query]);
 
-  // Handle keyboard navigation
   useEffect(() => {
-    if (onKeyDown) return; // Use external handler if provided
+    if (onKeyDown) return;
     
     const handleKeyDown = (e) => {
       if (!suggestions.length) return;
@@ -195,7 +139,6 @@ export default function MentionDropdown({
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [suggestions, currentSelectedIndex, onClose, onKeyDown]);
 
-  // Handle click outside to close
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -208,8 +151,6 @@ export default function MentionDropdown({
   }, [onClose]);
 
   const handleSelect = (suggestion) => {
-    console.log('MentionDropdown: Selected mention:', suggestion);
-    
     onSelect && onSelect({
       id: suggestion.id,
       name: suggestion.name,
@@ -221,12 +162,10 @@ export default function MentionDropdown({
     });
   };
 
-  // Don't show if no query or query too short
   if (!query || query.length < 2) {
     return null;
   }
 
-  // Calculate position with fallbacks
   const dropdownStyle = {
     position: 'absolute',
     top: position?.top || 0,
@@ -254,7 +193,6 @@ export default function MentionDropdown({
       }
       return 'User';
     } else {
-      // Organization - use the formatted organization name
       return suggestion.organization_name || 'Organization';
     }
   };
@@ -265,7 +203,6 @@ export default function MentionDropdown({
       style={dropdownStyle}
       className="mention-dropdown"
     >
-      {/* Header */}
       <div style={{
         padding: '8px 12px',
         borderBottom: '1px solid #e1e5e9',
@@ -282,7 +219,6 @@ export default function MentionDropdown({
         )}
       </div>
 
-      {/* Loading state */}
       {loading && (
         <div style={{
           padding: '16px',
@@ -294,7 +230,6 @@ export default function MentionDropdown({
         </div>
       )}
 
-      {/* No results state */}
       {!loading && suggestions.length === 0 && (
         <div style={{
           padding: '16px',
@@ -306,7 +241,6 @@ export default function MentionDropdown({
         </div>
       )}
 
-      {/* Results */}
       {!loading && suggestions.length > 0 && (
         <div>
           {suggestions.map((suggestion, index) => (
@@ -324,7 +258,6 @@ export default function MentionDropdown({
               onClick={() => handleSelect(suggestion)}
               onMouseEnter={() => setInternalSelectedIndex(index)}
             >
-              {/* Avatar */}
               <div style={{
                 width: '40px',
                 height: '40px',
@@ -352,7 +285,6 @@ export default function MentionDropdown({
                 )}
               </div>
 
-              {/* Content */}
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{
                   fontWeight: '600',
@@ -375,7 +307,6 @@ export default function MentionDropdown({
                 </div>
               </div>
 
-              {/* Type indicator */}
               <div style={{
                 fontSize: '16px',
                 opacity: 0.7,
@@ -385,7 +316,6 @@ export default function MentionDropdown({
               </div>
             </div>
           ))}
-          {/* Footer hint for navigation */}
           <div style={{
             padding: '8px 12px',
             borderTop: '1px solid #e1e5e9',

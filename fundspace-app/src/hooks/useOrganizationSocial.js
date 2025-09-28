@@ -1,5 +1,3 @@
-// src/hooks/useOrganizationSocial.js - FIXED to use session user ID
-
 import { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient.js';
 
@@ -15,7 +13,6 @@ export const useOrganizationSocial = (organizationId, sessionUserId) => {
 
     const loadSocialData = async () => {
       try {
-        // Get follower count
         const { count: followCount, error: followCountError } = await supabase
           .from('organization_follows')
           .select('*', { count: 'exact', head: true })
@@ -27,7 +24,6 @@ export const useOrganizationSocial = (organizationId, sessionUserId) => {
           setFollowersCount(followCount || 0);
         }
 
-        // Get bookmark count
         const { count: bookmarkCount, error: bookmarkCountError } = await supabase
           .from('organization_bookmarks')
           .select('*', { count: 'exact', head: true })
@@ -39,7 +35,6 @@ export const useOrganizationSocial = (organizationId, sessionUserId) => {
           setBookmarksCount(bookmarkCount || 0);
         }
 
-        // Check user's relationship if logged in (using session user ID)
         if (sessionUserId) {
           const [followRes, bookmarkRes] = await Promise.all([
             supabase
@@ -47,16 +42,15 @@ export const useOrganizationSocial = (organizationId, sessionUserId) => {
               .select('id')
               .eq('organization_id', organizationId)
               .eq('user_id', sessionUserId)
-              .maybeSingle(), // Use maybeSingle() to avoid errors when no data found
+              .maybeSingle(),
             supabase
               .from('organization_bookmarks')
               .select('id')
               .eq('organization_id', organizationId)
               .eq('user_id', sessionUserId)
-              .maybeSingle() // Use maybeSingle() to avoid errors when no data found
+              .maybeSingle()
           ]);
 
-          // Only log errors if they're not "no rows" errors
           if (followRes.error && followRes.error.code !== 'PGRST116') {
             console.warn('Error checking follow status:', followRes.error);
           } else {

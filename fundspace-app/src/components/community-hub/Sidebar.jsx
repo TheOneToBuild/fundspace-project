@@ -1,10 +1,9 @@
-// src/components/community-hub/Sidebar.jsx
 import React, { useState, useEffect } from 'react';
-import { TrendingUp, MessageCircle, Heart, Clock } from 'lucide-react';
+import { TrendingUp, MessageCircle, Heart } from 'lucide-react';
 import { supabase } from '../../supabaseClient';
 import PropTypes from 'prop-types';
 
-const TrendingPosts = ({ activeChannelConfig, organizationInfo, onTrendingPostClick, posts }) => {
+const TrendingPosts = ({ activeChannelConfig, onTrendingPostClick, posts }) => {
   const [trendingPosts, setTrendingPosts] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -15,14 +14,12 @@ const TrendingPosts = ({ activeChannelConfig, organizationInfo, onTrendingPostCl
       setTrendingPosts([]);
       setLoading(false);
     }
-  }, [activeChannelConfig?.dbChannel, organizationInfo]);
+  }, [activeChannelConfig?.dbChannel]);
 
   const fetchTrendingPosts = async () => {
     setLoading(true);
     try {
       const channelFilter = activeChannelConfig.dbChannel;
-
-      // Calculate trending score using engagement metrics from the last 7 days
       const sevenDaysAgo = new Date();
       sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
@@ -37,8 +34,7 @@ const TrendingPosts = ({ activeChannelConfig, organizationInfo, onTrendingPostCl
           profiles:profile_id(
             id,
             full_name,
-            avatar_url,
-            organization_name
+            avatar_url
           )
         `)
         .eq('channel', channelFilter)
@@ -48,41 +44,27 @@ const TrendingPosts = ({ activeChannelConfig, organizationInfo, onTrendingPostCl
 
       if (error) throw error;
 
-      // Improved trending score calculation focused on comments and reactions
       const postsWithTrendingScore = fetchedPosts?.map(post => {
         const hoursOld = (new Date() - new Date(post.created_at)) / (1000 * 60 * 60);
         const daysOld = hoursOld / 24;
-        
-        // Age decay factor (stronger decay for older posts)
         const ageWeight = Math.max(0.05, Math.exp(-daysOld * 0.3));
-        
-        // Trending score: heavily weighted towards comments (engagement quality)
-        const engagementScore = (
-          (post.comments_count * 3.0) + // Comments are most valuable (discussions)
-          (post.likes_count * 1.0)      // Likes are less valuable but still count
-        );
-        
-        // Final score with age decay
+        const engagementScore = (post.comments_count * 3.0) + (post.likes_count * 1.0);
         const trendingScore = engagementScore * ageWeight * 100;
-        
-        // Calculate engagement growth percentage
         const totalEngagement = post.likes_count + post.comments_count;
-        const expectedEngagement = Math.max(0.1, daysOld * 0.8); // Expected baseline
+        const expectedEngagement = Math.max(0.1, daysOld * 0.8);
         const growthRate = Math.round(((totalEngagement - expectedEngagement) / expectedEngagement) * 100);
 
         return {
           ...post,
           trendingScore,
           hoursOld: Math.floor(hoursOld),
-          daysOld: Math.max(0.1, daysOld),
           engagement: totalEngagement,
           growthRate: Math.max(0, Math.min(999, growthRate))
         };
       }) || [];
 
-      // Sort by trending score and take top 6 (instead of 3)
       const topTrending = postsWithTrendingScore
-        .filter(post => post.engagement > 0) // Only show posts with some engagement
+        .filter(post => post.engagement > 0)
         .sort((a, b) => b.trendingScore - a.trendingScore)
         .slice(0, 6);
 
@@ -95,31 +77,21 @@ const TrendingPosts = ({ activeChannelConfig, organizationInfo, onTrendingPostCl
     }
   };
 
-  // FIXED: Proper HTML content truncation with entity decoding
   const truncateContent = (content, maxLength = 50) => {
     if (!content) return '';
-    
-    // Create a temporary div to parse and decode HTML content
     const tempDiv = document.createElement('div');
     tempDiv.innerHTML = content;
-    
-    // Get the plain text content (this automatically decodes HTML entities)
     const plainText = tempDiv.textContent || tempDiv.innerText || '';
-    
-    // Clean up any extra whitespace
     const cleanText = plainText.replace(/\s+/g, ' ').trim();
     
     if (cleanText.length > maxLength) {
-      // Truncate at word boundary
       const truncated = cleanText.substring(0, maxLength);
       const lastSpaceIndex = truncated.lastIndexOf(' ');
-      
       if (lastSpaceIndex > 0 && lastSpaceIndex > maxLength * 0.7) {
         return truncated.substring(0, lastSpaceIndex) + '...';
       }
       return truncated + '...';
     }
-    
     return cleanText;
   };
 
@@ -131,21 +103,12 @@ const TrendingPosts = ({ activeChannelConfig, organizationInfo, onTrendingPostCl
     return `${days}d ago`;
   };
 
-  // Enhanced clickable post handler
   const handlePostClick = (postId, event) => {
     event.stopPropagation();
-    
-    // Always try to navigate to the post, either by scrolling or loading
     const isPostVisible = posts.some(post => post.id === postId);
-    
     if (isPostVisible) {
-      // If post is visible, scroll to it
       onTrendingPostClick(postId);
     } else {
-      // If post is not visible, could either:
-      // 1. Load more posts to find it, or
-      // 2. Navigate to a direct post view
-      // For now, we'll trigger the callback anyway and let parent handle it
       console.log(`Trending post ${postId} not visible, requesting navigation`);
       onTrendingPostClick(postId);
     }
@@ -188,7 +151,6 @@ const TrendingPosts = ({ activeChannelConfig, organizationInfo, onTrendingPostCl
               !isPostVisible ? 'opacity-75' : ''
             }`}
             onClick={(e) => handlePostClick(post.id, e)}
-            title="Click to view post"
           >
             <div className={`border-l-3 pl-3 ${
               index === 0 ? 'border-emerald-500' : 
@@ -200,7 +162,6 @@ const TrendingPosts = ({ activeChannelConfig, organizationInfo, onTrendingPostCl
             }`}>
               <div className="flex items-start justify-between">
                 <div className="flex-1 min-w-0">
-                  {/* Author info */}
                   <div className="flex items-center space-x-2 mb-2">
                     <div className="w-4 h-4 rounded-full bg-slate-300 flex-shrink-0">
                       {post.profiles?.avatar_url ? (
@@ -223,12 +184,10 @@ const TrendingPosts = ({ activeChannelConfig, organizationInfo, onTrendingPostCl
                     </div>
                   </div>
                   
-                  {/* Post content preview */}
                   <p className="text-sm text-slate-600 leading-relaxed mb-2 line-clamp-2">
                     {truncateContent(post.content, 65)}
                   </p>
                   
-                  {/* Engagement metrics and growth */}
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-3 text-xs text-slate-500">
                       <div className="flex items-center space-x-1">
@@ -241,7 +200,6 @@ const TrendingPosts = ({ activeChannelConfig, organizationInfo, onTrendingPostCl
                       </div>
                     </div>
                     
-                    {/* Growth percentage indicator */}
                     <div className={`text-xs font-medium flex items-center space-x-1 px-2 py-1 rounded-full ${
                       isHot ? 'bg-orange-100 text-orange-700' : 
                       index === 0 ? 'bg-emerald-100 text-emerald-700' : 
@@ -258,7 +216,6 @@ const TrendingPosts = ({ activeChannelConfig, organizationInfo, onTrendingPostCl
                     </div>
                   </div>
                   
-                  {/* Status indicator for non-visible posts */}
                   {!isPostVisible && (
                     <p className="text-xs text-slate-400 mt-1 italic">
                       📍 Scroll to find this post
@@ -276,15 +233,13 @@ const TrendingPosts = ({ activeChannelConfig, organizationInfo, onTrendingPostCl
 
 TrendingPosts.propTypes = {
   activeChannelConfig: PropTypes.object,
-  organizationInfo: PropTypes.object,
   onTrendingPostClick: PropTypes.func.isRequired,
   posts: PropTypes.array.isRequired
 };
 
-const Sidebar = ({ activeChannel, activeChannelConfig, organizationInfo, onTrendingPostClick, posts }) => {
+const Sidebar = ({ activeChannel, activeChannelConfig, onTrendingPostClick, posts }) => {
   return (
     <div className="lg:col-span-3 space-y-6">
-      {/* Trending Posts Section */}
       <div className="bg-white rounded-2xl shadow-lg border border-slate-100 p-4">
         <div className="flex items-center space-x-2 mb-4">
           <div className="w-8 h-8 bg-gradient-to-r from-green-400 to-blue-500 rounded-lg flex items-center justify-center flex-shrink-0">
@@ -297,13 +252,11 @@ const Sidebar = ({ activeChannel, activeChannelConfig, organizationInfo, onTrend
         </div>
         <TrendingPosts 
           activeChannelConfig={activeChannelConfig}
-          organizationInfo={organizationInfo}
           onTrendingPostClick={onTrendingPostClick}
           posts={posts}
         />
       </div>
 
-      {/* Community Guidelines */}
       <div className="bg-white rounded-2xl shadow-lg border border-slate-100 p-4">
         <div className="flex items-center space-x-2 mb-4">
           <div className="w-8 h-8 bg-gradient-to-r from-orange-400 to-pink-500 rounded-lg flex items-center justify-center flex-shrink-0">
@@ -337,7 +290,6 @@ const Sidebar = ({ activeChannel, activeChannelConfig, organizationInfo, onTrend
 Sidebar.propTypes = {
   activeChannel: PropTypes.string.isRequired,
   activeChannelConfig: PropTypes.object,
-  organizationInfo: PropTypes.object,
   onTrendingPostClick: PropTypes.func.isRequired,
   posts: PropTypes.array.isRequired
 };

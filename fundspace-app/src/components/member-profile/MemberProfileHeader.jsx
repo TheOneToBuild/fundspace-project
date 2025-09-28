@@ -1,4 +1,3 @@
-// components/member-profile/MemberProfileHeader.jsx - Complete consolidated version with Social Profiles
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../supabaseClient';
@@ -11,7 +10,7 @@ import {
   removeConnection,
   getMutualConnectionsCount 
 } from '../../utils/userConnectionsUtils';
-import { UserPlus, UserCheck, User, Users, UserX, Linkedin, Twitter, Globe, ExternalLink } from 'lucide-react';
+import { UserPlus, UserCheck, User, Users, UserX, Linkedin, Twitter, Globe } from 'lucide-react';
 
 const MemberProfileHeader = ({ 
     member, 
@@ -46,7 +45,6 @@ const MemberProfileHeader = ({
             try {
                 setStatsLoading(true);
                 
-                // Fetch follow stats
                 const [followersResult, followingResult] = await Promise.all([
                     supabase
                         .from('followers')
@@ -63,7 +61,6 @@ const MemberProfileHeader = ({
                     followingCount: followingResult.count || 0
                 });
 
-                // Fetch connection stats if not current user
                 if (currentUserId && currentUserId !== member.id) {
                     try {
                         const [connectionStatusResult, mutualConnectionsResult, connectionsCountResult] = await Promise.all([
@@ -255,35 +252,29 @@ const MemberProfileHeader = ({
         return 'Connect to see mutual connections';
     };
 
-    // Handle stats clicks - trigger tab changes instead of navigation
     const handleConnectionsClick = () => {
         if (onTabChange) {
             onTabChange('connections');
         }
     };
 
-    // Helper function to get the display title
     const getDisplayTitle = () => {
         return member.title || null;
     };
 
-    // Helper function to get the display organization info
     const getOrganizationDisplay = () => {
         if (member.organization_name) {
-            // Check if we have organization routing information
             const hasOrgId = member.organization_id || member.selected_organization_id;
             const orgSlug = member.organization_slug;
             
             if (hasOrgId) {
                 const handleOrgClick = async () => {
                     try {
-                        // If we already have a slug, use it
                         if (orgSlug) {
                             navigate(`/organizations/${orgSlug}`);
                             return;
                         }
                         
-                        // If no slug, fetch it from the database
                         const { data: orgData, error } = await supabase
                             .from('organizations')
                             .select('slug')
@@ -293,12 +284,10 @@ const MemberProfileHeader = ({
                         if (!error && orgData?.slug) {
                             navigate(`/organizations/${orgData.slug}`);
                         } else {
-                            // Fallback to generic route with ID if no slug found
                             navigate(`/organizations/${hasOrgId}`);
                         }
                     } catch (error) {
                         console.error('Error navigating to organization:', error);
-                        // Fallback to search if all else fails
                         navigate(`/organizations?search=${encodeURIComponent(member.organization_name)}`);
                     }
                 };
@@ -312,14 +301,12 @@ const MemberProfileHeader = ({
                     </button>
                 );
             } else {
-                // No routing info available, show as plain text
                 return <span className="text-lg leading-relaxed">{member.organization_name}</span>;
             }
         }
         return null;
     };
 
-    // Social profiles helper function
     const getSocialProfiles = () => {
         const profiles = [];
         
@@ -355,25 +342,8 @@ const MemberProfileHeader = ({
 
     const socialProfiles = getSocialProfiles();
 
-    // For testing - add some test profiles
-    const testSocialProfiles = [
-        {
-            platform: 'LinkedIn',
-            url: 'https://linkedin.com/in/test',
-            icon: Linkedin,
-            color: 'bg-blue-600 hover:bg-blue-700'
-        },
-        {
-            platform: 'Twitter/X',
-            url: 'https://twitter.com/test',
-            icon: Twitter,
-            color: 'bg-slate-900 hover:bg-slate-800'
-        }
-    ];
-
     return (
         <>
-            {/* Banner Image Section - Full width with rounded top corners */}
             <div className="relative">
                 <div className="h-80 bg-gradient-to-br from-slate-100 via-white to-slate-100 overflow-hidden rounded-t-3xl">
                     {member.banner_image_url ? (
@@ -393,11 +363,9 @@ const MemberProfileHeader = ({
                 <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent rounded-t-3xl" />
             </div>
 
-            {/* Main Header Content */}
             <div className="bg-white rounded-b-3xl">
                 <div className="max-w-7xl mx-auto px-8">
                     <div className="flex items-start gap-6 pb-6">
-                        {/* Avatar - overlapping banner, rounded square */}
                         <div className="relative -mt-20">
                             <div className="w-48 h-48 rounded-2xl bg-white border-4 border-white shadow-xl overflow-hidden">
                                 {member.avatar_url ? (
@@ -414,14 +382,12 @@ const MemberProfileHeader = ({
                             </div>
                         </div>
                         
-                        {/* Profile Info */}
                         <div className="flex-1 py-4">
                             <div className="mb-3">
                                 <h1 className="text-4xl font-bold text-slate-900 mb-2">
                                     {member.full_name}
                                 </h1>
                                 
-                                {/* Combined title and organization */}
                                 <div className="text-lg text-slate-600 space-y-1">
                                     {(() => {
                                         const title = getDisplayTitle();
@@ -459,10 +425,8 @@ const MemberProfileHeader = ({
                                 </p>
                             )}
 
-                            {/* Action buttons */}
                             {!isCurrentUser && currentUserId && member?.id && (
                                 <div className="flex gap-3 mb-6">
-                                    {/* Follow button */}
                                     {isFollowing ? (
                                         <button
                                             onClick={handleFollowClick}
@@ -483,19 +447,16 @@ const MemberProfileHeader = ({
                                         </button>
                                     )}
                                     
-                                    {/* Connection button */}
                                     {getConnectionButton()}
                                 </div>
                             )}
                         </div>
 
-                        {/* Stats - Show individual breakdown */}
                         <div className="flex-shrink-0 py-4">
                             <div className="flex space-x-6 text-center">
                                 <div 
                                     className="cursor-pointer hover:bg-slate-50 p-2 rounded-lg transition-colors"
                                     onClick={handleConnectionsClick}
-                                    title={`View ${isCurrentUser ? 'your' : member.full_name + "'s"} connections`}
                                 >
                                     <div className="text-2xl font-bold text-slate-900">
                                         {statsLoading ? '...' : connectionStats.connectionsCount}
@@ -507,7 +468,6 @@ const MemberProfileHeader = ({
                                 <div 
                                     className="cursor-pointer hover:bg-slate-50 p-2 rounded-lg transition-colors"
                                     onClick={handleConnectionsClick}
-                                    title={`View ${isCurrentUser ? 'your' : member.full_name + "'s"} followers`}
                                 >
                                     <div className="text-2xl font-bold text-slate-900">
                                         {statsLoading ? '...' : followStats.followersCount}
@@ -519,7 +479,6 @@ const MemberProfileHeader = ({
                                 <div 
                                     className="cursor-pointer hover:bg-slate-50 p-2 rounded-lg transition-colors"
                                     onClick={handleConnectionsClick}
-                                    title={`View who ${isCurrentUser ? 'you follow' : member.full_name + ' follows'}`}
                                 >
                                     <div className="text-2xl font-bold text-slate-900">
                                         {statsLoading ? '...' : followStats.followingCount}
@@ -530,7 +489,6 @@ const MemberProfileHeader = ({
                         </div>
                     </div>
 
-                    {/* Social Profiles Section - Only show if user has social profiles */}
                     {socialProfiles.length > 0 && (
                         <div className="flex justify-end pb-6">
                             <div className="flex gap-3">
@@ -553,7 +511,6 @@ const MemberProfileHeader = ({
                         </div>
                     )}
 
-                    {/* Tabs Navigation - Updated with 4 tabs */}
                     <div className="border-t border-slate-200">
                         <div className="flex space-x-0 overflow-x-auto">
                             {[

@@ -1,4 +1,3 @@
-// components/organization/DeleteOrganizationModal.jsx
 import React, { useState, useEffect } from 'react';
 import { Trash2, CheckCircle } from 'lucide-react';
 
@@ -14,7 +13,6 @@ export default function DeleteOrganizationModal({
     const [deleteConfirmText, setDeleteConfirmText] = useState('');
     const [showSuccess, setShowSuccess] = useState(false);
 
-    // Reset confirmation text when modal opens/closes
     useEffect(() => {
         if (isOpen) {
             setDeleteConfirmText('');
@@ -29,13 +27,10 @@ export default function DeleteOrganizationModal({
             return;
         }
 
-        // Call onConfirm but don't wait for navigation
         const success = await onConfirm(deleteConfirmText);
         if (success) {
-            // Show success state immediately
             setShowSuccess(true);
             
-            // Auto-close and let parent handle navigation
             setTimeout(() => {
                 setShowSuccess(false);
                 onClose();
@@ -52,7 +47,6 @@ export default function DeleteOrganizationModal({
 
     if (!isOpen || !organization) return null;
 
-    // Success state
     if (showSuccess) {
         return (
             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -74,7 +68,6 @@ export default function DeleteOrganizationModal({
         );
     }
 
-    // Main deletion modal
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white p-6 rounded-xl shadow-xl max-w-lg w-full mx-4">

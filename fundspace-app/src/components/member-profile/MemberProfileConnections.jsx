@@ -1,8 +1,6 @@
-// components/member-profile/MemberProfileConnections.jsx - FULLY OPTIMIZED VERSION
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../../supabaseClient';
-import { optimizedSupabaseQuery } from '../../utils/apiRequestOptimizer'; // ✅ CRITICAL IMPORT
 import { User, Users, Heart, UserPlus, UserCheck, UserX, Clock } from 'lucide-react';
 import { 
     sendConnectionRequest, 
@@ -11,7 +9,7 @@ import {
     withdrawConnectionRequest,
     removeConnection 
 } from '../../utils/userConnectionsUtils';
-import apiRequestOptimizer from '../../utils/apiRequestOptimizer';
+import { getBatchConnectionStatus } from '../../utils/rpcClientFunctions';
 
 const MemberProfileConnections = ({ member, loading, currentUserId, isCurrentUser }) => {
     const [activeSubTab, setActiveSubTab] = useState('connections');
@@ -22,7 +20,7 @@ const MemberProfileConnections = ({ member, loading, currentUserId, isCurrentUse
         loading: true,
         error: null
     });
-    const [connectionActions, setConnectionActions] = useState({}); // Track connection status for each user
+    const [connectionActions, setConnectionActions] = useState({});
 
     useEffect(() => {
         fetchConnectionsData();
@@ -34,45 +32,23 @@ const MemberProfileConnections = ({ member, loading, currentUserId, isCurrentUse
         try {
             setConnectionsData(prev => ({ ...prev, loading: true }));
 
-            // ✅ OPTIMIZED: Wrap user_connections query
-            const optimizedConnectionsQuery = optimizedSupabaseQuery(
+            const [connectionsResult, followersResult, followingResult] = await Promise.all([
                 supabase
                     .from('user_connections')
                     .select('id, created_at, requester_id, recipient_id')
                     .eq('status', 'accepted')
                     .or(`requester_id.eq.${member.id},recipient_id.eq.${member.id}`)
                     .order('created_at', { ascending: false }),
-                'user_connections_single',
-                { userId: member.id, status: 'accepted' }
-            );
-
-            // ✅ OPTIMIZED: Wrap followers query
-            const optimizedFollowersQuery = optimizedSupabaseQuery(
                 supabase
                     .from('followers')
                     .select('id, created_at, follower_id')
                     .eq('following_id', member.id)
                     .order('created_at', { ascending: false }),
-                'followers_single',
-                { userId: member.id }
-            );
-
-            // ✅ OPTIMIZED: Wrap following query
-            const optimizedFollowingQuery = optimizedSupabaseQuery(
                 supabase
                     .from('followers')
                     .select('id, created_at, following_id')
                     .eq('follower_id', member.id)
-                    .order('created_at', { ascending: false }),
-                'following_single',
-                { userId: member.id }
-            );
-
-            // Execute all queries
-            const [connectionsResult, followersResult, followingResult] = await Promise.all([
-                optimizedConnectionsQuery,
-                optimizedFollowersQuery,
-                optimizedFollowingQuery
+                    .order('created_at', { ascending: false })
             ]);
 
             const connectionsData = connectionsResult.data || [];
@@ -87,29 +63,20 @@ const MemberProfileConnections = ({ member, loading, currentUserId, isCurrentUse
                 );
             }
 
-            // Get user IDs to fetch profile details
             const connectionUserIds = connectionsData.map(conn => 
                 conn.requester_id === member.id ? conn.recipient_id : conn.requester_id
             );
             const followerUserIds = followersData.map(f => f.follower_id);
             const followingUserIds = followingData.map(f => f.following_id);
 
-            // Fetch all user profile details
             const allUserIds = [...new Set([...connectionUserIds, ...followerUserIds, ...followingUserIds])];
             
             let userProfiles = {};
             if (allUserIds.length > 0) {
-                // ✅ CRITICAL FIX: Replace direct profiles query with optimized version
-                const optimizedProfilesQuery = optimizedSupabaseQuery(
-                    supabase
-                        .from('profiles')
-                        .select('id, full_name, avatar_url, title, organization_name, location')
-                        .in('id', allUserIds),
-                    'profiles_single',
-                    { userIds: allUserIds }
-                );
-
-                const { data: profilesData, error: profilesError } = await optimizedProfilesQuery;
+                const { data: profilesData, error: profilesError } = await supabase
+                    .from('profiles')
+                    .select('id, full_name, avatar_url, title, organization_name, location')
+                    .in('id', allUserIds);
 
                 if (profilesError) {
                     console.error('Error fetching user profiles:', profilesError);
@@ -121,7 +88,6 @@ const MemberProfileConnections = ({ member, loading, currentUserId, isCurrentUse
                 }
             }
 
-            // Transform connections data
             const connections = connectionsData.map(conn => {
                 const otherUserId = conn.requester_id === member.id ? conn.recipient_id : conn.requester_id;
                 return {
@@ -154,7 +120,6 @@ const MemberProfileConnections = ({ member, loading, currentUserId, isCurrentUse
                 error: null
             });
 
-            // If current user is viewing someone else's profile, check connection status for each person
             if (currentUserId && currentUserId !== member.id) {
                 await fetchConnectionStatuses([...connections, ...followers, ...following]);
             }
@@ -169,9 +134,7 @@ const MemberProfileConnections = ({ member, loading, currentUserId, isCurrentUse
         }
     };
 
-    // OPTIMIZED: Replace individual API calls with batch call
     const fetchConnectionStatuses = async (allUsers) => {
-        // Extract all user IDs we need to check
         const targetUserIds = allUsers
             .filter(item => item.user?.id && item.user.id !== currentUserId)
             .map(item => item.user.id);
@@ -179,17 +142,10 @@ const MemberProfileConnections = ({ member, loading, currentUserId, isCurrentUse
         if (targetUserIds.length === 0) return;
 
         try {
-            // Use the batch optimizer instead of individual calls in a loop
-            const batchStatuses = await apiRequestOptimizer.optimizeSupabaseQuery(
-                null, 
-                'connection_statuses_batch', 
-                { currentUserId, targetUserIds }
-            );
-            
-            setConnectionActions(batchStatuses.data || {});
+            const batchStatuses = await getBatchConnectionStatus(currentUserId, targetUserIds);
+            setConnectionActions(batchStatuses.connections || {});
         } catch (error) {
             console.error('Error fetching batch connection statuses:', error);
-            // Fallback to empty statuses
             const fallbackStatuses = {};
             targetUserIds.forEach(userId => {
                 fallbackStatuses[userId] = { status: 'none', isRequester: false };
@@ -221,7 +177,6 @@ const MemberProfileConnections = ({ member, loading, currentUserId, isCurrentUse
                             ...prev,
                             [targetUserId]: { status: 'accepted', isRequester: false }
                         }));
-                        // Refresh data to show new connection
                         await fetchConnectionsData();
                     }
                     break;
@@ -253,7 +208,6 @@ const MemberProfileConnections = ({ member, loading, currentUserId, isCurrentUse
                             ...prev,
                             [targetUserId]: { status: 'none', isRequester: false }
                         }));
-                        // Refresh data to remove connection
                         await fetchConnectionsData();
                     }
                     break;
@@ -398,7 +352,6 @@ const MemberProfileConnections = ({ member, loading, currentUserId, isCurrentUse
     return (
         <div className="max-w-7xl mx-auto px-8 py-8">
             <div className="bg-white rounded-xl shadow-sm border border-slate-200">
-                {/* Header */}
                 <div className="border-b border-slate-200 p-6">
                     <h3 className="text-xl font-bold text-slate-800 mb-2">
                         {isCurrentUser ? 'Your Network' : `${firstName}'s Network`}
@@ -411,7 +364,6 @@ const MemberProfileConnections = ({ member, loading, currentUserId, isCurrentUse
                     </p>
                 </div>
 
-                {/* Sub-tabs */}
                 <div className="border-b border-slate-200">
                     <nav className="flex px-6">
                         <button
@@ -456,7 +408,6 @@ const MemberProfileConnections = ({ member, loading, currentUserId, isCurrentUse
                     </nav>
                 </div>
 
-                {/* Content */}
                 <div className="p-6">
                     {activeSubTab === 'connections' && (
                         <div>

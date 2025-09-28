@@ -1,9 +1,7 @@
-// PostCard.jsx - FULLY OPTIMIZED: All individual queries eliminated
 import React, { useState, useEffect, useMemo, memo, lazy, Suspense, useCallback, useRef } from 'react';
 import { supabase } from '../supabaseClient';
 import { useOutletContext } from 'react-router-dom';
 import { addOrganizationEventListener } from '../utils/organizationEvents';
-import apiRequestOptimizer from '../utils/apiRequestOptimizer';
 import PostHeader from './post/PostHeader';
 import PostBody from './post/PostBody';
 import PostActions from './post/PostActions';
@@ -22,16 +20,15 @@ function PostCard({
   disabled = false, 
   showOrganizationAsAuthor = false, 
   organization,
-  pageData, // Batched page data
-  postsLikesData, // From ProfilePage context
-  onPostLike, // From ProfilePage context
-  userReaction, // Pre-loaded user reaction
-  batchedProfiles, // Pre-loaded profiles
-  batchedOrganizations // Pre-loaded organizations
+  pageData,
+  postsLikesData,
+  onPostLike,
+  userReaction,
+  batchedProfiles,
+  batchedOrganizations
 }) {
   const { profile: currentUserProfile } = useOutletContext();
   
-  // Use batched data first, then fallback to individual data, then defaults
   const initialLikeCount = postsLikesData?.[post.id]?.userReaction ? 
     Object.values(postsLikesData[post.id].reaction_summary || {}).reduce((sum, count) => sum + count, 0) :
     pageData?.postLikes?.[post.id]?.likes_count || post.likes_count || 0;
@@ -72,7 +69,6 @@ function PostCard({
   const isAuthor = currentUserProfile?.id === individualAuthor?.id;
   const displayImages = image_urls && image_urls.length > 0 ? image_urls : (image_url ? [image_url] : []);
 
-  // Enhanced author with batched data prioritization
   const displayAuthor = useMemo(() => {
     if (showOrganizationAsAuthor && organization) {
       return {
@@ -84,14 +80,12 @@ function PostCard({
     
     let author = { ...individualAuthor };
     
-    // Prioritize batched data sources
     if (batchedProfiles?.[author.id]) {
       author = { ...author, ...batchedProfiles[author.id] };
     } else if (pageData?.profiles?.[author.id]) {
       author = { ...author, ...pageData.profiles[author.id] };
     }
     
-    // Use batched organization data
     if (batchedOrganizations?.[author.id]) {
       const orgInfo = batchedOrganizations[author.id];
       author.organization_name = orgInfo.name || author.organization_name;
@@ -109,18 +103,15 @@ function PostCard({
     return author;
   }, [showOrganizationAsAuthor, organization, individualAuthor, batchedProfiles, pageData, batchedOrganizations]);
 
-  // OPTIMIZED: Use context reaction handler if available, otherwise optimized individual handler
   const handleReaction = useCallback(async (reactionType) => {
     if (!currentUserProfile || !post?.id || disabled || isProcessingReaction) return;
     
-    // Use centralized handler if available (from ProfilePage)
     if (onPostLike) {
       onPostLike(post.id, selectedReaction, selectedReaction === reactionType ? null : reactionType);
       setSelectedReaction(selectedReaction === reactionType ? null : reactionType);
       return;
     }
     
-    // OPTIMIZED: Fallback handler uses API optimizer instead of direct queries
     if (reactionDebounceRef.current) {
       clearTimeout(reactionDebounceRef.current);
     }
@@ -134,33 +125,22 @@ function PostCard({
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
 
-        // OPTIMIZED: Use API optimizer to check existing reaction
-        const existingReactionResult = await apiRequestOptimizer.optimizeSupabaseQuery(
-          null,
-          'user_post_reaction_status',
-          { postId: post.id, userId: user.id }
-        );
+        const { data: existingReaction } = await supabase
+          .from('post_likes')
+          .select('id, reaction_type')
+          .eq('post_id', post.id)
+          .eq('user_id', user.id)
+          .maybeSingle();
 
-        const hasExistingReaction = existingReactionResult?.userReaction === reactionType;
+        const hasExistingReaction = existingReaction?.reaction_type === reactionType;
 
         if (hasExistingReaction) {
-          // Remove reaction - still need direct call for mutations
-          const { data: existingReaction } = await supabase
-            .from('post_likes')
-            .select('id')
-            .eq('post_id', post.id)
-            .eq('user_id', user.id)
-            .maybeSingle();
-
-          if (existingReaction) {
-            await supabase.from('post_likes').delete().eq('id', existingReaction.id);
-            if (mountedRef.current) {
-              setSelectedReaction(null);
-              setLikeCount(prev => Math.max(0, prev - 1));
-            }
+          await supabase.from('post_likes').delete().eq('id', existingReaction.id);
+          if (mountedRef.current) {
+            setSelectedReaction(null);
+            setLikeCount(prev => Math.max(0, prev - 1));
           }
         } else {
-          // Add or update reaction - direct call needed for mutations
           await supabase
             .from('post_likes')
             .upsert({ 
@@ -171,7 +151,7 @@ function PostCard({
           
           if (mountedRef.current) {
             setSelectedReaction(reactionType);
-            if (!existingReactionResult?.userReaction) {
+            if (!existingReaction) {
               setLikeCount(prev => prev + 1);
             }
           }
@@ -189,21 +169,20 @@ function PostCard({
     }, 200);
   }, [currentUserProfile, post?.id, disabled, selectedReaction, isProcessingReaction, onPostLike]);
 
-  // OPTIMIZED: Check user's reaction status using API optimizer
   useEffect(() => {
     if (selectedReaction !== null || !currentUserProfile?.id || !post.id) return;
     
     const checkReactionStatus = async () => {
       try {
-        // OPTIMIZED: Use API optimizer instead of direct Supabase call
-        const result = await apiRequestOptimizer.optimizeSupabaseQuery(
-          null,
-          'user_post_reaction_status',
-          { postId: post.id, userId: currentUserProfile.id }
-        );
+        const { data } = await supabase
+          .from('post_likes')
+          .select('reaction_type')
+          .eq('post_id', post.id)
+          .eq('user_id', currentUserProfile.id)
+          .maybeSingle();
 
         if (mountedRef.current) {
-          setSelectedReaction(result?.userReaction || null);
+          setSelectedReaction(data?.reaction_type || null);
         }
       } catch (error) {
         console.error('Error checking reaction status:', error);
@@ -213,7 +192,6 @@ function PostCard({
     checkReactionStatus();
   }, [post.id, currentUserProfile?.id, selectedReaction]);
 
-  // Organization change listener (only for authors)
   useEffect(() => {
     if (!isAuthor || !currentUserProfile?.id) return;
     
@@ -295,7 +273,6 @@ function PostCard({
     }, 300);
   };
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
       mountedRef.current = false;

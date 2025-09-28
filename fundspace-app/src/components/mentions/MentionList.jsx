@@ -1,17 +1,12 @@
-// src/components/mentions/MentionList.jsx - Updated for New Schema
 import React, { useState, useEffect, forwardRef, useImperativeHandle } from 'react';
 import Avatar from '../Avatar';
 
 const MentionList = forwardRef((props, ref) => {
     const [selectedIndex, setSelectedIndex] = useState(0);
 
-    // Clean selectItem function - remove debug logs for production
     const selectItem = index => {
         const item = props.items[index];
         if (item) {
-            console.log('🎯 MentionList: Selecting item:', item);
-            
-            // Pass all three attributes to Tiptap
             props.command({ 
                 id: item.id, 
                 label: item.name,
@@ -63,7 +58,6 @@ const MentionList = forwardRef((props, ref) => {
             }
             return 'User';
         } else {
-            // FIXED: Handle all organization types from the unified organizations table
             const getOrgTypeLabel = (role) => {
                 const typeLabels = {
                     'nonprofit': 'Nonprofit',
@@ -93,7 +87,6 @@ const MentionList = forwardRef((props, ref) => {
             boxShadow: '0 4px 20px rgba(0, 0, 0, 0.1)',
             fontSize: '14px'
         }}>
-            {/* Header for the dropdown, showing query and result count */}
             <div style={{
                 padding: '8px 12px',
                 borderBottom: '1px solid #e1e5e9',
@@ -104,7 +97,6 @@ const MentionList = forwardRef((props, ref) => {
                 💬 {props.items.length} result{props.items.length !== 1 ? 's' : ''} for "{props.query}"
             </div>
 
-            {/* Map through the items (suggestions) and render each one */}
             {props.items.map((item, index) => (
                 <div
                     key={`${item.type}-${item.id}`}
@@ -121,7 +113,6 @@ const MentionList = forwardRef((props, ref) => {
                         borderBottom: index < props.items.length - 1 ? '1px solid #f0f2f5' : 'none'
                     }}
                 >
-                    {/* Avatar component for user/organization */}
                     <div style={{
                         width: '40px', height: '40px', borderRadius: '50%', backgroundColor: '#e4e6ea',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -133,7 +124,6 @@ const MentionList = forwardRef((props, ref) => {
                             <span>{item.type === 'user' ? '👤' : '🏢'}</span>
                         )}
                     </div>
-                    {/* Display name and descriptive label */}
                     <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{
                             fontWeight: '600', color: '#1c1e21', marginBottom: '2px',
@@ -148,13 +138,11 @@ const MentionList = forwardRef((props, ref) => {
                             {getUserTypeLabel(item)}
                         </div>
                     </div>
-                    {/* Type indicator icon on the right */}
                     <div style={{ fontSize: '20px', opacity: 0.6 }}>
                         {item.type === 'user' ? '👤' : '🏢'}
                     </div>
                 </div>
             ))}
-            {/* Footer hint for navigation */}
             <div style={{
                 padding: '8px 12px',
                 borderTop: '1px solid #e1e5e9',

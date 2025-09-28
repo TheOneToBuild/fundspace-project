@@ -1,18 +1,15 @@
-// src/components/ConnectionsPage.jsx - FULLY OPTIMIZED VERSION - All queries wrapped
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useOutletContext, Link } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
-import { optimizedSupabaseQuery } from '../utils/apiRequestOptimizer'; // ✅ CRITICAL IMPORT
+import { getBatchConnectionStatus } from '../utils/rpcClientFunctions';
 import { Users, UserCheck, UserX, ArrowLeft, Clock, Building, MapPin, Search, Filter } from 'lucide-react';
 import Avatar from './Avatar';
 import PublicPageLayout from './PublicPageLayout.jsx';
-import globalDataManager from '../utils/globalDataManager';
 
-// ✅ FULLY OPTIMIZED ConnectionsDataManager - Uses globalDataManager and optimized queries
 class ConnectionsDataManager {
   constructor() {
     this.cache = new Map();
-    this.CACHE_TTL = 30000; // 30 seconds
+    this.CACHE_TTL = 30000;
   }
 
   getCacheKey(type, params) {
@@ -32,7 +29,6 @@ class ConnectionsDataManager {
     return this.isValidCache(item) ? item.data : null;
   }
 
-  // Get current authenticated user ID
   async getCurrentAuthUserId() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -43,24 +39,24 @@ class ConnectionsDataManager {
     }
   }
 
-  // ✅ CRITICAL FIX: Use globalDataManager for all connection data loading
   async loadAllConnectionData() {
     const cacheKey = this.getCacheKey('all-data', {});
     const cached = this.getCache(cacheKey);
     if (cached) return cached;
 
     try {
-      // Get the current auth user ID first
       const authUserId = await this.getCurrentAuthUserId();
       if (!authUserId) {
         throw new Error('No authenticated user found');
       }
 
-      // ✅ Use globalDataManager batch operations
-      const userConnectionsData = await globalDataManager.getUserConnections([authUserId]);
-      const connections = userConnectionsData[authUserId] || [];
+      const { data: connections, error: connectionsError } = await supabase
+        .from('user_connections')
+        .select('*')
+        .or(`requester_id.eq.${authUserId},recipient_id.eq.${authUserId}`);
 
-      // Separate connections by status
+      if (connectionsError) throw connectionsError;
+
       const establishedConnections = connections.filter(conn => conn.status === 'accepted');
       const incomingRequests = connections.filter(conn => 
         conn.status === 'pending' && conn.recipient_id === authUserId
@@ -69,51 +65,54 @@ class ConnectionsDataManager {
         conn.status === 'pending' && conn.requester_id === authUserId
       );
 
-      // Collect all user IDs we need profile data for
-      const allAuthUserIds = new Set();
-      
+      const allUserIds = new Set();
       establishedConnections.forEach(conn => {
         const otherUserId = conn.requester_id === authUserId ? conn.recipient_id : conn.requester_id;
-        allAuthUserIds.add(otherUserId);
+        allUserIds.add(otherUserId);
       });
-      
-      incomingRequests.forEach(req => allAuthUserIds.add(req.requester_id));
-      outgoingRequests.forEach(req => allAuthUserIds.add(req.recipient_id));
+      incomingRequests.forEach(req => allUserIds.add(req.requester_id));
+      outgoingRequests.forEach(req => allUserIds.add(req.recipient_id));
 
-      // ✅ CRITICAL: Use globalDataManager batch profile loading
       let allUserProfiles = {};
       let orgMembershipsData = {};
 
-      if (allAuthUserIds.size > 0) {
-        const authUserIdsArray = Array.from(allAuthUserIds);
+      if (allUserIds.size > 0) {
+        const userIdsArray = Array.from(allUserIds);
         
-        allUserProfiles = await globalDataManager.getProfiles(authUserIdsArray);
-        orgMembershipsData = await globalDataManager.getOrganizationMemberships(authUserIdsArray);
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .select('id, full_name, avatar_url, organization_name, organization_type, role, title, location')
+          .in('id', userIdsArray);
+
+        if (profileError) throw profileError;
+
+        profileData.forEach(profile => {
+          allUserProfiles[profile.id] = profile;
+        });
+
+      // Skip organization memberships query - use profile organization data instead
+      // This avoids the schema mismatch errors while maintaining functionality
       }
 
-      // Process established connections with enhanced profile data
       const processedConnections = establishedConnections.map(conn => {
-        const otherAuthUserId = conn.requester_id === authUserId ? conn.recipient_id : conn.requester_id;
-        const userProfile = allUserProfiles[otherAuthUserId] || { id: otherAuthUserId, full_name: 'Unknown User' };
-        const orgMembership = orgMembershipsData[userProfile.id];
+        const otherUserId = conn.requester_id === authUserId ? conn.recipient_id : conn.requester_id;
+        const userProfile = allUserProfiles[otherUserId] || { id: otherUserId, full_name: 'Unknown User' };
         
         return {
           id: conn.id,
           connected_at: conn.updated_at || conn.created_at,
           user: {
             ...userProfile,
-            organization_name: orgMembership?.organization?.name || userProfile.organization_name,
-            organization_type: orgMembership?.organization?.type || userProfile.organization_type,
-            role: orgMembership?.role || userProfile.role
+            organization_name: userProfile.organization_name,
+            organization_type: userProfile.organization_type,
+            role: userProfile.role
           }
         };
       });
 
-      // Process pending requests with enhanced profile data
       const processedPendingRequests = [
         ...incomingRequests.map(req => {
           const userProfile = allUserProfiles[req.requester_id] || { id: req.requester_id, full_name: 'Unknown User' };
-          const orgMembership = orgMembershipsData[userProfile.id];
           
           return {
             id: req.id,
@@ -122,15 +121,14 @@ class ConnectionsDataManager {
             isIncoming: true,
             user_profile: {
               ...userProfile,
-              organization_name: orgMembership?.organization?.name || userProfile.organization_name,
-              organization_type: orgMembership?.organization?.type || userProfile.organization_type,
-              role: orgMembership?.role || userProfile.role
+              organization_name: userProfile.organization_name,
+              organization_type: userProfile.organization_type,
+              role: userProfile.role
             }
           };
         }),
         ...outgoingRequests.map(req => {
           const userProfile = allUserProfiles[req.recipient_id] || { id: req.recipient_id, full_name: 'Unknown User' };
-          const orgMembership = orgMembershipsData[userProfile.id];
           
           return {
             id: req.id,
@@ -139,9 +137,9 @@ class ConnectionsDataManager {
             isIncoming: false,
             user_profile: {
               ...userProfile,
-              organization_name: orgMembership?.organization?.name || userProfile.organization_name,
-              organization_type: orgMembership?.organization?.type || userProfile.organization_type,
-              role: orgMembership?.role || userProfile.role
+              organization_name: userProfile.organization_name,
+              organization_type: userProfile.organization_type,
+              role: userProfile.role
             }
           };
         })
@@ -173,7 +171,6 @@ class ConnectionsDataManager {
     }
   }
 
-  // ✅ FIXED: Discovery query with optimization wrapper
   async loadDiscoveryData(searchQuery = '', filterType = 'all', connectedProfileIds = new Set()) {
     const cacheKey = this.getCacheKey('discovery', { searchQuery, filterType });
     const cached = this.getCache(cacheKey);
@@ -183,7 +180,6 @@ class ConnectionsDataManager {
       const authUserId = await this.getCurrentAuthUserId();
       if (!authUserId) return [];
 
-      // ✅ CRITICAL FIX: Wrap discovery profiles query with optimizer
       let baseQuery = supabase
         .from('profiles')
         .select('id, full_name, title, avatar_url, location, organization_name, organization_type, role')
@@ -193,7 +189,7 @@ class ConnectionsDataManager {
 
       if (connectedProfileIds.size > 0) {
         const userIdArray = Array.from(connectedProfileIds);
-        baseQuery = baseQuery.not('id', 'in', `(${userIdArray.map(id => `"${id}"`).join(',')})`);
+        baseQuery = baseQuery.not('id', 'in', `(${userIdArray.join(',')})`);
       }
 
       if (searchQuery.trim()) {
@@ -212,14 +208,7 @@ class ConnectionsDataManager {
         }
       }
 
-      // ✅ CRITICAL: Wrap the discovery query with optimizer
-      const optimizedDiscoveryQuery = optimizedSupabaseQuery(
-        baseQuery.order('updated_at', { ascending: false }),
-        'profiles_single',
-        { searchQuery, filterType, excludeIds: Array.from(connectedProfileIds) }
-      );
-
-      const { data, error } = await optimizedDiscoveryQuery;
+      const { data, error } = await baseQuery.order('updated_at', { ascending: false });
       
       if (error) throw error;
 
@@ -255,7 +244,6 @@ export default function ConnectionsPage() {
   const connectedProfileIdsRef = useRef(new Set());
   const authUserIdRef = useRef(null);
 
-  // ✅ OPTIMIZED: Load connection data using globalDataManager
   const loadConnectionData = useCallback(async () => {
     if (!currentUserProfile?.id) return;
     
@@ -276,7 +264,6 @@ export default function ConnectionsPage() {
     }
   }, [currentUserProfile?.id]);
 
-  // Load discovery data
   const loadDiscoveryData = useCallback(async () => {
     if (!currentUserProfile?.id) return;
     
@@ -298,19 +285,16 @@ export default function ConnectionsPage() {
     }
   }, [currentUserProfile?.id, searchQuery, filterType]);
 
-  // Initial data load
   useEffect(() => {
     loadConnectionData();
   }, [loadConnectionData]);
 
-  // Load discovery when needed
   useEffect(() => {
     if (activeTab === 'discover') {
       loadDiscoveryData();
     }
   }, [activeTab, loadDiscoveryData]);
 
-  // ✅ OPTIMIZED: Action handlers use minimal direct queries
   const handleSendConnectionRequest = useCallback(async (profileId) => {
     if (actionInProgress.has(profileId)) return;
     if (!authUserIdRef.current) return;
@@ -329,7 +313,6 @@ export default function ConnectionsPage() {
       if (error) throw error;
       
       connectionsDataManager.clearCache();
-      globalDataManager.clearCache();
       setDiscoveredMembers(prev => prev.filter(member => member.id !== profileId));
       await loadConnectionData();
       
@@ -358,7 +341,6 @@ export default function ConnectionsPage() {
       if (error) throw error;
       
       connectionsDataManager.clearCache();
-      globalDataManager.clearCache();
       await loadConnectionData();
       
     } catch (error) {
@@ -386,7 +368,6 @@ export default function ConnectionsPage() {
       if (error) throw error;
       
       connectionsDataManager.clearCache();
-      globalDataManager.clearCache();
       await loadConnectionData();
       
     } catch (error) {
@@ -414,7 +395,6 @@ export default function ConnectionsPage() {
       if (error) throw error;
       
       connectionsDataManager.clearCache();
-      globalDataManager.clearCache();
       await loadConnectionData();
       await loadDiscoveryData();
       
@@ -446,7 +426,6 @@ export default function ConnectionsPage() {
       if (error) throw error;
       
       connectionsDataManager.clearCache();
-      globalDataManager.clearCache();
       await loadConnectionData();
       
     } catch (error) {
@@ -473,7 +452,6 @@ export default function ConnectionsPage() {
     return date.toLocaleDateString();
   }, []);
 
-  // Component rendering (UI components)
   const ConnectionCard = useCallback(({ connection, type = 'connection' }) => {
     let user, connectionDate, isActionInProgress;
     

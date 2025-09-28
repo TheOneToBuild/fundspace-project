@@ -1,4 +1,3 @@
-// src/components/Avatar.jsx - Fixed with Consistent Rounded Styling
 import React, { useState, useEffect } from 'react';
 
 const Avatar = ({ 
@@ -14,7 +13,6 @@ const Avatar = ({
   const [imageLoading, setImageLoading] = useState(false);
   const [imageSrc, setImageSrc] = useState(null);
 
-  // Reset state when src changes and validate src
   useEffect(() => {
     const newSrc = src?.trim();
     
@@ -25,13 +23,11 @@ const Avatar = ({
       return;
     }
 
-    // If src changed, reset states and start loading
     if (newSrc !== imageSrc) {
       setImageError(false);
       setImageLoading(true);
       setImageSrc(newSrc);
       
-      // Test if the image can be loaded
       const img = new Image();
       img.onload = () => {
         setImageLoading(false);
@@ -46,7 +42,6 @@ const Avatar = ({
     }
   }, [src, imageSrc]);
 
-  // Size configurations with explicit pixel values for consistency
   const sizeConfig = {
     xs: { 
       size: 'w-6 h-6',
@@ -82,7 +77,6 @@ const Avatar = ({
 
   const config = sizeConfig[size] || sizeConfig.md;
 
-  // Generate initials from full name
   const getInitials = (name) => {
     if (!name) return '?';
     
@@ -95,7 +89,6 @@ const Avatar = ({
       .slice(0, 2);
   };
 
-  // Generate a consistent background color based on name
   const getBackgroundColor = (name) => {
     if (!name) return 'bg-slate-500';
     
@@ -127,17 +120,15 @@ const Avatar = ({
     return colors[Math.abs(hash) % colors.length];
   };
 
-  // Check if we should show the image
   const shouldShowImage = imageSrc && !imageError && !imageLoading;
 
-  // CRITICAL: Always ensure rounded-full and proper overflow
   const containerClasses = [
     'relative',
     'inline-block',
     config.size,
-    'rounded-full',           // ALWAYS round
-    'overflow-hidden',        // ALWAYS hide overflow
-    'flex-shrink-0',         // Prevent squashing
+    'rounded-full',
+    'overflow-hidden',
+    'flex-shrink-0',
     onClick ? 'cursor-pointer hover:opacity-80 transition-opacity' : '',
     className
   ].filter(Boolean).join(' ');
@@ -145,7 +136,7 @@ const Avatar = ({
   const initialsClasses = [
     'w-full',
     'h-full',
-    'rounded-full',           // ALWAYS round
+    'rounded-full',
     'flex',
     'items-center',
     'justify-center',
@@ -159,8 +150,8 @@ const Avatar = ({
   const imageClasses = [
     'w-full',
     'h-full',
-    'object-cover',          // Maintain aspect ratio
-    'rounded-full'           // ALWAYS round
+    'object-cover',
+    'rounded-full'
   ].join(' ');
 
   const statusClasses = [
@@ -182,7 +173,6 @@ const Avatar = ({
           loading="lazy"
         />
       ) : (
-        // Fallback initials (shown when loading, error, or no image)
         <div className={initialsClasses}>
           {imageLoading ? (
             <div className="animate-pulse">
@@ -194,7 +184,6 @@ const Avatar = ({
         </div>
       )}
 
-      {/* Online status indicator */}
       {showOnlineStatus && (
         <div 
           className={statusClasses}

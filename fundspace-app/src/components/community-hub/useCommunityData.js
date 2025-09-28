@@ -1,10 +1,9 @@
-// src/components/community-hub/useCommunityData.js - OPTIMIZED: Use globalDataManager
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../supabaseClient';
 import { addOrganizationEventListener } from '../../utils/organizationEvents';
 import { getOrganizationInfoForCommunity } from '../../utils/membershipQueries.js';
 import { POSTS_PER_PAGE, getOrgBaseType } from './constants';
-import globalDataManager from '../../utils/globalDataManager.js'; // ✅ ADD THIS IMPORT
+import { getDashboardData } from '../../utils/rpcClientFunctions';
 
 export const useCommunityData = (profile) => {
   const [posts, setPosts] = useState([]);
@@ -13,7 +12,6 @@ export const useCommunityData = (profile) => {
   const [hasMore, setHasMore] = useState(true);
   const [organizationInfo, setOrganizationInfo] = useState(null);
 
-  // Set up organization listener
   useEffect(() => {
     if (!profile?.id) return;
     
@@ -34,7 +32,6 @@ export const useCommunityData = (profile) => {
     return cleanup;
   }, [profile?.id]);
 
-  // Fetch organization info
   useEffect(() => {
     const fetchOrganizationInfo = async () => {
       if (!profile?.id) return;
@@ -51,7 +48,6 @@ export const useCommunityData = (profile) => {
     fetchOrganizationInfo();
   }, [profile?.id]);
 
-  // ✅ OPTIMIZED: Fetch posts function using globalDataManager
   const fetchPosts = async (pageNum, channelConfig) => {
     if (!channelConfig || channelConfig.disabled) {
       setLoading(false);
@@ -62,18 +58,10 @@ export const useCommunityData = (profile) => {
       let postsData;
       
       if (channelConfig.id === 'hello-world') {
-        // ✅ BEFORE (Direct query causing individual posts API calls):
-        // const { data, error } = await supabase
-        //   .from('posts')
-        //   .select(`*, profiles:profile_id(...)`)
-        //   .eq('channel', 'hello-world')
-
-        // ✅ AFTER (Use globalDataManager for batched loading):
         if (pageNum === 0) {
-          // First page - use globalDataManager
-          postsData = await globalDataManager.getPostsByChannel('hello-world', POSTS_PER_PAGE);
+          const dashboardData = await getDashboardData(profile?.id);
+          postsData = dashboardData?.posts?.filter(post => post.channel === 'hello-world') || [];
         } else {
-          // Subsequent pages - fallback to direct query with range
           const { data, error } = await supabase
             .from('posts')
             .select(`*, profiles:profile_id(id, full_name, avatar_url, title, organization_name, role, organization_type)`)
@@ -92,12 +80,10 @@ export const useCommunityData = (profile) => {
           return;
         }
 
-        // ✅ OPTIMIZED: Use globalDataManager for community posts
         if (pageNum === 0) {
-          // First page - use globalDataManager
-          postsData = await globalDataManager.getPostsByChannel(channelConfig.dbChannel, POSTS_PER_PAGE);
+          const dashboardData = await getDashboardData(profile?.id);
+          postsData = dashboardData?.posts?.filter(post => post.channel === channelConfig.dbChannel) || [];
         } else {
-          // Subsequent pages - fallback to direct query
           const { data, error } = await supabase
             .from('posts')
             .select(`*, profiles:profile_id(id, full_name, avatar_url, title, organization_name, role, organization_type)`)
@@ -113,11 +99,36 @@ export const useCommunityData = (profile) => {
       }
 
       if (postsData && postsData.length > 0) {
-        // ✅ OPTIMIZED: Batch load reactions instead of individual queries
         const postIds = postsData.map(post => post.id);
         
-        // Use globalDataManager for batched reactions loading
-        const reactionsData = await globalDataManager.getPostLikes(postIds);
+        let reactionsData = {};
+        if (pageNum === 0) {
+          const dashboardData = await getDashboardData(profile?.id);
+          if (dashboardData?.post_likes) {
+            dashboardData.post_likes.forEach(like => {
+              if (postIds.includes(like.post_id)) {
+                if (!reactionsData[like.post_id]) {
+                  reactionsData[like.post_id] = { reaction_summary: [] };
+                }
+                reactionsData[like.post_id].reaction_summary.push(like);
+              }
+            });
+          }
+        } else {
+          const { data: reactions } = await supabase
+            .from('post_reactions')
+            .select('post_id, reaction_type, user_id')
+            .in('post_id', postIds);
+          
+          if (reactions) {
+            reactions.forEach(reaction => {
+              if (!reactionsData[reaction.post_id]) {
+                reactionsData[reaction.post_id] = { reaction_summary: [] };
+              }
+              reactionsData[reaction.post_id].reaction_summary.push(reaction);
+            });
+          }
+        }
 
         const enrichedPosts = postsData.map(post => {
           const postReactions = reactionsData[post.id];
@@ -142,7 +153,6 @@ export const useCommunityData = (profile) => {
     }
   };
 
-  // Handle new post
   const handleNewPost = useCallback((newPostData) => {
     const postWithOrgInfo = {
       ...newPostData,
@@ -158,12 +168,10 @@ export const useCommunityData = (profile) => {
     setPosts(prev => [postWithOrgInfo, ...prev]);
   }, [profile, organizationInfo]);
 
-  // Handle delete post
   const handleDeletePost = useCallback((deletedPostId) => {
     setPosts(prev => prev.filter(p => p.id !== deletedPostId));
   }, []);
 
-  // Reset posts when channel changes
   const resetPosts = () => {
     setPosts([]);
     setPage(0);

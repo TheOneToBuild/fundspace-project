@@ -1,4 +1,3 @@
-// src/components/dashboard/WelcomeBanner.jsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Calendar, Bell, Plus, X, Globe, Building, FileText } from 'lucide-react';
@@ -8,11 +7,9 @@ const WelcomeBanner = ({ profile, organizationInfo }) => {
     const navigate = useNavigate();
     const [showCreatePopup, setShowCreatePopup] = useState(false);
     const [imageTheme, setImageTheme] = useState(() => {
-        // Load image theme from localStorage or default to 'dark'
         return localStorage.getItem('welcomeBannerImageTheme') || 'dark';
     });
 
-    // Save image theme to localStorage when it changes
     useEffect(() => {
         localStorage.setItem('welcomeBannerImageTheme', imageTheme);
     }, [imageTheme]);
@@ -23,19 +20,17 @@ const WelcomeBanner = ({ profile, organizationInfo }) => {
 
     const handleOrganizationClick = () => {
         if (organizationInfo?.name) {
-            // Create a slug from the organization name for navigation
             const orgSlug = organizationInfo.name
                 .toLowerCase()
-                .replace(/[^a-z0-9\s-]/g, '') // Remove special characters
-                .replace(/\s+/g, '-') // Replace spaces with hyphens
-                .replace(/-+/g, '-') // Replace multiple hyphens with single
+                .replace(/[^a-z0-9\s-]/g, '')
+                .replace(/\s+/g, '-')
+                .replace(/-+/g, '-')
                 .trim();
             
             navigate(`/organizations/${orgSlug}`);
         }
     };
 
-    // Define image themes with different background images
     const imageThemes = {
         dark: {
             backgroundImage: "url('https://images.unsplash.com/photo-1506905925346-21bda4d32df4?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2070&q=80')",
@@ -83,7 +78,6 @@ const WelcomeBanner = ({ profile, organizationInfo }) => {
             color: currentTheme.buttonStyle,
             action: () => setShowCreatePopup(true)
         },
-        // FIXED: Navigate to grants portal page instead of grants page
         ...(profile?.is_omega_admin || organizationInfo ? [{
             icon: FileText,
             label: 'Fund Portal',
@@ -95,7 +89,7 @@ const WelcomeBanner = ({ profile, organizationInfo }) => {
             label: 'Events',
             color: currentTheme.comingSoonStyle,
             isComingSoon: true,
-            action: () => {} // No action for coming soon
+            action: () => {}
         },
         {
             icon: Bell,
@@ -105,19 +99,15 @@ const WelcomeBanner = ({ profile, organizationInfo }) => {
         }
     ];
 
-    // Get the user's display role - FIXED: Use profile.title first, then fallback logic
     const getUserDisplayRole = () => {
-        // First priority: Use the user's actual title from their profile
         if (profile?.title) {
             return profile.title;
         }
         
-        // Second priority: Use organization role if available
         if (organizationInfo?.role) {
             return organizationInfo.role;
         }
         
-        // Final fallback: Use a generic role based on organization type or default
         if (organizationInfo?.type) {
             const typeRoleMap = {
                 'nonprofit': 'Nonprofit Professional',
@@ -138,7 +128,6 @@ const WelcomeBanner = ({ profile, organizationInfo }) => {
     return (
         <>
             <div className="relative overflow-hidden">
-                {/* Theme toggle button */}
                 <div className="absolute top-4 right-4 z-30">
                     <button
                         onClick={toggleImageTheme}
@@ -149,35 +138,28 @@ const WelcomeBanner = ({ profile, organizationInfo }) => {
                     </button>
                 </div>
 
-                {/* IMAGE THEME */}
                 <div className="rounded-2xl relative overflow-hidden min-h-[350px]">
-                    {/* Background image with overlay */}
                     <div 
                         className="absolute inset-0 bg-cover bg-center bg-no-repeat"
                         style={{
                             backgroundImage: currentTheme.backgroundImage
                         }}
                     >
-                        {/* Overlay for better text readability */}
                         <div className={`absolute inset-0 ${currentTheme.overlay}`}></div>
                     </div>
 
-                    {/* Content overlay */}
                     <div className="relative z-10 p-8">
                         <div className="flex items-start justify-between">
                             <div className="flex-1">
-                                {/* Time-based greeting */}
                                 <div className={`${currentTheme.dateColor} text-sm font-medium mb-2 flex items-center gap-2`}>
                                     <Calendar size={16} />
                                     {getTodaysDate()}
                                 </div>
 
-                                {/* Main welcome message */}
                                 <h1 className={`text-3xl font-bold ${currentTheme.textColor} mb-3 leading-tight`}>
                                     {getCurrentTimeGreeting()}, {profile?.full_name?.split(' ')[0] || 'there'}! 👋
                                 </h1>
 
-                                {/* Organization and role info - FIXED */}
                                 <div className={`${currentTheme.orgColor} text-lg mb-6`}>
                                     {organizationInfo ? (
                                         <div className="flex items-center gap-2 flex-wrap">
@@ -195,7 +177,6 @@ const WelcomeBanner = ({ profile, organizationInfo }) => {
                                     )}
                                 </div>
 
-                                {/* Quick action buttons */}
                                 <div className="flex gap-3 flex-wrap">
                                     {quickActions.map((action, index) => (
                                         <div key={index} className="relative">
@@ -225,7 +206,6 @@ const WelcomeBanner = ({ profile, organizationInfo }) => {
                 </div>
             </div>
 
-            {/* Create Post Popup Modal */}
             {showCreatePopup && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
                     <div className="max-w-md w-full rounded-2xl overflow-hidden shadow-2xl bg-white relative">
@@ -235,7 +215,6 @@ const WelcomeBanner = ({ profile, organizationInfo }) => {
                             <div className="absolute bottom-0 left-1/3 w-56 h-56 bg-gradient-to-br from-indigo-200/25 to-cyan-200/25 rounded-full blur-3xl -translate-y-12"></div>
                         </div>
                         
-                        {/* Header */}
                         <div className="p-6 relative text-slate-900">
                             <button
                                 onClick={() => setShowCreatePopup(false)}
@@ -254,9 +233,7 @@ const WelcomeBanner = ({ profile, organizationInfo }) => {
                             </div>
                         </div>
 
-                        {/* Post Type Options */}
                         <div className="p-6 pt-0 relative space-y-3">
-                            {/* Global Feed Option */}
                             <button 
                                 onClick={() => {
                                     navigate('/profile/community-hub?channel=hello-world');
@@ -275,7 +252,6 @@ const WelcomeBanner = ({ profile, organizationInfo }) => {
                                 </div>
                             </button>
 
-                            {/* Organization Feed Option */}
                             {organizationInfo && (
                                 <button 
                                     onClick={() => {
@@ -297,7 +273,6 @@ const WelcomeBanner = ({ profile, organizationInfo }) => {
                             )}
                         </div>
 
-                        {/* Footer */}
                         <div className="mt-6 pt-4 border-t border-slate-200 px-6 pb-6">
                             <p className="text-center text-xs text-slate-500">
                                 Choose where you'd like to share your post
@@ -315,4 +290,4 @@ WelcomeBanner.propTypes = {
     organizationInfo: PropTypes.object
 };
 
-export default WelcomeBanner
+export default WelcomeBanner;

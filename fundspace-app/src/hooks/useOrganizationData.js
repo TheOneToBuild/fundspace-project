@@ -1,4 +1,3 @@
-// hooks/useOrganizationData.js - Complete fixed version
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
@@ -80,7 +79,6 @@ export function useOrganizationData(profile, session) {
                 contact_email: orgData.contact_email || '',
             });
 
-            // Fetch organization members with proper error handling
             const { data: memberData, error: memberError } = await supabase
                 .from('organization_memberships')
                 .select(`
@@ -100,7 +98,6 @@ export function useOrganizationData(profile, session) {
                 .order('joined_at', { ascending: true });
 
             if (!memberError && memberData) {
-                // Filter out members with missing profile data and log issues
                 const validMembers = memberData.filter(member => {
                     if (!member.profiles || !member.profiles.id) {
                         console.warn('Filtering out member with invalid profile data:', {
@@ -134,7 +131,6 @@ export function useOrganizationData(profile, session) {
             setLoading(true);
             setError('');
 
-            // Step 1: Delete from main organization_memberships table
             const { error: deleteError } = await supabase
                 .from('organization_memberships')
                 .delete()
@@ -146,7 +142,6 @@ export function useOrganizationData(profile, session) {
                 return;
             }
 
-            // Step 2: Delete from cache table (manual cache cleanup)
             const { error: cacheDeleteError } = await supabase
                 .from('organization_membership_cache')
                 .delete()
@@ -155,10 +150,8 @@ export function useOrganizationData(profile, session) {
 
             if (cacheDeleteError) {
                 console.warn('Warning: Failed to clean cache, but main membership deleted:', cacheDeleteError);
-                // Don't fail the whole operation for cache cleanup issues
             }
 
-            // Step 3: Update profile to clear organization references
             await supabase
                 .from('profiles')
                 .update({
@@ -170,10 +163,6 @@ export function useOrganizationData(profile, session) {
                 })
                 .eq('id', session.user.id);
 
-            // Step 4: REMOVED - No longer calling refresh_org_cache RPC function
-            // This was causing the 403 error. Manual cache cleanup above is sufficient.
-
-            // Trigger refresh functions if available
             if (window.refreshDashboardOrganizationData) {
                 window.refreshDashboardOrganizationData();
             }
@@ -205,7 +194,6 @@ export function useOrganizationData(profile, session) {
             setLoading(true);
             setError('');
 
-            // Step 1: Delete all organization memberships
             const { error: membershipError } = await supabase
                 .from('organization_memberships')
                 .delete()
@@ -215,13 +203,11 @@ export function useOrganizationData(profile, session) {
                 throw new Error('Failed to remove organization members: ' + membershipError.message);
             }
 
-            // Step 2: Delete organization posts (if any)
             await supabase
                 .from('organization_posts')
                 .delete()
                 .eq('organization_id', organization.id);
 
-            // Step 3: Delete the organization itself
             const { error: orgError } = await supabase
                 .from('organizations')
                 .delete()
@@ -231,7 +217,6 @@ export function useOrganizationData(profile, session) {
                 throw new Error('Failed to delete organization: ' + orgError.message);
             }
 
-            // Step 4: Update user profile to clear organization references
             await supabase
                 .from('profiles')
                 .update({
@@ -242,7 +227,6 @@ export function useOrganizationData(profile, session) {
                 })
                 .eq('id', session.user.id);
 
-            // Success - navigate away
             navigate('/profile');
             return true;
         } catch (err) {

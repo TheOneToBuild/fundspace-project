@@ -1,8 +1,7 @@
-// src/components/HomeDashboard.jsx - HYBRID RPC OPTIMIZATION: Replace multiple calls with single RPC
 import React, { useState, useEffect } from 'react';
 import { useOutletContext, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
-import { getDashboardData, trackRPCUsage } from '../utils/rpcClientFunctions'; // ✅ NEW RPC IMPORT
+import { getDashboardData } from '../utils/rpcClientFunctions';
 import { rssNewsService as newsService } from '../services/rssNewsService.js';
 import { getOrganizationInfoForDashboard } from '../utils/membershipQueries.js';
 
@@ -35,19 +34,15 @@ const useNews = () => {
     return news;
 };
 
-// ✅ REPLACED: Use RPC instead of globalDataManager for trending posts
 const useOptimizedTrendingPosts = (dashboardData) => {
-    // Return posts from RPC data instead of making separate API call
     return dashboardData?.posts || [];
 };
 
-// ✅ REPLACED: Use RPC instead of multiple grants/organizations queries
 const useTrendingGrants = (dashboardData) => {
     const [trendingGrants, setTrendingGrants] = useState([]);
 
     useEffect(() => {
         if (dashboardData?.recent_grants) {
-            // Process RPC grants data to match your existing format
             const processedGrants = dashboardData.recent_grants.map(grant => ({
                 id: grant.id,
                 title: grant.title || 'Untitled Grant',
@@ -110,7 +105,6 @@ const useUserData = (profile) => {
     return { organizationInfo, loading, refreshOrganizationData };
 };
 
-// ✅ NEW: Single RPC call to replace multiple dashboard API calls
 const useDashboardData = (profile) => {
     const [dashboardData, setDashboardData] = useState(null);
     const [rpcLoading, setRpcLoading] = useState(false);
@@ -121,17 +115,13 @@ const useDashboardData = (profile) => {
 
             setRpcLoading(true);
             try {
-                console.log('🎯 Loading dashboard with single RPC call...');
+                console.log('Loading dashboard with single RPC call...');
                 
-                // SINGLE RPC CALL REPLACES:
-                // ❌ OLD: Multiple separate API calls to posts, grants, organizations, etc.
-                // ✅ NEW: One optimized RPC call
                 const data = await getDashboardData(profile.id);
                 
                 setDashboardData(data);
-                trackRPCUsage('get_dashboard_data', true);
                 
-                console.log('✅ Dashboard RPC loaded:', {
+                console.log('Dashboard RPC loaded:', {
                     posts: data?.posts?.length || 0,
                     grants: data?.recent_grants?.length || 0,
                     organizations: data?.trending_organizations?.length || 0
@@ -139,7 +129,6 @@ const useDashboardData = (profile) => {
                 
             } catch (error) {
                 console.error('Error loading dashboard RPC:', error);
-                trackRPCUsage('get_dashboard_data', false);
             } finally {
                 setRpcLoading(false);
             }
@@ -169,18 +158,15 @@ export default function HomeDashboard() {
     const [selectedGrant, setSelectedGrant] = useState(null);
     const [isGrantModalOpen, setIsGrantModalOpen] = useState(false);
 
-    // ✅ NEW: Get dashboard data from single RPC call
     const { dashboardData, rpcLoading } = useDashboardData(profile);
     
     const { organizationInfo, loading, refreshOrganizationData } = useUserData(profile);
     const news = useNews();
     
-    // ✅ UPDATED: Use RPC data instead of separate API calls
     const trendingPosts = useOptimizedTrendingPosts(dashboardData);
     const { trendingGrants, setTrendingGrants } = useTrendingGrants(dashboardData);
     const helloCommunityPosts = useHelloCommunityPosts(organizationInfo);
 
-    // Create enhanced pageData with RPC data
     const enhancedPageData = React.useMemo(() => {
         const rpcPageData = {
             profiles: {},
@@ -189,7 +175,6 @@ export default function HomeDashboard() {
             orgMemberships: {}
         };
 
-        // Populate with RPC data
         if (dashboardData?.posts) {
             dashboardData.posts.forEach(post => {
                 if (post.profile) {
@@ -348,10 +333,9 @@ export default function HomeDashboard() {
 
     return (
         <div className="space-y-8">
-            {/* ✅ RPC Optimization Indicator */}
             {process.env.NODE_ENV === 'development' && dashboardData && (
                 <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-                    <h3 className="text-green-800 font-semibold mb-2">🎯 RPC Optimization Active!</h3>
+                    <h3 className="text-green-800 font-semibold mb-2">RPC Optimization Active</h3>
                     <p className="text-green-600 text-sm">
                         Dashboard loaded with 1 RPC call instead of 15+ individual API calls.
                         Posts: {dashboardData.posts?.length || 0}, Grants: {dashboardData.recent_grants?.length || 0}, 

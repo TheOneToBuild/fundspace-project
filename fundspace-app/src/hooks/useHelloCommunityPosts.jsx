@@ -1,8 +1,6 @@
-// src/hooks/useHelloCommunityPosts.jsx - CORRECTED: Fully batched version
 import { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 
-// Organization channel configuration
 const ORGANIZATION_CHANNELS = {
   'nonprofit': { dbChannel: 'nonprofit-community' },
   'foundation': { dbChannel: 'foundation-community' },
@@ -27,7 +25,6 @@ export const useHelloCommunityPosts = (organizationInfo) => {
 
     useEffect(() => {
         const fetchHelloCommunityPosts = async () => {
-            // Return early if no organization info
             if (!organizationInfo?.type) {
                 setHelloCommunityPosts([]);
                 return;
@@ -42,9 +39,6 @@ export const useHelloCommunityPosts = (organizationInfo) => {
                     return;
                 }
 
-                const dbChannel = channelInfo.dbChannel;
-
-                // First try the RPC function like HelloCommunity does
                 try {
                     const { data: rpcData, error: rpcError } = await supabase.rpc('get_community_posts_by_org_type', {
                         user_org_type: userOrgType, 
@@ -62,71 +56,35 @@ export const useHelloCommunityPosts = (organizationInfo) => {
                                 title: post.profile_title,
                                 organization_name: post.profile_organization_name,
                                 role: post.profile_role
+                            },
+                            reactions: {
+                                summary: post.reaction_summary || []
                             }
                         }));
 
-                        // FIXED: Single batched query for all additional data
-                        const profileIds = [...new Set(transformedPosts.map(post => post.profile_id))];
-                        const postIds = transformedPosts.map(post => post.id);
-
-                        const [membershipsData, reactionsData] = await Promise.all([
-                            supabase
-                                .from('organization_memberships')
-                                .select('profile_id, organizations!inner(name)')
-                                .in('profile_id', profileIds)
-                                .order('joined_at', { ascending: false }),
-                            supabase
-                                .from('post_likes')
-                                .select('post_id, reaction_type')
-                                .in('post_id', postIds)
-                        ]);
-
-                        // Create lookup maps
-                        const orgMap = {};
-                        membershipsData.data?.forEach(membership => {
-                            if (!orgMap[membership.profile_id]) {
-                                orgMap[membership.profile_id] = membership.organizations.name;
-                            }
-                        });
-
-                        const reactionsMap = {};
-                        reactionsData.data?.forEach(reaction => {
-                            if (!reactionsMap[reaction.post_id]) {
-                                reactionsMap[reaction.post_id] = [];
-                            }
-                            reactionsMap[reaction.post_id].push(reaction);
-                        });
-
-                        const enrichedPosts = transformedPosts.map(post => {
-                            const currentOrgName = orgMap[post.profile_id];
-                            const postReactions = reactionsMap[post.id] || [];
-                            const reactionSummary = postReactions.reduce((acc, r) => {
-                                const type = r.reaction_type || 'like';
-                                acc[type] = (acc[type] || 0) + 1;
-                                return acc;
-                            }, {});
-                            return {
-                                ...post,
-                                profiles: {
-                                    ...post.profiles,
-                                    organization_name: currentOrgName || post.profiles.organization_name
-                                },
-                                reactions: {
-                                    summary: Object.entries(reactionSummary).map(([type, count]) => ({ type, count }))
-                                }
-                            };
-                        });
-                        setHelloCommunityPosts(enrichedPosts);
+                        setHelloCommunityPosts(transformedPosts);
                         return;
                     }
                 } catch (rpcError) {
-                    console.warn('⚠️ RPC function failed, falling back to direct query:', rpcError);
+                    console.warn('RPC function failed, falling back to direct query:', rpcError);
                 }
 
-                // FIXED: Fallback with complete batching instead of sequential queries
+                const dbChannel = channelInfo.dbChannel;
+                
                 const { data: postsData, error: postsError } = await supabase
                     .from('posts')
-                    .select('*')
+                    .select(`
+                        *,
+                        profiles!inner (
+                            id,
+                            full_name,
+                            avatar_url,
+                            title,
+                            organization_name,
+                            role,
+                            organization_type
+                        )
+                    `)
                     .eq('channel', dbChannel)
                     .order('created_at', { ascending: false })
                     .limit(10);
@@ -134,63 +92,31 @@ export const useHelloCommunityPosts = (organizationInfo) => {
                 if (postsError) throw postsError;
 
                 if (postsData && postsData.length > 0) {
-                    // FIXED: Single parallel batch for all related data
-                    const profileIds = [...new Set(postsData.map(post => post.profile_id))];
                     const postIds = postsData.map(post => post.id);
 
-                    const [profilesResult, membershipsResult, reactionsResult] = await Promise.all([
-                        supabase
-                            .from('profiles')
-                            .select('id, full_name, avatar_url, title, organization_name, role, organization_type')
-                            .in('id', profileIds),
-                        supabase
-                            .from('organization_memberships')
-                            .select('profile_id, organizations!inner(name)')
-                            .in('profile_id', profileIds)
-                            .order('joined_at', { ascending: false }),
-                        supabase
-                            .from('post_likes')
-                            .select('post_id, reaction_type')
-                            .in('post_id', postIds)
-                    ]);
-
-                    // Create efficient lookup maps
-                    const profilesMap = {};
-                    profilesResult.data?.forEach(profile => {
-                        profilesMap[profile.id] = profile;
-                    });
-
-                    const orgMap = {};
-                    membershipsResult.data?.forEach(membership => {
-                        if (!orgMap[membership.profile_id]) {
-                            orgMap[membership.profile_id] = membership.organizations.name;
-                        }
-                    });
+                    const { data: reactionsData } = await supabase
+                        .from('post_likes')
+                        .select('post_id, reaction_type')
+                        .in('post_id', postIds);
 
                     const reactionsMap = {};
-                    reactionsResult.data?.forEach(reaction => {
+                    reactionsData?.forEach(reaction => {
                         if (!reactionsMap[reaction.post_id]) {
                             reactionsMap[reaction.post_id] = [];
                         }
                         reactionsMap[reaction.post_id].push(reaction);
                     });
 
-                    // Single pass enrichment
                     const enrichedPosts = postsData.map(post => {
-                        const profile = profilesMap[post.profile_id];
-                        const currentOrgName = orgMap[post.profile_id];
                         const postReactions = reactionsMap[post.id] || [];
                         const reactionSummary = postReactions.reduce((acc, r) => {
                             const type = r.reaction_type || 'like';
                             acc[type] = (acc[type] || 0) + 1;
                             return acc;
                         }, {});
+                        
                         return {
                             ...post,
-                            profiles: {
-                                ...profile,
-                                organization_name: currentOrgName || profile?.organization_name
-                            },
                             reactions: {
                                 summary: Object.entries(reactionSummary).map(([type, count]) => ({ type, count }))
                             }
@@ -209,7 +135,6 @@ export const useHelloCommunityPosts = (organizationInfo) => {
 
         fetchHelloCommunityPosts();
 
-        // Set up real-time subscription only if we have valid organization info
         if (organizationInfo?.type && helloCommunityPosts.length > 0) {
             const userOrgType = getOrgBaseType(organizationInfo.type);
             const channelInfo = getChannelInfo(userOrgType);
@@ -230,11 +155,9 @@ export const useHelloCommunityPosts = (organizationInfo) => {
                         
                         if (!affectedPostId) return;
                         
-                        // Check if this reaction is for one of our community posts
                         const affectedPost = helloCommunityPosts.find(post => post.id === affectedPostId);
                         if (!affectedPost) return;
                         
-                        // Refetch reactions for this specific post
                         try {
                             const { data: reactionsData } = await supabase
                                 .from('post_likes')
@@ -249,7 +172,6 @@ export const useHelloCommunityPosts = (organizationInfo) => {
                             
                             const totalLikes = Object.values(reactionSummary).reduce((sum, count) => sum + count, 0);
                             
-                            // Update the specific post in our community posts
                             setHelloCommunityPosts(currentPosts => 
                                 currentPosts.map(post => 
                                     post.id === affectedPostId 
@@ -274,7 +196,7 @@ export const useHelloCommunityPosts = (organizationInfo) => {
                 };
             }
         }
-    }, [organizationInfo?.type, organizationInfo?.id]); // Only depend on the type and id
+    }, [organizationInfo?.type, organizationInfo?.id]);
 
     return helloCommunityPosts;
 };

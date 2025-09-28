@@ -1,7 +1,5 @@
-// src/components/discover/components/ContentSection.jsx
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { MapPin, Building, DollarSign, MessageSquare, BarChart3, ArrowUpRight, Clock, Star } from 'lucide-react';
+import { MapPin, Building, DollarSign, MessageSquare, ArrowUpRight, Clock } from 'lucide-react';
 import { BAY_AREA_COUNTIES } from '../data/locationData.js';
 import StatsCards from './StatsCards.jsx';
 import DemographicsSection from './DemographicsSection.jsx';
@@ -10,10 +8,8 @@ import OrganizationCard from './OrganizationCard.jsx';
 import GrantCard from './GrantCard.jsx';
 import PostCard from './PostCard.jsx';
 
-// Animation Styles Component
 const AnimationStyles = () => {
     React.useEffect(() => {
-        // Inject CSS styles into the document head
         const styleElement = document.createElement('style');
         styleElement.textContent = `
             @keyframes slideInUp {
@@ -64,7 +60,6 @@ const AnimationStyles = () => {
         
         document.head.appendChild(styleElement);
         
-        // Cleanup function to remove styles when component unmounts
         return () => {
             document.head.removeChild(styleElement);
         };
@@ -73,7 +68,6 @@ const AnimationStyles = () => {
     return null;
 };
 
-// Overview Grid Component
 const OverviewGrid = ({ locationData, setActiveTab, isVisible }) => {
     const sections = [
         {
@@ -192,7 +186,6 @@ const OverviewGrid = ({ locationData, setActiveTab, isVisible }) => {
     );
 };
 
-// Tab Content Component
 const TabContent = ({ activeTab, locationData, isVisible }) => {
     const EmptyState = ({ icon: Icon, title, description, bgColor }) => (
         <div className="text-center py-16">
@@ -300,7 +293,6 @@ const TabContent = ({ activeTab, locationData, isVisible }) => {
     );
 };
 
-// Main ContentSection Component
 export default function ContentSection({ 
     selectedLocation, 
     viewType,
@@ -317,11 +309,9 @@ export default function ContentSection({
     const [previousLocation, setPreviousLocation] = useState(selectedLocation);
     const [previousTab, setPreviousTab] = useState(activeTab);
 
-    // Handle location changes - seamless animation
     useEffect(() => {
         if (selectedLocation !== previousLocation) {
             setIsVisible(false);
-            // Only reset when location actually changes
             const timer = setTimeout(() => {
                 setIsVisible(true);
                 setPreviousLocation(selectedLocation);
@@ -329,12 +319,10 @@ export default function ContentSection({
             
             return () => clearTimeout(timer);
         } else if (!loading && locationData && !isVisible) {
-            // Initial load or data ready
             setIsVisible(true);
         }
     }, [selectedLocation, previousLocation, loading, locationData, isVisible]);
 
-    // Handle tab switching - immediate smooth transition
     useEffect(() => {
         if (activeTab !== previousTab) {
             setIsVisible(false);
@@ -347,7 +335,6 @@ export default function ContentSection({
         }
     }, [activeTab, previousTab]);
 
-    // No location selected state
     if (!selectedLocation) {
         return (
             <div className="bg-gradient-to-br from-slate-50 to-slate-100 rounded-3xl shadow-lg border border-slate-200 p-16 text-center">
@@ -370,7 +357,6 @@ export default function ContentSection({
         <>
             <AnimationStyles />
             
-            {/* Dashboard Banner */}
             <DashboardBanner 
                 selectedLocation={selectedLocation}
                 locationName={locationName}
@@ -384,7 +370,6 @@ export default function ContentSection({
                 isVisible={isVisible}
             />
 
-            {/* Tab Content */}
             <TabContent 
                 activeTab={activeTab} 
                 locationData={locationData} 
