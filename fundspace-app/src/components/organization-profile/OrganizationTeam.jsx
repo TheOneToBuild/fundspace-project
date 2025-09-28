@@ -1,15 +1,10 @@
-// src/components/organization-profile/OrganizationTeam.jsx
-// Extract shared team display logic with full social functionality
-
 import React from 'react';
 import { Users, UserPlus, ExternalLink } from 'lucide-react';
 import { Linkedin, Twitter, Globe } from '../Icons.jsx';
 import Avatar from '../Avatar.jsx';
 import { hasPermission, PERMISSIONS } from '../../utils/organizationPermissions.js';
-import { useTeamMemberSocial } from '../../hooks/useTeamMemberSocial.js';
 
 const OrganizationTeam = ({ teamMembers = [], organization, userMembership, session }) => {
-  // Check if user can manage team members
   const canManageTeam = userMembership && hasPermission(
     userMembership.role, 
     PERMISSIONS.MANAGE_MEMBERS, 
@@ -43,7 +38,6 @@ const OrganizationTeam = ({ teamMembers = [], organization, userMembership, sess
     );
   }
 
-  // Group team members by membership type and role
   const groupedMembers = teamMembers.reduce((groups, member) => {
     const roleType = member.membership_type || 'staff';
     if (!groups[roleType]) {
@@ -53,7 +47,6 @@ const OrganizationTeam = ({ teamMembers = [], organization, userMembership, sess
     return groups;
   }, {});
 
-  // Define role order and labels
   const roleOrder = ['leadership', 'staff', 'board', 'volunteer', 'contractor', 'partner', 'intern'];
   const roleLabels = {
     leadership: 'Leadership Team',
@@ -65,14 +58,12 @@ const OrganizationTeam = ({ teamMembers = [], organization, userMembership, sess
     intern: 'Interns'
   };
 
-  // Social platform mapping
   const socialPlatforms = [
     { key: 'linkedin_url', icon: Linkedin, color: 'bg-blue-600' },
     { key: 'twitter_url', icon: Twitter, color: 'bg-slate-900' },
     { key: 'website_url', icon: Globe, color: 'bg-green-600' }
   ];
 
-  // Get available social links for a member
   const getSocialLinks = (profile) => {
     return socialPlatforms.filter(platform => profile?.[platform.key]).map(platform => ({
       ...platform,
@@ -80,45 +71,12 @@ const OrganizationTeam = ({ teamMembers = [], organization, userMembership, sess
     }));
   };
 
-  // Team Member Card Component with Social Functionality
   const TeamMemberCard = ({ member, organization, currentUserId }) => {
-    const {
-      isFollowing,
-      followLoading,
-      toggleFollow,
-      mutualConnections,
-      connectionLoading,
-      getConnectionButtonProps
-    } = useTeamMemberSocial(member.profile_id, currentUserId);
-
-    const connectionButtonProps = getConnectionButtonProps();
     const socialLinks = getSocialLinks(member.profiles);
 
-    const getConnectionText = () => {
-      if (mutualConnections > 0) {
-        return `${mutualConnections} mutual connection${mutualConnections > 1 ? 's' : ''}`;
-      }
-      return 'Connect to see mutual connections';
-    };
-
-    const getButtonVariantClasses = (variant) => {
-      switch (variant) {
-        case 'primary':
-          return 'bg-blue-600 text-white hover:bg-blue-700';
-        case 'secondary':
-          return 'border border-slate-300 text-slate-700 hover:bg-slate-50';
-        case 'connected':
-          return 'border border-green-300 text-green-700 bg-green-50 hover:bg-green-100';
-        default:
-          return 'border border-slate-300 text-slate-700 hover:bg-slate-50';
-      }
-    };
-
-    // Don't show buttons for current user's own card
     if (member.profile_id === currentUserId) {
       return (
         <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden w-full max-w-xs mx-auto">
-          {/* Banner with organization image */}
           <div className="h-24 bg-gradient-to-r from-slate-200 to-slate-300 relative overflow-hidden">
             {organization?.banner_image_url ? (
               <img 
@@ -132,7 +90,6 @@ const OrganizationTeam = ({ teamMembers = [], organization, userMembership, sess
           </div>
           
           <div className="px-7 pb-7 text-center relative">
-            {/* Avatar positioned to overlap banner */}
             <div className="relative -mt-12 mb-5">
               <div className="w-24 h-24 mx-auto rounded-full overflow-hidden ring-4 ring-white shadow-lg bg-slate-100">
                 <Avatar 
@@ -144,24 +101,20 @@ const OrganizationTeam = ({ teamMembers = [], organization, userMembership, sess
               </div>
             </div>
             
-            {/* Name */}
             <h5 className="text-xl font-bold text-slate-900 mb-2">
               {member.profiles?.full_name || 'Unknown Member'}
             </h5>
             
-            {/* Organization Name */}
             <p className="text-slate-600 text-sm mb-3">
               {organization?.name}
             </p>
             
-            {/* Title/Role */}
             {(member.functional_role || member.profiles?.title) && (
               <p className="text-blue-600 font-semibold text-sm mb-4">
                 {member.functional_role || member.profiles.title}
               </p>
             )}
             
-            {/* Social Links - only show if user has social profiles */}
             {socialLinks.length > 0 && (
               <div className="flex justify-center gap-2 mb-4">
                 {socialLinks.map((social, index) => {
@@ -182,12 +135,10 @@ const OrganizationTeam = ({ teamMembers = [], organization, userMembership, sess
               </div>
             )}
             
-            {/* Your Profile indicator */}
             <p className="text-slate-500 text-xs mb-5">
               Your Profile
             </p>
             
-            {/* No action buttons for current user */}
             <div className="flex gap-3">
               <div className="flex-1 bg-slate-100 text-slate-500 px-5 py-2.5 rounded-full text-sm font-medium">
                 You
@@ -200,7 +151,6 @@ const OrganizationTeam = ({ teamMembers = [], organization, userMembership, sess
 
     return (
       <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden hover:shadow-xl hover:border-slate-300 transition-all duration-300 w-full max-w-xs mx-auto">
-        {/* Banner with organization image */}
         <div className="h-24 bg-gradient-to-r from-slate-200 to-slate-300 relative overflow-hidden">
           {organization?.banner_image_url ? (
             <img 
@@ -214,7 +164,6 @@ const OrganizationTeam = ({ teamMembers = [], organization, userMembership, sess
         </div>
         
         <div className="px-7 pb-7 text-center relative">
-          {/* Avatar positioned to overlap banner */}
           <div className="relative -mt-12 mb-5">
             <div className="w-24 h-24 mx-auto rounded-full overflow-hidden ring-4 ring-white shadow-lg bg-slate-100">
               <Avatar 
@@ -226,24 +175,20 @@ const OrganizationTeam = ({ teamMembers = [], organization, userMembership, sess
             </div>
           </div>
           
-          {/* Name */}
           <h5 className="text-xl font-bold text-slate-900 mb-2">
             {member.profiles?.full_name || 'Unknown Member'}
           </h5>
           
-          {/* Organization Name */}
           <p className="text-slate-600 text-sm mb-3">
             {organization?.name}
           </p>
           
-          {/* Title/Role */}
           {(member.functional_role || member.profiles?.title) && (
             <p className="text-blue-600 font-semibold text-sm mb-4">
               {member.functional_role || member.profiles.title}
             </p>
           )}
           
-          {/* Social Links - only show if user has social profiles */}
           {socialLinks.length > 0 && (
             <div className="flex justify-center gap-2 mb-4">
               {socialLinks.map((social, index) => {
@@ -264,30 +209,16 @@ const OrganizationTeam = ({ teamMembers = [], organization, userMembership, sess
             </div>
           )}
           
-          {/* Connection info - mutual connections */}
           <p className="text-slate-500 text-xs mb-5">
-            {getConnectionText()}
+            View Profile
           </p>
           
-          {/* Action buttons */}
           <div className="flex gap-3">
-            <button 
-              onClick={connectionButtonProps.action}
-              disabled={connectionButtonProps.disabled || connectionLoading}
-              className={`flex-1 px-5 py-2.5 rounded-full text-sm font-medium transition-colors ${getButtonVariantClasses(connectionButtonProps.variant)} ${connectionButtonProps.disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
-            >
-              {connectionLoading ? 'Loading...' : connectionButtonProps.text}
+            <button className="flex-1 px-5 py-2.5 rounded-full text-sm font-medium transition-colors border border-slate-300 text-slate-700 hover:bg-slate-50">
+              Connect
             </button>
-            <button 
-              onClick={toggleFollow}
-              disabled={followLoading}
-              className={`flex-1 px-5 py-2.5 rounded-full text-sm font-medium transition-colors ${
-                isFollowing 
-                  ? 'border border-slate-300 text-slate-700 bg-slate-50' 
-                  : 'border border-slate-300 text-slate-700 hover:bg-slate-50'
-              } ${followLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
-            >
-              {followLoading ? 'Loading...' : (isFollowing ? 'Following' : 'Follow')}
+            <button className="flex-1 px-5 py-2.5 rounded-full text-sm font-medium transition-colors border border-slate-300 text-slate-700 hover:bg-slate-50">
+              Follow
             </button>
           </div>
         </div>
@@ -321,7 +252,6 @@ const OrganizationTeam = ({ teamMembers = [], organization, userMembership, sess
 
   return (
     <div className="space-y-8">
-      {/* Header */}
       <div className="text-center mb-12">
         <h2 className="text-4xl font-bold text-slate-900 mb-4">Meet Our Team</h2>
         <p className="text-xl text-slate-600 max-w-2xl mx-auto leading-relaxed">
@@ -338,13 +268,11 @@ const OrganizationTeam = ({ teamMembers = [], organization, userMembership, sess
         )}
       </div>
       
-      {/* Render groups in priority order */}
       {roleOrder.map(roleType => {
         const members = groupedMembers[roleType];
         return members && members.length > 0 ? renderTeamGroup(roleType, members) : null;
       })}
       
-      {/* Render any remaining role types not in the predefined order */}
       {Object.entries(groupedMembers).map(([roleType, members]) => {
         if (!roleOrder.includes(roleType) && members.length > 0) {
           return renderTeamGroup(roleType, members);

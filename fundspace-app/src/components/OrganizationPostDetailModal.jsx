@@ -1,9 +1,7 @@
-// src/components/OrganizationPostDetailModal.jsx - OPTIMIZED: All direct queries wrapped
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { X, ThumbsUp, Heart, Lightbulb, PartyPopper, MessageCircle, Share2, Send } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
-import { optimizedSupabaseQuery } from '../utils/apiRequestOptimizer'; // ✅ ADD THIS IMPORT
 
 const reactions = [
   { type: 'like', Icon: ThumbsUp, color: 'bg-blue-500', label: 'Like' },
@@ -17,10 +15,8 @@ export default function OrganizationPostDetailModal({
   organization, 
   onClose, 
   currentUserId, 
-  canEdit,
-  pageData // ✅ ADD: Accept pageData for batched loading
+  canEdit
 }) {
-  // Early return if post is null
   if (!post) {
     return null;
   }
@@ -38,131 +34,55 @@ export default function OrganizationPostDetailModal({
   const images = post?.image_urls || [];
   const organizationAvatar = organization?.logo_url || organization?.image_url;
 
-  // ✅ OPTIMIZED: Load reactions and comments with pageData first, fallback to optimizer
   useEffect(() => {
     const loadData = async () => {
       if (!post?.id) return;
 
       try {
-        // ✅ PRIORITY 1: Use pageData if available (best performance)
-        if (pageData?.organizationPostLikes?.[post.id]) {
-          const postData = pageData.organizationPostLikes[post.id];
-          setTotalLikes(postData.likes_count || 0);
-          setReactionSummary(postData.reaction_summary || []);
+        if (currentUserId) {
+          const { data: userReaction } = await supabase
+            .from('organization_post_likes')
+            .select('reaction_type')
+            .eq('organization_post_id', post.id)
+            .eq('user_id', currentUserId)
+            .single();
           
-          // Check user's reaction from pageData
-          if (currentUserId) {
-            const userReaction = postData.user_reaction || null;
-            setSelectedReaction(userReaction);
-          }
-        } else {
-          // ✅ PRIORITY 2: Use API optimizer for batch loading
-          
-          // ✅ BEFORE (Direct query causing individual API calls):
-          // const { data: userReaction } = await supabase
-          //   .from('organization_post_likes')
-          //   .select('reaction_type')
-          //   .eq('organization_post_id', post.id)
-
-          // ✅ AFTER (Optimized user reaction):
-          if (currentUserId) {
-            const optimizedUserReactionQuery = optimizedSupabaseQuery(
-              supabase
-                .from('organization_post_likes')
-                .select('reaction_type')
-                .eq('organization_post_id', post.id)
-                .eq('user_id', currentUserId),
-              'organization_post_likes_single',
-              { postIds: [post.id], userId: currentUserId }
-            );
-            
-            const { data: userReaction } = await optimizedUserReactionQuery.single();
-            setSelectedReaction(userReaction?.reaction_type || null);
-          }
-
-          // ✅ OPTIMIZED: Batch load reaction summary
-          const optimizedReactionQuery = optimizedSupabaseQuery(
-            supabase
-              .from('organization_post_likes')
-              .select('reaction_type')
-              .eq('organization_post_id', post.id),
-            'organization_post_likes_single',
-            { postIds: [post.id] }
-          );
-
-          const { data: reactionData } = await optimizedReactionQuery;
-
-          if (reactionData) {
-            const counts = {};
-            reactionData.forEach(like => {
-              const type = like.reaction_type || 'like';
-              counts[type] = (counts[type] || 0) + 1;
-            });
-
-            const summary = Object.entries(counts).map(([type, count]) => ({ type, count }));
-            setReactionSummary(summary);
-            setTotalLikes(reactionData.length);
-          }
+          setSelectedReaction(userReaction?.reaction_type || null);
         }
 
-        // ✅ OPTIMIZED: Load comments with batch optimization
-        // ✅ BEFORE (Direct query):
-        // const { data: commentsData, error: commentsError } = await supabase
-        //   .from('organization_post_comments')
-        //   .select(`
-        //     *,
-        //     profiles:profile_id (
-        //       id,
-        //       full_name,
-        //       avatar_url
-        //     )
-        //   `)
-        //   .eq('organization_post_id', post.id)
+        const { data: reactionData } = await supabase
+          .from('organization_post_likes')
+          .select('reaction_type')
+          .eq('organization_post_id', post.id);
 
-        // ✅ AFTER (Optimized comments loading):
-        const optimizedCommentsQuery = optimizedSupabaseQuery(
-          supabase
-            .from('organization_post_comments')
-            .select('id, organization_post_id, profile_id, content, created_at')
-            .eq('organization_post_id', post.id)
-            .order('created_at', { ascending: true }),
-          'organization_post_comments_single',
-          { postIds: [post.id] }
-        );
+        if (reactionData) {
+          const counts = {};
+          reactionData.forEach(like => {
+            const type = like.reaction_type || 'like';
+            counts[type] = (counts[type] || 0) + 1;
+          });
 
-        const { data: commentsData, error: commentsError } = await optimizedCommentsQuery;
+          const summary = Object.entries(counts).map(([type, count]) => ({ type, count }));
+          setReactionSummary(summary);
+          setTotalLikes(reactionData.length);
+        }
+
+        const { data: commentsData, error: commentsError } = await supabase
+          .from('organization_post_comments')
+          .select(`
+            *,
+            profiles:profile_id (
+              id,
+              full_name,
+              avatar_url
+            )
+          `)
+          .eq('organization_post_id', post.id)
+          .order('created_at', { ascending: true });
 
         if (commentsError) throw commentsError;
 
-        if (commentsData?.length > 0) {
-          // ✅ OPTIMIZED: Batch load profiles for comment authors
-          const profileIds = [...new Set(commentsData.map(c => c.profile_id))];
-          
-          const optimizedProfilesQuery = optimizedSupabaseQuery(
-            supabase
-              .from('profiles')
-              .select('id, full_name, avatar_url')
-              .in('id', profileIds),
-            'profiles_single',
-            { userIds: profileIds }
-          );
-
-          const { data: profilesData } = await optimizedProfilesQuery;
-
-          // Merge comments with profile data
-          const commentsWithProfiles = commentsData.map(comment => ({
-            ...comment,
-            profiles: profilesData?.find(p => p.id === comment.profile_id) || {
-              id: comment.profile_id,
-              full_name: 'Unknown User',
-              avatar_url: null
-            }
-          }));
-
-          setComments(commentsWithProfiles);
-        } else {
-          setComments([]);
-        }
+        setComments(commentsData || []);
 
       } catch (error) {
         console.error('Error loading modal data:', error);
@@ -170,14 +90,13 @@ export default function OrganizationPostDetailModal({
     };
 
     loadData();
-  }, [post?.id, currentUserId, pageData]);
+  }, [post?.id, currentUserId]);
 
   const handleReaction = async (reactionType) => {
     if (!canInteract || !post?.id) return;
 
     try {
       if (selectedReaction === reactionType) {
-        // ✅ MUTATION: Keep direct query for DELETE operations
         const { error } = await supabase
           .from('organization_post_likes')
           .delete()
@@ -187,7 +106,6 @@ export default function OrganizationPostDetailModal({
         if (error) throw error;
         setSelectedReaction(null);
       } else {
-        // ✅ MUTATION: Keep direct query for INSERT/UPDATE operations
         const { error } = await supabase
           .from('organization_post_likes')
           .upsert({
@@ -200,22 +118,14 @@ export default function OrganizationPostDetailModal({
         setSelectedReaction(reactionType);
       }
 
-      // ✅ NOTE: Keep RPC calls for business logic
       await supabase.rpc('update_organization_post_likes_count', { 
         post_id: post.id 
       });
 
-      // ✅ OPTIMIZED: Reload reaction summary with optimizer
-      const optimizedReactionQuery = optimizedSupabaseQuery(
-        supabase
-          .from('organization_post_likes')
-          .select('reaction_type')
-          .eq('organization_post_id', post.id),
-        'organization_post_likes_single',
-        { postIds: [post.id] }
-      );
-
-      const { data: reactionData } = await optimizedReactionQuery;
+      const { data: reactionData } = await supabase
+        .from('organization_post_likes')
+        .select('reaction_type')
+        .eq('organization_post_id', post.id);
 
       if (reactionData) {
         const counts = {};
@@ -242,7 +152,6 @@ export default function OrganizationPostDetailModal({
     try {
       setSubmittingComment(true);
       
-      // ✅ MUTATION: Keep direct query for INSERT operations
       const { data, error } = await supabase
         .from('organization_post_comments')
         .insert({
@@ -266,7 +175,6 @@ export default function OrganizationPostDetailModal({
       setComments(prev => [...prev, data]);
       setNewComment('');
 
-      // ✅ NOTE: Keep RPC calls for business logic
       await supabase.rpc('update_organization_post_comments_count', { 
         post_id: post.id 
       });
@@ -293,7 +201,6 @@ export default function OrganizationPostDetailModal({
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl max-w-6xl w-full max-h-[90vh] overflow-hidden flex">
-        {/* Left side - Images */}
         {images.length > 0 && (
           <div className="flex-1 bg-slate-900 relative flex items-center justify-center">
             <img
@@ -302,7 +209,6 @@ export default function OrganizationPostDetailModal({
               className="max-w-full max-h-full object-contain"
             />
             
-            {/* Image navigation */}
             {images.length > 1 && (
               <>
                 <button
@@ -325,9 +231,7 @@ export default function OrganizationPostDetailModal({
           </div>
         )}
 
-        {/* Right side - Post details and comments */}
         <div className={`${images.length > 0 ? 'w-96' : 'flex-1'} flex flex-col`}>
-          {/* Header */}
           <div className="p-6 border-b border-slate-200 flex items-center justify-between">
             <div className="flex items-center space-x-3">
               <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0">
@@ -358,14 +262,12 @@ export default function OrganizationPostDetailModal({
             </button>
           </div>
 
-          {/* Post content */}
           <div className="p-6 border-b border-slate-200">
             <div 
               className="text-slate-800 mb-4"
               dangerouslySetInnerHTML={{ __html: post?.content || '' }}
             />
 
-            {/* Tags */}
             {post?.tags && JSON.parse(post.tags).length > 0 && (
               <div className="flex flex-wrap gap-2">
                 {JSON.parse(post.tags).map((tag, index) => (
@@ -380,7 +282,6 @@ export default function OrganizationPostDetailModal({
             )}
           </div>
 
-          {/* Reaction summary */}
           {totalLikes > 0 && (
             <div className="px-6 py-3 border-b border-slate-200">
               <div className="flex items-center space-x-2">
@@ -402,9 +303,7 @@ export default function OrganizationPostDetailModal({
             </div>
           )}
 
-          {/* Actions */}
           <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
-            {/* Reaction Button with Picker */}
             <div className="relative">
               <button
                 onClick={() => canInteract ? handleReaction('like') : null}
@@ -424,7 +323,6 @@ export default function OrganizationPostDetailModal({
                 <span className="text-sm">{selectedReaction ? primaryReaction.label : 'Like'}</span>
               </button>
 
-              {/* Reaction Picker */}
               {showReactionPicker && canInteract && (
                 <div 
                   className="absolute bottom-full left-0 mb-2 bg-white border border-slate-200 rounded-lg shadow-lg p-2 flex space-x-1 z-10"
@@ -456,7 +354,6 @@ export default function OrganizationPostDetailModal({
             </button>
           </div>
 
-          {/* Comments section */}
           <div className="flex-1 overflow-y-auto">
             {comments.length > 0 && (
               <div className="p-6 space-y-4">
@@ -492,7 +389,6 @@ export default function OrganizationPostDetailModal({
             )}
           </div>
 
-          {/* Comment form */}
           {canInteract ? (
             <div className="p-6 border-t border-slate-200">
               <form onSubmit={handleSubmitComment} className="flex space-x-3">

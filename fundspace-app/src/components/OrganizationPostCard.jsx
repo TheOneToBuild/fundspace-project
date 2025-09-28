@@ -1,12 +1,9 @@
-// src/components/OrganizationPostCard.jsx - OPTIMIZED: All direct queries wrapped
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { useOutletContext } from 'react-router-dom';
 import { MoreHorizontal, Edit, Trash2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
-import { optimizedSupabaseQuery } from '../utils/apiRequestOptimizer'; // ✅ ADD THIS IMPORT
 
-// Import the same components used by PostCard
 import PostActions from './post/PostActions';
 import ReactorsText from './post/ReactorsText';
 import ReactionsPreview from './post/ReactionsPreview';
@@ -22,10 +19,8 @@ export default function OrganizationPostCard({
   canEdit,
   currentUserId,
   onOpenDetail,
-  currentUserProfile,
-  pageData // Accept pageData prop for batched loading
+  currentUserProfile
 }) {
-  // FALLBACK: Use useOutletContext if currentUserProfile is not passed
   const outletContext = useOutletContext();
   const finalUserProfile = currentUserProfile || outletContext?.profile;
 
@@ -41,74 +36,44 @@ export default function OrganizationPostCard({
 
   const reactorsTimeoutRef = React.useRef(null);
 
-  // Anyone with currentUserId can interact (like/comment)
   const canInteract = !!currentUserId;
 
-  // Parse images from image_urls array and tags
   const images = post?.image_urls || [];
   const organizationAvatar = organization?.logo_url || organization?.image_url;
   const parsedTags = post?.tags ? JSON.parse(post.tags) : [];
 
-  // ✅ OPTIMIZED: Load reactions using pageData first, fallback to optimizer
   useEffect(() => {
     const loadReactions = async () => {
       if (!post?.id) return;
       
-      // ✅ PRIORITY 1: Use pageData if available (best performance)
-      if (pageData?.organizationPostLikes?.[post.id]) {
-        const postData = pageData.organizationPostLikes[post.id];
-        setTotalLikes(postData.likes_count || 0);
-        setReactionSummary(postData.reaction_summary || []);
-        setReactors(postData.reactors || []);
-        
-        // Check user's reaction from pageData
-        if (currentUserId) {
-          const userReaction = postData.user_reaction || null;
-          setSelectedReaction(userReaction);
-        }
-        return; // Skip API calls since we have cached data
-      }
-      
-      // ✅ PRIORITY 2: Use API optimizer for batch loading
       try {
-        // ✅ BEFORE (Direct query causing individual API calls):
-        // const { data: userReaction } = await supabase
-        //   .from('organization_post_likes')
-        //   .select('reaction_type')
-        //   .eq('organization_post_id', post.id)
-
-        // ✅ AFTER (Optimized with batch loading):
         if (currentUserId) {
-          const { data: userReactionData } = await optimizedSupabaseQuery(
-            supabase
-              .from('organization_post_likes')
-              .select('reaction_type')
-              .eq('organization_post_id', post.id)
-              .eq('user_id', currentUserId),
-            'organization_post_likes_single',
-            { postIds: [post.id], userId: currentUserId }
-          );
+          const { data: userReactionData, error: userError } = await supabase
+            .from('organization_post_likes')
+            .select('reaction_type')
+            .eq('organization_post_id', post.id)
+            .eq('user_id', currentUserId)
+            .maybeSingle();
           
-          // Handle array or single result
-          const userReaction = Array.isArray(userReactionData) ? userReactionData[0] : userReactionData;
-          setSelectedReaction(userReaction?.reaction_type || null);
+          if (userError && userError.code !== 'PGRST116') {
+            console.error('Error fetching user reaction:', userError);
+          } else {
+            setSelectedReaction(userReactionData?.reaction_type || null);
+          }
         }
 
-        // ✅ OPTIMIZED: Batch load reaction summary and reactors
-        const optimizedReactionsQuery = optimizedSupabaseQuery(
-          supabase
-            .from('organization_post_likes')
-            .select('reaction_type, user_id, created_at')
-            .eq('organization_post_id', post.id)
-            .order('created_at', { ascending: false }),
-          'organization_post_likes_single',
-          { postIds: [post.id] }
-        );
+        const { data: reactionData, error: reactionError } = await supabase
+          .from('organization_post_likes')
+          .select('reaction_type, user_id, created_at')
+          .eq('organization_post_id', post.id)
+          .order('created_at', { ascending: false });
 
-        const { data: reactionData } = await optimizedReactionsQuery;
+        if (reactionError) {
+          console.error('Error fetching reactions:', reactionError);
+          return;
+        }
 
         if (reactionData && reactionData.length > 0) {
-          // Count reactions by type
           const counts = {};
           reactionData.forEach(like => {
             const type = like.reaction_type || 'like';
@@ -119,18 +84,19 @@ export default function OrganizationPostCard({
           setReactionSummary(summary);
           setTotalLikes(reactionData.length);
 
-          // ✅ OPTIMIZED: Batch load profiles for reactors
-          const userIds = reactionData.map(like => like.user_id).filter(Boolean); // Filter out undefined
+          const userIds = reactionData.map(like => like.user_id).filter(Boolean);
           
           if (userIds.length > 0) {
-            const { data: profilesData } = await optimizedSupabaseQuery(
-              supabase
-                .from('profiles')
-                .select('id, full_name, avatar_url, title, organization_name, role')
-                .in('id', userIds),
-              'profiles_single',
-              { userIds }
-            );
+            const { data: profilesData, error: profilesError } = await supabase
+              .from('profiles')
+              .select('id, full_name, avatar_url, title, organization_name, role')
+              .in('id', userIds);
+
+            if (profilesError) {
+              console.error('Error fetching profiles:', profilesError);
+              setReactors([]);
+              return;
+            }
 
             const transformedReactors = reactionData.map(like => {
               const profile = profilesData?.find(p => p.id === like.user_id);
@@ -153,43 +119,39 @@ export default function OrganizationPostCard({
           }
         } else {
           setReactors([]);
+          setReactionSummary([]);
+          setTotalLikes(0);
         }
       } catch (error) {
         console.error('Error loading reactions:', error);
+        setReactors([]);
+        setReactionSummary([]);
+        setTotalLikes(0);
       }
     };
 
     loadReactions();
-  }, [post?.id, currentUserId, pageData]);
+  }, [post?.id, currentUserId]);
 
-  // ✅ OPTIMIZED: Refresh post data with optimizer
   const refreshPostData = async () => {
     if (!post?.id) return;
     try {
-      // ✅ BEFORE (Direct query):
-      // const { data: likesData, error: likesError } = await supabase
-      //   .from('organization_post_likes')
-      //   .select('user_id, reaction_type')
-      //   .eq('organization_post_id', post.id);
+      const { data: likesData, error: likesError } = await supabase
+        .from('organization_post_likes')
+        .select('user_id, reaction_type')
+        .eq('organization_post_id', post.id);
 
-      // ✅ AFTER (Optimized):
-      const { data: likesData, error: likesError } = await optimizedSupabaseQuery(
-        supabase
-          .from('organization_post_likes')
-          .select('user_id, reaction_type')
-          .eq('organization_post_id', post.id),
-        'organization_post_likes_single',
-        { postIds: [post.id] }
-      );
-
-      if (likesError) throw likesError;
+      if (likesError) {
+        console.error('Error refreshing post data:', likesError);
+        return;
+      }
 
       const summary = {};
-      likesData.forEach(like => {
+      (likesData || []).forEach(like => {
         const type = like.reaction_type || 'like';
         summary[type] = (summary[type] || 0) + 1;
       });
-      setTotalLikes(likesData.length);
+      setTotalLikes((likesData || []).length);
       setReactionSummary(Object.entries(summary).map(([type, count]) => ({ type, count })));
     } catch (error) {
       console.error('Failed to refresh post data:', error);
@@ -200,29 +162,42 @@ export default function OrganizationPostCard({
     if (!canInteract || !post?.id) return;
 
     try {
-      // ✅ CHECK: Keep direct queries for mutations (INSERT/UPDATE/DELETE operations)
-      // These don't need optimization as they're individual operations
-      const { data: existingReaction } = await supabase
+      const { data: existingReaction, error: checkError } = await supabase
         .from('organization_post_likes')
         .select('id')
         .eq('organization_post_id', post.id)
         .eq('user_id', currentUserId)
         .maybeSingle();
 
+      if (checkError && checkError.code !== 'PGRST116') {
+        console.error('Error checking existing reaction:', checkError);
+        return;
+      }
+
       if (existingReaction && selectedReaction === reactionType) {
-        await supabase
+        const { error: deleteError } = await supabase
           .from('organization_post_likes')
           .delete()
           .eq('id', existingReaction.id);
+        
+        if (deleteError) {
+          console.error('Error deleting reaction:', deleteError);
+          return;
+        }
         setSelectedReaction(null);
       } else {
-        await supabase
+        const { error: upsertError } = await supabase
           .from('organization_post_likes')
           .upsert({
             organization_post_id: post.id,
             user_id: currentUserId,
             reaction_type: reactionType
           }, { onConflict: 'organization_post_id,user_id' });
+        
+        if (upsertError) {
+          console.error('Error upserting reaction:', upsertError);
+          return;
+        }
         setSelectedReaction(reactionType);
       }
 
@@ -285,7 +260,6 @@ export default function OrganizationPostCard({
         updateData.image_urls = null;
       }
 
-      // ✅ MUTATION: Keep direct query for UPDATE operations
       const { data: updatedPost, error } = await supabase
         .from('organization_posts')
         .update(updateData)
@@ -336,7 +310,6 @@ export default function OrganizationPostCard({
       data-organization-post-id={post?.id}
       data-post-id={post?.id}
     >
-      {/* Header - Organization info and timestamp */}
       <div className="flex items-start space-x-3 mb-4">
         <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0">
           {organizationAvatar ? (
@@ -402,7 +375,6 @@ export default function OrganizationPostCard({
         </div>
       </div>
 
-      {/* Content */}
       {isEditing ? (
         <EditPost 
           post={post} 
@@ -426,7 +398,6 @@ export default function OrganizationPostCard({
         </div>
       )}
 
-      {/* Reaction Summary and Comment Count */}
       <div className="flex items-center justify-between text-sm text-slate-500 my-2 min-h-[20px]">
         <div 
           className="relative" 
@@ -483,7 +454,6 @@ export default function OrganizationPostCard({
         )}
       </div>
 
-      {/* Actions Bar */}
       {!isEditing && (
         <PostActions 
           onReaction={handleReaction}
@@ -494,7 +464,6 @@ export default function OrganizationPostCard({
         />
       )}
 
-      {/* Comments Section */}
       {showComments && !isEditing && (
         <div className="mt-4 border-t pt-4 max-h-96 overflow-y-auto">
           <CommentSection 

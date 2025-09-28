@@ -4,17 +4,13 @@ import { supabase } from '../supabaseClient';
 import { UserCheck, UserPlus, ArrowLeft } from 'lucide-react';
 import Avatar from './Avatar';
 import { followUser, unfollowUser } from '../utils/followUtils';
-import { usePageDataLoader } from '../hooks/usePageDataLoader';
 
 export default function FollowersPage() {
-    const { profile: currentUserProfile, pageData } = useOutletContext();
+    const { profile: currentUserProfile } = useOutletContext();
     const [followers, setFollowers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [followedIds, setFollowedIds] = useState(new Set());
     const [followingInProgress, setFollowingInProgress] = useState(new Set());
-
-    const { pageData: localPageData, loadConnectionsPageData, clearPageData } = usePageDataLoader();
-    const activePageData = pageData || localPageData;
 
     useEffect(() => {
         if (currentUserProfile?.id) {
@@ -27,11 +23,10 @@ export default function FollowersPage() {
         try {
             setLoading(true);
             
-            // ✅ FIXED: Use correct column name 'following_id' instead of 'followed_id'
             const { data, error } = await supabase
                 .from('followers')
                 .select('follower_id, created_at')
-                .eq('following_id', currentUserProfile.id) // ✅ CORRECT: following_id
+                .eq('following_id', currentUserProfile.id)
                 .order('created_at', { ascending: false });
 
             if (error) {
@@ -40,19 +35,48 @@ export default function FollowersPage() {
             }
 
             if (data && data.length > 0) {
-                await loadConnectionsPageData(data, []);
+                const followerIds = data.map(f => f.follower_id);
                 
+                const { data: profilesData, error: profilesError } = await supabase
+                    .from('profiles')
+                    .select('id, full_name, avatar_url, title')
+                    .in('id', followerIds);
+
+                if (profilesError) {
+                    console.error('Error fetching profiles:', profilesError);
+                    return;
+                }
+
+                const { data: membershipData } = await supabase
+                    .from('organization_memberships')
+                    .select(`
+                        profile_id, 
+                        role,
+                        organizations (name)
+                    `)
+                    .in('profile_id', followerIds);
+
+                const profilesMap = {};
+                profilesData.forEach(profile => {
+                    profilesMap[profile.id] = profile;
+                });
+
+                const membershipMap = {};
+                membershipData?.forEach(membership => {
+                    membershipMap[membership.profile_id] = membership;
+                });
+
                 const formattedFollowers = data.map(follow => {
-                    const profileData = activePageData?.profiles?.[follow.follower_id];
-                    const orgMembership = activePageData?.orgMemberships?.[follow.follower_id];
+                    const profile = profilesMap[follow.follower_id];
+                    const membership = membershipMap[follow.follower_id];
                     
                     return {
                         id: follow.follower_id,
-                        full_name: profileData?.full_name || 'Unknown User',
-                        avatar_url: profileData?.avatar_url || null,
-                        title: profileData?.title || orgMembership?.role || null,
-                        organization_name: orgMembership?.organization?.name || profileData?.organization_name || null,
-                        role: orgMembership?.role || profileData?.role || null,
+                        full_name: profile?.full_name || 'Unknown User',
+                        avatar_url: profile?.avatar_url || null,
+                        title: profile?.title || membership?.role || null,
+                        organization_name: membership?.organizations?.name || null,
+                        role: membership?.role || null,
                         followed_at: follow.created_at
                     };
                 });
@@ -71,7 +95,6 @@ export default function FollowersPage() {
 
     const fetchFollowedUsers = async () => {
         try {
-            // ✅ CORRECT: follower_id and following_id are correct
             const { data, error } = await supabase
                 .from('followers')
                 .select('following_id')
@@ -119,7 +142,6 @@ export default function FollowersPage() {
                 newSet.delete(profileIdToFollow);
                 return newSet;
             });
-            clearPageData();
         }
     };
 
@@ -149,7 +171,6 @@ export default function FollowersPage() {
                 newSet.delete(profileIdToUnfollow);
                 return newSet;
             });
-            clearPageData();
         }
     };
 
@@ -195,18 +216,6 @@ export default function FollowersPage() {
                         const isFollowing = followedIds.has(follower.id);
                         const isFollowingInProgress = followingInProgress.has(follower.id);
                         
-                        const enhancedFollower = {
-                            ...follower,
-                            ...(activePageData?.profiles?.[follower.id] || {}),
-                        };
-                        
-                        const orgMembership = activePageData?.orgMemberships?.[follower.id];
-                        if (orgMembership) {
-                            enhancedFollower.organization_name = orgMembership.organization?.name || enhancedFollower.organization_name;
-                            enhancedFollower.role = orgMembership.role || enhancedFollower.role;
-                            enhancedFollower.title = orgMembership.role || enhancedFollower.title;
-                        }
-                        
                         return (
                             <div 
                                 key={follower.id} 
@@ -215,8 +224,8 @@ export default function FollowersPage() {
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center space-x-3">
                                         <Avatar 
-                                            src={enhancedFollower.avatar_url} 
-                                            fullName={enhancedFollower.full_name} 
+                                            src={follower.avatar_url} 
+                                            fullName={follower.full_name} 
                                             size="lg" 
                                         />
                                         <div className="flex-grow">
@@ -224,16 +233,16 @@ export default function FollowersPage() {
                                                 to={`/profile/members/${follower.id}`}
                                                 className="text-lg font-semibold text-slate-900 hover:text-blue-600 transition-colors"
                                             >
-                                                {enhancedFollower.full_name}
+                                                {follower.full_name}
                                             </Link>
                                             
-                                            {enhancedFollower.title && (
-                                                <p className="text-sm text-slate-600 mt-1">{enhancedFollower.title}</p>
+                                            {follower.title && (
+                                                <p className="text-sm text-slate-600 mt-1">{follower.title}</p>
                                             )}
                                             
-                                            {enhancedFollower.organization_name && (
+                                            {follower.organization_name && (
                                                 <p className="text-sm text-slate-500 mt-1">
-                                                    {enhancedFollower.organization_name}
+                                                    {follower.organization_name}
                                                 </p>
                                             )}
                                             

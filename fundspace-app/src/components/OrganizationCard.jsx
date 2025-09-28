@@ -1,10 +1,7 @@
-// src/components/OrganizationCard.jsx
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { getPillClasses } from '../utils.js';
-import { MapPin, DollarSign, Users, Award, MessageSquare, ExternalLink, Heart, Shield, GraduationCap, Stethoscope, Church, Building, ChevronRight, Sparkles, Target, TrendingUp, Eye } from './Icons.jsx';
+import { MapPin, DollarSign, Users, Award, Heart, Shield, GraduationCap, Stethoscope, Church, Building, Sparkles, Target, TrendingUp, Eye, ChevronRight } from './Icons.jsx';
 
-// Organization type configurations
 const ORG_TYPE_CONFIG = {
   nonprofit: {
     label: 'Nonprofits',
@@ -50,7 +47,6 @@ const ORG_TYPE_CONFIG = {
   }
 };
 
-// Enhanced gradient pill classes for focus areas - all different colors
 const getEnhancedPillClasses = (focusArea) => {
   const areaMap = {
     'Arts': 'bg-gradient-to-r from-fuchsia-100 to-purple-100 text-fuchsia-700 border-fuchsia-200',
@@ -81,7 +77,6 @@ const getEnhancedPillClasses = (focusArea) => {
 const OrganizationCard = ({ organization, handleFilterChange, linkTo, buttonText = "View Profile" }) => {
   const [isHovered, setIsHovered] = useState(false);
   
-  // FIXED: Normalize organization type for consistent lookup
   const normalizedType = organization.type?.toLowerCase();
   const typeConfig = ORG_TYPE_CONFIG[normalizedType] || ORG_TYPE_CONFIG.nonprofit;
   
@@ -94,7 +89,6 @@ const OrganizationCard = ({ organization, handleFilterChange, linkTo, buttonText
     return name.substring(0, 2).toUpperCase();
   };
 
-  // Use Tailwind classes as strings to avoid dynamic class issues
   const getColorClasses = (color) => {
     const colorMap = {
       purple: { 
@@ -151,8 +145,6 @@ const OrganizationCard = ({ organization, handleFilterChange, linkTo, buttonText
   };
 
   const colorClasses = getColorClasses(typeConfig.color);
-
-  // Auto-generate link if not provided
   const finalLinkTo = linkTo || `/organizations/${organization.slug}`;
 
   return (
@@ -163,9 +155,7 @@ const OrganizationCard = ({ organization, handleFilterChange, linkTo, buttonText
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      {/* Banner & Avatar Section */}
       <div className="relative">
-        {/* Banner */}
         <div className="h-24 bg-gradient-to-br from-slate-100 via-white to-slate-100">
           {organization.banner_image_url && (
             <img
@@ -176,7 +166,6 @@ const OrganizationCard = ({ organization, handleFilterChange, linkTo, buttonText
           )}
         </div>
 
-        {/* Avatar - positioned to overlap banner */}
         <div className="absolute bottom-0 left-4 translate-y-1/2 transform transition-transform duration-300 group-hover:scale-105">
           {organization.image_url ? (
             <img 
@@ -195,19 +184,13 @@ const OrganizationCard = ({ organization, handleFilterChange, linkTo, buttonText
         </div>
       </div>
 
-      {/* Magical gradient overlay that appears on hover */}
       <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 via-purple-500/10 to-pink-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-      
-      {/* Magical border effect */}
       <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 opacity-0 group-hover:opacity-20 transition-opacity duration-500 -z-10 blur-xl scale-110" />
 
-      {/* Main content - Added pt-10 for avatar overlap */}
       <div className="p-6 pt-10 relative z-0 flex-grow flex flex-col">
-        {/* Header with organization info */}
         <div className="mb-4">
           <h3 className="text-xl font-bold text-slate-800 mb-2 group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r group-hover:from-blue-600 group-hover:to-purple-600 transition-all duration-300 line-clamp-1 h-7">{organization.name}</h3>
           
-          {/* Organization type badge and engagement stats */}
           <div className="flex flex-wrap items-center gap-2 mt-2">
             {handleFilterChange ? (
               <button 
@@ -229,7 +212,6 @@ const OrganizationCard = ({ organization, handleFilterChange, linkTo, buttonText
               </span>
             )}
 
-            {/* Followers count */}
             {(organization.followers_count || organization.followersCount) && (
               <span className="text-xs font-medium px-2 py-1 rounded-full bg-blue-50 text-blue-600 border border-blue-200 inline-flex items-center gap-1">
                 <Eye size={12} />
@@ -237,7 +219,6 @@ const OrganizationCard = ({ organization, handleFilterChange, linkTo, buttonText
               </span>
             )}
 
-            {/* Likes count */}
             {(organization.likes_count || organization.likesCount) && (
               <span className="text-xs font-medium px-2 py-1 rounded-full bg-pink-50 text-pink-600 border border-pink-200 inline-flex items-center gap-1">
                 <Heart size={12} />
@@ -247,16 +228,14 @@ const OrganizationCard = ({ organization, handleFilterChange, linkTo, buttonText
           </div>
         </div>
 
-        {/* Description - Fixed height to ensure consistent layout */}
-        <div className="mb-6 h-16"> {/* Fixed height for exactly 3 lines */}
+        <div className="mb-6 h-16">
           <p className="text-slate-600 text-sm leading-relaxed line-clamp-3 h-full">
             {organization.description}
           </p>
         </div>
 
-        {/* Key metrics in a beautiful grid - Fixed positioning */}
         <div className="grid grid-cols-1 gap-3 mb-6">
-          <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-4 rounded-xl border border-blue-100 group-hover:shadow-lg transition-shadow duration-300 h-20"> {/* Fixed height */}
+          <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-4 rounded-xl border border-blue-100 group-hover:shadow-lg transition-shadow duration-300 h-20">
             <div className="flex items-center gap-2 mb-2">
               <div className="p-1 bg-blue-100 rounded-lg">
                 <MapPin size={14} className="text-blue-600" />
@@ -268,9 +247,8 @@ const OrganizationCard = ({ organization, handleFilterChange, linkTo, buttonText
             </div>
           </div>
           
-          {/* Type-specific fields */}
           {normalizedType === 'foundation' && organization.total_funding_annually && (
-            <div className="bg-gradient-to-br from-green-50 to-emerald-50 p-4 rounded-xl border border-green-100 group-hover:shadow-lg transition-shadow duration-300 h-20"> {/* Fixed height */}
+            <div className="bg-gradient-to-br from-green-50 to-emerald-50 p-4 rounded-xl border border-green-100 group-hover:shadow-lg transition-shadow duration-300 h-20">
               <div className="flex items-center gap-2 mb-2">
                 <div className="p-1 bg-green-100 rounded-lg">
                   <DollarSign size={14} className="text-green-600" />
@@ -284,7 +262,7 @@ const OrganizationCard = ({ organization, handleFilterChange, linkTo, buttonText
           )}
           
           {normalizedType === 'nonprofit' && organization.budget && (
-            <div className="bg-gradient-to-br from-green-50 to-emerald-50 p-4 rounded-xl border border-green-100 group-hover:shadow-lg transition-shadow duration-300 h-20"> {/* Fixed height */}
+            <div className="bg-gradient-to-br from-green-50 to-emerald-50 p-4 rounded-xl border border-green-100 group-hover:shadow-lg transition-shadow duration-300 h-20">
               <div className="flex items-center gap-2 mb-2">
                 <div className="p-1 bg-green-100 rounded-lg">
                   <DollarSign size={14} className="text-green-600" />
@@ -298,7 +276,7 @@ const OrganizationCard = ({ organization, handleFilterChange, linkTo, buttonText
           )}
           
           {(organization.staff_count || organization.staffCount) && (
-            <div className="bg-gradient-to-br from-purple-50 to-pink-50 p-4 rounded-xl border border-purple-100 group-hover:shadow-lg transition-shadow duration-300 h-20"> {/* Fixed height */}
+            <div className="bg-gradient-to-br from-purple-50 to-pink-50 p-4 rounded-xl border border-purple-100 group-hover:shadow-lg transition-shadow duration-300 h-20">
               <div className="flex items-center gap-2 mb-2">
                 <div className="p-1 bg-purple-100 rounded-lg">
                   <Users size={14} className="text-purple-600" />
@@ -311,9 +289,8 @@ const OrganizationCard = ({ organization, handleFilterChange, linkTo, buttonText
             </div>
           )}
 
-          {/* Legacy funder fields for backward compatibility */}
           {organization.notable_grant && (
-            <div className="bg-gradient-to-br from-amber-50 to-yellow-50 p-4 rounded-xl border border-amber-100 group-hover:shadow-lg transition-shadow duration-300 h-20"> {/* Fixed height */}
+            <div className="bg-gradient-to-br from-amber-50 to-yellow-50 p-4 rounded-xl border border-amber-100 group-hover:shadow-lg transition-shadow duration-300 h-20">
               <div className="flex items-center gap-2 mb-2">
                 <div className="p-1 bg-amber-100 rounded-lg">
                   <Award size={14} className="text-amber-600" />
@@ -327,7 +304,7 @@ const OrganizationCard = ({ organization, handleFilterChange, linkTo, buttonText
           )}
           
           {organization.average_grant_size && (
-            <div className="bg-gradient-to-br from-orange-50 to-red-50 p-4 rounded-xl border border-orange-100 group-hover:shadow-lg transition-shadow duration-300 h-20"> {/* Fixed height */}
+            <div className="bg-gradient-to-br from-orange-50 to-red-50 p-4 rounded-xl border border-orange-100 group-hover:shadow-lg transition-shadow duration-300 h-20">
               <div className="flex items-center gap-2 mb-2">
                 <div className="p-1 bg-orange-100 rounded-lg">
                   <TrendingUp size={14} className="text-orange-600" />
@@ -341,7 +318,6 @@ const OrganizationCard = ({ organization, handleFilterChange, linkTo, buttonText
           )}
         </div>
 
-        {/* Focus areas with better design and different colors */}
         {((organization.focus_areas && organization.focus_areas.length > 0) || 
           (organization.focusAreas && organization.focusAreas.length > 0)) && (
           <div className="mb-6">
@@ -374,7 +350,6 @@ const OrganizationCard = ({ organization, handleFilterChange, linkTo, buttonText
         )}
       </div>
 
-      {/* Action footer */}
       <div className="px-6 pb-6 relative z-0 mt-auto">
         <Link 
           to={finalLinkTo} 

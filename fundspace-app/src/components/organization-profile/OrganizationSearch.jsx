@@ -1,8 +1,6 @@
-// src/components/organization-profile/OrganizationSearch.jsx - OPTIMIZED VERSION
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, X, Building2, Check } from 'lucide-react';
+import { Search, X, Building2 } from 'lucide-react';
 import { supabase } from '../../supabaseClient.js';
-import { optimizedSupabaseQuery } from '../../utils/apiRequestOptimizer'; // ✅ CRITICAL IMPORT
 
 const OrganizationSearch = ({ 
   selectedOrganizations = [], 
@@ -17,7 +15,6 @@ const OrganizationSearch = ({
   const searchInputRef = useRef(null);
   const dropdownRef = useRef(null);
 
-  // Debounced search function
   useEffect(() => {
     const timeoutId = setTimeout(() => {
       if (searchTerm.trim() && searchTerm.length >= 2) {
@@ -31,7 +28,6 @@ const OrganizationSearch = ({
     return () => clearTimeout(timeoutId);
   }, [searchTerm]);
 
-  // Click outside to close dropdown
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -47,31 +43,15 @@ const OrganizationSearch = ({
     try {
       setIsSearching(true);
       
-      // ✅ BEFORE (Direct organizations query):
-      // const { data, error } = await supabase
-      //   .from('organizations')
-      //   .select('id, name, type, tagline, image_url')
-      //   .or(`name.ilike.%${query}%,tagline.ilike.%${query}%`)
-      //   .limit(10)
-      //   .order('name');
-
-      // ✅ AFTER (Optimized organizations query):
-      const optimizedSearchQuery = optimizedSupabaseQuery(
-        supabase
-          .from('organizations')
-          .select('id, name, type, tagline, image_url')
-          .or(`name.ilike.%${query}%,tagline.ilike.%${query}%`)
-          .limit(10)
-          .order('name'),
-        'organizations_single',
-        { searchQuery: query, orgIds: [] }
-      );
-
-      const { data, error } = await optimizedSearchQuery;
+      const { data, error } = await supabase
+        .from('organizations')
+        .select('id, name, type, tagline, image_url')
+        .or(`name.ilike.%${query}%,tagline.ilike.%${query}%`)
+        .limit(10)
+        .order('name');
 
       if (error) throw error;
 
-      // Filter out already selected organizations
       const selectedIds = selectedOrganizations.map(org => org.id);
       const filteredResults = (data || []).filter(org => !selectedIds.includes(org.id));
       
@@ -88,7 +68,7 @@ const OrganizationSearch = ({
 
   const handleSelectOrganization = (organization) => {
     if (selectedOrganizations.length >= maxSelections) {
-      return; // Don't add if at max limit
+      return;
     }
 
     const newSelectedOrgs = [...selectedOrganizations, organization];
@@ -111,7 +91,6 @@ const OrganizationSearch = ({
 
   return (
     <div className="space-y-3">
-      {/* Selected Organizations */}
       {selectedOrganizations.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {selectedOrganizations.map((org) => (
@@ -139,7 +118,6 @@ const OrganizationSearch = ({
         </div>
       )}
 
-      {/* Search Input */}
       <div className="relative" ref={dropdownRef}>
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
@@ -163,7 +141,6 @@ const OrganizationSearch = ({
           )}
         </div>
 
-        {/* Search Results Dropdown */}
         {showDropdown && searchResults.length > 0 && (
           <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg z-50 max-h-60 overflow-y-auto">
             {searchResults.map((org) => (
@@ -196,7 +173,6 @@ const OrganizationSearch = ({
           </div>
         )}
 
-        {/* No Results Message */}
         {showDropdown && searchResults.length === 0 && searchTerm.length >= 2 && !isSearching && (
           <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg z-50 p-4 text-center text-slate-500">
             No organizations found for "{searchTerm}"
@@ -204,7 +180,6 @@ const OrganizationSearch = ({
         )}
       </div>
 
-      {/* Helper Text */}
       {selectedOrganizations.length < maxSelections && (
         <p className="text-xs text-slate-500">
           Search and select up to {maxSelections} funding organizations. 

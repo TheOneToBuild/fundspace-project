@@ -1,4 +1,3 @@
-// src/components/organization-profile/ProgramDetailModal.jsx
 import React, { useState } from 'react';
 import { 
   X, ExternalLink, MapPin, Calendar, Users, Target, Info, 
@@ -35,9 +34,7 @@ const ProgramDetailModal = ({ program, isOpen, onClose, onEdit, canEdit = false 
     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-[100] animate-in fade-in duration-300">
       <div className="bg-white/95 backdrop-blur-xl rounded-3xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden border border-white/20 animate-in slide-in-from-bottom-4 duration-500">
         
-        {/* Header */}
         <div className="relative p-8 bg-gradient-to-br from-slate-50/80 via-white/50 to-indigo-50/30 border-b border-slate-200/50">
-          {/* Subtle background pattern */}
           <div className="absolute inset-0 opacity-30">
             <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-indigo-200/40 to-purple-200/20 rounded-full blur-3xl" />
             <div className="absolute bottom-0 left-0 w-24 h-24 bg-gradient-to-tr from-blue-200/30 to-cyan-200/20 rounded-full blur-2xl" />
@@ -45,7 +42,6 @@ const ProgramDetailModal = ({ program, isOpen, onClose, onEdit, canEdit = false 
           
           <div className="relative flex justify-between items-start">
             <div className="flex-1 pr-6">
-              {/* Status and Title */}
               <div className="flex items-center gap-4 mb-4">
                 <div className={`w-3 h-3 rounded-full ${getStatusColor(program.status)} shadow-lg`} />
                 <span className="text-sm font-medium text-slate-600 capitalize">
@@ -63,7 +59,6 @@ const ProgramDetailModal = ({ program, isOpen, onClose, onEdit, canEdit = false 
                 </p>
               )}
 
-              {/* Funded By Section in Header */}
               {program.funded_by_organizations && program.funded_by_organizations.length > 0 && (
                 <div className="mt-4">
                   <div className="flex items-center gap-2 mb-3">
@@ -107,14 +102,11 @@ const ProgramDetailModal = ({ program, isOpen, onClose, onEdit, canEdit = false 
           </div>
         </div>
 
-        {/* Content - Single page layout, no scrolling */}
         <div className="flex-1 p-8 overflow-hidden">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 h-full">
             
-            {/* Left Column - Goals, Target Population, and Location */}
             <div className="space-y-4">
               
-              {/* Goals Section - Top left */}
               {program.goals && (
                 <div className="bg-gradient-to-br from-slate-50/50 to-gray-50/30 rounded-2xl p-6 border border-slate-100/50 backdrop-blur-sm">
                   <div className="flex items-center gap-3 mb-3">
@@ -127,7 +119,6 @@ const ProgramDetailModal = ({ program, isOpen, onClose, onEdit, canEdit = false 
                 </div>
               )}
 
-              {/* Target Population - Under Goals */}
               {program.target_population && (
                 <div className="bg-gradient-to-br from-purple-50/50 to-indigo-50/30 rounded-2xl p-6 border border-purple-100/50 backdrop-blur-sm">
                   <div className="flex items-center gap-3 mb-3">
@@ -140,7 +131,6 @@ const ProgramDetailModal = ({ program, isOpen, onClose, onEdit, canEdit = false 
                 </div>
               )}
 
-              {/* Location - Bottom left */}
               {program.location && (
                 <div className="bg-gradient-to-br from-blue-50/50 to-cyan-50/30 rounded-2xl p-6 border border-blue-100/50 backdrop-blur-sm">
                   <div className="flex items-center gap-3 mb-3">
@@ -154,10 +144,8 @@ const ProgramDetailModal = ({ program, isOpen, onClose, onEdit, canEdit = false 
               )}
             </div>
 
-            {/* Right Column - Impact and Duration */}
             <div className="space-y-4">
               
-              {/* Impact Metrics - Top right */}
               {program.impact_metrics && (
                 <div className="bg-gradient-to-br from-amber-50/50 to-orange-50/30 rounded-2xl p-6 border border-amber-100/50 backdrop-blur-sm">
                   <div className="flex items-center gap-3 mb-3">
@@ -170,7 +158,6 @@ const ProgramDetailModal = ({ program, isOpen, onClose, onEdit, canEdit = false 
                 </div>
               )}
 
-              {/* Duration - Bottom right */}
               {(program.start_date || program.end_date) && (
                 <div className="bg-gradient-to-br from-emerald-50/50 to-teal-50/30 rounded-2xl p-6 border border-emerald-100/50 backdrop-blur-sm">
                   <div className="flex items-center gap-3 mb-3">
@@ -198,7 +185,6 @@ const ProgramDetailModal = ({ program, isOpen, onClose, onEdit, canEdit = false 
           </div>
         </div>
 
-        {/* Footer */}
         <div className="p-6 border-t border-slate-200/50 bg-slate-50/30 backdrop-blur-sm">
           <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
             <div className="flex items-center gap-3">

@@ -1,4 +1,3 @@
-// src/utils/realtimeManager.js - Enhanced version with organization posts support
 import { getChannelFilterForPosts, getUserChannelAccess, getChannelInfo } from './channelUtils.js';
 
 class RealtimeManager {
@@ -8,9 +7,7 @@ class RealtimeManager {
     this.debugMode = false;
   }
 
-  // Create subscription with your channel system integration (existing method)
   createSubscription(channelName, supabase, userProfile, callbacks) {
-    // Use your channel access logic
     const accessibleChannels = getUserChannelAccess(userProfile);
     const channelInfo = getChannelInfo(channelName, userProfile);
     
@@ -21,24 +18,18 @@ class RealtimeManager {
       return null;
     }
 
-    // Cancel any pending cleanup
     if (this.cleanupTimeouts.has(channelName)) {
       clearTimeout(this.cleanupTimeouts.get(channelName));
       this.cleanupTimeouts.delete(channelName);
     }
 
-    // Return existing subscription if it exists
     if (this.activeSubscriptions.has(channelName)) {
       return this.activeSubscriptions.get(channelName);
     }
 
-    // Create new subscription with proper cleanup
     const channel = supabase.channel(`realtime:${channelName}`);
-    
-    // Apply your channel-specific filters
     const filter = getChannelFilterForPosts(channelName);
     
-    // Set up event listeners based on your channel system
     if (callbacks.onPostInsert) {
       channel.on('postgres_changes', {
         event: 'INSERT',
@@ -82,7 +73,6 @@ class RealtimeManager {
       }, callbacks.onCommentChange);
     }
 
-    // Subscribe with error handling
     channel.subscribe((status) => {
       if (status === 'SUBSCRIBED') {
         if (this.debugMode) {
@@ -100,22 +90,18 @@ class RealtimeManager {
     return channel;
   }
 
-  // Subscribe to posts with proper channel management (legacy method)
   subscribeToPosts(channelName, supabase, filter = null, callbacks = {}) {
-    // Cancel any pending cleanup
     if (this.cleanupTimeouts.has(channelName)) {
       clearTimeout(this.cleanupTimeouts.get(channelName));
       this.cleanupTimeouts.delete(channelName);
     }
 
-    // Return existing subscription if it exists
     if (this.activeSubscriptions.has(channelName)) {
       return this.activeSubscriptions.get(channelName);
     }
 
     const channel = supabase.channel(channelName);
 
-    // Set up postgres change listeners
     if (callbacks.onPostInsert) {
       channel.on('postgres_changes', {
         event: 'INSERT',
@@ -159,7 +145,6 @@ class RealtimeManager {
       }, callbacks.onCommentChange);
     }
 
-    // Subscribe with error handling
     channel.subscribe((status) => {
       if (status === 'SUBSCRIBED') {
         if (this.debugMode) {
@@ -177,22 +162,18 @@ class RealtimeManager {
     return channel;
   }
 
-  // Subscribe to organization posts
   subscribeToOrganizationPosts(channelName, supabase, organizationId, callbacks = {}) {
-    // Cancel any pending cleanup
     if (this.cleanupTimeouts.has(channelName)) {
       clearTimeout(this.cleanupTimeouts.get(channelName));
       this.cleanupTimeouts.delete(channelName);
     }
 
-    // Return existing subscription if it exists
     if (this.activeSubscriptions.has(channelName)) {
       return this.activeSubscriptions.get(channelName);
     }
 
     const channel = supabase.channel(channelName);
 
-    // Set up postgres change listeners for organization posts
     if (callbacks.onPostInsert) {
       channel.on('postgres_changes', {
         event: 'INSERT',
@@ -220,7 +201,6 @@ class RealtimeManager {
       }, callbacks.onPostDelete);
     }
 
-    // Subscribe with error handling
     channel.subscribe((status) => {
       if (status === 'SUBSCRIBED') {
         if (this.debugMode) {
@@ -238,7 +218,6 @@ class RealtimeManager {
     return channel;
   }
 
-  // Safe removal with delay to prevent rapid cleanup cycles
   removeSubscription(channelName, supabase) {
     const timeoutId = setTimeout(() => {
       const channel = this.activeSubscriptions.get(channelName);
@@ -256,7 +235,6 @@ class RealtimeManager {
           try {
             supabase.removeChannel(channel);
           } catch (error) {
-            // Suppress WebSocket errors during cleanup
             if (this.debugMode && !error.message?.includes('WebSocket')) {
               console.warn(`⚠️ Error removing channel ${channelName}:`, error);
             }
@@ -268,27 +246,23 @@ class RealtimeManager {
           }
         }
       }
-    }, 1000); // 1 second delay
+    }, 1000);
 
     this.cleanupTimeouts.set(channelName, timeoutId);
   }
 
-  // Get active subscription count for debugging
   getActiveCount() {
     return this.activeSubscriptions.size;
   }
 
-  // Enable/disable debug logs
   setDebugMode(enabled) {
     this.debugMode = enabled;
   }
 
-  // Get list of active channels (for debugging)
   getActiveChannels() {
     return Array.from(this.activeSubscriptions.keys());
   }
 
-  // Force cleanup all (for app unmount)
   cleanup(supabase) {
     this.cleanupTimeouts.forEach(timeoutId => clearTimeout(timeoutId));
     this.activeSubscriptions.forEach((channel, name) => {
@@ -302,7 +276,6 @@ class RealtimeManager {
         try {
           supabase.removeChannel(channel);
         } catch (error) {
-          // Suppress WebSocket errors during cleanup
         }
       }
     });
@@ -315,5 +288,4 @@ class RealtimeManager {
   }
 }
 
-// Export singleton
 export const realtimeManager = new RealtimeManager();

@@ -1,4 +1,3 @@
-// components/SocialMetricsCard.jsx - Component to show social metrics on organization pages
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { Eye, Heart, TrendingUp, Users, Calendar, ChevronDown } from 'lucide-react';
@@ -11,10 +10,9 @@ const SocialMetricsCard = ({ organization, organizationType, userRole, isOmegaAd
     recentActivity: []
   });
   const [loading, setLoading] = useState(true);
-  const [timeRange, setTimeRange] = useState('30'); // days
+  const [timeRange, setTimeRange] = useState('30');
   const [isCollapsed, setIsCollapsed] = useState(false);
 
-  // Check if user can view social metrics
   const canViewSocialMetrics = organizationType === 'funder' && 
     (hasPermission(userRole, PERMISSIONS.EDIT_ORGANIZATION, isOmegaAdmin) || 
      hasPermission(userRole, PERMISSIONS.MANAGE_MEMBERS, isOmegaAdmin));
@@ -26,21 +24,17 @@ const SocialMetricsCard = ({ organization, organizationType, userRole, isOmegaAd
       try {
         setLoading(true);
 
-        // Only fetch for funders (nonprofits don't have these social features yet)
         if (organizationType === 'funder') {
-          // Get followers count (basic count only)
           const { count: followersCount, error: followersError } = await supabase
             .from('funder_follows')
             .select('*', { count: 'exact', head: true })
             .eq('funder_id', organization.id);
 
-          // Get bookmarks/likes count (basic count only)
           const { count: likesCount, error: likesError } = await supabase
             .from('funder_bookmarks')
             .select('*', { count: 'exact', head: true })
             .eq('funder_id', organization.id);
 
-          // Get recent activity without complex relationships - just basic data
           const { data: recentFollowIds, error: recentFollowError } = await supabase
             .from('funder_follows')
             .select('user_id, created_at')
@@ -57,7 +51,6 @@ const SocialMetricsCard = ({ organization, organizationType, userRole, isOmegaAd
             .order('created_at', { ascending: false })
             .limit(5);
 
-          // Log any errors but don't fail
           if (followersError) {
             console.warn('Could not fetch followers count:', followersError.message);
           }
@@ -71,7 +64,6 @@ const SocialMetricsCard = ({ organization, organizationType, userRole, isOmegaAd
             console.warn('Could not fetch recent bookmarks:', recentBookmarkError.message);
           }
 
-          // Combine activity sources (simplified without profile details)
           const combinedActivity = [
             ...(recentFollowIds || []).map(item => ({
               type: 'follow',
@@ -109,7 +101,6 @@ const SocialMetricsCard = ({ organization, organizationType, userRole, isOmegaAd
     fetchSocialMetrics();
   }, [organization?.id, organizationType, timeRange, canViewSocialMetrics]);
 
-  // Don't show for nonprofits or users without permission
   if (!canViewSocialMetrics) {
     return null;
   }
@@ -199,7 +190,6 @@ const SocialMetricsCard = ({ organization, organizationType, userRole, isOmegaAd
             </div>
           ) : (
             <>
-              {/* Metrics Overview - Removed Profile Views */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                 <div className="bg-blue-50 rounded-lg p-4 border border-blue-100">
                   <div className="flex items-center justify-between">
@@ -228,7 +218,6 @@ const SocialMetricsCard = ({ organization, organizationType, userRole, isOmegaAd
                 </div>
               </div>
 
-              {/* Recent Activity */}
               <div>
                 <h3 className="text-md font-semibold text-slate-800 mb-4 flex items-center gap-2">
                   <Calendar className="text-slate-500" size={18} />
@@ -264,9 +253,8 @@ const SocialMetricsCard = ({ organization, organizationType, userRole, isOmegaAd
                 )}
               </div>
 
-              {/* Tips for increasing engagement */}
               <div className="mt-6 pt-6 border-t border-slate-200">
-                <h4 className="text-sm font-semibold text-slate-700 mb-3">💡 Tips to increase engagement:</h4>
+                <h4 className="text-sm font-semibold text-slate-700 mb-3">Tips to increase engagement:</h4>
                 <ul className="text-xs text-slate-600 space-y-1">
                   <li>• Regularly update your organization's posts and announcements</li>
                   <li>• Share impact stories and success stories from your grantees</li>

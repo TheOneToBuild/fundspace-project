@@ -1,5 +1,3 @@
-// src/components/OrganizationPosts.jsx - OPTIMIZED: Use globalDataManager instead of direct queries
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../supabaseClient';
 import { MessageSquare, AlertTriangle } from 'lucide-react';
@@ -7,7 +5,6 @@ import CreatePost from './CreatePost.jsx';
 import OrganizationPostCard from './OrganizationPostCard.jsx';
 import OrganizationPostDetailModal from './OrganizationPostDetailModal.jsx';
 import { hasPermission, PERMISSIONS } from '../utils/permissions.js';
-import globalDataManager from '../utils/globalDataManager.js'; // ✅ ADD THIS IMPORT
 
 export default function OrganizationPosts({ 
   organization, 
@@ -15,7 +12,7 @@ export default function OrganizationPosts({
   userRole, 
   isOmegaAdmin, 
   profile,
-  className = '' // Added to allow custom styling from parent
+  className = ''
 }) {
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -23,8 +20,6 @@ export default function OrganizationPosts({
   const [selectedPost, setSelectedPost] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // Only super_admins and omega_admins can create/edit/delete posts
-  // Regular admins and members can only view and interact
   const canCreatePosts = hasPermission(userRole, PERMISSIONS.EDIT_ORGANIZATION, isOmegaAdmin);
   const canEditPosts = hasPermission(userRole, PERMISSIONS.EDIT_ORGANIZATION, isOmegaAdmin);
   const canInteractWithPosts = hasPermission(userRole, PERMISSIONS.VIEW_ORGANIZATION, isOmegaAdmin);
@@ -36,35 +31,27 @@ export default function OrganizationPosts({
       setLoading(true);
       setError('');
       
-      // ✅ BEFORE (Direct query causing 4 organization_posts API calls):
-      // const { data: postsData, error: postsError } = await supabase
-      //   .from('organization_posts')
-      //   .select('*')
-      //   .eq('organization_id', organization.id)
+      const { data: postsData, error: postsError } = await supabase
+        .from('organization_posts')
+        .select('*')
+        .eq('organization_id', organization.id)
+        .order('created_at', { ascending: false });
 
-      // ✅ AFTER (Use globalDataManager for batched loading):
-      const postsData = await globalDataManager.getPostsForOrganizations([organization.id]);
-      const organizationPosts = postsData[organization.id] || [];
-      
-      // Filter by organization type if needed
-      const filteredPosts = organizationPosts.filter(post => 
-        post.organization_type === organizationType
-      );
+      if (postsError) throw postsError;
 
-      setPosts(filteredPosts);
+      setPosts(postsData || []);
     } catch (err) {
       console.error('Error fetching organization posts:', err);
       setError('Failed to load organization posts');
     } finally {
       setLoading(false);
     }
-  }, [organization?.id, organizationType]);
+  }, [organization?.id]);
 
   useEffect(() => {
     fetchOrganizationPosts();
   }, [fetchOrganizationPosts]);
 
-  // Set up real-time subscriptions for organization posts
   useEffect(() => {
     if (!organization?.id) return;
 
@@ -105,17 +92,12 @@ export default function OrganizationPosts({
   }, [organization?.id]);
 
   const handleNewPost = useCallback((newPostData) => {
-    // For organization posts, we don't need to attach profile info
-    // since the post belongs to the organization
     const postWithMetadata = { 
       ...newPostData, 
       likes_count: 0,
       comments_count: 0,
     };
     setPosts(prev => [postWithMetadata, ...prev]);
-    
-    // Clear globalDataManager cache to ensure fresh data on next load
-    globalDataManager.clearCache();
   }, []);
 
   const handleDeletePost = useCallback(async (postId) => {
@@ -131,9 +113,6 @@ export default function OrganizationPosts({
       if (error) throw error;
       
       setPosts(prev => prev.filter(post => post.id !== postId));
-      
-      // Clear globalDataManager cache to ensure fresh data on next load
-      globalDataManager.clearCache();
     } catch (err) {
       console.error('Error deleting post:', err);
       setError('Failed to delete post');
@@ -182,7 +161,7 @@ export default function OrganizationPosts({
           organizationId={organization.id}
           organizationType={organizationType}
           organization={organization}
-          className="p-6 rounded-xl shadow-sm border border-slate-200" // Match OrganizationPostCard styling
+          className="p-6 rounded-xl shadow-sm border border-slate-200"
         />
       )}
 
@@ -222,7 +201,6 @@ export default function OrganizationPosts({
         </div>
       )}
 
-      {/* Organization Post Detail Modal */}
       <OrganizationPostDetailModal
         post={selectedPost}
         organization={organization}
