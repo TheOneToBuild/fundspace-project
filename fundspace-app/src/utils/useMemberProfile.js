@@ -1,6 +1,5 @@
-// hooks/useMemberProfile.js
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '../supabaseClient';
+import { getUserProfileComplete } from '../utils/rpcClientFunctions';
 import { followUser, unfollowUser, checkFollowStatus } from '../utils/followUtils';
 
 export const useMemberProfile = (memberIdToUse, currentUserProfile) => {
@@ -12,7 +11,6 @@ export const useMemberProfile = (memberIdToUse, currentUserProfile) => {
     const [followingInProgress, setFollowingInProgress] = useState(false);
     const [refreshTrigger, setRefreshTrigger] = useState(0);
 
-    // NEW: Refresh function to trigger data reload
     const refreshMemberData = useCallback(() => {
         setRefreshTrigger(prev => prev + 1);
     }, []);
@@ -28,47 +26,24 @@ export const useMemberProfile = (memberIdToUse, currentUserProfile) => {
             setLoading(true);
             setError(null);
             
-            const { data: memberData, error: memberError } = await supabase
-                .from('profiles')
-                .select('*')
-                .eq('id', memberIdToUse)
-                .single();
+            const profileData = await getUserProfileComplete(
+                memberIdToUse,
+                currentUserProfile?.id
+            );
 
-            if (memberError) {
-                throw new Error(memberError.message);
-            }
-
-            if (!memberData) {
+            if (!profileData) {
                 throw new Error('Member not found');
             }
 
-            setMember(memberData);
-
-            const { data: postsData, error: postsError } = await supabase
-                .from('posts')
-                .select(`
-                    *,
-                    profiles (
-                        id,
-                        full_name,
-                        avatar_url,
-                        title,
-                        organization_name
-                    )
-                `)
-                .eq('profile_id', memberIdToUse)
-                .order('created_at', { ascending: false });
-
-            if (!postsError) {
-                setPosts(postsData || []);
-            }
+            setMember(profileData);
+            setPosts(profileData.posts || []);
 
         } catch (err) {
             setError(err.message);
         } finally {
             setLoading(false);
         }
-    }, [memberIdToUse, refreshTrigger]); // Add refreshTrigger as dependency
+    }, [memberIdToUse, currentUserProfile?.id, refreshTrigger]);
 
     const checkFollowingStatus = useCallback(async () => {
         if (!currentUserProfile?.id || !memberIdToUse || currentUserProfile.id === memberIdToUse) {
@@ -142,6 +117,6 @@ export const useMemberProfile = (memberIdToUse, currentUserProfile) => {
         handleFollow,
         handleUnfollow,
         isCurrentUser: currentUserProfile?.id === member?.id,
-        refreshMemberData // NEW: Export refresh function
+        refreshMemberData
     };
 };

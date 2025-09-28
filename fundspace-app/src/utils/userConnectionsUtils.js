@@ -1,6 +1,5 @@
-// src/utils/userConnectionsUtils.js - FIXED VERSION - Corrected notification schema
 import { supabase } from '../supabaseClient';
-import apiRequestOptimizer from './apiRequestOptimizer';
+import { getBatchConnectionStatus, getUserProfileComplete } from './rpcClientFunctions';
 
 export const getConnectionStatus = async (userId1, userId2) => {
   try {
@@ -8,14 +7,10 @@ export const getConnectionStatus = async (userId1, userId2) => {
       return { status: 'none', isRequester: false };
     }
 
-    // OPTIMIZED: Use the API optimizer instead of direct Supabase calls
-    const result = await apiRequestOptimizer.optimizeSupabaseQuery(
-      null,
-      'user_connections_status',
-      { currentUserId: userId1, targetUserId: userId2 }
-    );
-
-    return result || { status: 'none', isRequester: false };
+    const result = await getBatchConnectionStatus(userId1, [userId2]);
+    const status = result.connections?.[userId2] || { status: 'none', isRequester: false };
+    
+    return status;
 
   } catch (error) {
     console.error('Error getting connection status:', error);
@@ -23,20 +18,14 @@ export const getConnectionStatus = async (userId1, userId2) => {
   }
 };
 
-// NEW: Batch connection status checking (for components that need multiple statuses)
 export const getBatchConnectionStatuses = async (currentUserId, targetUserIds) => {
   try {
     if (!currentUserId || !targetUserIds || targetUserIds.length === 0) {
       return {};
     }
 
-    const result = await apiRequestOptimizer.optimizeSupabaseQuery(
-      null,
-      'connection_statuses_batch',
-      { currentUserId, targetUserIds }
-    );
-
-    return result.data || {};
+    const result = await getBatchConnectionStatus(currentUserId, targetUserIds);
+    return result.connections || {};
   } catch (error) {
     console.error('Error getting batch connection statuses:', error);
     return {};
@@ -45,7 +34,6 @@ export const getBatchConnectionStatuses = async (currentUserId, targetUserIds) =
 
 export const getMutualConnectionsCount = async (userId1, userId2) => {
   try {
-    // Try RPC function first (if it exists)
     const { data: rpcData, error: rpcError } = await supabase
       .rpc('get_mutual_connections', {
         user1_id: userId1,
@@ -56,7 +44,6 @@ export const getMutualConnectionsCount = async (userId1, userId2) => {
       return { count: rpcData || 0 };
     }
 
-    // Fallback to manual calculation if RPC doesn't exist
     const { data: mutualData } = await supabase
       .from('user_connections')
       .select('requester_id, recipient_id')
@@ -250,15 +237,12 @@ export const withdrawConnectionRequest = async (requesterId, recipientId) => {
       return { success: false, error: error.message };
     }
 
-    // FIXED: Clean up notification without using non-existent columns
-    // Since we don't have actor_id, we can only filter by user_id and type
     const { error: notificationError } = await supabase
       .from('notifications')
       .delete()
       .eq('user_id', recipientId)
       .eq('type', 'connection_request');
 
-    // Don't fail the main operation if notification cleanup fails
     if (notificationError) {
       console.warn('Could not clean up notification:', notificationError);
     }
@@ -271,6 +255,12 @@ export const withdrawConnectionRequest = async (requesterId, recipientId) => {
 
 export const getUserConnections = async (userId, limit = 50) => {
   try {
+    const profileData = await getUserProfileComplete(userId);
+    
+    if (profileData?.connections) {
+      return { connections: profileData.connections.slice(0, limit) };
+    }
+
     const { data: connectionsData, error: connectionsError } = await supabase
       .from('user_connections')
       .select('id, requester_id, recipient_id, created_at')
@@ -382,21 +372,17 @@ export const getPendingConnectionRequests = async (userId) => {
   }
 };
 
-// FIXED: Notification creation function to match your database schema
 const createConnectionNotification = async (actorId, recipientId, type, connectionId = null) => {
   try {
     if (actorId === recipientId) {
       return { success: true };
     }
 
-    // Only use columns that exist in your notifications table
     const notificationData = {
       user_id: recipientId,
       type: type,
       is_read: false
     };
-
-    // Don't try to insert actor_id or connection_id since they don't exist in your schema
 
     const { data, error } = await supabase
       .from('notifications')

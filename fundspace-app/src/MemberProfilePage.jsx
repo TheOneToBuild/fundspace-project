@@ -1,8 +1,8 @@
-// MemberProfilePage.jsx - Updated to use PublicPageLayout with debugging
 import React, { useState, useEffect } from 'react';
 import { useParams, useOutletContext } from 'react-router-dom';
 import PublicPageLayout from './components/PublicPageLayout.jsx';
-import { useMemberProfile } from './hooks/useMemberProfile';
+import { getUserProfileComplete } from './utils/rpcClientFunctions';
+import { followUser, unfollowUser, checkFollowStatus } from './utils/followUtils';
 import MemberProfileHeader from './components/member-profile/MemberProfileHeader';
 import MemberProfileActivity from './components/member-profile/MemberProfileActivity';
 import MemberProfilePhotos from './components/member-profile/MemberProfilePhotos';
@@ -15,29 +15,85 @@ export default function MemberProfilePage() {
     
     const memberIdToUse = memberId || profileId;
     
-    const {
-        member,
-        posts,
-        loading,
-        error,
-        isFollowing,
-        followingInProgress,
-        handleFollow,
-        handleUnfollow,
-        isCurrentUser,
-        refreshMemberData
-    } = useMemberProfile(memberIdToUse, currentUserProfile);
-
-    // Tab state management
+    const [memberData, setMemberData] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+    const [isFollowing, setIsFollowing] = useState(false);
+    const [followingInProgress, setFollowingInProgress] = useState(false);
     const [activeTab, setActiveTab] = useState('activity');
 
-    // Expose refresh function globally for organization changes
+    const loadMemberData = async () => {
+        if (!memberIdToUse) return;
+        
+        setLoading(true);
+        try {
+            const profileData = await getUserProfileComplete(
+                memberIdToUse, 
+                currentUserProfile?.id
+            );
+            
+            if (!profileData) {
+                setError('Member not found');
+                return;
+            }
+
+            setMemberData(profileData);
+            
+            if (currentUserProfile?.id && currentUserProfile.id !== memberIdToUse) {
+                const followStatus = await checkFollowStatus(currentUserProfile.id, memberIdToUse);
+                setIsFollowing(followStatus);
+            }
+            
+        } catch (error) {
+            console.error('Error loading member data:', error);
+            setError(error.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     useEffect(() => {
-        window.refreshMemberProfile = refreshMemberData;
+        loadMemberData();
+    }, [memberIdToUse, currentUserProfile?.id]);
+
+    useEffect(() => {
+        window.refreshMemberProfile = loadMemberData;
         return () => {
             delete window.refreshMemberProfile;
         };
-    }, [refreshMemberData]);
+    }, []);
+
+    const handleFollow = async () => {
+        if (!currentUserProfile?.id || followingInProgress) return;
+        
+        setFollowingInProgress(true);
+        try {
+            const result = await followUser(currentUserProfile.id, memberIdToUse);
+            if (result.success) {
+                setIsFollowing(true);
+            }
+        } catch (error) {
+            console.error('Error following user:', error);
+        } finally {
+            setFollowingInProgress(false);
+        }
+    };
+
+    const handleUnfollow = async () => {
+        if (!currentUserProfile?.id || followingInProgress) return;
+        
+        setFollowingInProgress(true);
+        try {
+            const result = await unfollowUser(currentUserProfile.id, memberIdToUse);
+            if (result.success) {
+                setIsFollowing(false);
+            }
+        } catch (error) {
+            console.error('Error unfollowing user:', error);
+        } finally {
+            setFollowingInProgress(false);
+        }
+    };
 
     const handleTabChange = (newTab) => {
         setActiveTab(newTab);
@@ -74,7 +130,7 @@ export default function MemberProfilePage() {
         );
     }
 
-    if (!member) {
+    if (!memberData) {
         return (
             <PublicPageLayout bgColor="bg-[#faf7f4]">
                 <div className="min-h-screen flex items-center justify-center">
@@ -86,34 +142,36 @@ export default function MemberProfilePage() {
         );
     }
 
+    const isCurrentUser = currentUserProfile?.id === memberIdToUse;
+
     const renderActiveTab = () => {
         switch (activeTab) {
             case 'activity':
                 return (
                     <MemberProfileActivity 
-                        member={member}
-                        posts={posts}
+                        member={memberData}
+                        posts={memberData.posts || []}
                         loading={loading}
                         isCurrentUser={isCurrentUser}
                         currentUserProfile={currentUserProfile}
-                        refreshData={refreshMemberData}
+                        refreshData={loadMemberData}
                     />
                 );
             case 'experience':
                 return (
                     <MemberProfileExperience 
-                        member={member}
+                        member={memberData}
                         loading={loading}
                         currentUserId={currentUserProfile?.id}
                         isCurrentUser={isCurrentUser}
-                        refreshData={refreshMemberData}
+                        refreshData={loadMemberData}
                     />
                 );
             case 'photos':
                 return (
                     <MemberProfilePhotos 
-                        member={member}
-                        posts={posts}
+                        member={memberData}
+                        posts={memberData.posts || []}
                         loading={loading}
                         isCurrentUser={isCurrentUser}
                     />
@@ -121,7 +179,7 @@ export default function MemberProfilePage() {
             case 'connections':
                 return (
                     <MemberProfileConnections 
-                        member={member}
+                        member={memberData}
                         loading={loading}
                         currentUserId={currentUserProfile?.id}
                         isCurrentUser={isCurrentUser}
@@ -137,7 +195,7 @@ export default function MemberProfilePage() {
         <PublicPageLayout bgColor="bg-[#faf7f4]">
             <div className="min-h-screen">
                 <MemberProfileHeader
-                    member={member}
+                    member={memberData}
                     isFollowing={isFollowing}
                     followingInProgress={followingInProgress}
                     onFollow={handleFollow}

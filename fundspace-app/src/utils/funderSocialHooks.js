@@ -1,18 +1,11 @@
-// utils/funderSocialHooks.js - Custom hooks for funder social interactions
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../supabaseClient';
 
-/**
- * Hook for managing funder follows
- * @param {number} funderId - The ID of the funder
- * @param {string} userId - The current user's ID
- */
 export const useFunderFollow = (funderId, userId) => {
   const [isFollowing, setIsFollowing] = useState(false);
   const [followersCount, setFollowersCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
-  // Fetch initial follow status and count
   useEffect(() => {
     const fetchFollowData = async () => {
       if (!funderId) return;
@@ -20,7 +13,6 @@ export const useFunderFollow = (funderId, userId) => {
       try {
         setLoading(true);
         
-        // Get total followers count
         const { count: totalFollowers, error: countError } = await supabase
           .from('funder_follows')
           .select('*', { count: 'exact', head: true })
@@ -29,7 +21,6 @@ export const useFunderFollow = (funderId, userId) => {
         if (countError) throw countError;
         setFollowersCount(totalFollowers || 0);
 
-        // Check if current user is following (only if logged in)
         if (userId) {
           const { data: followData, error: followError } = await supabase
             .from('funder_follows')
@@ -38,7 +29,7 @@ export const useFunderFollow = (funderId, userId) => {
             .eq('user_id', userId)
             .single();
 
-          if (followError && followError.code !== 'PGRST116') { // PGRST116 = no rows returned
+          if (followError && followError.code !== 'PGRST116') {
             throw followError;
           }
 
@@ -54,7 +45,6 @@ export const useFunderFollow = (funderId, userId) => {
     fetchFollowData();
   }, [funderId, userId]);
 
-  // Toggle follow status
   const toggleFollow = useCallback(async () => {
     if (!userId || !funderId) {
       console.warn('User must be logged in to follow funders');
@@ -63,7 +53,6 @@ export const useFunderFollow = (funderId, userId) => {
 
     try {
       if (isFollowing) {
-        // Unfollow
         const { error } = await supabase
           .from('funder_follows')
           .delete()
@@ -75,7 +64,6 @@ export const useFunderFollow = (funderId, userId) => {
         setIsFollowing(false);
         setFollowersCount(prev => Math.max(0, prev - 1));
       } else {
-        // Follow
         const { error } = await supabase
           .from('funder_follows')
           .insert({
@@ -90,7 +78,6 @@ export const useFunderFollow = (funderId, userId) => {
       }
     } catch (error) {
       console.error('Error toggling follow:', error);
-      // You might want to show a toast notification here
     }
   }, [funderId, userId, isFollowing]);
 
@@ -102,17 +89,11 @@ export const useFunderFollow = (funderId, userId) => {
   };
 };
 
-/**
- * Hook for managing funder bookmarks/likes
- * @param {number} funderId - The ID of the funder
- * @param {string} userId - The current user's ID
- */
 export const useFunderBookmark = (funderId, userId) => {
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [bookmarksCount, setBookmarksCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
-  // Fetch initial bookmark status and count
   useEffect(() => {
     const fetchBookmarkData = async () => {
       if (!funderId) return;
@@ -120,7 +101,6 @@ export const useFunderBookmark = (funderId, userId) => {
       try {
         setLoading(true);
         
-        // Get total bookmarks count (using as "likes")
         const { count: totalBookmarks, error: countError } = await supabase
           .from('funder_bookmarks')
           .select('*', { count: 'exact', head: true })
@@ -129,7 +109,6 @@ export const useFunderBookmark = (funderId, userId) => {
         if (countError) throw countError;
         setBookmarksCount(totalBookmarks || 0);
 
-        // Check if current user has bookmarked (only if logged in)
         if (userId) {
           const { data: bookmarkData, error: bookmarkError } = await supabase
             .from('funder_bookmarks')
@@ -154,7 +133,6 @@ export const useFunderBookmark = (funderId, userId) => {
     fetchBookmarkData();
   }, [funderId, userId]);
 
-  // Toggle bookmark status
   const toggleBookmark = useCallback(async () => {
     if (!userId || !funderId) {
       console.warn('User must be logged in to bookmark funders');
@@ -163,7 +141,6 @@ export const useFunderBookmark = (funderId, userId) => {
 
     try {
       if (isBookmarked) {
-        // Remove bookmark
         const { error } = await supabase
           .from('funder_bookmarks')
           .delete()
@@ -175,7 +152,6 @@ export const useFunderBookmark = (funderId, userId) => {
         setIsBookmarked(false);
         setBookmarksCount(prev => Math.max(0, prev - 1));
       } else {
-        // Add bookmark
         const { error } = await supabase
           .from('funder_bookmarks')
           .insert({
@@ -190,7 +166,6 @@ export const useFunderBookmark = (funderId, userId) => {
       }
     } catch (error) {
       console.error('Error toggling bookmark:', error);
-      // You might want to show a toast notification here
     }
   }, [funderId, userId, isBookmarked]);
 
@@ -202,17 +177,11 @@ export const useFunderBookmark = (funderId, userId) => {
   };
 };
 
-/**
- * Hook for managing organization post likes
- * @param {number} postId - The ID of the post
- * @param {string} userId - The current user's ID
- */
 export const usePostLike = (postId, userId) => {
   const [isLiked, setIsLiked] = useState(false);
   const [likesCount, setLikesCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
-  // Fetch initial like status and count
   useEffect(() => {
     const fetchLikeData = async () => {
       if (!postId) return;
@@ -220,7 +189,6 @@ export const usePostLike = (postId, userId) => {
       try {
         setLoading(true);
         
-        // Get total likes count
         const { count: totalLikes, error: countError } = await supabase
           .from('post_likes')
           .select('*', { count: 'exact', head: true })
@@ -229,7 +197,6 @@ export const usePostLike = (postId, userId) => {
         if (countError) throw countError;
         setLikesCount(totalLikes || 0);
 
-        // Check if current user has liked (only if logged in)
         if (userId) {
           const { data: likeData, error: likeError } = await supabase
             .from('post_likes')
@@ -254,7 +221,6 @@ export const usePostLike = (postId, userId) => {
     fetchLikeData();
   }, [postId, userId]);
 
-  // Toggle like status
   const toggleLike = useCallback(async () => {
     if (!userId || !postId) {
       console.warn('User must be logged in to like posts');
@@ -263,7 +229,6 @@ export const usePostLike = (postId, userId) => {
 
     try {
       if (isLiked) {
-        // Unlike
         const { error } = await supabase
           .from('post_likes')
           .delete()
@@ -275,7 +240,6 @@ export const usePostLike = (postId, userId) => {
         setIsLiked(false);
         setLikesCount(prev => Math.max(0, prev - 1));
       } else {
-        // Like
         const { error } = await supabase
           .from('post_likes')
           .insert({
@@ -290,7 +254,6 @@ export const usePostLike = (postId, userId) => {
         setLikesCount(prev => prev + 1);
       }
 
-      // Also update the posts table likes_count if you want to maintain denormalized counts
       const { error: updateError } = await supabase
         .rpc('update_post_likes_count', { post_id: postId });
 
@@ -310,10 +273,6 @@ export const usePostLike = (postId, userId) => {
   };
 };
 
-/**
- * Hook for fetching funder's followers list
- * @param {number} funderId - The ID of the funder
- */
 export const useFunderFollowers = (funderId) => {
   const [followers, setFollowers] = useState([]);
   const [loading, setLoading] = useState(true);
