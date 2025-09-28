@@ -52,47 +52,60 @@ import ConnectionsPage from './components/ConnectionsPage.jsx';
 import GrantsPortalPage from './components/GrantsPortalPage.jsx';
 import RPCTestPage from './components/RPCTestPage.jsx';
 
-// ✅ CRITICAL FIX: Import and enable API Request Optimizer
-import apiRequestOptimizer from './utils/apiRequestOptimizer';
+// ✅ OPTIMIZATION: Import RPC functions instead of API Request Optimizer
+import { getUserProfileComplete, getDashboardData, invalidateCache } from './utils/rpcClientFunctions';
 
-// Enable API optimizer to intercept individual API calls
-apiRequestOptimizer.enableDebug();
-console.log('🚀 API Request Optimizer enabled - individual API calls will be batched automatically');
-
-// ✅ OPTIONAL: Add API call monitoring in development
+// ✅ OPTIONAL: Add RPC call monitoring in development
 if (process.env.NODE_ENV === 'development') {
-  // Monitor all Supabase API calls
+  // Monitor RPC vs API call usage
   const originalFetch = window.fetch;
-  let callCount = 0;
+  let rpcCallCount = 0;
+  let apiCallCount = 0;
   let recentCalls = [];
   
   window.fetch = function(...args) {
     const url = args[0];
     if (typeof url === 'string' && url.includes('supabase.co/rest/v1/')) {
-      callCount++;
+      const isRPCCall = url.includes('/rpc/');
       const endpoint = url.split('/rest/v1/')[1]?.split('?')[0];
       const timestamp = new Date().toISOString();
       
-      recentCalls.push({ endpoint, timestamp, url });
-      if (recentCalls.length > 50) recentCalls.shift(); // Keep last 50 calls
-      
-      console.log(`🔍 API Call #${callCount}: ${endpoint}`);
-      
-      // Alert if too many calls in short time
-      if (callCount > 20) {
-        console.warn('⚠️ HIGH API USAGE DETECTED - Check for missing pageData props!');
-        console.log('Recent API calls:', recentCalls.slice(-10));
+      if (isRPCCall) {
+        rpcCallCount++;
+        console.log(`🚀 RPC Call #${rpcCallCount}: ${endpoint}`);
+      } else {
+        apiCallCount++;
+        console.log(`📡 API Call #${apiCallCount}: ${endpoint}`);
+        
+        // Warn about unoptimized calls
+        if (apiCallCount > 10) {
+          console.warn('⚠️ HIGH INDIVIDUAL API USAGE - Consider using RPC functions!');
+        }
       }
+      
+      recentCalls.push({ endpoint, timestamp, url, type: isRPCCall ? 'RPC' : 'API' });
+      if (recentCalls.length > 50) recentCalls.shift();
     }
     return originalFetch.apply(this, args);
   };
   
-  // Log API optimizer stats periodically
+  // Log optimization stats periodically
   setInterval(() => {
-    const stats = apiRequestOptimizer.getStats();
-    if (callCount > 0 || stats.interceptedCalls > 0) {
-      console.log(`📊 Last minute: ${callCount} API calls, ${stats.interceptedCalls} intercepted by optimizer`);
-      callCount = 0;
+    const totalCalls = rpcCallCount + apiCallCount;
+    if (totalCalls > 0) {
+      const rpcPercentage = ((rpcCallCount / totalCalls) * 100).toFixed(1);
+      console.log(`📊 Last minute: ${rpcCallCount} RPC calls, ${apiCallCount} API calls (${rpcPercentage}% RPC)`);
+      
+      if (rpcPercentage >= 60) {
+        console.log('✅ EXCELLENT: RPC optimization is working!');
+      } else if (rpcPercentage >= 30) {
+        console.log('🟡 PARTIAL: Some components still using individual API calls');
+      } else {
+        console.log('🔴 POOR: Most calls are still individual API calls - check RPC integration');
+      }
+      
+      rpcCallCount = 0;
+      apiCallCount = 0;
     }
   }, 60000); // Every minute
 }
@@ -222,6 +235,8 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
+
+  // ✅ OPTIMIZED: Use RPC function for session data
   const fetchSessionData = async (session) => {
     if (!session) {
       setProfile(null);
@@ -230,32 +245,67 @@ export default function App() {
       setLoading(false);
       return;
     }
+
     try {
-      const [profileRes, notificationsRes] = await Promise.all([
-        supabase.from('profiles').select('*').eq('id', session.user.id).single(),
+      // ✅ Use RPC function to get complete profile data in one call
+      const [profileData, notificationsRes] = await Promise.all([
+        getUserProfileComplete(session.user.id),
         supabase.from('notifications').select(`
           id, type, post_id, organization_post_id, is_read, created_at,
           actor_id:profiles!notifications_actor_id_fkey (id, full_name, avatar_url, title, organization_name)
         `, { count: 'exact' }).eq('user_id', session.user.id).order('created_at', { ascending: false }).limit(50)
       ]);
-      setProfile(profileRes.data || null);
+
+      // Extract profile from RPC data
+      setProfile(profileData?.profile || null);
       setNotifications(notificationsRes.data || []);
       setUnreadCount(notificationsRes.data?.filter(n => !n.is_read).length || 0);
+
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🚀 Session data loaded with RPC optimization');
+      }
     } catch (error) {
       console.error('Error fetching session data:', error);
+      // Fallback to individual API call if RPC fails
+      try {
+        const profileRes = await supabase.from('profiles').select('*').eq('id', session.user.id).single();
+        setProfile(profileRes.data || null);
+      } catch (fallbackError) {
+        console.error('Fallback profile fetch failed:', fallbackError);
+      }
     } finally {
       setLoading(false);
     }
   };
+
+  // ✅ OPTIMIZED: Use RPC function for profile refresh
   const refreshProfile = async () => {
     if (!session?.user?.id) return;
+    
     try {
-      const { data, error } = await supabase.from('profiles').select('*').eq('id', session.user.id).single();
-      if (!error && data) setProfile(data);
+      const profileData = await getUserProfileComplete(session.user.id);
+      if (profileData?.profile) {
+        setProfile(profileData.profile);
+        
+        // Invalidate cache to ensure fresh data next time
+        invalidateCache('profile');
+        
+        if (process.env.NODE_ENV === 'development') {
+          console.log('🚀 Profile refreshed with RPC optimization');
+        }
+      }
     } catch (error) {
-      console.error('Error refreshing profile:', error);
+      console.error('Error refreshing profile with RPC:', error);
+      // Fallback to individual API call
+      try {
+        const { data, error } = await supabase.from('profiles').select('*').eq('id', session.user.id).single();
+        if (!error && data) setProfile(data);
+      } catch (fallbackError) {
+        console.error('Fallback profile refresh failed:', fallbackError);
+      }
     }
   };
+
   const handleClearAllNotifications = async () => {
     if (!session?.user?.id) return;
     try {
@@ -268,6 +318,7 @@ export default function App() {
       console.error('Error clearing notifications:', error);
     }
   };
+
   const handleViewPost = async (postId, isOrganizationPost = false) => {
     const selector = isOrganizationPost ? `[data-organization-post-id="${postId}"]` : `[data-post-id="${postId}"]`;
     if (!isOrganizationPost) {
@@ -284,6 +335,7 @@ export default function App() {
       }
     }, 100);
   };
+
   const markNotificationsAsRead = async () => {
     if (unreadCount === 0 || !session) return;
     const unreadIds = notifications.filter(n => !n.is_read).map(n => n.id);
@@ -296,6 +348,7 @@ export default function App() {
       console.error('Error marking notifications as read:', error);
     }
   };
+
   useEffect(() => {
     const getInitialSession = async () => {
       setLoading(true);
@@ -314,6 +367,7 @@ export default function App() {
     });
     return () => subscription.unsubscribe();
   }, []);
+
   useEffect(() => {
     if (!session?.user?.id) return;
     const channel = supabase.channel(`profile-notifications:${session.user.id}`);
@@ -350,12 +404,13 @@ export default function App() {
       }
     };
   }, [session?.user?.id]);
+
   const outletContext = { session, profile, loading, notifications, unreadCount, markNotificationsAsRead, handleClearAllNotifications, handleViewPost, refreshProfile };
+
   return (
     <BrowserRouter>
       <ScrollToTop />
       <Routes>
-        
         <Route element={<Outlet context={outletContext} />}>
           <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
           <Route path="/signup" element={<PublicRoute><SignUpWizard /></PublicRoute>} />
@@ -364,7 +419,7 @@ export default function App() {
             <Route index element={<AuthRedirect><HomePage /></AuthRedirect>} />
             <Route path="grants" element={<GrantsPageContent />} />
             <Route path="organizations" element={<ExploreOrganizations />} />
-              <Route path="test-rpc" element={<RPCTestPage />} />  
+            <Route path="test-rpc" element={<RPCTestPage />} />  
             <Route path="spotlight" element={<SpotlightLandingPage />} />
             <Route path="spotlight/:countySlug" element={<CountySpotlightPage />} />
             <Route path="spotlight/:countySlug/:citySlug" element={<CitySpotlightPage />} />

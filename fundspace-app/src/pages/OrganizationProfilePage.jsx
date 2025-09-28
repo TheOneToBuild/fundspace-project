@@ -1,15 +1,12 @@
-// src/pages/OrganizationProfilePage.jsx - CORRECTED: Complete batched data support
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../supabaseClient.js';
 import { usePageDataLoader } from '../hooks/usePageDataLoader';
 
-// Shared Components
 import PublicPageLayout from '../components/PublicPageLayout.jsx';
 import EditableOrganizationHeader from '../components/organization-profile/EditableOrganizationHeader.jsx';
 import OrganizationHeader from '../components/organization-profile/OrganizationHeader.jsx';
 
-// Page Section Components
 import OrganizationHome from '../components/organization-profile/OrganizationHome.jsx';
 import OrganizationTeam from '../components/organization-profile/OrganizationTeam.jsx';
 import EditableOrganizationHome from '../components/organization-profile/EditableOrganizationHome.jsx';
@@ -20,7 +17,6 @@ import OrganizationGrantsFixed from '../components/organization-profile/Organiza
 import OrganizationPrograms from '../components/organization-profile/OrganizationPrograms.jsx';
 import EditableOrganizationPrograms from '../components/organization-profile/EditableOrganizationPrograms.jsx';
 
-// Hooks and Utilities
 import { useOrganizationSocial } from '../hooks/useOrganizationSocial.js';
 import { hasPermission, PERMISSIONS } from '../utils/organizationPermissions.js';
 
@@ -74,7 +70,6 @@ const OrganizationProfilePage = () => {
   const [activeTab, setActiveTab] = useState('home');
   const [organizationPosts, setOrganizationPosts] = useState([]);
   
-  // CRITICAL: Add state for batched post data
   const [postsLikesData, setPostsLikesData] = useState({});
   const [batchedProfilesData, setBatchedProfilesData] = useState({});
   const [batchedOrganizationsData, setBatchedOrganizationsData] = useState({});
@@ -98,7 +93,6 @@ const OrganizationProfilePage = () => {
   
   const orgConfig = organization ? ORG_TYPE_CONFIGS[getOrgTypeFromType(organization.type)] : ORG_TYPE_CONFIGS.default;
 
-  // CRITICAL: Create enhanced pageData with all batched sources
   const enhancedPageData = React.useMemo(() => ({
     ...pageData,
     postLikes: postsLikesData || pageData?.postLikes || {},
@@ -146,7 +140,6 @@ const OrganizationProfilePage = () => {
     checkMembership();
   }, [session?.user?.id, organization?.id]);
 
-  // FIXED: Load organization with complete batched data
   const loadOrganization = useCallback(async () => {
     if (!slug) {
       setError("Organization identifier is required");
@@ -176,10 +169,9 @@ const OrganizationProfilePage = () => {
 
       setOrganization(orgData);
       
-      // FIXED: Load organization posts with complete batching
       const { data: postsData, error: postsError } = await supabase
         .from('organization_posts')
-        .select('*, profiles:profile_id(id, full_name, avatar_url, title, organization_name, role, organization_type)')
+        .select('*')
         .eq('organization_id', orgData.id)
         .order('created_at', { ascending: false })
         .limit(20);
@@ -187,31 +179,26 @@ const OrganizationProfilePage = () => {
       if (!postsError && postsData?.length > 0) {
         setOrganizationPosts(postsData);
         
-        // CRITICAL: Batch load all related data
-        const profileIds = [...new Set(postsData.map(p => p.profile_id))];
+        const userIds = [...new Set(postsData.map(p => p.created_by_user_id).filter(Boolean))];
         const postIds = postsData.map(p => p.id);
         
         const [likesResult, profilesResult, orgsResult] = await Promise.all([
-          // Batch post likes
           supabase
             .from('organization_post_likes')
             .select('organization_post_id, user_id, reaction_type, created_at')
             .in('organization_post_id', postIds),
           
-          // Batch profiles (if not already loaded)
-          profileIds.length > 0 ? supabase
+          userIds.length > 0 ? supabase
             .from('profiles')
             .select('id, full_name, avatar_url, title, organization_name, role, organization_type')
-            .in('id', profileIds) : Promise.resolve({ data: [] }),
+            .in('id', userIds) : Promise.resolve({ data: [] }),
           
-          // Batch organizations
           supabase
             .from('organizations')
             .select('id, name, image_url, type, slug')
             .limit(50)
         ]);
 
-        // Process batched likes data
         if (likesResult.data) {
           const likesMap = {};
           likesResult.data.forEach(like => {
@@ -241,7 +228,6 @@ const OrganizationProfilePage = () => {
           setPostsLikesData(processedLikes);
         }
 
-        // Process batched profiles
         if (profilesResult.data) {
           const profilesMap = {};
           profilesResult.data.forEach(profile => {
@@ -250,7 +236,6 @@ const OrganizationProfilePage = () => {
           setBatchedProfilesData(profilesMap);
         }
 
-        // Process batched organizations
         if (orgsResult.data) {
           const orgsMap = {};
           orgsResult.data.forEach(org => {
@@ -259,7 +244,6 @@ const OrganizationProfilePage = () => {
           setBatchedOrganizationsData(orgsMap);
         }
 
-        // Load into page data loader
         loadPostsPageData(postsData);
       }
 
@@ -286,11 +270,9 @@ const OrganizationProfilePage = () => {
     setOrganization(prev => ({ ...prev, ...updatedData }));
   }, []);
 
-  // CRITICAL: Add centralized handlers for organization posts
   const handlePostLike = useCallback(async (postId, currentReaction, newReaction) => {
     if (!session?.user?.id) return;
 
-    // Optimistic update
     setPostsLikesData(prev => ({
       ...prev,
       [postId]: {
@@ -325,7 +307,6 @@ const OrganizationProfilePage = () => {
       }
     } catch (error) {
       console.error('Error updating post reaction:', error);
-      // Revert optimistic update
       setPostsLikesData(prev => ({
         ...prev,
         [postId]: {
@@ -368,7 +349,6 @@ const OrganizationProfilePage = () => {
     return tabs.filter(tab => tab.available);
   }, [organization, orgConfig, userMembership]);
 
-  // CRITICAL: Pass ALL batched data props to tab components
   const renderActiveTab = () => {
     if (!organization) return null;
 
@@ -377,7 +357,6 @@ const OrganizationProfilePage = () => {
       userMembership,
       session,
       onUpdate: handleUpdateOrganization,
-      // CRITICAL: Pass all batched data
       pageData: enhancedPageData,
       postsLikesData,
       onPostLike: handlePostLike,
