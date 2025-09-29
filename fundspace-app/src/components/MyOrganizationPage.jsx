@@ -248,16 +248,6 @@ export default function MyOrganizationPage() {
   return (
     <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="space-y-6">
-        {process.env.NODE_ENV === 'development' && organization && (
-          <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg">
-            <h3 className="text-purple-800 font-semibold mb-2">Organization Page RPC Optimization Active!</h3>
-            <p className="text-purple-600 text-sm">
-              Organization page loaded with 2 RPC calls instead of 5+ individual API calls.
-              Organization: {organization.name}, Members loaded via RPC
-            </p>
-          </div>
-        )}
-        
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
             {error}

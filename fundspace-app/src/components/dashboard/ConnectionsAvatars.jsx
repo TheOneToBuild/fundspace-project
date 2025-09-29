@@ -76,23 +76,40 @@ const ConnectionsAvatars = ({ currentUserProfile }) => {
             if (!currentUserProfile?.id) return;
             try {
                 setLoading(true);
+
                 const dashboardData = await getDashboardData(currentUserProfile.id);
+
+                // ✅ FIX: Add defensive checks
+                if (!dashboardData) {
+                    setNetworkMembers([]);
+                    setStats({ connectionsCount: 0, followingCount: 0, uniqueFollowingCount: 0 });
+                    setLoading(false);
+                    return;
+                }
+
                 const connections = dashboardData?.connections || [];
                 const following = dashboardData?.following || [];
                 const profiles = dashboardData?.profiles || {};
                 
                 const connectionUserIds = new Set();
                 const followingUserIds = new Set();
-
+                
+                // ✅ FIX: Add null checks for connection data
                 connections.forEach(conn => {
+                    if (!conn) return;
                     const otherUserId = conn.requester_id === currentUserProfile.id 
                         ? conn.recipient_id 
                         : conn.requester_id;
-                    connectionUserIds.add(otherUserId);
+                    if (otherUserId) {
+                        connectionUserIds.add(otherUserId);
+                    }
                 });
-
+                
+                // ✅ FIX: Add null checks for following data
                 following.forEach(follow => {
-                    followingUserIds.add(follow.following_id);
+                    if (follow?.following_id) {
+                        followingUserIds.add(follow.following_id);
+                    }
                 });
 
                 const allUserIds = [...new Set([...connectionUserIds, ...followingUserIds])];

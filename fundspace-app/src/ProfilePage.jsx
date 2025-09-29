@@ -65,7 +65,6 @@ export default function ProfilePage() {
     if (!userId) return;
     setAppState((prev) => ({ ...prev, dataLoading: true, error: null }));
     try {
-      console.log('Loading profile page with RPC optimization...');
       const [profileData, dashboardData] = await Promise.all([
         getUserProfileComplete(userId, userId),
         getDashboardData(userId)
@@ -107,13 +106,6 @@ export default function ProfilePage() {
       }));
       trackRPCUsage('get_user_profile_complete', true);
       trackRPCUsage('get_dashboard_data', true);
-      console.log('Profile page RPC loaded:', {
-        posts: posts.length,
-        followers: profileData.follower_count || 0,
-        following: profileData.following_count || 0,
-        saved_grants: profileData.saved_grants?.length || 0,
-        trending_grants: trendingGrants.length
-      });
     } catch (error) {
       console.error('Error loading profile page RPC:', error);
       trackRPCUsage('get_user_profile_complete', false);
@@ -417,17 +409,6 @@ export default function ProfilePage() {
   return (
     <PublicPageLayout bgColor="bg-[#faf7f4]">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 min-h-screen flex flex-col">
-        {process.env.NODE_ENV === 'development' && posts.length > 0 && (
-          <div className="p-4 bg-green-50 border border-green-200 rounded-lg mb-6">
-            <h3 className="text-green-800 font-semibold mb-2">Profile Page RPC Optimization Active!</h3>
-            <p className="text-green-600 text-sm">
-              Profile page loaded with 2 RPC calls instead of 8+ individual API calls.
-              Posts: {posts.length}, Followers: {totalFollowers}, Following: {totalFollowing}, 
-              Saved Grants: {savedGrants.length}, Trending Grants: {trendingGrants.length}
-            </p>
-          </div>
-        )}
-        
         <Outlet context={outletContext} />
         {isDetailModalOpen && selectedGrant && (
           <GrantDetailModal

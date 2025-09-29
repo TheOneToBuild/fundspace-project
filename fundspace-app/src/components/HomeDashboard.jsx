@@ -115,18 +115,8 @@ const useDashboardData = (profile) => {
 
             setRpcLoading(true);
             try {
-                console.log('Loading dashboard with single RPC call...');
-                
                 const data = await getDashboardData(profile.id);
-                
                 setDashboardData(data);
-                
-                console.log('Dashboard RPC loaded:', {
-                    posts: data?.posts?.length || 0,
-                    grants: data?.recent_grants?.length || 0,
-                    organizations: data?.trending_organizations?.length || 0
-                });
-                
             } catch (error) {
                 console.error('Error loading dashboard RPC:', error);
             } finally {
@@ -333,17 +323,6 @@ export default function HomeDashboard() {
 
     return (
         <div className="space-y-8">
-            {process.env.NODE_ENV === 'development' && dashboardData && (
-                <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-                    <h3 className="text-green-800 font-semibold mb-2">RPC Optimization Active</h3>
-                    <p className="text-green-600 text-sm">
-                        Dashboard loaded with 1 RPC call instead of 15+ individual API calls.
-                        Posts: {dashboardData.posts?.length || 0}, Grants: {dashboardData.recent_grants?.length || 0}, 
-                        Organizations: {dashboardData.trending_organizations?.length || 0}
-                    </p>
-                </div>
-            )}
-
             <WelcomeBanner 
                 profile={profile} 
                 organizationInfo={organizationInfo} 

@@ -44,105 +44,88 @@ class ConnectionsDataManager {
     const cacheKey = this.getCacheKey('all-data', {});
     const cached = this.getCache(cacheKey);
     if (cached) return cached;
-
+  
     try {
       const authUserId = await this.getCurrentAuthUserId();
       if (!authUserId) {
         throw new Error('No authenticated user found');
       }
-
-      // ✅ OPTIMIZED: Use the RPC function to fetch connections and profile data in one go
-      const userData = await getUserProfileComplete(authUserId);
+  
+      // ✅ FIX: Use getDashboardData instead of getUserProfileComplete
+      const dashboardData = await getDashboardData(authUserId);
       
-      if (!userData || !Array.isArray(userData.connections)) {
-         throw new Error('Failed to load complete user profile or connections data.');
+      if (!dashboardData) {
+        return {
+          connections: [],
+          pendingRequests: [],
+          connectedProfileIds: new Set(),
+          authUserId
+        };
       }
-
-      const connections = userData.connections;
+  
+      // ✅ FIX: getDashboardData returns connections, not user_connections
+      const connections = dashboardData.connections || [];
+      const profiles = dashboardData.profiles || {};
       
-      const establishedConnections = connections.filter(conn => conn.status === 'accepted');
+      // ✅ FIX: Filter by status if the connections include status field
+      const establishedConnections = connections.filter(conn => 
+        conn.status === 'accepted' || !conn.status // handle connections without status
+      );
+      
       const incomingRequests = connections.filter(conn => 
         conn.status === 'pending' && conn.recipient_id === authUserId
       );
+      
       const outgoingRequests = connections.filter(conn => 
         conn.status === 'pending' && conn.requester_id === authUserId
       );
-
-      const allUserIds = new Set();
-      establishedConnections.forEach(conn => {
-        const otherUserId = conn.requester_id === authUserId ? conn.recipient_id : conn.requester_id;
-        allUserIds.add(otherUserId);
-      });
-      incomingRequests.forEach(req => allUserIds.add(req.requester_id));
-      outgoingRequests.forEach(req => allUserIds.add(req.recipient_id));
-
-      let allUserProfiles = {};
-      let orgMembershipsData = {};
-
-      if (allUserIds.size > 0) {
-        // 1. REPLACED SECTION: The RPC call already includes profile data, use it directly
-        allUserProfiles = userData.profiles || {};
-
-      // Skip organization memberships query - use profile organization data instead
-      // This avoids the schema mismatch errors while maintaining functionality
-      }
-
+  
+      // ✅ FIX: Build user profiles from dashboard data
       const processedConnections = establishedConnections.map(conn => {
-        const otherUserId = conn.requester_id === authUserId ? conn.recipient_id : conn.requester_id;
-        const userProfile = allUserProfiles[otherUserId] || { id: otherUserId, full_name: 'Unknown User' };
+        const otherUserId = conn.requester_id === authUserId 
+          ? conn.recipient_id 
+          : conn.requester_id;
+        
+        const userProfile = profiles[otherUserId] || { 
+          id: otherUserId, 
+          full_name: 'Unknown User' 
+        };
         
         return {
           id: conn.id,
           connected_at: conn.updated_at || conn.created_at,
-          user: {
-            ...userProfile,
-            organization_name: userProfile.organization_name,
-            organization_type: userProfile.organization_type,
-            role: userProfile.role
-          }
+          user: userProfile
         };
       });
-
+  
       const processedPendingRequests = [
-        ...incomingRequests.map(req => {
-          const userProfile = allUserProfiles[req.requester_id] || { id: req.requester_id, full_name: 'Unknown User' };
-          
-          return {
-            id: req.id,
-            created_at: req.created_at,
-            type: 'incoming',
-            isIncoming: true,
-            user_profile: {
-              ...userProfile,
-              organization_name: userProfile.organization_name,
-              organization_type: userProfile.organization_type,
-              role: userProfile.role
-            }
-          };
-        }),
-        ...outgoingRequests.map(req => {
-          const userProfile = allUserProfiles[req.recipient_id] || { id: req.recipient_id, full_name: 'Unknown User' };
-          
-          return {
-            id: req.id,
-            created_at: req.created_at,
-            type: 'outgoing',
-            isIncoming: false,
-            user_profile: {
-              ...userProfile,
-              organization_name: userProfile.organization_name,
-              organization_type: userProfile.organization_type,
-              role: userProfile.role
-            }
-          };
-        })
+        ...incomingRequests.map(req => ({
+          id: req.id,
+          created_at: req.created_at,
+          type: 'incoming',
+          isIncoming: true,
+          user_profile: profiles[req.requester_id] || { 
+            id: req.requester_id, 
+            full_name: 'Unknown User' 
+          }
+        })),
+        ...outgoingRequests.map(req => ({
+          id: req.id,
+          created_at: req.created_at,
+          type: 'outgoing',
+          isIncoming: false,
+          user_profile: profiles[req.recipient_id] || { 
+            id: req.recipient_id, 
+            full_name: 'Unknown User' 
+          }
+        }))
       ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-
+  
       const connectedProfileIds = new Set([
         ...processedConnections.map(c => c.user.id),
         ...processedPendingRequests.map(r => r.user_profile.id)
       ]);
-
+  
       const result = {
         connections: processedConnections,
         pendingRequests: processedPendingRequests,
@@ -152,7 +135,7 @@ class ConnectionsDataManager {
 
       this.setCache(cacheKey, result);
       return result;
-
+  
     } catch (error) {
       console.error('Error loading connection data:', error);
       return {
@@ -163,6 +146,7 @@ class ConnectionsDataManager {
       };
     }
   }
+
 
   // 2. REPLACED METHOD: Switched to fetching suggested users via RPC and filtering client-side
   async loadDiscoveryData(searchQuery = '', filterType = 'all', connectedProfileIds = new Set()) {

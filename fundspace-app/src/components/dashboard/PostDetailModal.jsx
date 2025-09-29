@@ -167,9 +167,7 @@ const PostDetailModal = ({ post, isOpen, onClose, currentUserProfile, pageData, 
         }
     }, [onClose]);
 
-    const handleImageClick = useCallback((index) => {
-        console.log('Image clicked:', index);
-    }, []);
+    const handleImageClick = useCallback((index) => {}, []);
 
     const handleLikeClick = useCallback(() => {
         // Toggle reaction picker or directly like
