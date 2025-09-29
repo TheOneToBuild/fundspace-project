@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { Users, Plus } from 'lucide-react';
 import JoinOrganizationTab from './organization-setup/JoinOrganizationTab.jsx';
 import CreateOrganizationTab from './organization-setup/CreateOrganizationTab.jsx';
+import { invalidateCache } from '../utils/rpcClientFunctions';
 
 export default function OrganizationSetupPage({ profile, session, onComplete }) {
     const [activeTab, setActiveTab] = useState(() => {
@@ -17,13 +18,14 @@ export default function OrganizationSetupPage({ profile, session, onComplete }) 
         setError('');
     };
 
-    const handleSuccess = (successMessage) => {
+    const handleSuccess = async (successMessage) => {
         setMessage(successMessage);
+        invalidateCache('user_org_membership');
         // Clear persisted data on success
         localStorage.removeItem('orgSetupActiveTab');
-        setTimeout(() => {
-            if (onComplete) onComplete();
-        }, 2000);
+        if (onComplete) {
+            await onComplete();
+        }
     };
 
     const handleError = (errorMessage) => {

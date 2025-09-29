@@ -236,7 +236,7 @@ export default function App() {
   const [unreadCount, setUnreadCount] = useState(0);
 
   // ✅ OPTIMIZED: Use RPC function for session data
-  const fetchSessionData = async (session) => {
+const fetchSessionData = async (session) => {
     if (!session) {
       setProfile(null);
       setNotifications([]);
@@ -246,32 +246,19 @@ export default function App() {
     }
 
     try {
-      // ✅ Use RPC function to get complete profile data in one call
-      const [profileData, notificationsRes] = await Promise.all([
-        getUserProfileComplete(session.user.id),
+      const [profileRes, notificationsRes] = await Promise.all([
+        supabase.from('profiles').select('*').eq('id', session.user.id).single(),
         supabase.from('notifications').select(`
           id, type, post_id, organization_post_id, is_read, created_at,
           actor_id:profiles!notifications_actor_id_fkey (id, full_name, avatar_url, title, organization_name)
-        `, { count: 'exact' }).eq('user_id', session.user.id).order('created_at', { ascending: false }).limit(50)
+        `).eq('user_id', session.user.id).order('created_at', { ascending: false }).limit(50)
       ]);
 
-      // Extract profile from RPC data
-      setProfile(profileData?.profile || null);
+      setProfile(profileRes.data);
       setNotifications(notificationsRes.data || []);
       setUnreadCount(notificationsRes.data?.filter(n => !n.is_read).length || 0);
-
-      if (process.env.NODE_ENV === 'development') {
-        console.log('🚀 Session data loaded with RPC optimization');
-      }
     } catch (error) {
       console.error('Error fetching session data:', error);
-      // Fallback to individual API call if RPC fails
-      try {
-        const profileRes = await supabase.from('profiles').select('*').eq('id', session.user.id).single();
-        setProfile(profileRes.data || null);
-      } catch (fallbackError) {
-        console.error('Fallback profile fetch failed:', fallbackError);
-      }
     } finally {
       setLoading(false);
     }
@@ -360,10 +347,12 @@ export default function App() {
       }
     };
     getInitialSession();
+    
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, newSession) => {
       setSession(newSession);
       fetchSessionData(newSession);
     });
+    
     return () => subscription.unsubscribe();
   }, []);
 
@@ -411,7 +400,7 @@ export default function App() {
       <ScrollToTop />
       <Routes>
         <Route element={<Outlet context={outletContext} />}>
-          <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
+          <Route path="/login" element={<LoginPage />} />
           <Route path="/signup" element={<PublicRoute><SignUpWizard /></PublicRoute>} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/" element={<AppLayout />}>

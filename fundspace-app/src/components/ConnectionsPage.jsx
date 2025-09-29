@@ -153,47 +153,38 @@ class ConnectionsDataManager {
     const cacheKey = this.getCacheKey('discovery', { searchQuery, filterType });
     const cached = this.getCache(cacheKey);
     if (cached) return cached;
-
+  
     try {
       const authUserId = await this.getCurrentAuthUserId();
       if (!authUserId) return [];
-
-      const dashboardData = await getDashboardData(authUserId);
-      let discoveredUsers = dashboardData?.suggested_users || [];
-
-      // Filter out already connected/pending users
+  
+      // Build the query
+      let query = supabase
+        .from('profiles')
+        .select('id, full_name, avatar_url, title, organization_name, organization_type, location')
+        .neq('id', authUserId);
+  
+      // Filter out connected users
       if (connectedProfileIds.size > 0) {
-        discoveredUsers = discoveredUsers.filter(user => !connectedProfileIds.has(user.id));
+        query = query.not('id', 'in', `(${Array.from(connectedProfileIds).join(',')})`);
       }
-
-      // Client-side search filtering
+  
+      // Apply search
       if (searchQuery.trim()) {
-        const query = searchQuery.toLowerCase();
-        discoveredUsers = discoveredUsers.filter(user => 
-          user.full_name?.toLowerCase().includes(query) ||
-          user.organization_name?.toLowerCase().includes(query) ||
-          user.title?.toLowerCase().includes(query)
-        );
+        const searchPattern = `%${searchQuery}%`;
+        query = query.or(`full_name.ilike.${searchPattern},organization_name.ilike.${searchPattern},title.ilike.${searchPattern}`);
       }
-
-      // Client-side organization type filtering
+  
+      // Apply filter
       if (filterType !== 'all') {
-        const filterMap = {
-          nonprofit: 'nonprofit',
-          foundation: 'foundation', 
-          education: 'education',
-          government: 'government'
-        };
-        if (filterMap[filterType]) {
-          discoveredUsers = discoveredUsers.filter(user => 
-            user.organization_type?.startsWith(filterMap[filterType])
-          );
-        }
+        query = query.ilike('organization_type', `${filterType}%`);
       }
-
-      // Limit results to 20
-      const result = discoveredUsers.slice(0, 20);
+  
+      const { data, error } = await query.limit(20);
       
+      if (error) throw error;
+      
+      const result = data || [];
       this.setCache(cacheKey, result);
       return result;
       

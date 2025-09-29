@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useOutletContext } from 'react-router-dom';
 import PublicPageLayout from './components/PublicPageLayout.jsx';
+import { supabase } from './supabaseClient';
 import { getUserProfileComplete } from './utils/rpcClientFunctions';
 import { followUser, unfollowUser, checkFollowStatus } from './utils/followUtils';
 import MemberProfileHeader from './components/member-profile/MemberProfileHeader';
@@ -22,30 +23,118 @@ export default function MemberProfilePage() {
     const [followingInProgress, setFollowingInProgress] = useState(false);
     const [activeTab, setActiveTab] = useState('activity');
 
+    useEffect(() => {
+        loadMemberData();
+    }, [memberIdToUse, currentUserProfile?.id]);
+
     const loadMemberData = async () => {
         if (!memberIdToUse) return;
-        
+
         setLoading(true);
         try {
-            // ✅ OPTIMIZED: Single RPC call instead of 6+ individual API calls
-            const profileData = await getUserProfileComplete(
-                memberIdToUse, 
-                currentUserProfile?.id
-            );
-            
+            const profileData = await getUserProfileComplete(memberIdToUse, currentUserProfile?.id);
+
             if (!profileData) {
                 setError('Member not found');
                 return;
             }
 
-            setMemberData(profileData);
-            
-            // Only check follow status if needed
-            if (currentUserProfile?.id && currentUserProfile.id !== memberIdToUse) {
-                const followStatus = await checkFollowStatus(currentUserProfile.id, memberIdToUse);
-                setIsFollowing(followStatus);
+            // Fetch posts separately
+            const { data: postsData } = await supabase
+              .from('posts')
+              .select('*')
+              .eq('profile_id', memberIdToUse)
+              .order('created_at', { ascending: false });
+
+            // Fetch connections - just get the IDs first
+            const { data: connectionsData } = await supabase
+              .from('user_connections')
+              .select('id, requester_id, recipient_id, status, created_at, updated_at')
+              .or(`requester_id.eq.${memberIdToUse},recipient_id.eq.${memberIdToUse}`)
+              .eq('status', 'accepted');
+
+            // Get the user IDs from connections
+            const connectionUserIds = connectionsData?.map(conn => 
+              conn.requester_id === memberIdToUse ? conn.recipient_id : conn.requester_id
+            ).filter(Boolean) || [];
+
+            // Fetch profiles for those users
+            let connectionProfiles = [];
+            if (connectionUserIds.length > 0) {
+              const { data: profiles } = await supabase
+                .from('profiles')
+                .select('id, full_name, avatar_url, title, organization_name, location')
+                .in('id', connectionUserIds);
+              connectionProfiles = profiles || [];
             }
-            
+
+            // Similarly for followers
+            const { data: followersData } = await supabase
+              .from('followers')
+              .select('id, follower_id, created_at')
+              .eq('following_id', memberIdToUse);
+
+            const followerIds = followersData?.map(f => f.follower_id).filter(Boolean) || [];
+            let followerProfiles = [];
+            if (followerIds.length > 0) {
+              const { data: profiles } = await supabase
+                .from('profiles')
+                .select('id, full_name, avatar_url, title, organization_name, location')
+                .in('id', followerIds);
+              followerProfiles = profiles || [];
+            }
+
+            // And following
+            const { data: followingData } = await supabase
+              .from('followers')
+              .select('id, following_id, created_at')
+              .eq('follower_id', memberIdToUse);
+
+            const followingIds = followingData?.map(f => f.following_id).filter(Boolean) || [];
+            let followingProfiles = [];
+            if (followingIds.length > 0) {
+              const { data: profiles } = await supabase
+                .from('profiles')
+                .select('id, full_name, avatar_url, title, organization_name, location')
+                .in('id', followingIds);
+              followingProfiles = profiles || [];
+            }
+
+            // Merge the data
+            const connections = connectionsData?.map(conn => ({
+              ...conn,
+              user: connectionProfiles.find(p => p.id === (conn.requester_id === memberIdToUse ? conn.recipient_id : conn.requester_id))
+            })) || [];
+
+            const followers = followersData?.map(f => ({
+              ...f,
+              profile: followerProfiles.find(p => p.id === f.follower_id)
+            })) || [];
+
+            const following = followingData?.map(f => ({
+              ...f,
+              profile: followingProfiles.find(p => p.id === f.following_id)
+            })) || [];
+
+            const enrichedPosts = (postsData || []).map(post => ({
+                ...post,
+                profiles: {
+                    id: profileData.id,
+                    full_name: profileData.full_name,
+                    avatar_url: profileData.avatar_url,
+                    title: profileData.title,
+                    organization_name: profileData.organization_name,
+                }
+            }));
+
+            setMemberData({ 
+              ...profileData, 
+              posts: enrichedPosts,
+              connections,
+              followers,
+              following
+            });
+
         } catch (error) {
             console.error('Error loading member data:', error);
             setError(error.message);
@@ -53,18 +142,6 @@ export default function MemberProfilePage() {
             setLoading(false);
         }
     };
-
-    useEffect(() => {
-        loadMemberData();
-    }, [memberIdToUse, currentUserProfile?.id]);
-
-    useEffect(() => {
-        // Set up refresh callback for child components
-        window.refreshMemberProfile = loadMemberData;
-        return () => {
-            delete window.refreshMemberProfile;
-        };
-    }, []);
 
     const handleFollow = async () => {
         if (!currentUserProfile?.id || followingInProgress) return;
@@ -151,7 +228,7 @@ export default function MemberProfilePage() {
         switch (activeTab) {
             case 'activity':
                 return (
-                    <MemberProfileActivity 
+                    <MemberProfileActivity
                         member={memberData}
                         posts={memberData.posts || []}
                         loading={loading}

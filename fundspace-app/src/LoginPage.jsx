@@ -24,11 +24,6 @@ export default function LoginPage() {
   const [view, setView] = useState(initialView);
   const from = location.state?.from?.pathname || '/profile';
   useEffect(() => {
-    if (!loading && session && profile) {
-      navigate(from, { replace: true });
-    }
-  }, [session, profile, loading, navigate, from]);
-  useEffect(() => {
     const viewParam = new URLSearchParams(location.search).get('view');
     switch (viewParam) {
       case 'signup':
@@ -42,10 +37,22 @@ export default function LoginPage() {
         break;
     }
   }, [location.search]);
+
+  useEffect(() => {
+    if (!loading && session && profile) {
+      navigate('/profile', { replace: true });
+    }
+  }, [loading, session, profile, navigate]);
+
   const handleSwitchView = (newView, urlSuffix = '') => {
     setView(newView);
     navigate(`/login${urlSuffix}`, { replace: true });
   };
+  const handleLoginSuccess = () => {
+    // Use replace to prevent back button issues
+    window.location.replace('/profile');
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-[#faf7f4] flex items-center justify-center relative overflow-hidden">
@@ -85,7 +92,7 @@ export default function LoginPage() {
     );
   }
   if (session && profile) {
-    return null;
+    return null; // Render nothing while the redirect effect runs
   }
   return (
     <div className="min-h-screen bg-[#faf7f4]">
@@ -101,7 +108,7 @@ export default function LoginPage() {
             <LoginForm
               onSwitchToSignUp={() => handleSwitchView('signup', '?view=signup')}
               onSwitchToForgotPassword={() => handleSwitchView('forgot-password', '?view=forgot-password')}
-              onLoginSuccess={() => {}}
+              onLoginSuccess={handleLoginSuccess}
             />
           )}
           {view === 'signup' && (

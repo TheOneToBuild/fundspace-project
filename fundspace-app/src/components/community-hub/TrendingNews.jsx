@@ -67,7 +67,7 @@ const TrendingNews = ({ channelType }) => {
         style={{ scrollBehavior: 'smooth' }}
       >
         {news.map(item => (
-          <div key={item.id} className="flex-shrink-0">
+          <div key={item.id} className="flex-shrink-0 w-72">
             <NewsCard 
               title={item.title}
               category={item.category}

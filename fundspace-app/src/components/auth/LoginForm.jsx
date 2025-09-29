@@ -41,31 +41,26 @@ export default function LoginForm({ onSwitchToSignUp, onSwitchToForgotPassword, 
     setLoading(true);
     setError('');
     setMessage('');
-    
+  
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email: formData.email.trim(),
         password: formData.password,
       });
+  
+      if (error) throw error;
+  
+      await new Promise(resolve => setTimeout(resolve, 100));
       
-      if (error) {
-        if (error.message.includes('Invalid login credentials')) {
-          setError('Invalid email or password. Please check your credentials and try again.');
-        } else if (error.message.includes('Email not confirmed')) {
-          setError('Please check your email and click the confirmation link before signing in.');
-        } else {
-          setError(error.message);
-        }
-        return;
+      if (onLoginSuccess) {
+        onLoginSuccess();
+      } else {
+        window.location.href = '/profile';
       }
-      
-      // Call the success handler
-      onLoginSuccess();
-      
+  
     } catch (err) {
-      setError('An unexpected error occurred. Please try again.');
       console.error('Login error:', err);
-    } finally {
+      setError(err.message || 'An unexpected error occurred. Please try again.');
       setLoading(false);
     }
   };

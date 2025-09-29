@@ -62,10 +62,10 @@ const useTrendingGrants = (dashboardData) => {
                 eligible_organization_types: grant.eligible_organization_types || [],
                 organization: {
                     name: grant.organization?.name || 'Unknown Foundation',
-                    image_url: grant.organization?.logo_url || null,
-                    banner_image_url: null
+                    image_url: grant.organization?.image_url || null,
+                    banner_image_url: grant.organization?.banner_image_url || null
                 },
-                funder_logo_url: grant.organization?.logo_url || null,
+                funder_logo_url: grant.organization?.image_url || null,
                 is_saved: grant.is_saved || false
             }));
 

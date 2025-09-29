@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useOutletContext, useNavigate } from 'react-router-dom';
 import { AlertTriangle, Crown, Users, Plus } from 'lucide-react';
+import { supabase } from '../supabaseClient';
 import StreamlinedOrganizationSetupPage from './OrganizationSetupPage.jsx';
 import OrganizationHeader from './organization/OrganizationHeader.jsx';
 import OrganizationTabs from './organization/OrganizationTabs.jsx';
@@ -69,6 +70,7 @@ export default function MyOrganizationPage() {
   const [isConfirmingLeave, setIsConfirmingLeave] = useState(false);
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
   const [organization, setOrganization] = useState(null);
+  const [members, setMembers] = useState([]);
   const [userMembership, setUserMembership] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -99,6 +101,27 @@ export default function MyOrganizationPage() {
       if (orgData?.organization) {
         setOrganization(orgData.organization);
       }
+      
+      // Fetch members separately with profile join
+      const { data: membersData, error: membersError } = await supabase
+        .from('organization_memberships')
+        .select(`
+          *,
+          profiles:profile_id (
+            id,
+            full_name,
+            avatar_url,
+            title,
+            organizational_role,
+            is_omega_admin
+          )
+        `)
+        .eq('organization_id', orgId);
+      
+      if (membersError) throw membersError;
+      
+      setMembers(membersData || []);
+      
     } catch (error) {
       console.error('Error fetching organization data:', error);
       setError('Failed to load organization data');
@@ -278,6 +301,7 @@ export default function MyOrganizationPage() {
             organization={organization}
             userMembership={userMembership}
             profile={profile}
+            members={members}
             onMemberAction={loadPageData}
             setError={setError}
           />
