@@ -4,7 +4,7 @@ import { Outlet, useOutletContext } from 'react-router-dom';
 import PublicPageLayout from './components/PublicPageLayout.jsx';
 import GrantDetailModal from './GrantDetailModal.jsx';
 import { usePageDataLoader } from './hooks/usePageDataLoader';
-import { getUserProfileComplete, trackRPCUsage } from './utils/rpcClientFunctions';
+import { getUserProfileComplete, getDashboardData, trackRPCUsage } from './utils/rpcClientFunctions';
 
 export default function ProfilePage() {
   const appContext = useOutletContext();
@@ -63,95 +63,57 @@ export default function ProfilePage() {
 
   const fetchPageData = useCallback(async (userId) => {
     if (!userId) return;
-
     setAppState((prev) => ({ ...prev, dataLoading: true, error: null }));
-
     try {
       console.log('Loading profile page with RPC optimization...');
-      
-      const rpcData = await getUserProfileComplete(userId, userId);
-      
-      const posts = rpcData.posts || [];
-      const postsLikesData = rpcData.post_likes_lookup || {};
-      
-      const [
-        { data: trendingGrantsData },
-        { data: communityMembersData },
-      ] = await Promise.all([
-        supabase
-          .from('grants')
-          .select('*')
-          .order('id', { ascending: false })
-          .limit(15),
-        supabase
-          .from('profiles')
-          .select('id, full_name, avatar_url, title, organization_name')
-          .neq('id', userId)
-          .limit(10),
+      const [profileData, dashboardData] = await Promise.all([
+        getUserProfileComplete(userId, userId),
+        getDashboardData(userId)
       ]);
-
-      const orgIds = [...new Set(trendingGrantsData?.map(g => g.organization_id).filter(Boolean))];
-      let orgsData = [];
-      if (orgIds.length > 0) {
-        const { data: organizationsData } = await supabase
-          .from('organizations')
-          .select('id, name, image_url, banner_image_url, slug')
-          .in('id', orgIds);
-        orgsData = organizationsData || [];
-      }
-
-      const formattedTrendingGrants = (trendingGrantsData || []).map(grant => {
-        const orgData = orgsData.find(o => o.id === grant.organization_id);
-        return {
-          ...grant,
-          organization: orgData || null
-        };
-      });
-
+      const posts = profileData.posts || [];
+      const postsLikesData = profileData.post_likes_lookup || {};
+      const trendingGrants = dashboardData.recent_grants || [];
+      const communityMembers = dashboardData.trending_profiles || [];
       const impactMetrics = {
         grantsApplied: Math.floor(Math.random() * 15) + 5,
         grantsReceived: Math.floor(Math.random() * 5) + 1,
         totalFunding: Math.floor(Math.random() * 500000) + 50000,
-        communitiesHelped: rpcData.follower_count || 0,
+        communitiesHelped: profileData.follower_count || 0,
         postsShared: posts.length,
-        connectionsGrown: (rpcData.follower_count || 0) + (rpcData.following_count || 0),
+        connectionsGrown: (profileData.follower_count || 0) + (profileData.following_count || 0),
       };
-
       const stories = [
         { id: 1, type: 'grant_success', title: 'Grant Success', image: null, viewed: false },
         { id: 2, type: 'community_event', title: 'Workshop', image: null, viewed: true },
         { id: 3, type: 'team_update', title: 'Team News', image: null, viewed: false },
       ];
-
       await loadProfilePageData(userId, posts);
-
       setAppState((prev) => ({
         ...prev,
         dataLoading: false,
         posts,
         postsLikesData,
-        savedGrants: rpcData.saved_grants || [],
-        trendingGrants: formattedTrendingGrants,
+        savedGrants: profileData.saved_grants || [],
+        trendingGrants,
         totalPosts: posts.length,
-        followerUsers: rpcData.followers || [],
-        totalFollowers: rpcData.follower_count || 0,
-        followingUsers: rpcData.following || [],
-        totalFollowing: rpcData.following_count || 0,
-        communityMembers: communityMembersData || [],
-        suggestedConnections: (communityMembersData || []).slice(0, 5),
+        followerUsers: profileData.followers || [],
+        totalFollowers: profileData.follower_count || 0,
+        followingUsers: profileData.following || [],
+        totalFollowing: profileData.following_count || 0,
+        communityMembers,
+        suggestedConnections: communityMembers.slice(0, 5),
         impactMetrics,
         stories,
       }));
-
       trackRPCUsage('get_user_profile_complete', true);
-      
+      trackRPCUsage('get_dashboard_data', true);
       console.log('Profile page RPC loaded:', {
         posts: posts.length,
-        followers: rpcData.follower_count || 0,
-        following: rpcData.following_count || 0,
-        saved_grants: rpcData.saved_grants?.length || 0
+        followers: profileData.follower_count || 0,
+        following: profileData.following_count || 0,
+        saved_grants: profileData.saved_grants?.length || 0,
+        trending_grants: trendingGrants.length
       });
-
     } catch (error) {
       console.error('Error loading profile page RPC:', error);
       trackRPCUsage('get_user_profile_complete', false);
@@ -169,7 +131,6 @@ export default function ProfilePage() {
 
   const handleFollowUser = useCallback(async (userId, action) => {
     if (!session?.user?.id) return;
-
     try {
       if (action === 'follow') {
         await supabase.from('followers').insert({
@@ -183,13 +144,11 @@ export default function ProfilePage() {
           .eq('follower_id', session.user.id)
           .eq('following_id', userId);
       }
-
       window.dispatchEvent(
         new CustomEvent('followUpdate', {
           detail: { action, followerId: session.user.id, followingId: userId },
         })
       );
-
       clearPageData();
       fetchPageData(session.user.id);
     } catch (error) {
@@ -241,7 +200,6 @@ export default function ProfilePage() {
           [newPostData.id]: { userReaction: null }
         }
       }));
-
       clearPageData();
     },
     [profile, clearPageData]
@@ -257,7 +215,6 @@ export default function ProfilePage() {
           Object.entries(prev.postsLikesData).filter(([postId]) => postId !== deletedPostId.toString())
         )
       }));
-
       clearPageData();
     },
     [clearPageData]
@@ -278,7 +235,6 @@ export default function ProfilePage() {
         .select(`*, grant_categories(categories(*)), grant_locations(locations(*))`)
         .eq('id', grantId)
         .single();
-
       if (data) {
         let orgData = null;
         if (data.organization_id) {
@@ -289,7 +245,6 @@ export default function ProfilePage() {
             .single();
           orgData = organizationData;
         }
-
         openDetail({
           ...data,
           foundationName: orgData?.name || 'Unknown Organization',
@@ -328,7 +283,6 @@ export default function ProfilePage() {
 
   const handlePostLike = useCallback(async (postId, currentReaction, newReaction) => {
     if (!session?.user?.id) return;
-
     setAppState(prev => ({
       ...prev,
       postsLikesData: {
@@ -336,7 +290,6 @@ export default function ProfilePage() {
         [postId]: { userReaction: newReaction }
       }
     }));
-
     try {
       if (currentReaction) {
         if (newReaction === null) {
@@ -468,9 +421,9 @@ export default function ProfilePage() {
           <div className="p-4 bg-green-50 border border-green-200 rounded-lg mb-6">
             <h3 className="text-green-800 font-semibold mb-2">Profile Page RPC Optimization Active!</h3>
             <p className="text-green-600 text-sm">
-              Profile page loaded with 1 RPC call instead of 8+ individual API calls.
+              Profile page loaded with 2 RPC calls instead of 8+ individual API calls.
               Posts: {posts.length}, Followers: {totalFollowers}, Following: {totalFollowing}, 
-              Saved Grants: {savedGrants.length}
+              Saved Grants: {savedGrants.length}, Trending Grants: {trendingGrants.length}
             </p>
           </div>
         )}

@@ -8,9 +8,34 @@ import PropTypes from 'prop-types';
 const TrendingPostCard = ({ post, onClick, pageData, postsLikesData, onPostLike }) => {
     const navigate = useNavigate();
     
+    // ✅ FIXED: Better profile data access using same pattern as PostDetailModal
+    const getAuthorProfile = () => {
+        // Use same pattern as PostDetailModal - check profile_id first, then profiles.id
+        const authorId = post.profile_id || post.profiles?.id;
+        const postAuthor = post.profiles || post.profile || post.author || post.user;
+        
+        if (!authorId && !postAuthor) return { full_name: 'Anonymous' };
+        
+        // Get enhanced profile from pageData if available
+        const enhancedProfile = pageData?.profiles?.[authorId];
+        const orgMembership = pageData?.orgMemberships?.[authorId];
+        
+        return {
+            ...postAuthor,
+            ...enhancedProfile,
+            organization_name: orgMembership?.organization?.name || 
+                              enhancedProfile?.organization_name || 
+                              postAuthor?.organization_name,
+            organization_type: orgMembership?.organization?.type || 
+                              enhancedProfile?.organization_type || 
+                              postAuthor?.organization_type,
+            role: orgMembership?.role || enhancedProfile?.role || postAuthor?.role
+        };
+    };
+
+    const displayAuthor = getAuthorProfile();
+    
     const likesData = postsLikesData?.[post.id] || pageData?.postLikes?.[post.id];
-    const profileData = pageData?.profiles?.[post.profile_id || post.profiles?.id] || post.profiles;
-    const orgMembership = pageData?.orgMemberships?.[post.profile_id || post.profiles?.id];
     
     const [localLikes, setLocalLikes] = React.useState(
         likesData?.likes_count || post?.reactions?.summary?.reduce((total, r) => total + r.count, 0) || post?.likes_count || 0
@@ -24,13 +49,6 @@ const TrendingPostCard = ({ post, onClick, pageData, postsLikesData, onPostLike 
             setLocalLikes(likesData.likes_count);
         }
     }, [likesData]);
-
-    const displayAuthor = React.useMemo(() => ({
-        ...profileData,
-        organization_name: orgMembership?.organization?.name || profileData?.organization_name,
-        organization_type: orgMembership?.organization?.type || profileData?.organization_type,
-        role: orgMembership?.role || profileData?.role
-    }), [profileData, orgMembership]);
 
     const formatTimeAgo = (dateString) => {
         const now = new Date();

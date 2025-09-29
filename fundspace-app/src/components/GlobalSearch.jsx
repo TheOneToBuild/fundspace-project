@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../supabaseClient';
 import { Search, Loader, Building, User, FileText } from 'lucide-react';
+import { getGlobalSearchResults } from '../utils/rpcClientFunctions';
 
 const getInitials = (name) => {
     if (!name) return '?';
@@ -19,7 +19,7 @@ const SearchResultItem = ({ item, onClick }) => {
         e.preventDefault();
         
         if (item.type === 'organization') {
-            navigate(`/organizations/${item.slug}`);
+            navigate(`/organizations/${item.slug || item.id}`);
         } else if (item.type === 'member' || item.type === 'user') {
             navigate(`/profile/members/${item.id}`);
         } else if (item.type === 'grant') {
@@ -140,7 +140,7 @@ const SearchResultItem = ({ item, onClick }) => {
 
 export default function GlobalSearch({ mobile = false }) {
     const [query, setQuery] = useState('');
-    const [results, setResults] = useState([]);
+    const [results, setResults] = useState({ organizations: [], profiles: [] });
     const [isLoading, setIsLoading] = useState(false);
     const [isFocused, setIsFocused] = useState(false);
     const searchRef = useRef(null);
@@ -150,94 +150,20 @@ export default function GlobalSearch({ mobile = false }) {
             if (query.length > 2) {
                 setIsLoading(true);
                 try {
-                    const { data: searchData, error: searchError } = await supabase.rpc('search_all', { 
-                        search_term: query 
-                    });
-                    
-                    if (searchError) {
-                        console.warn('search_all function not available, falling back to manual search');
-                        await performManualSearch(query);
-                    } else {
-                        setResults(searchData || []);
-                    }
+                    const searchResults = await getGlobalSearchResults(query.trim(), 10);
+                    setResults(searchResults);
                 } catch (error) {
                     console.error('Search error:', error);
-                    await performManualSearch(query);
+                    setResults({ organizations: [], profiles: [] });
                 }
                 setIsLoading(false);
             } else {
-                setResults([]);
+                setResults({ organizations: [], profiles: [] });
             }
         }, 300);
 
         return () => clearTimeout(handler);
     }, [query]);
-
-    const performManualSearch = async (searchTerm) => {
-        try {
-            const searchPattern = `%${searchTerm}%`;
-            const allResults = [];
-
-            const { data: organizations, error: orgError } = await supabase
-                .from('organizations')
-                .select('id, name, type, tagline, image_url, location, slug')
-                .or(`name.ilike.${searchPattern},tagline.ilike.${searchPattern}`)
-                .limit(5);
-
-            if (!orgError && organizations) {
-                const orgResults = organizations.map(org => ({
-                    id: org.id,
-                    name: org.name,
-                    type: 'organization',
-                    image_url: org.image_url,
-                    location: org.location,
-                    type_display: org.type,
-                    slug: org.slug
-                }));
-                allResults.push(...orgResults);
-            }
-
-            const { data: profiles, error: profileError } = await supabase
-                .from('profiles')
-                .select('id, full_name, title, organization_name, avatar_url')
-                .or(`full_name.ilike.${searchPattern},title.ilike.${searchPattern},organization_name.ilike.${searchPattern}`)
-                .limit(5);
-
-            if (!profileError && profiles) {
-                const userResults = profiles.map(profile => ({
-                    id: profile.id,
-                    name: profile.full_name,
-                    type: 'member',
-                    avatar_url: profile.avatar_url,
-                    title: profile.title,
-                    organization_name: profile.organization_name
-                }));
-                allResults.push(...userResults);
-            }
-
-            const { data: grants, error: grantError } = await supabase
-                .from('grant_opportunities')
-                .select('id, title, foundation_name, funding_amount_text, description')
-                .or(`title.ilike.${searchPattern},foundation_name.ilike.${searchPattern},description.ilike.${searchPattern}`)
-                .limit(5);
-
-            if (!grantError && grants) {
-                const grantResults = grants.map(grant => ({
-                    id: grant.id,
-                    name: grant.title,
-                    type: 'grant',
-                    foundation_name: grant.foundation_name,
-                    funding_amount_text: grant.funding_amount_text
-                }));
-                allResults.push(...grantResults);
-            }
-
-            setResults(allResults);
-        } catch (error) {
-            console.error('Manual search error:', error);
-            setResults([]);
-        }
-    };
 
     useEffect(() => {
         const handleClickOutside = (event) => {
@@ -251,9 +177,11 @@ export default function GlobalSearch({ mobile = false }) {
 
     const handleResultClick = () => {
         setQuery('');
-        setResults([]);
+        setResults({ organizations: [], profiles: [] });
         setIsFocused(false);
     };
+
+    const allResults = [...(results.organizations || []), ...(results.profiles || [])];
 
     const inputClass = mobile
         ? "w-full pl-10 pr-4 py-2 border border-slate-300 rounded-full bg-slate-50 focus:bg-white focus:ring-1 focus:ring-blue-500 transition-colors"
@@ -279,15 +207,36 @@ export default function GlobalSearch({ mobile = false }) {
                             <Loader className="animate-spin mx-auto mb-2" size={20} />
                             Searching...
                         </div>
-                    ) : results.length > 0 ? (
+                    ) : allResults.length > 0 ? (
                         <div className="p-2">
-                            {results.map((item, index) => (
-                                <SearchResultItem 
-                                    key={`${item.type}-${item.id}-${index}`} 
-                                    item={item} 
-                                    onClick={handleResultClick} 
-                                />
-                            ))}
+                            {results.organizations && results.organizations.length > 0 && (
+                                <div className="mb-4">
+                                    <h3 className="px-3 py-2 text-sm font-semibold text-slate-700 bg-slate-50">
+                                        Organizations ({results.organizations.length})
+                                    </h3>
+                                    {results.organizations.map((org, index) => (
+                                        <SearchResultItem 
+                                            key={`org-${org.id}-${index}`} 
+                                            item={{...org, type: 'organization'}} 
+                                            onClick={handleResultClick} 
+                                        />
+                                    ))}
+                                </div>
+                            )}
+                            {results.profiles && results.profiles.length > 0 && (
+                                <div>
+                                    <h3 className="px-3 py-2 text-sm font-semibold text-slate-700 bg-slate-50">
+                                        Members ({results.profiles.length})
+                                    </h3>
+                                    {results.profiles.map((profile, index) => (
+                                        <SearchResultItem 
+                                            key={`profile-${profile.id}-${index}`} 
+                                            item={{...profile, name: profile.full_name, type: 'member'}} 
+                                            onClick={handleResultClick} 
+                                        />
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     ) : (
                         query.length > 2 && (

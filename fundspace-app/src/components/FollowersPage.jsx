@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useOutletContext, Link } from 'react-router-dom';
-import { supabase } from '../supabaseClient';
 import { UserCheck, UserPlus, ArrowLeft } from 'lucide-react';
 import Avatar from './Avatar';
 import { followUser, unfollowUser } from '../utils/followUtils';
+import { getUserSocialConnections } from '../utils/rpcClientFunctions';
 
 export default function FollowersPage() {
     const { profile: currentUserProfile } = useOutletContext();
@@ -14,101 +14,35 @@ export default function FollowersPage() {
 
     useEffect(() => {
         if (currentUserProfile?.id) {
-            fetchFollowers();
-            fetchFollowedUsers();
+            fetchFollowersAndFollowing();
         }
     }, [currentUserProfile?.id]);
 
-    const fetchFollowers = async () => {
+    const fetchFollowersAndFollowing = async () => {
         try {
             setLoading(true);
+            const [followersData, followingData] = await Promise.all([
+                getUserSocialConnections(currentUserProfile.id, 'followers'),
+                getUserSocialConnections(currentUserProfile.id, 'following')
+            ]);
             
-            const { data, error } = await supabase
-                .from('followers')
-                .select('follower_id, created_at')
-                .eq('following_id', currentUserProfile.id)
-                .order('created_at', { ascending: false });
-
-            if (error) {
-                console.error('Error fetching followers:', error);
-                return;
-            }
-
-            if (data && data.length > 0) {
-                const followerIds = data.map(f => f.follower_id);
-                
-                const { data: profilesData, error: profilesError } = await supabase
-                    .from('profiles')
-                    .select('id, full_name, avatar_url, title')
-                    .in('id', followerIds);
-
-                if (profilesError) {
-                    console.error('Error fetching profiles:', profilesError);
-                    return;
-                }
-
-                const { data: membershipData } = await supabase
-                    .from('organization_memberships')
-                    .select(`
-                        profile_id, 
-                        role,
-                        organizations (name)
-                    `)
-                    .in('profile_id', followerIds);
-
-                const profilesMap = {};
-                profilesData.forEach(profile => {
-                    profilesMap[profile.id] = profile;
-                });
-
-                const membershipMap = {};
-                membershipData?.forEach(membership => {
-                    membershipMap[membership.profile_id] = membership;
-                });
-
-                const formattedFollowers = data.map(follow => {
-                    const profile = profilesMap[follow.follower_id];
-                    const membership = membershipMap[follow.follower_id];
-                    
-                    return {
-                        id: follow.follower_id,
-                        full_name: profile?.full_name || 'Unknown User',
-                        avatar_url: profile?.avatar_url || null,
-                        title: profile?.title || membership?.role || null,
-                        organization_name: membership?.organizations?.name || null,
-                        role: membership?.role || null,
-                        followed_at: follow.created_at
-                    };
-                });
-
-                setFollowers(formattedFollowers);
-            } else {
-                setFollowers([]);
-            }
+            const followersArray = followersData?.followers || [];
+            const followingArray = followingData?.following || [];
+            
+            setFollowers(followersArray.map(follower => ({
+                id: follower.id,
+                full_name: follower.full_name,
+                avatar_url: follower.avatar_url,
+                title: follower.title,
+                organization_name: follower.organization_name,
+                followed_at: follower.followed_at
+            })));
+            
+            setFollowedIds(new Set(followingArray.map(f => f.id)));
         } catch (error) {
-            console.error('Error in fetchFollowers:', error);
-            setFollowers([]);
+            console.error('Error fetching followers:', error);
         } finally {
             setLoading(false);
-        }
-    };
-
-    const fetchFollowedUsers = async () => {
-        try {
-            const { data, error } = await supabase
-                .from('followers')
-                .select('following_id')
-                .eq('follower_id', currentUserProfile.id);
-
-            if (error) {
-                console.error('Error fetching followed users:', error);
-                return;
-            }
-
-            const followedSet = new Set(data.map(f => f.following_id));
-            setFollowedIds(followedSet);
-        } catch (error) {
-            console.error('Error in fetchFollowedUsers:', error);
         }
     };
 

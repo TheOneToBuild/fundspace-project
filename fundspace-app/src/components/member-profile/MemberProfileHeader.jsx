@@ -1,15 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../../supabaseClient';
 import { 
   sendConnectionRequest, 
-  getConnectionStatus, 
   acceptConnectionRequest, 
   declineConnectionRequest,
   withdrawConnectionRequest,
   removeConnection,
-  getMutualConnectionsCount 
 } from '../../utils/userConnectionsUtils';
+import { getUserSocialConnections, getBatchConnectionStatus } from '../../utils/rpcClientFunctions';
 import { UserPlus, UserCheck, User, Users, UserX, Linkedin, Twitter, Globe } from 'lucide-react';
 
 const MemberProfileHeader = ({ 
@@ -24,7 +22,6 @@ const MemberProfileHeader = ({
     activeTab = 'activity'
 }) => {
     const navigate = useNavigate();
-    
     const [followStats, setFollowStats] = useState({
         followersCount: 0,
         followingCount: 0
@@ -41,52 +38,24 @@ const MemberProfileHeader = ({
     useEffect(() => {
         const fetchStats = async () => {
             if (!member?.id) return;
-            
             try {
                 setStatsLoading(true);
-                
-                const [followersResult, followingResult] = await Promise.all([
-                    supabase
-                        .from('followers')
-                        .select('*', { count: 'exact', head: true })
-                        .eq('following_id', member.id),
-                    supabase
-                        .from('followers')
-                        .select('*', { count: 'exact', head: true })
-                        .eq('follower_id', member.id)
+                const [socialData, connectionData] = await Promise.all([
+                    getUserSocialConnections(member.id, 'both'),
+                    currentUserId ? getBatchConnectionStatus(currentUserId, [member.id]) : null
                 ]);
-
                 setFollowStats({
-                    followersCount: followersResult.count || 0,
-                    followingCount: followingResult.count || 0
+                    followersCount: socialData?.stats?.followers_count || 0,
+                    followingCount: socialData?.stats?.following_count || 0
                 });
-
-                if (currentUserId && currentUserId !== member.id) {
-                    try {
-                        const [connectionStatusResult, mutualConnectionsResult, connectionsCountResult] = await Promise.all([
-                            getConnectionStatus(currentUserId, member.id),
-                            getMutualConnectionsCount(currentUserId, member.id),
-                            supabase
-                                .from('user_connections')
-                                .select('*', { count: 'exact', head: true })
-                                .or(`and(requester_id.eq.${member.id},status.eq.accepted),and(recipient_id.eq.${member.id},status.eq.accepted)`)
-                        ]);
-
-                        setConnectionStats({
-                            connectionStatus: connectionStatusResult.status || 'none',
-                            isRequester: connectionStatusResult.isRequester || false,
-                            mutualConnections: mutualConnectionsResult.count || 0,
-                            connectionsCount: connectionsCountResult.count || 0
-                        });
-                    } catch (connectionError) {
-                        console.error('Connection stats error:', connectionError);
-                        setConnectionStats({
-                            connectionStatus: 'none',
-                            isRequester: false,
-                            mutualConnections: 0,
-                            connectionsCount: 0
-                        });
-                    }
+                if (connectionData && currentUserId) {
+                    const status = connectionData.connections?.[member.id] || { status: 'none', isRequester: false };
+                    setConnectionStats({
+                        connectionStatus: status.status,
+                        isRequester: status.isRequester,
+                        mutualConnections: status.mutualConnections || 0,
+                        connectionsCount: socialData?.stats?.connections_count || 0
+                    });
                 }
             } catch (error) {
                 console.error('Error fetching stats:', error);
@@ -94,7 +63,6 @@ const MemberProfileHeader = ({
                 setStatsLoading(false);
             }
         };
-
         fetchStats();
     }, [member?.id, currentUserId]);
 
@@ -110,7 +78,6 @@ const MemberProfileHeader = ({
 
     const handleConnectionAction = async (action) => {
         if (!currentUserId || connectionLoading) return;
-        
         setConnectionLoading(true);
         try {
             let result;
@@ -125,7 +92,6 @@ const MemberProfileHeader = ({
                         }));
                     }
                     break;
-                    
                 case 'accept':
                     result = await acceptConnectionRequest(currentUserId, member.id);
                     if (result.success) {
@@ -136,7 +102,6 @@ const MemberProfileHeader = ({
                         }));
                     }
                     break;
-                    
                 case 'decline':
                     result = await declineConnectionRequest(currentUserId, member.id);
                     if (result.success) {
@@ -146,7 +111,6 @@ const MemberProfileHeader = ({
                         }));
                     }
                     break;
-                    
                 case 'withdraw':
                     result = await withdrawConnectionRequest(currentUserId, member.id);
                     if (result.success) {
@@ -157,7 +121,6 @@ const MemberProfileHeader = ({
                         }));
                     }
                     break;
-                    
                 case 'disconnect':
                     result = await removeConnection(currentUserId, member.id);
                     if (result.success) {
@@ -178,7 +141,6 @@ const MemberProfileHeader = ({
 
     const getConnectionButton = () => {
         const { connectionStatus, isRequester } = connectionStats;
-        
         switch (connectionStatus) {
             case 'none':
                 return (
@@ -191,7 +153,6 @@ const MemberProfileHeader = ({
                         {connectionLoading ? 'Connecting...' : 'Connect'}
                     </button>
                 );
-                
             case 'pending':
                 if (isRequester) {
                     return (
@@ -226,7 +187,6 @@ const MemberProfileHeader = ({
                         </div>
                     );
                 }
-                
             case 'accepted':
                 return (
                     <button
@@ -238,7 +198,6 @@ const MemberProfileHeader = ({
                         {connectionLoading ? 'Disconnecting...' : 'Connected'}
                     </button>
                 );
-                
             default:
                 return null;
         }
@@ -266,7 +225,6 @@ const MemberProfileHeader = ({
         if (member.organization_name) {
             const hasOrgId = member.organization_id || member.selected_organization_id;
             const orgSlug = member.organization_slug;
-            
             if (hasOrgId) {
                 const handleOrgClick = async () => {
                     try {
@@ -274,24 +232,12 @@ const MemberProfileHeader = ({
                             navigate(`/organizations/${orgSlug}`);
                             return;
                         }
-                        
-                        const { data: orgData, error } = await supabase
-                            .from('organizations')
-                            .select('slug')
-                            .eq('id', hasOrgId)
-                            .single();
-                        
-                        if (!error && orgData?.slug) {
-                            navigate(`/organizations/${orgData.slug}`);
-                        } else {
-                            navigate(`/organizations/${hasOrgId}`);
-                        }
+                        navigate(`/organizations/${hasOrgId}`);
                     } catch (error) {
                         console.error('Error navigating to organization:', error);
                         navigate(`/organizations?search=${encodeURIComponent(member.organization_name)}`);
                     }
                 };
-                
                 return (
                     <button
                         onClick={handleOrgClick}
@@ -309,7 +255,6 @@ const MemberProfileHeader = ({
 
     const getSocialProfiles = () => {
         const profiles = [];
-        
         if (member.linkedin_url) {
             profiles.push({
                 platform: 'LinkedIn',
@@ -318,7 +263,6 @@ const MemberProfileHeader = ({
                 color: 'bg-blue-600 hover:bg-blue-700'
             });
         }
-        
         if (member.twitter_url) {
             profiles.push({
                 platform: 'Twitter/X',
@@ -327,7 +271,6 @@ const MemberProfileHeader = ({
                 color: 'bg-slate-900 hover:bg-slate-800'
             });
         }
-        
         if (member.website_url) {
             profiles.push({
                 platform: 'Website',
@@ -336,7 +279,6 @@ const MemberProfileHeader = ({
                 color: 'bg-green-600 hover:bg-green-700'
             });
         }
-        
         return profiles;
     };
 

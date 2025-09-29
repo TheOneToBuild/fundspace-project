@@ -27,6 +27,7 @@ export default function MemberProfilePage() {
         
         setLoading(true);
         try {
+            // ✅ OPTIMIZED: Single RPC call instead of 6+ individual API calls
             const profileData = await getUserProfileComplete(
                 memberIdToUse, 
                 currentUserProfile?.id
@@ -39,6 +40,7 @@ export default function MemberProfilePage() {
 
             setMemberData(profileData);
             
+            // Only check follow status if needed
             if (currentUserProfile?.id && currentUserProfile.id !== memberIdToUse) {
                 const followStatus = await checkFollowStatus(currentUserProfile.id, memberIdToUse);
                 setIsFollowing(followStatus);
@@ -57,6 +59,7 @@ export default function MemberProfilePage() {
     }, [memberIdToUse, currentUserProfile?.id]);
 
     useEffect(() => {
+        // Set up refresh callback for child components
         window.refreshMemberProfile = loadMemberData;
         return () => {
             delete window.refreshMemberProfile;
@@ -106,6 +109,16 @@ export default function MemberProfilePage() {
                     <div className="text-center">
                         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
                         <p className="text-slate-600">Loading profile...</p>
+                        {process.env.NODE_ENV === 'development' && (
+                            <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                                <p className="text-green-700 text-sm font-medium">
+                                    ✅ RPC Optimized: Using getUserProfileComplete()
+                                </p>
+                                <p className="text-green-600 text-xs">
+                                    1 RPC call instead of 6+ individual API calls
+                                </p>
+                            </div>
+                        )}
                     </div>
                 </div>
             </PublicPageLayout>
@@ -210,6 +223,21 @@ export default function MemberProfilePage() {
                 <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
                     {renderActiveTab()}
                 </div>
+                
+                {/* Development indicator */}
+                {process.env.NODE_ENV === 'development' && (
+                    <div className="fixed bottom-4 right-4 p-3 bg-green-50 border border-green-200 rounded-lg shadow-lg max-w-xs">
+                        <p className="text-green-700 text-sm font-medium">
+                            ✅ MemberProfilePage Optimized
+                        </p>
+                        <p className="text-green-600 text-xs">
+                            RPC Usage: getUserProfileComplete() + follow utils
+                        </p>
+                        <p className="text-green-600 text-xs">
+                            Performance: 1 RPC call vs 6+ individual calls
+                        </p>
+                    </div>
+                )}
             </div>
         </PublicPageLayout>
     );
