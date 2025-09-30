@@ -246,17 +246,16 @@ const fetchSessionData = async (session) => {
     }
 
     try {
-      const [profileRes, notificationsRes] = await Promise.all([
+      const [profileRes, { data: notificationsData, error: notificationsError }] = await Promise.all([
         supabase.from('profiles').select('*').eq('id', session.user.id).single(),
-        supabase.from('notifications').select(`
-          id, type, post_id, organization_post_id, is_read, created_at,
-          actor_id:profiles!notifications_actor_id_fkey (id, full_name, avatar_url, title, organization_name)
-        `).eq('user_id', session.user.id).order('created_at', { ascending: false }).limit(50)
+        supabase.rpc('get_user_notifications', { p_limit: 50, p_unread_only: false })
       ]);
 
+      if (notificationsError) throw notificationsError;
+
       setProfile(profileRes.data);
-      setNotifications(notificationsRes.data || []);
-      setUnreadCount(notificationsRes.data?.filter(n => !n.is_read).length || 0);
+      setNotifications(notificationsData || []);
+      setUnreadCount(notificationsData?.filter(n => !n.is_read).length || 0);
     } catch (error) {
       console.error('Error fetching session data:', error);
     } finally {

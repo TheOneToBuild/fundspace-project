@@ -57,16 +57,28 @@ export default function DashboardHeader({ profile }) {
         
         return deduplicate(`profile-stats-${profile.id}`, async () => {
             try {
-                const [followersRes, followingRes, connectionsRes] = await Promise.all([
-                    supabase.from('followers').select('id').eq('following_id', profile.id),
-                    supabase.from('followers').select('id').eq('follower_id', profile.id),
-                    supabase.from('user_connections').select('id').or(`requester_id.eq.${profile.id},recipient_id.eq.${profile.id}`).eq('status', 'accepted')
+                const [followersRes, followingRes, connectionsRes] = await Promise.allSettled([
+                    supabase.rpc('get_user_followers', { p_user_id: profile.id, p_limit: 9999 }),
+                    supabase.rpc('get_user_following', { p_user_id: profile.id, p_limit: 9999 }),
+                    supabase.from('user_connections').select('id', { count: 'exact', head: true }).or(`requester_id.eq.${profile.id},recipient_id.eq.${profile.id}`).eq('status', 'accepted')
                 ]);
 
+                const followersCount = followersRes.status === 'fulfilled' && followersRes.value.data ? followersRes.value.data.length : 0;
+                if (followersRes.status === 'fulfilled' && followersRes.value.error) console.error('Error fetching followers:', followersRes.value.error);
+                if (followersRes.status === 'rejected') console.error('Error fetching followers:', followersRes.reason);
+
+                const followingCount = followingRes.status === 'fulfilled' && followingRes.value.data ? followingRes.value.data.length : 0;
+                if (followingRes.status === 'fulfilled' && followingRes.value.error) console.error('Error fetching following:', followingRes.value.error);
+                if (followingRes.status === 'rejected') console.error('Error fetching following:', followingRes.reason);
+
+                const connectionsCount = connectionsRes.status === 'fulfilled' ? connectionsRes.value.count : 0;
+                if (connectionsRes.status === 'fulfilled' && connectionsRes.value.error) console.error('Error fetching connections count:', connectionsRes.value.error);
+                if (connectionsRes.status === 'rejected') console.error('Error fetching connections count:', connectionsRes.reason);
+
                 setStats({
-                    followersCount: followersRes.data?.length || 0,
-                    followingCount: followingRes.data?.length || 0,
-                    connectionsCount: connectionsRes.data?.length || 0
+                    followersCount,
+                    followingCount,
+                    connectionsCount
                 });
             } catch (error) {
                 console.error('Error fetching profile stats:', error);
@@ -79,15 +91,14 @@ export default function DashboardHeader({ profile }) {
         
         return deduplicate(`notifications-${profile.id}`, async () => {
             try {
-                const { count, error } = await supabase
-                    .from('notifications')
-                    .select('id', { count: 'exact', head: true })
-                    .eq('user_id', profile.id)
-                    .eq('is_read', false);
+                const { data: count, error } = await supabase.rpc('get_unread_notification_count');
                 
-                if (!error) {
-                    setUnreadNotifications(count || 0);
+                if (error) {
+                    console.error('Error fetching notification stats:', error);
+                    return;
                 }
+
+                setUnreadNotifications(count || 0);
             } catch (error) {
                 console.error('Error fetching notification stats:', error);
             }

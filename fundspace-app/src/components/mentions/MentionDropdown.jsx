@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../supabaseClient';
+import { searchProfiles } from '../../utils/profileHelpers';
 
 export default function MentionDropdown({ 
   query, 
@@ -25,22 +26,13 @@ export default function MentionDropdown({
 
       setLoading(true);
       try {
-        const searchPattern = `%${query.trim()}%`;
-        
-        const { data: profiles, error: profilesError } = await supabase
-          .from('profiles')
-          .select('id, full_name, title, organization_name, avatar_url, role')
-          .or(`full_name.ilike.${searchPattern},title.ilike.${searchPattern},organization_name.ilike.${searchPattern}`)
-          .limit(5);
-
-        if (profilesError) {
-          console.error('Error searching profiles:', profilesError);
-        }
+        const profiles = await searchProfiles(query, 5);
 
         const { data: organizations, error: orgsError } = await supabase
           .from('organizations')
           .select('id, name, type, tagline, image_url, slug')
-          .ilike('name', searchPattern)
+          // Keep the search pattern for organizations until it's also refactored
+          .ilike('name', `%${query.trim()}%`)
           .limit(5);
 
         if (orgsError) {

@@ -360,34 +360,27 @@ export default function NotificationsPage() {
     const fetchNotifications = async () => {
         try {
             setLoading(true);
-            
-            let query = supabase
-                .from('notifications')
-                .select(`
-                    id, type, post_id, organization_post_id, is_read, created_at, connection_id,
-                    actor_id:profiles!notifications_actor_id_fkey (id, full_name, avatar_url, title, organization_name)
-                `)
-                .eq('user_id', session.user.id);
 
-            if (filter === 'unread') {
-                query = query.eq('is_read', false);
-            } else if (filter === 'read') {
-                query = query.eq('is_read', true);
-            } else if (filter === 'connections') {
-                query = query.in('type', ['connection_request', 'connection_accepted', 'connection_declined']);
-            }
-
-            const ascending = sortBy === 'oldest';
-            query = query.order('created_at', { ascending }).limit(100);
-
-            const { data, error } = await query;
+            const { data, error } = await supabase.rpc('get_user_notifications', {
+                p_limit: 100,
+                p_unread_only: filter === 'unread' ? true : null,
+                p_types: filter === 'connections' ? ['connection_request', 'connection_accepted', 'connection_declined'] : null,
+                p_order_asc: sortBy === 'oldest'
+            });
 
             if (error) {
                 console.error('Error fetching notifications:', error);
                 return;
             }
 
-            setNotifications(data || []);
+            let finalData = data || [];
+
+            // Client-side filter for 'read' since RPC handles 'all' or 'unread'
+            if (filter === 'read') {
+                finalData = finalData.filter(n => n.is_read);
+            }
+
+            setNotifications(finalData);
         } catch (error) {
             console.error('Error in fetchNotifications:', error);
         } finally {

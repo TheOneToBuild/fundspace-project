@@ -12,6 +12,7 @@ import 'tippy.js/dist/tippy.css';
 
 // --- CUSTOM COMPONENT IMPORTS ---
 import MentionList from '../mentions/MentionList';
+import { searchProfiles } from '../../utils/profileHelpers';
 
 export default function EditComment({ 
     comment, 
@@ -56,24 +57,13 @@ export default function EditComment({
                                 return [];
                             }
 
-                            const searchPattern = `%${query.trim()}%`;
-                            
-                            // Search users/profiles
-                            const { data: profiles, error: profilesError } = await supabase
-                                .from('profiles')
-                                .select('id, full_name, title, organization_name, avatar_url, role')
-                                .or(`full_name.ilike.${searchPattern},title.ilike.${searchPattern},organization_name.ilike.${searchPattern}`)
-                                .limit(5);
-
-                            if (profilesError) {
-                                console.error('Error searching profiles:', profilesError);
-                            }
+                            const profiles = await searchProfiles(query, 5);
 
                             // Search organizations
                             const { data: organizations, error: orgsError } = await supabase
                                 .from('organizations')
                                 .select('id, name, type, tagline, image_url')
-                                .ilike('name', searchPattern)
+                                .ilike('name', `%${query.trim()}%`)
                                 .limit(5);
 
                             if (orgsError) {

@@ -83,7 +83,7 @@ const NotificationItem = ({ notification, onViewPost, onMarkAsRead, onDelete, cu
     const [localConnectionStatus, setLocalConnectionStatus] = useState(null);
     
     const { 
-        actor_id: actor, 
+        actor,
         type, 
         created_at, 
         post_id, 
@@ -367,34 +367,39 @@ export default function NotificationsPage() {
     const fetchNotifications = async () => {
         try {
             setLoading(true);
-            
-            let query = supabase
-                .from('notifications')
-                .select(`
-                    id, type, post_id, organization_post_id, is_read, created_at, connection_id,
-                    actor_id:profiles!notifications_actor_id_fkey (id, full_name, avatar_url, title, organization_name)
-                `)
-                .eq('user_id', session.user.id);
 
-            if (filter === 'unread') {
-                query = query.eq('is_read', false);
-            } else if (filter === 'read') {
-                query = query.eq('is_read', true);
-            } else if (filter === 'connections') {
-                query = query.in('type', ['connection_request', 'connection_accepted', 'connection_declined']);
-            }
-
-            const ascending = sortBy === 'oldest';
-            query = query.order('created_at', { ascending }).limit(100);
-
-            const { data, error } = await query;
+            const { data, error } = await supabase.rpc('get_user_notifications', {
+                p_limit: 100,
+                p_offset: 0,
+                p_unread_only: filter === 'unread'
+            });
 
             if (error) {
                 console.error('Error fetching notifications:', error);
                 return;
             }
 
-            setNotifications(data || []);
+            let finalData = data || [];
+
+            // Client-side filtering for 'read' and 'connections'
+            if (filter === 'read') {
+                finalData = finalData.filter(n => n.is_read);
+            } else if (filter === 'connections') {
+                finalData = finalData.filter(n => 
+                    ['connection_request', 'connection_accepted', 'connection_declined'].includes(n.type)
+                );
+            }
+
+            // Client-side sorting
+            if (sortBy === 'oldest') {
+                // The RPC likely returns newest first, so we reverse for oldest.
+                // If the default RPC order changes, this might need adjustment.
+                finalData.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+            } else {
+                finalData.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+            }
+
+            setNotifications(finalData);
         } catch (error) {
             console.error('Error in fetchNotifications:', error);
         } finally {

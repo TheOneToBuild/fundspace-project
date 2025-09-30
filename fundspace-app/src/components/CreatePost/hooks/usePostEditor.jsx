@@ -89,13 +89,10 @@ export const usePostEditor = (placeholderText, profile, onUpdate) => {
 
               if (query.length < 2) return [];
 
-              const searchPattern = `%${query.trim()}%`;
-              
-              const { data: profiles, error: profilesError } = await supabase
-                .from('profiles')
-                .select('id, full_name, title, organization_name, avatar_url, role')
-                .or(`full_name.ilike.${searchPattern},title.ilike.${searchPattern},organization_name.ilike.${searchPattern}`)
-                .limit(5);
+              const { data: profiles, error: profilesError } = await supabase.rpc('get_profiles_list', {
+                p_search: query.trim(),
+                p_limit: 5
+              });
 
               if (profilesError) {
                 console.error('Error searching profiles:', profilesError);
@@ -104,7 +101,7 @@ export const usePostEditor = (placeholderText, profile, onUpdate) => {
               const { data: organizations, error: orgsError } = await supabase
                 .from('organizations')
                 .select('id, name, type, tagline, image_url, slug')
-                .ilike('name', searchPattern)
+                .ilike('name', `%${query.trim()}%`)
                 .limit(5);
 
               if (orgsError) {
