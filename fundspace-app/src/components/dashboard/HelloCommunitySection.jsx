@@ -8,29 +8,36 @@ import PropTypes from 'prop-types';
 const TrendingPostCard = ({ post, onClick, pageData, postsLikesData, onPostLike }) => {
     const navigate = useNavigate();
     
-    const likesData = postsLikesData?.[post.id] || pageData?.postLikes?.[post.id];
-    const profileData = pageData?.profiles?.[post.profile_id || post.profiles?.id] || post.profiles;
-    const orgMembership = pageData?.orgMemberships?.[post.profile_id || post.profiles?.id];
+    const displayAuthor = React.useMemo(() => {
+        const authorId = post.profile_id || post.profiles?.id;
+        const postAuthor = post.profiles || post.profile || post.author || post.user;
+        
+        // If post already has complete profile data embedded, use it directly
+        if (postAuthor?.full_name) {
+            return postAuthor;
+        }
+        
+        // Fallback to pageData lookup
+        if (authorId && pageData?.profiles?.[authorId]) {
+            return pageData.profiles[authorId];
+        }
+        
+        return { full_name: 'Anonymous' };
+    }, [post.profiles, post.profile, post.author, post.user, post.profile_id, pageData]);
     
     const [localLikes, setLocalLikes] = React.useState(
-        likesData?.likes_count || post?.reactions?.summary?.reduce((total, r) => total + r.count, 0) || post?.likes_count || 0
+        (postsLikesData?.[post.id] || pageData?.postLikes?.[post.id])?.likes_count || post?.reactions?.summary?.reduce((total, r) => total + r.count, 0) || post?.likes_count || 0
     );
     const [localComments, setLocalComments] = React.useState(
         post?.comments_count || 0
     );
 
     React.useEffect(() => {
+        const likesData = postsLikesData?.[post.id] || pageData?.postLikes?.[post.id];
         if (likesData?.likes_count !== undefined) {
             setLocalLikes(likesData.likes_count);
         }
-    }, [likesData]);
-
-    const displayAuthor = React.useMemo(() => ({
-        ...profileData,
-        organization_name: orgMembership?.organization?.name || profileData?.organization_name,
-        organization_type: orgMembership?.organization?.type || profileData?.organization_type,
-        role: orgMembership?.role || profileData?.role
-    }), [profileData, orgMembership]);
+    }, [postsLikesData, pageData, post.id]);
 
     const formatTimeAgo = (dateString) => {
         const now = new Date();

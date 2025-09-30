@@ -27,121 +27,84 @@ export default function MemberProfilePage() {
         loadMemberData();
     }, [memberIdToUse, currentUserProfile?.id]);
 
-    const loadMemberData = async () => {
-        if (!memberIdToUse) return;
+const loadMemberData = async () => {
+    if (!memberIdToUse) return;
 
-        setLoading(true);
-        try {
-            const profileData = await getUserProfileComplete(memberIdToUse, currentUserProfile?.id);
+    setLoading(true);
+    try {
+      const profileData = await getUserProfileComplete(memberIdToUse, currentUserProfile?.id);
 
-            if (!profileData) {
-                setError('Member not found');
-                return;
-            }
+      if (!profileData) {
+        setError('Member not found');
+        return;
+      }
 
-            // Fetch posts separately
-            const { data: postsData } = await supabase
-              .from('posts')
-              .select('*')
-              .eq('profile_id', memberIdToUse)
-              .order('created_at', { ascending: false });
-
-            // Fetch connections - just get the IDs first
-            const { data: connectionsData } = await supabase
-              .from('user_connections')
-              .select('id, requester_id, recipient_id, status, created_at, updated_at')
-              .or(`requester_id.eq.${memberIdToUse},recipient_id.eq.${memberIdToUse}`)
-              .eq('status', 'accepted');
-
-            // Get the user IDs from connections
-            const connectionUserIds = connectionsData?.map(conn => 
-              conn.requester_id === memberIdToUse ? conn.recipient_id : conn.requester_id
-            ).filter(Boolean) || [];
-
-            // Fetch profiles for those users
-            let connectionProfiles = [];
-            if (connectionUserIds.length > 0) {
-              const { data: profiles } = await supabase
-                .from('profiles')
-                .select('id, full_name, avatar_url, title, organization_name, location')
-                .in('id', connectionUserIds);
-              connectionProfiles = profiles || [];
-            }
-
-            // Similarly for followers
-            const { data: followersData } = await supabase
-              .from('followers')
-              .select('id, follower_id, created_at')
-              .eq('following_id', memberIdToUse);
-
-            const followerIds = followersData?.map(f => f.follower_id).filter(Boolean) || [];
-            let followerProfiles = [];
-            if (followerIds.length > 0) {
-              const { data: profiles } = await supabase
-                .from('profiles')
-                .select('id, full_name, avatar_url, title, organization_name, location')
-                .in('id', followerIds);
-              followerProfiles = profiles || [];
-            }
-
-            // And following
-            const { data: followingData } = await supabase
-              .from('followers')
-              .select('id, following_id, created_at')
-              .eq('follower_id', memberIdToUse);
-
-            const followingIds = followingData?.map(f => f.following_id).filter(Boolean) || [];
-            let followingProfiles = [];
-            if (followingIds.length > 0) {
-              const { data: profiles } = await supabase
-                .from('profiles')
-                .select('id, full_name, avatar_url, title, organization_name, location')
-                .in('id', followingIds);
-              followingProfiles = profiles || [];
-            }
-
-            // Merge the data
-            const connections = connectionsData?.map(conn => ({
-              ...conn,
-              user: connectionProfiles.find(p => p.id === (conn.requester_id === memberIdToUse ? conn.recipient_id : conn.requester_id))
-            })) || [];
-
-            const followers = followersData?.map(f => ({
-              ...f,
-              profile: followerProfiles.find(p => p.id === f.follower_id)
-            })) || [];
-
-            const following = followingData?.map(f => ({
-              ...f,
-              profile: followingProfiles.find(p => p.id === f.following_id)
-            })) || [];
-
-            const enrichedPosts = (postsData || []).map(post => ({
-                ...post,
-                profiles: {
-                    id: profileData.id,
-                    full_name: profileData.full_name,
-                    avatar_url: profileData.avatar_url,
-                    title: profileData.title,
-                    organization_name: profileData.organization_name,
-                }
-            }));
-
-            setMemberData({ 
-              ...profileData, 
-              posts: enrichedPosts,
-              connections,
-              followers,
-              following
-            });
-
-        } catch (error) {
-            console.error('Error loading member data:', error);
-            setError(error.message);
-        } finally {
-            setLoading(false);
+      // The RPC returns posts, connections, followers, following already
+      // We just need to ensure posts have the profile data attached
+      const enrichedPosts = (profileData.posts || []).map(post => ({
+        ...post,
+        profiles: {
+          id: profileData.id,
+          full_name: profileData.full_name,
+          avatar_url: profileData.avatar_url,
+          title: profileData.title,
+          organization_name: profileData.organization_name,
+          role: profileData.role
         }
-    };
+      }));
+
+      // Enrich connections/followers/following with profile data
+      const enrichedConnections = (profileData.connections || []).map(conn => ({
+        ...conn,
+        user: conn.profile || { // RPC may return it as 'profile'
+          id: conn.user_id,
+          full_name: conn.full_name,
+          avatar_url: conn.avatar_url,
+          title: conn.title,
+          organization_name: conn.organization_name,
+          location: conn.location
+        }
+      }));
+
+      const enrichedFollowers = (profileData.followers || []).map(f => ({
+        ...f,
+        profile: f.profile || {
+          id: f.follower_id,
+          full_name: f.full_name,
+          avatar_url: f.avatar_url,
+          title: f.title,
+          organization_name: f.organization_name,
+          location: f.location
+        }
+      }));
+
+      const enrichedFollowing = (profileData.following || []).map(f => ({
+        ...f,
+        profile: f.profile || {
+          id: f.following_id,
+          full_name: f.full_name,
+          avatar_url: f.avatar_url,
+          title: f.title,
+          organization_name: f.organization_name,
+          location: f.location
+        }
+      }));
+
+      setMemberData({ 
+        ...profileData,
+        posts: enrichedPosts,
+        connections: enrichedConnections,
+        followers: enrichedFollowers,
+        following: enrichedFollowing
+      });
+
+    } catch (error) {
+      console.error('Error loading member data:', error);
+      setError(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
     const handleFollow = async () => {
         if (!currentUserProfile?.id || followingInProgress) return;

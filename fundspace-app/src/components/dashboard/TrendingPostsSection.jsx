@@ -8,32 +8,22 @@ import PropTypes from 'prop-types';
 const TrendingPostCard = ({ post, onClick, pageData, postsLikesData, onPostLike }) => {
     const navigate = useNavigate();
     
-    // ✅ FIXED: Better profile data access using same pattern as PostDetailModal
-    const getAuthorProfile = () => {
-        // Use same pattern as PostDetailModal - check profile_id first, then profiles.id
+    const displayAuthor = React.useMemo(() => {
         const authorId = post.profile_id || post.profiles?.id;
         const postAuthor = post.profiles || post.profile || post.author || post.user;
         
-        if (!authorId && !postAuthor) return { full_name: 'Anonymous' };
+        // If post already has complete profile data embedded, use it directly
+        if (postAuthor?.full_name) {
+            return postAuthor;
+        }
         
-        // Get enhanced profile from pageData if available
-        const enhancedProfile = pageData?.profiles?.[authorId];
-        const orgMembership = pageData?.orgMemberships?.[authorId];
+        // Fallback to pageData lookup
+        if (authorId && pageData?.profiles?.[authorId]) {
+            return pageData.profiles[authorId];
+        }
         
-        return {
-            ...postAuthor,
-            ...enhancedProfile,
-            organization_name: orgMembership?.organization?.name || 
-                              enhancedProfile?.organization_name || 
-                              postAuthor?.organization_name,
-            organization_type: orgMembership?.organization?.type || 
-                              enhancedProfile?.organization_type || 
-                              postAuthor?.organization_type,
-            role: orgMembership?.role || enhancedProfile?.role || postAuthor?.role
-        };
-    };
-
-    const displayAuthor = getAuthorProfile();
+        return { full_name: 'Anonymous' };
+    }, [post.profiles, post.profile, post.author, post.user, post.profile_id, pageData]);
     
     const likesData = postsLikesData?.[post.id] || pageData?.postLikes?.[post.id];
     

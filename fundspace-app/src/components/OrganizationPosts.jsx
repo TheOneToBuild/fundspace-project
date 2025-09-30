@@ -4,7 +4,8 @@ import { MessageSquare, AlertTriangle } from 'lucide-react';
 import CreatePost from './CreatePost.jsx';
 import OrganizationPostCard from './OrganizationPostCard.jsx';
 import OrganizationPostDetailModal from './OrganizationPostDetailModal.jsx';
-import { hasPermission, PERMISSIONS } from '../utils/permissions.js';
+import { hasPermission, PERMISSIONS } from '../utils/organizationPermissions.js';
+import { getOrganizationData } from '../utils/rpcClientFunctions';
 
 export default function OrganizationPosts({ 
   organization, 
@@ -31,22 +32,16 @@ export default function OrganizationPosts({
       setLoading(true);
       setError('');
       
-      const { data: postsData, error: postsError } = await supabase
-        .from('organization_posts')
-        .select('*')
-        .eq('organization_id', organization.id)
-        .order('created_at', { ascending: false });
-
-      if (postsError) throw postsError;
-
-      setPosts(postsData || []);
+      // Use RPC instead of direct query
+      const orgData = await getOrganizationData(organization.id, profile?.id);
+      setPosts(orgData?.posts || []);
     } catch (err) {
       console.error('Error fetching organization posts:', err);
       setError('Failed to load organization posts');
     } finally {
       setLoading(false);
     }
-  }, [organization?.id]);
+  }, [organization?.id, profile?.id]);
 
   useEffect(() => {
     fetchOrganizationPosts();

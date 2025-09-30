@@ -155,43 +155,46 @@ export default function HomeDashboard() {
     
     const trendingPosts = useOptimizedTrendingPosts(dashboardData);
     const { trendingGrants, setTrendingGrants } = useTrendingGrants(dashboardData);
-    const helloCommunityPosts = useHelloCommunityPosts(organizationInfo);
+    const helloCommunityPosts = useHelloCommunityPosts(organizationInfo, profile);
 
-    const enhancedPageData = React.useMemo(() => {
-        const rpcPageData = {
-            profiles: {},
-            postLikes: {},
-            organizations: {},
-            orgMemberships: {}
-        };
+const enhancedPageData = React.useMemo(() => {
+    // Start with profiles from dashboardData
+    const profilesMap = {};
+    
+    // If dashboardData has a profiles object, use it
+    if (dashboardData?.profiles) {
+        Object.assign(profilesMap, dashboardData.profiles);
+    }
+    
+    // Also merge in any profiles from pageData context
+    if (pageData?.profiles) {
+        Object.assign(profilesMap, pageData.profiles);
+    }
 
-        if (dashboardData?.posts) {
-            dashboardData.posts.forEach(post => {
-                if (post.profile) {
-                    rpcPageData.profiles[post.profile.id] = post.profile;
-                }
-                rpcPageData.postLikes[post.id] = { 
-                    isLiked: post.is_liked,
-                    likesCount: post.likes_count 
-                };
-            });
-        }
+    const rpcPageData = {
+        profiles: profilesMap,
+        postLikes: {},
+        organizations: dashboardData?.organizations || pageData?.organizations || {},
+        orgMemberships: dashboardData?.orgMemberships || pageData?.orgMemberships || {}
+    };
 
-        if (dashboardData?.trending_organizations) {
-            dashboardData.trending_organizations.forEach(org => {
-                rpcPageData.organizations[org.id] = org;
-            });
-        }
+    // Add post likes data
+    if (postsLikesData) {
+        Object.assign(rpcPageData.postLikes, postsLikesData);
+    }
+    
+    if (dashboardData?.posts) {
+        dashboardData.posts.forEach(post => {
+            if (!rpcPageData.postLikes[post.id]) {
+                rpcPageData.postLikes[post.id] = {};
+            }
+            rpcPageData.postLikes[post.id].isLiked = post.is_liked;
+            rpcPageData.postLikes[post.id].likesCount = post.likes_count;
+        });
+    }
 
-        return {
-            ...pageData,
-            ...rpcPageData,
-            postLikes: { ...rpcPageData.postLikes, ...(postsLikesData || pageData?.postLikes || {}) },
-            profiles: { ...rpcPageData.profiles, ...(pageData?.profiles || {}) },
-            orgMemberships: pageData?.orgMemberships || {},
-            organizations: { ...rpcPageData.organizations, ...(pageData?.organizations || {}) }
-        };
-    }, [pageData, postsLikesData, dashboardData]);
+    return rpcPageData;
+}, [dashboardData, pageData, postsLikesData]);
 
     const savedGrantIds = React.useMemo(() => {
         const rpcSavedIds = new Set(
