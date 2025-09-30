@@ -19,6 +19,7 @@ import EditableOrganizationPrograms from '../components/organization-profile/Edi
 
 import { useOrganizationSocial } from '../hooks/useOrganizationSocial.js';
 import { hasPermission, PERMISSIONS } from '../utils/organizationPermissions.js';
+import { getProfilesBatch } from '../utils/profileHelpers';
 
 const ORG_TYPE_CONFIGS = {
   foundation: {
@@ -188,11 +189,11 @@ const OrganizationProfilePage = () => {
             .select('organization_post_id, user_id, reaction_type, created_at')
             .in('organization_post_id', postIds),
           
-          userIds.length > 0 ? supabase
-            .from('profiles')
-            .select('id, full_name, avatar_url, title, organization_name, role, organization_type')
-            .in('id', userIds) : Promise.resolve({ data: [] }),
-          
+          userIds.length > 0 ?
+            getProfilesBatch(userIds).then(profilesMap => ({
+              data: Object.values(profilesMap)
+            })) :
+            Promise.resolve({ data: [] }),
           supabase
             .from('organizations')
             .select('id, name, image_url, type, slug')

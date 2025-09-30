@@ -51,9 +51,8 @@ class ConnectionsDataManager {
         throw new Error('No authenticated user found');
       }
   
-      // ✅ FIX: Use getDashboardData instead of getUserProfileComplete
       const dashboardData = await getDashboardData(authUserId);
-      
+  
       if (!dashboardData) {
         return {
           connections: [],
@@ -63,34 +62,31 @@ class ConnectionsDataManager {
         };
       }
   
-      // ✅ FIX: getDashboardData returns connections, not user_connections
       const connections = dashboardData.connections || [];
       const profiles = dashboardData.profiles || {};
-      
-      // ✅ FIX: Filter by status if the connections include status field
-      const establishedConnections = connections.filter(conn => 
-        conn.status === 'accepted' || !conn.status // handle connections without status
+  
+      const establishedConnections = connections.filter(conn =>
+        conn.status === 'accepted'
       );
-      
-      const incomingRequests = connections.filter(conn => 
+  
+      const incomingRequests = connections.filter(conn =>
         conn.status === 'pending' && conn.recipient_id === authUserId
       );
-      
-      const outgoingRequests = connections.filter(conn => 
+  
+      const outgoingRequests = connections.filter(conn =>
         conn.status === 'pending' && conn.requester_id === authUserId
       );
   
-      // ✅ FIX: Build user profiles from dashboard data
       const processedConnections = establishedConnections.map(conn => {
-        const otherUserId = conn.requester_id === authUserId 
-          ? conn.recipient_id 
+        const otherUserId = conn.requester_id === authUserId
+          ? conn.recipient_id
           : conn.requester_id;
-        
-        const userProfile = profiles[otherUserId] || { 
-          id: otherUserId, 
-          full_name: 'Unknown User' 
+  
+        const userProfile = profiles[otherUserId] || {
+          id: otherUserId,
+          full_name: 'Unknown User'
         };
-        
+  
         return {
           id: conn.id,
           connected_at: conn.updated_at || conn.created_at,
@@ -104,9 +100,9 @@ class ConnectionsDataManager {
           created_at: req.created_at,
           type: 'incoming',
           isIncoming: true,
-          user_profile: profiles[req.requester_id] || { 
-            id: req.requester_id, 
-            full_name: 'Unknown User' 
+          user_profile: profiles[req.requester_id] || {
+            id: req.requester_id,
+            full_name: 'Unknown User'
           }
         })),
         ...outgoingRequests.map(req => ({
@@ -114,9 +110,9 @@ class ConnectionsDataManager {
           created_at: req.created_at,
           type: 'outgoing',
           isIncoming: false,
-          user_profile: profiles[req.recipient_id] || { 
-            id: req.recipient_id, 
-            full_name: 'Unknown User' 
+          user_profile: profiles[req.recipient_id] || {
+            id: req.recipient_id,
+            full_name: 'Unknown User'
           }
         }))
       ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
@@ -132,7 +128,7 @@ class ConnectionsDataManager {
         connectedProfileIds,
         authUserId
       };
-
+  
       this.setCache(cacheKey, result);
       return result;
   
@@ -146,8 +142,6 @@ class ConnectionsDataManager {
       };
     }
   }
-
-
   // 2. REPLACED METHOD: Switched to fetching suggested users via RPC and filtering client-side
   async loadDiscoveryData(searchQuery = '', filterType = 'all', connectedProfileIds = new Set()) {
     const cacheKey = this.getCacheKey('discovery', { searchQuery, filterType });

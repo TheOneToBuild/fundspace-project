@@ -49,6 +49,7 @@ import NotificationsPage from './components/NotificationsPage.jsx';
 import ResetPasswordForm from './components/auth/ResetPasswordForm';
 import AuthLayout from './components/auth/AuthLayout';
 import ConnectionsPage from './components/ConnectionsPage.jsx';
+import { getProfileById } from './utils/profileHelpers';
 import GrantsPortalPage from './components/GrantsPortalPage.jsx';
 
 // ✅ OPTIMIZATION: Import RPC functions instead of API Request Optimizer
@@ -366,12 +367,7 @@ const fetchSessionData = async (session) => {
         filter: `user_id=eq.${session.user.id}`
       }, async (payload) => {
         try {
-          const { data: actor } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', payload.new.actor_id)
-            .single();
-          if (actor) {
+          const actor = await getProfileById(payload.new.actor_id);          if (actor) {
             setNotifications(current => [{ ...payload.new, actor_id: actor }, ...current]);
             setUnreadCount(current => current + 1);
           }

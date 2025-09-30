@@ -195,9 +195,17 @@ export default function HelloWorldChannel() {
         if (page === 0) {
           const dashboardData = await getDashboardData(profile?.id);
           const helloWorldPosts = dashboardData?.posts?.filter(post => post.channel === 'hello-world') || [];
-          if (helloWorldPosts.length > 0) {
-            setPosts(helloWorldPosts);
-            if (helloWorldPosts.length < POSTS_PER_PAGE) setHasMore(false);
+          
+          // Map to include profile data if available
+          const enrichedPosts = helloWorldPosts.map(post => ({
+            ...post,
+            profiles: dashboardData?.profiles?.[post.profile_id] || post.profiles,
+            reactions: { summary: [], sample: [] }
+          }));
+          
+          if (enrichedPosts.length > 0) {
+            setPosts(enrichedPosts);
+            if (enrichedPosts.length < POSTS_PER_PAGE) setHasMore(false);
           } else {
             setHasMore(false);
           }

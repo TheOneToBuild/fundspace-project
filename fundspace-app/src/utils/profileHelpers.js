@@ -57,22 +57,14 @@ export const getProfilesBatch = async (userIds) => {
     return {};
   }
 
-  try {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('id, full_name, avatar_url, title, organization_name, organization_type, role, location')
-      .in('id', userIds);
-
-    if (error) throw error;
-
-    const profilesMap = {};
-    data?.forEach(profile => {
-      profilesMap[profile.id] = profile;
-    });
-
-    return profilesMap;
-  } catch (error) {
+  const { data, error } = await supabase.rpc('get_profiles_batch', {
+    p_profile_ids: userIds
+  });
+  
+  if (error) {
     console.error('Error fetching batch profiles:', error);
     return {};
   }
+  
+  return data || {};
 };

@@ -36,18 +36,23 @@ export default function CommunityHub() {
   const batchLoadPostLikes = useCallback(async (postIds, userId) => {
     if (!postIds.length || !userId) return {};
     try {
-      const dashboardData = await getDashboardData(userId);
+      const { data, error } = await supabase
+        .from('post_likes')
+        .select('post_id, reaction_type')
+        .in('post_id', postIds)
+        .eq('user_id', userId);
+
+      if (error) throw error;
+
       const likesLookup = {};
       postIds.forEach(postId => {
         likesLookup[postId] = { userReaction: null };
       });
-      if (dashboardData?.post_likes) {
-        dashboardData.post_likes.forEach(like => {
-          if (postIds.includes(like.post_id) && like.user_id === userId) {
-            likesLookup[like.post_id].userReaction = like.reaction_type;
-          }
-        });
-      }
+
+      data.forEach(like => {
+        likesLookup[like.post_id] = { userReaction: like.reaction_type };
+      });
+
       return likesLookup;
     } catch (error) {
       console.error('Error in batchLoadPostLikes:', error);
