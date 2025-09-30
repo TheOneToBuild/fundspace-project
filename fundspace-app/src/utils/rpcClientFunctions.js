@@ -135,6 +135,28 @@ export const getBatchConnectionStatus = async (viewerId, profileIds) => {
   }
 };
 
+export const getCommentReactionsBatch = async (commentIds, userId = null) => {
+  if (!commentIds || commentIds.length === 0) return {};
+  
+  const cacheKey = getCacheKey('comment_reactions', { commentIds, userId });
+  const cached = getCachedData(cacheKey);
+  if (cached) return cached;
+  
+  try {
+    const { data, error } = await supabase.rpc('get_comment_reactions_batch', {
+      p_comment_ids: commentIds,
+      p_user_id: userId
+    });
+    
+    if (error) throw error;
+    setCachedData(cacheKey, data);
+    return data || {};
+  } catch (error) {
+    console.error('Error fetching comment reactions:', error);
+    return {};
+  }
+};
+
 export const getGlobalSearchResults = async (searchTerm, limit = 20) => {
   const cacheKey = getCacheKey('search', { searchTerm, limit });
   const cached = getCachedData(cacheKey);

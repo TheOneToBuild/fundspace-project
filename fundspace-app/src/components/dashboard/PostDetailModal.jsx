@@ -116,15 +116,9 @@ const PostDetailModal = ({ post, isOpen, onClose, currentUserProfile, pageData, 
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) return;
 
-            const { data: existingReaction } = await supabase
-                .from('post_likes')
-                .select('id, reaction_type')
-                .eq('post_id', post.id)
-                .eq('user_id', user.id)
-                .maybeSingle();
-
-            if (existingReaction && selectedReaction === reactionType) {
-                await supabase.from('post_likes').delete().eq('id', existingReaction.id);
+            const existingReaction = selectedReaction ? { reaction_type: selectedReaction } : null;
+            if (selectedReaction === reactionType) {
+                await supabase.from('post_likes').delete().match({ post_id: post.id, user_id: user.id });
                 setSelectedReaction(null);
                 setLikeCount(prev => Math.max(0, prev - 1));
             } else {
@@ -133,7 +127,7 @@ const PostDetailModal = ({ post, isOpen, onClose, currentUserProfile, pageData, 
                     .upsert({ 
                         post_id: post.id,
                         user_id: user.id,
-                        reaction_type: reactionType 
+                        reaction_type: reactionType
                     });
                 
                 const prevReaction = selectedReaction;

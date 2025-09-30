@@ -61,6 +61,12 @@ function PostCard({
   const [isProcessingReaction, setIsProcessingReaction] = useState(false);
   
   const reactorsTimeoutRef = useRef(null);
+
+  useEffect(() => {
+    if (userReaction !== undefined) {
+      setSelectedReaction(userReaction);
+    }
+  }, [userReaction]);
   const reactionDebounceRef = useRef(null);
   const mountedRef = useRef(true);
 
@@ -125,16 +131,8 @@ function PostCard({
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
 
-        const { data: existingReaction } = await supabase
-          .from('post_likes')
-          .select('id, reaction_type')
-          .eq('post_id', post.id)
-          .eq('user_id', user.id)
-          .maybeSingle();
-
-        const hasExistingReaction = existingReaction?.reaction_type === reactionType;
-
-        if (hasExistingReaction) {
+        const existingReaction = selectedReaction ? { reaction_type: selectedReaction } : null;
+        if (selectedReaction === reactionType) {
           await supabase.from('post_likes').delete().eq('id', existingReaction.id);
           if (mountedRef.current) {
             setSelectedReaction(null);
@@ -168,29 +166,6 @@ function PostCard({
       }
     }, 200);
   }, [currentUserProfile, post?.id, disabled, selectedReaction, isProcessingReaction, onPostLike]);
-
-  useEffect(() => {
-    if (selectedReaction !== null || !currentUserProfile?.id || !post.id) return;
-    
-    const checkReactionStatus = async () => {
-      try {
-        const { data } = await supabase
-          .from('post_likes')
-          .select('reaction_type')
-          .eq('post_id', post.id)
-          .eq('user_id', currentUserProfile.id)
-          .maybeSingle();
-
-        if (mountedRef.current) {
-          setSelectedReaction(data?.reaction_type || null);
-        }
-      } catch (error) {
-        console.error('Error checking reaction status:', error);
-      }
-    };
-
-    checkReactionStatus();
-  }, [post.id, currentUserProfile?.id, selectedReaction]);
 
   useEffect(() => {
     if (!isAuthor || !currentUserProfile?.id) return;

@@ -2,13 +2,15 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../supabaseClient';
 import Avatar from '../Avatar';
+import { getCommentReactionsBatch } from '../../utils/rpcClientFunctions';
 import { reactions } from './constants';
 
 export default function CommentReactions({ 
     comment, 
     currentUserProfile, 
     isOrganizationPost, 
-    onOpenReactionsModal 
+    onOpenReactionsModal,
+    preloadedCommentReactions
 }) {
     const [selectedReaction, setSelectedReaction] = useState(null);
     const [reactionSummary, setReactionSummary] = useState([]);
@@ -23,62 +25,42 @@ export default function CommentReactions({
 
     const commentReactionsTable = isOrganizationPost ? 'organization_post_comment_likes' : 'post_comment_likes';
 
-    // Load user's reaction and reaction summary
     useEffect(() => {
-        let isMounted = true;
+      let isMounted = true;
+      
+      const loadReactions = async () => {
+        // Use preloaded if available
+        if (preloadedCommentReactions?.[comment.id]) {
+          const data = preloadedCommentReactions[comment.id];
+          if (isMounted) {
+            setSelectedReaction(data.userReaction || null);
+            setReactionSummary(data.summary || []);
+            setTotalLikes(data.count || 0);
+          }
+          return;
+        }
         
-        const loadReactions = async () => {
-            if (!comment?.id) return;
-
-            try {
-                // Load user's reaction if user is logged in
-                if (currentUserProfile?.id) {
-                    const { data: userReaction, error: userReactionError } = await supabase
-                        .from(commentReactionsTable)
-                        .select('reaction_type')
-                        .eq('comment_id', comment.id)
-                        .eq('user_id', currentUserProfile.id)
-                        .maybeSingle(); // Use maybeSingle instead of single to avoid PGRST116 error
-                    
-                    if (userReactionError) {
-                        console.error('Error loading user reaction:', userReactionError);
-                    }
-                    
-                    if (isMounted) {
-                        setSelectedReaction(userReaction?.reaction_type || null);
-                    }
-                }
-
-                // Load reaction summary
-                const { data: reactionData, error: reactionError } = await supabase
-                    .from(commentReactionsTable)
-                    .select('reaction_type')
-                    .eq('comment_id', comment.id);
-
-                if (reactionError) {
-                    console.error('Error loading reactions:', reactionError);
-                } else if (reactionData && isMounted) {
-                    const counts = {};
-                    reactionData.forEach(like => {
-                        const type = like.reaction_type || 'like';
-                        counts[type] = (counts[type] || 0) + 1;
-                    });
-
-                    const summary = Object.entries(counts).map(([type, count]) => ({ type, count }));
-                    setReactionSummary(summary);
-                    setTotalLikes(reactionData.length);
-                }
-            } catch (error) {
-                console.error('Error loading comment reactions:', error);
-            }
-        };
-
-        loadReactions();
-
-        return () => {
-            isMounted = false;
-        };
-    }, [comment?.id, currentUserProfile?.id, commentReactionsTable]);
+        // Fallback: load directly
+        if (!currentUserProfile?.id || !comment?.id) return;
+        
+        try {
+          const reactions = await getCommentReactionsBatch([comment.id], currentUserProfile.id);
+          const commentData = reactions[comment.id];
+          
+          if (commentData && isMounted) {
+            setSelectedReaction(commentData.userReaction || null);
+            setReactionSummary(commentData.summary || []);
+            setTotalLikes(commentData.count || 0);
+          }
+        } catch (error) {
+          console.error('Error loading comment reactions:', error);
+        }
+      };
+      
+      loadReactions();
+      
+      return () => { isMounted = false; };
+    }, [comment.id, currentUserProfile?.id, preloadedCommentReactions]);
 
     const handleReaction = async (reactionType) => {
         if (!currentUserProfile?.id || !comment?.id || isLoading) return;

@@ -15,7 +15,8 @@ export default function OrganizationPostDetailModal({
   organization, 
   onClose, 
   currentUserId, 
-  canEdit
+  canEdit,
+  preloadedReactions
 }) {
   if (!post) {
     return null;
@@ -39,34 +40,13 @@ export default function OrganizationPostDetailModal({
       if (!post?.id) return;
 
       try {
-        if (currentUserId) {
-          const { data: userReaction } = await supabase
-            .from('organization_post_likes')
-            .select('reaction_type')
-            .eq('organization_post_id', post.id)
-            .eq('user_id', currentUserId)
-            .single();
-          
-          setSelectedReaction(userReaction?.reaction_type || null);
+        // Remove direct queries, use props instead
+        if (preloadedReactions) {
+          setSelectedReaction(preloadedReactions.userReaction || null);
+          setReactionSummary(preloadedReactions.summary || []);
+          setTotalLikes(preloadedReactions.count || 0);
         }
-
-        const { data: reactionData } = await supabase
-          .from('organization_post_likes')
-          .select('reaction_type')
-          .eq('organization_post_id', post.id);
-
-        if (reactionData) {
-          const counts = {};
-          reactionData.forEach(like => {
-            const type = like.reaction_type || 'like';
-            counts[type] = (counts[type] || 0) + 1;
-          });
-
-          const summary = Object.entries(counts).map(([type, count]) => ({ type, count }));
-          setReactionSummary(summary);
-          setTotalLikes(reactionData.length);
-        }
-
+        
         const { data: commentsData, error: commentsError } = await supabase
           .from('organization_post_comments')
           .select(`
@@ -90,7 +70,7 @@ export default function OrganizationPostDetailModal({
     };
 
     loadData();
-  }, [post?.id, currentUserId]);
+  }, [post?.id, currentUserId, preloadedReactions]);
 
   const handleReaction = async (reactionType) => {
     if (!canInteract || !post?.id) return;
