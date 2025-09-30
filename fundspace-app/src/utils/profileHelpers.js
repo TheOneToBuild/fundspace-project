@@ -46,3 +46,33 @@ export const getProfileById = async (profileId) => {
   
   return data;
 };
+
+/**
+ * Get multiple profiles by ID
+ * @param {Array<string>} userIds - Array of UUIDs of profiles
+ * @returns {Promise<Object>} Object map of profile objects with profile ID as key
+ */
+export const getProfilesBatch = async (userIds) => {
+  if (!userIds || userIds.length === 0) {
+    return {};
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id, full_name, avatar_url, title, organization_name, organization_type, role, location')
+      .in('id', userIds);
+
+    if (error) throw error;
+
+    const profilesMap = {};
+    data?.forEach(profile => {
+      profilesMap[profile.id] = profile;
+    });
+
+    return profilesMap;
+  } catch (error) {
+    console.error('Error fetching batch profiles:', error);
+    return {};
+  }
+};

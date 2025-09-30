@@ -1,5 +1,5 @@
-// src/utils/globalDataManager.js - COMPLETE VERSION with posts optimization methods
 import { supabase } from '../supabaseClient';
+import { getProfilesBatch } from './profileHelpers';
 
 class GlobalDataManager {
   constructor() {
@@ -10,22 +10,16 @@ class GlobalDataManager {
       profiles: new Map(),
       orgMemberships: new Map(),
       comments: new Map(),
-      // NEW batch queues
       userConnections: new Map(),
       connectionStatuses: new Map(),
       followers: new Map(),
       following: new Map()
     };
     this.batchTimeouts = {};
-    
-    // Cache TTL (30 seconds)
     this.CACHE_TTL = 30000;
-    
-    // Batch delay (100ms to collect multiple requests)
     this.BATCH_DELAY = 100;
   }
 
-  // Generic cache management
   getCacheKey(type, params) {
     return `${type}-${JSON.stringify(params)}`;
   }
@@ -35,24 +29,18 @@ class GlobalDataManager {
   }
 
   setCache(key, data) {
-    this.cache.set(key, {
-      data,
-      timestamp: Date.now()
-    });
+    this.cache.set(key, { data, timestamp: Date.now() });
   }
 
   getCache(key) {
     const cacheItem = this.cache.get(key);
     return this.isCacheValid(cacheItem) ? cacheItem.data : null;
   }
-
-  // Batch post likes loading
   async getPostLikes(postIds) {
     const cacheKey = this.getCacheKey('post-likes-batch', postIds.sort());
     const cached = this.getCache(cacheKey);
     if (cached) return cached;
 
-    // Deduplicate request
     if (this.pendingRequests.has(cacheKey)) {
       return this.pendingRequests.get(cacheKey);
     }
@@ -78,7 +66,6 @@ class GlobalDataManager {
 
       if (error) throw error;
 
-      // Group likes by post_id
       const likesByPost = {};
       const userIds = new Set();
 
@@ -90,7 +77,6 @@ class GlobalDataManager {
         userIds.add(like.user_id);
       });
 
-      // Fetch user profiles for all reactors
       let profilesData = [];
       if (userIds.size > 0) {
         const { data: profiles } = await supabase
@@ -100,25 +86,21 @@ class GlobalDataManager {
         profilesData = profiles || [];
       }
 
-      // Create profiles map
       const profilesMap = {};
       profilesData.forEach(profile => {
         profilesMap[profile.id] = profile;
       });
 
-      // Process likes with profile data
       const result = {};
       postIds.forEach(postId => {
         const postLikes = likesByPost[postId] || [];
         
-        // Calculate reaction summary
         const reactionCounts = {};
         postLikes.forEach(like => {
           const type = like.reaction_type || 'like';
           reactionCounts[type] = (reactionCounts[type] || 0) + 1;
         });
 
-        // Create reactors with profile info
         const reactors = postLikes.map(like => ({
           user_id: like.user_id,
           reaction_type: like.reaction_type,
@@ -132,7 +114,7 @@ class GlobalDataManager {
         result[postId] = {
           likes_count: postLikes.length,
           reaction_summary: Object.entries(reactionCounts).map(([type, count]) => ({ type, count })),
-          reactors: reactors.slice(0, 20) // Limit reactors shown
+          reactors: reactors.slice(0, 20)
         };
       });
 
@@ -143,7 +125,6 @@ class GlobalDataManager {
     }
   }
 
-  // Batch profile loading
   async getProfiles(userIds) {
     const uniqueIds = [...new Set(userIds)];
     const cacheKey = this.getCacheKey('profiles-batch', uniqueIds.sort());
@@ -168,30 +149,16 @@ class GlobalDataManager {
 
   async _fetchProfiles(userIds) {
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, full_name, avatar_url, title, organization_name, organization_type, role, location')
-        .in('id', userIds);
-
-      if (error) throw error;
-
-      const profilesMap = {};
-      data?.forEach(profile => {
-        profilesMap[profile.id] = profile;
-      });
-
-      return profilesMap;
+      return await getProfilesBatch(userIds);
     } catch (error) {
       console.error('Error fetching batch profiles:', error);
       return {};
     }
   }
 
-  // Batch organizations loading
   async getOrganizations(orgIds, orgType = null) {
     const uniqueIds = [...new Set(orgIds.filter(Boolean))];
     if (uniqueIds.length === 0) {
-      // Handle case where no specific IDs provided - get recent organizations
       return this._fetchRecentOrganizations(orgType);
     }
 
@@ -268,11 +235,9 @@ class GlobalDataManager {
     }
   }
 
-  // Batch grants loading
   async getGrants(grantIds) {
     const uniqueIds = [...new Set(grantIds.filter(Boolean))];
     if (uniqueIds.length === 0) {
-      // Handle case where no specific IDs provided - get recent grants
       return this._fetchRecentGrants();
     }
 
@@ -340,7 +305,6 @@ class GlobalDataManager {
     }
   }
 
-  // Batch saved grants loading
   async getSavedGrants(userIds) {
     const uniqueIds = [...new Set(userIds.filter(Boolean))];
     const cacheKey = this.getCacheKey('saved-grants-batch', uniqueIds.sort());
@@ -373,7 +337,6 @@ class GlobalDataManager {
 
       if (error) throw error;
 
-      // Group saved grants by user_id
       const savedByUser = {};
       userIds.forEach(userId => {
         savedByUser[userId] = [];
@@ -392,7 +355,6 @@ class GlobalDataManager {
     }
   }
 
-  // FIXED: Batch notifications loading - Use correct column name
   async getNotifications(userIds) {
     const uniqueIds = [...new Set(userIds.filter(Boolean))];
     const cacheKey = this.getCacheKey('notifications-batch', uniqueIds.sort());
@@ -426,7 +388,6 @@ class GlobalDataManager {
 
       if (error) throw error;
 
-      // Group notifications by user_id
       const notificationsByUser = {};
       userIds.forEach(userId => {
         notificationsByUser[userId] = [];
@@ -445,7 +406,6 @@ class GlobalDataManager {
     }
   }
 
-  // Batch posts for organizations loading
   async getPostsForOrganizations(orgIds) {
     const uniqueIds = [...new Set(orgIds.filter(Boolean))];
     const cacheKey = this.getCacheKey('org-posts-batch', uniqueIds.sort());
@@ -482,7 +442,6 @@ class GlobalDataManager {
 
       if (error) throw error;
 
-      // Group posts by organization_id
       const postsByOrg = {};
       orgIds.forEach(orgId => {
         postsByOrg[orgId] = [];
@@ -501,7 +460,6 @@ class GlobalDataManager {
     }
   }
 
-  // NEW: Batch posts by channel loading
   async getPostsByChannel(channel, limit = 20) {
     const cacheKey = this.getCacheKey('posts-by-channel', { channel, limit });
     const cached = this.getCache(cacheKey);
@@ -543,7 +501,6 @@ class GlobalDataManager {
     }
   }
 
-  // NEW: Batch posts for multiple users
   async getPostsForUsers(userIds, limit = 20) {
     const uniqueIds = [...new Set(userIds.filter(Boolean))];
     const cacheKey = this.getCacheKey('posts-for-users', { userIds: uniqueIds.sort(), limit });
@@ -580,7 +537,6 @@ class GlobalDataManager {
 
       if (error) throw error;
 
-      // Group posts by user
       const postsByUser = {};
       userIds.forEach(userId => {
         postsByUser[userId] = [];
@@ -599,14 +555,11 @@ class GlobalDataManager {
     }
   }
 
-  // Batch post likes for multiple posts
   async getPostLikesForPosts(postIds) {
     const uniqueIds = [...new Set(postIds.filter(Boolean))];
-    // This just delegates to the existing getPostLikes method
     return this.getPostLikes(uniqueIds);
   }
 
-  // Batch user connections loading
   async getUserConnections(userIds, status = null) {
     const uniqueIds = [...new Set(userIds)];
     const cacheKey = this.getCacheKey('user-connections-batch', { userIds: uniqueIds.sort(), status });
@@ -636,7 +589,6 @@ class GlobalDataManager {
         .select('id, requester_id, recipient_id, status, created_at, updated_at')
         .order('created_at', { ascending: false });
 
-      // Build OR conditions for all users
       const orConditions = userIds.flatMap(userId => [
         `requester_id.eq.${userId}`,
         `recipient_id.eq.${userId}`
@@ -652,14 +604,12 @@ class GlobalDataManager {
 
       if (error) throw error;
 
-      // Group connections by user
       const connectionsByUser = {};
       userIds.forEach(userId => {
         connectionsByUser[userId] = [];
       });
 
       connectionsData?.forEach(conn => {
-        // Add to requester's connections
         if (connectionsByUser[conn.requester_id]) {
           connectionsByUser[conn.requester_id].push({
             ...conn,
@@ -667,7 +617,6 @@ class GlobalDataManager {
           });
         }
         
-        // Add to recipient's connections
         if (connectionsByUser[conn.recipient_id]) {
           connectionsByUser[conn.recipient_id].push({
             ...conn,
@@ -683,7 +632,6 @@ class GlobalDataManager {
     }
   }
 
-  // Batch connection status checks (major performance improvement)
   async getBatchConnectionStatuses(currentUserId, targetUserIds) {
     const uniqueIds = [...new Set(targetUserIds)];
     const cacheKey = this.getCacheKey('connection-statuses-batch', { currentUserId, targetUserIds: uniqueIds.sort() });
@@ -708,7 +656,6 @@ class GlobalDataManager {
 
   async _fetchBatchConnectionStatuses(currentUserId, targetUserIds) {
     try {
-      // Build OR conditions for all target users
       const orConditions = targetUserIds.flatMap(targetId => [
         `and(requester_id.eq.${currentUserId},recipient_id.eq.${targetId})`,
         `and(requester_id.eq.${targetId},recipient_id.eq.${currentUserId})`
@@ -721,7 +668,6 @@ class GlobalDataManager {
 
       if (error) throw error;
 
-      // Process results
       const statusMap = {};
       targetUserIds.forEach(targetId => {
         statusMap[targetId] = { status: 'none', isRequester: false };
@@ -754,7 +700,6 @@ class GlobalDataManager {
     }
   }
 
-  // Single connection status (with batching)
   async getConnectionStatus(currentUserId, targetUserId) {
     return new Promise((resolve) => {
       const key = `${currentUserId}-${targetUserId}`;
@@ -768,7 +713,6 @@ class GlobalDataManager {
         const requests = Array.from(this.batchQueues.connectionStatuses.values());
         this.batchQueues.connectionStatuses.clear();
 
-        // Group requests by currentUserId for more efficient batching
         const requestsByUser = {};
         requests.forEach(req => {
           if (!requestsByUser[req.currentUserId]) {
@@ -777,7 +721,6 @@ class GlobalDataManager {
           requestsByUser[req.currentUserId].push(req);
         });
 
-        // Process each user's requests
         for (const [currentUserId, userRequests] of Object.entries(requestsByUser)) {
           try {
             const targetUserIds = userRequests.map(req => req.targetUserId);
@@ -796,7 +739,6 @@ class GlobalDataManager {
     });
   }
 
-  // Batch followers loading
   async getFollowers(userIds) {
     const uniqueIds = [...new Set(userIds)];
     const cacheKey = this.getCacheKey('followers-batch', uniqueIds.sort());
@@ -832,7 +774,6 @@ class GlobalDataManager {
 
       if (error) throw error;
 
-      // Group followers by following_id
       const followersByUser = {};
       userIds.forEach(userId => {
         followersByUser[userId] = [];
@@ -851,7 +792,6 @@ class GlobalDataManager {
     }
   }
 
-  // Batch following loading
   async getFollowing(userIds) {
     const uniqueIds = [...new Set(userIds)];
     const cacheKey = this.getCacheKey('following-batch', uniqueIds.sort());
@@ -887,7 +827,6 @@ class GlobalDataManager {
 
       if (error) throw error;
 
-      // Group following by follower_id
       const followingByUser = {};
       userIds.forEach(userId => {
         followingByUser[userId] = [];
@@ -906,7 +845,6 @@ class GlobalDataManager {
     }
   }
 
-  // Batch organization membership loading
   async getOrganizationMemberships(userIds) {
     const uniqueIds = [...new Set(userIds)];
     const cacheKey = this.getCacheKey('org-memberships-batch', uniqueIds.sort());
@@ -931,7 +869,6 @@ class GlobalDataManager {
 
   async _fetchOrgMemberships(userIds) {
     try {
-      // Direct queries approach - no RPC needed
       const { data: memberships, error } = await supabase
         .from('organization_memberships')
         .select('profile_id, organization_id, role, organization_type')
@@ -975,7 +912,6 @@ class GlobalDataManager {
     }
   }
 
-  // Batch comment loading
   async getPostComments(postIds) {
     const cacheKey = this.getCacheKey('post-comments-batch', postIds.sort());
     const cached = this.getCache(cacheKey);
@@ -1010,7 +946,6 @@ class GlobalDataManager {
 
       if (error) throw error;
 
-      // Group comments by post_id
       const commentsByPost = {};
       postIds.forEach(postId => {
         commentsByPost[postId] = [];
@@ -1029,18 +964,14 @@ class GlobalDataManager {
     }
   }
 
-  // Single post likes (with batching)
   async getPostLikesForPost(postId) {
     return new Promise((resolve) => {
-      // Add to batch queue
       this.batchQueues.postLikes.set(postId, resolve);
 
-      // Clear existing timeout
       if (this.batchTimeouts.postLikes) {
         clearTimeout(this.batchTimeouts.postLikes);
       }
 
-      // Set new timeout to process batch
       this.batchTimeouts.postLikes = setTimeout(async () => {
         const postIds = Array.from(this.batchQueues.postLikes.keys());
         const resolvers = Array.from(this.batchQueues.postLikes.values());
@@ -1069,7 +1000,6 @@ class GlobalDataManager {
     });
   }
 
-  // Single organization membership (with batching)
   async getOrganizationMembership(userId) {
     return new Promise((resolve) => {
       this.batchQueues.orgMemberships.set(userId, resolve);
@@ -1098,7 +1028,6 @@ class GlobalDataManager {
     });
   }
 
-  // Single post comments (with batching)
   async getCommentsForPost(postId) {
     return new Promise((resolve) => {
       this.batchQueues.comments.set(postId, resolve);
@@ -1127,7 +1056,6 @@ class GlobalDataManager {
     });
   }
 
-  // Clear cache
   clearCache(prefix) {
     if (prefix) {
       for (const [key] of this.cache) {
@@ -1140,7 +1068,6 @@ class GlobalDataManager {
     }
   }
 
-  // Periodic cache cleanup
   startCacheCleanup() {
     setInterval(() => {
       const now = Date.now();
@@ -1153,10 +1080,7 @@ class GlobalDataManager {
   }
 }
 
-// Create singleton instance
 const globalDataManager = new GlobalDataManager();
-
-// Start cleanup
 globalDataManager.startCacheCleanup();
 
 export default globalDataManager;

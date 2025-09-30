@@ -3,6 +3,7 @@ import { Link, NavLink, useLocation } from 'react-router-dom';
 import { Menu, X, PlusCircle, ChevronDown } from './Icons.jsx';
 import AuthButton from './AuthButton.jsx';
 import { supabase } from '../supabaseClient';
+import { getProfileById } from '../utils/profileHelpers.js';
 import headerLogoImage from '../assets/fundspace-logo2.png';
 
 const PublicNavLink = ({ to, children, activeClassName, mobile = false, onClick }) => {
@@ -38,32 +39,24 @@ export default function PublicHeader() {
 
     // Fetch session/profile on mount
     useEffect(() => {
+        const fetchProfileForSession = async (currentSession) => {
+            setSession(currentSession);
+            if (currentSession?.user) {
+                const profileData = await getProfileById(currentSession.user.id);
+                setProfile(profileData);
+            } else {
+                setProfile(null);
+            }
+        };
+
         supabase.auth.getSession().then(({ data: { session } }) => {
-            setSession(session);
-            if (session?.user) {
-                supabase
-                    .from('profiles')
-                    .select('*')
-                    .eq('id', session.user.id)
-                    .single()
-                    .then(({ data }) => setProfile(data));
-            } else {
-                setProfile(null);
-            }
+            fetchProfileForSession(session);
         });
+
         const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, newSession) => {
-            setSession(newSession);
-            if (newSession?.user) {
-                supabase
-                    .from('profiles')
-                    .select('*')
-                    .eq('id', newSession.user.id)
-                    .single()
-                    .then(({ data }) => setProfile(data));
-            } else {
-                setProfile(null);
-            }
+            fetchProfileForSession(newSession);
         });
+
         return () => subscription.unsubscribe();
     }, []);
 
