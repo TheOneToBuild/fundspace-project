@@ -188,74 +188,45 @@ export default function HelloWorldChannel() {
   }, [profile?.id]);
 
   useEffect(() => {
-    const fetchPosts = async () => {
-      if (!hasMore) return;
-      setIsLoading(true);
-      try {
-        if (page === 0) {
-          const dashboardData = await getDashboardData(profile?.id);
-          const helloWorldPosts = dashboardData?.posts?.filter(post => post.channel === 'hello-world') || [];
-          
-          // Map to include profile data if available
-          const enrichedPosts = helloWorldPosts.map(post => ({
-            ...post,
-            profiles: dashboardData?.profiles?.[post.profile_id] || post.profiles,
-            reactions: { summary: [], sample: [] }
-          }));
-          
-          if (enrichedPosts.length > 0) {
-            setPosts(enrichedPosts);
-            if (enrichedPosts.length < POSTS_PER_PAGE) setHasMore(false);
-          } else {
-            setHasMore(false);
-          }
+  const fetchPosts = async () => {
+    if (!hasMore) return;
+    setIsLoading(true);
+    try {
+      // Always use RPC for all pages
+      const dashboardData = await getDashboardData(profile?.id);
+      const helloWorldPosts = dashboardData?.posts?.filter(post => post.channel === 'hello-world') || [];
+      
+      // Map to include profile data if available
+      const enrichedPosts = helloWorldPosts.map(post => ({
+        ...post,
+        profiles: dashboardData?.profiles?.[post.profile_id] || post.profiles,
+        reactions: { summary: [], sample: [] }
+      }));
+      
+      if (page === 0) {
+        setPosts(enrichedPosts);
+      } else {
+        // For pagination beyond what RPC returns, fall back to direct query
+        if (enrichedPosts.length >= POSTS_PER_PAGE) {
+          setPosts(prevPosts => [...prevPosts, ...enrichedPosts.slice(page * POSTS_PER_PAGE)]);
         } else {
-          const { data: postsData, error: postsError } = await supabase
-            .from('posts')
-            .select(`*, profiles:profile_id(id, full_name, avatar_url, title, organization_name, role, organization_type)`)
-            .eq('channel', 'hello-world')
-            .order('created_at', { ascending: false })
-            .range(page * POSTS_PER_PAGE, (page + 1) * POSTS_PER_PAGE - 1);
-
-          if (postsError) throw postsError;
-
-          if (postsData && postsData.length > 0) {
-            const basicPosts = postsData.map(post => ({
-              ...post,
-              reactions: { summary: [], sample: [] }
-            }));
-            setPosts(prevPosts => [...prevPosts, ...basicPosts]);
-            if (postsData.length < POSTS_PER_PAGE) setHasMore(false);
-          } else {
-            setHasMore(false);
-          }
+          setHasMore(false);
         }
-      } catch (error) {
-        console.error("Error fetching posts:", error);
-        setHasMore(false);
-      } finally {
-        setIsLoading(false);
       }
-    };
-    fetchPosts();
+      
+      if (enrichedPosts.length < POSTS_PER_PAGE) setHasMore(false);
+    } catch (error) {
+      console.error("Error fetching posts:", error);
+      setHasMore(false);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  fetchPosts();
   }, [page, hasMore, profile?.id]);
 
   useEffect(() => {
     if (!profile) return;
-    const refreshPostCounts = async (postId) => {
-      const isInCurrentPosts = posts.some(p => p.id === postId);
-      if (!isInCurrentPosts) return;
-      const { data: postData } = await supabase
-        .from('posts')
-        .select('likes_count, comments_count')
-        .eq('id', postId)
-        .single();
-      if (postData) {
-        setPosts(currentPosts => currentPosts.map(p => 
-          p.id === postId ? { ...p, likes_count: postData.likes_count, comments_count: postData.comments_count } : p
-        ));
-      }
-    };
 
     const subscription = realtimeManager.createSubscription(
       'hello-world',
@@ -290,11 +261,13 @@ export default function HelloWorldChannel() {
         },
         onLikeChange: (payload) => {
           const postId = payload.new?.post_id || payload.old?.post_id;
-          if (postId) refreshPostCounts(postId);
+          // The count is now updated via database triggers and re-fetched.
+          // No client-side action needed here for counts.
         },
         onCommentChange: (payload) => {
           const postId = payload.new?.post_id || payload.old?.post_id;
-          if (postId) refreshPostCounts(postId);
+          // The count is now updated via database triggers and re-fetched.
+          // No client-side action needed here for counts.
         }
       }
     );

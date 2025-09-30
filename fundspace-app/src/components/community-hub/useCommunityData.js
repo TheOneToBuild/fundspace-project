@@ -55,99 +55,30 @@ export const useCommunityData = (profile) => {
     }
 
     try {
-      let postsData;
+      setLoading(true);
       
-      if (channelConfig.id === 'hello-world') {
-        if (pageNum === 0) {
-          const dashboardData = await getDashboardData(profile?.id);
-          postsData = dashboardData?.posts?.filter(post => post.channel === 'hello-world') || [];
-        } else {
-          const { data, error } = await supabase
-            .from('posts')
-            .select(`*, profiles:profile_id(id, full_name, avatar_url, title, organization_name, role, organization_type)`)
-            .eq('channel', 'hello-world')
-            .order('created_at', { ascending: false })
-            .range(pageNum * POSTS_PER_PAGE, (pageNum + 1) * POSTS_PER_PAGE - 1);
-          
-          if (error) throw error;
-          postsData = data;
-        }
-        
-      } else if (channelConfig.id === 'hello-community') {
-        const userOrgType = getOrgBaseType(organizationInfo?.type);
-        if (!userOrgType) {
-          setLoading(false);
-          return;
-        }
-
-        if (pageNum === 0) {
-          const dashboardData = await getDashboardData(profile?.id);
-          postsData = dashboardData?.posts?.filter(post => post.channel === channelConfig.dbChannel) || [];
-        } else {
-          const { data, error } = await supabase
-            .from('posts')
-            .select(`*, profiles:profile_id(id, full_name, avatar_url, title, organization_name, role, organization_type)`)
-            .eq('channel', channelConfig.dbChannel)
-            .order('created_at', { ascending: false })
-            .range(pageNum * POSTS_PER_PAGE, (pageNum + 1) * POSTS_PER_PAGE - 1);
-          
-          if (error) throw error;
-          postsData = data;
-        }
+      // Always use RPC - get from dashboard data
+      const dashboardData = await getDashboardData(profile?.id);
+      const allPosts = dashboardData?.posts || [];
+      
+      // Filter by channel
+      const channelPosts = allPosts.filter(post => post.channel === channelConfig.dbChannel);
+      
+      if (pageNum === 0) {
+        setPosts(channelPosts);
       } else {
-        postsData = [];
+        // For pagination, append
+        const start = pageNum * POSTS_PER_PAGE;
+        const pagePosts = channelPosts.slice(start, start + POSTS_PER_PAGE);
+        setPosts(prevPosts => [...prevPosts, ...pagePosts]);
       }
-
-      if (postsData && postsData.length > 0) {
-        const postIds = postsData.map(post => post.id);
-        
-        let reactionsData = {};
-        if (pageNum === 0) {
-          const dashboardData = await getDashboardData(profile?.id);
-          if (dashboardData?.post_likes) {
-            dashboardData.post_likes.forEach(like => {
-              if (postIds.includes(like.post_id)) {
-                if (!reactionsData[like.post_id]) {
-                  reactionsData[like.post_id] = { reaction_summary: [] };
-                }
-                reactionsData[like.post_id].reaction_summary.push(like);
-              }
-            });
-          }
-        } else {
-          const { data: reactions } = await supabase
-            .from('post_reactions')
-            .select('post_id, reaction_type, user_id')
-            .in('post_id', postIds);
-          
-          if (reactions) {
-            reactions.forEach(reaction => {
-              if (!reactionsData[reaction.post_id]) {
-                reactionsData[reaction.post_id] = { reaction_summary: [] };
-              }
-              reactionsData[reaction.post_id].reaction_summary.push(reaction);
-            });
-          }
-        }
-
-        const enrichedPosts = postsData.map(post => {
-          const postReactions = reactionsData[post.id];
-          return {
-            ...post,
-            reactions: {
-              summary: postReactions?.reaction_summary || [],
-              sample: []
-            }
-          };
-        });
-
-        setPosts(prev => pageNum === 0 ? enrichedPosts : [...prev, ...enrichedPosts]);
-        if (enrichedPosts.length < POSTS_PER_PAGE) setHasMore(false);
-      } else {
+      
+      if (channelPosts.length < (pageNum + 1) * POSTS_PER_PAGE) {
         setHasMore(false);
       }
     } catch (error) {
       console.error('Error fetching posts:', error);
+      setHasMore(false);
     } finally {
       setLoading(false);
     }

@@ -20,6 +20,7 @@ import EditableOrganizationPrograms from '../components/organization-profile/Edi
 import { useOrganizationSocial } from '../hooks/useOrganizationSocial.js';
 import { hasPermission, PERMISSIONS } from '../utils/organizationPermissions.js';
 import { getProfilesBatch } from '../utils/profileHelpers';
+import { getOrganizationData } from '../utils/rpcClientFunctions.js';
 
 const ORG_TYPE_CONFIGS = {
   foundation: {
@@ -168,84 +169,21 @@ const OrganizationProfilePage = () => {
       if (orgError) throw orgError;
       if (!orgData) throw new Error("Organization not found");
 
-      setOrganization(orgData);
-      
-      const { data: postsData, error: postsError } = await supabase
-        .from('organization_posts')
-        .select('*')
-        .eq('organization_id', orgData.id)
-        .order('created_at', { ascending: false })
-        .limit(20);
+      // Use RPC to get all organization data
+      const fullOrgData = await getOrganizationData(orgData.id, session?.user?.id);
 
-      if (!postsError && postsData?.length > 0) {
-        setOrganizationPosts(postsData);
+      if (fullOrgData) {
+        setOrganization(fullOrgData.organization);
+        setOrganizationPosts(fullOrgData.posts || []);
+        setPostsLikesData(fullOrgData.post_likes_summary || {});
+        setBatchedProfilesData(fullOrgData.profiles || {});
+        setBatchedOrganizationsData(fullOrgData.organizations || {});
         
-        const userIds = [...new Set(postsData.map(p => p.created_by_user_id).filter(Boolean))];
-        const postIds = postsData.map(p => p.id);
-        
-        const [likesResult, profilesResult, orgsResult] = await Promise.all([
-          supabase
-            .from('organization_post_likes')
-            .select('organization_post_id, user_id, reaction_type, created_at')
-            .in('organization_post_id', postIds),
-          
-          userIds.length > 0 ?
-            getProfilesBatch(userIds).then(profilesMap => ({
-              data: Object.values(profilesMap)
-            })) :
-            Promise.resolve({ data: [] }),
-          supabase
-            .from('organizations')
-            .select('id, name, image_url, type, slug')
-            .limit(50)
-        ]);
-
-        if (likesResult.data) {
-          const likesMap = {};
-          likesResult.data.forEach(like => {
-            if (!likesMap[like.organization_post_id]) {
-              likesMap[like.organization_post_id] = [];
-            }
-            likesMap[like.organization_post_id].push(like);
-          });
-
-          const processedLikes = {};
-          Object.entries(likesMap).forEach(([postId, likes]) => {
-            const reactionCounts = {};
-            likes.forEach(like => {
-              const type = like.reaction_type || 'like';
-              reactionCounts[type] = (reactionCounts[type] || 0) + 1;
-            });
-
-            processedLikes[postId] = {
-              likes_count: likes.length,
-              reaction_summary: Object.entries(reactionCounts).map(([type, count]) => ({ type, count })),
-              reactors: likes.slice(0, 10),
-              userReaction: session?.user?.id ? 
-                likes.find(l => l.user_id === session.user.id)?.reaction_type || null : null
-            };
-          });
-
-          setPostsLikesData(processedLikes);
+        if (fullOrgData.posts && fullOrgData.posts.length > 0) {
+          loadPostsPageData(fullOrgData.posts);
         }
-
-        if (profilesResult.data) {
-          const profilesMap = {};
-          profilesResult.data.forEach(profile => {
-            profilesMap[profile.id] = profile;
-          });
-          setBatchedProfilesData(profilesMap);
-        }
-
-        if (orgsResult.data) {
-          const orgsMap = {};
-          orgsResult.data.forEach(org => {
-            orgsMap[org.id] = org;
-          });
-          setBatchedOrganizationsData(orgsMap);
-        }
-
-        loadPostsPageData(postsData);
+      } else {
+        setOrganization(orgData); // Fallback to basic data
       }
 
     } catch (err) {
