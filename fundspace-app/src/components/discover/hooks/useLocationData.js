@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '../../../supabaseClient';
 import { DEMOGRAPHICS_DATA } from '../data/demographics/index.js';
 import { BAY_AREA_COUNTIES } from '../data/locationData.js';
+import { getLocationData } from '../../../utils/rpcClientFunctions';
 
 export function useLocationData(selectedLocation, viewType) {
     const [locationData, setLocationData] = useState({
@@ -37,46 +37,17 @@ export function useLocationData(selectedLocation, viewType) {
                 }
             }
 
-            let orgsQuery = supabase
-                .from('organizations')
-                .select(`id, name, type, tagline, image_url, location, slug`)
-                .limit(12);
-
-            if (location !== 'bay-area') {
-                orgsQuery = orgsQuery.ilike('location', locationQuery);
-            }
-
-            const { data: orgsData, error: orgsError } = await orgsQuery;
-
-            const { data: grantsData, error: grantsError } = await supabase
-                .from('grants')
-                .select(`id, title, description, deadline, max_funding_amount, funding_amount_text, organization_id`)
-                .limit(12);
-
-            let postsQuery = supabase
-                .from('posts')
-                .select(`id, content, created_at, likes_count, comments_count, profiles:profile_id(id, full_name, avatar_url, organization_name)`)
-                .order('created_at', { ascending: false })
-                .limit(12);
-
-            if (location !== 'bay-area') {
-                postsQuery = postsQuery.or(`content.ilike.%${location}%,content.ilike.%${locationQuery}%`);
-            }
-
-            const { data: postsData, error: postsError } = await postsQuery;
-
-            if (orgsError) console.error('Organizations query error:', orgsError);
-            if (grantsError) console.error('Grants query error:', grantsError);
-            if (postsError) console.error('Posts query error:', postsError);
+            // Single RPC call instead of 3 REST queries
+            const data = await getLocationData(location, locationQuery);
 
             const finalData = {
-                organizations: orgsData || [],
-                grants: grantsData || [],
-                posts: postsData || [],
-                stats: {
-                    totalOrgs: orgsData?.length || 0,
-                    totalGrants: grantsData?.length || 0,
-                    totalPosts: postsData?.length || 0
+                organizations: data.organizations || [],
+                grants: data.grants || [],
+                posts: data.posts || [],
+                stats: data.stats || {
+                    totalOrgs: 0,
+                    totalGrants: 0,
+                    totalPosts: 0
                 },
                 demographics
             };

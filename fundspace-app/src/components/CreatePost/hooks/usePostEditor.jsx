@@ -1,4 +1,3 @@
-// src/components/CreatePost/hooks/usePostEditor.jsx
 import { useEditor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Mention from '@tiptap/extension-mention';
@@ -19,7 +18,6 @@ export const usePostEditor = (placeholderText, profile, onUpdate) => {
         showOnlyCurrent: false,
         includeChildren: true,
       }),
-      // MENTION EXTENSION with following/followers
       Mention.extend({
         name: 'mention',
         addAttributes() {

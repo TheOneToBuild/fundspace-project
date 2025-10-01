@@ -4,7 +4,7 @@ import { Outlet, useOutletContext } from 'react-router-dom';
 import PublicPageLayout from './components/PublicPageLayout.jsx';
 import GrantDetailModal from './GrantDetailModal.jsx';
 import { usePageDataLoader } from './hooks/usePageDataLoader';
-import { getUserProfileComplete, getDashboardData, trackRPCUsage } from './utils/rpcClientFunctions';
+import { getUserProfileComplete, getDashboardData, trackRPCUsage, getGrantById } from './utils/rpcClientFunctions';
 
 export default function ProfilePage() {
   const appContext = useOutletContext();
@@ -222,34 +222,23 @@ export default function ProfilePage() {
 
   const handleTrendingGrantClick = useCallback(async (grantId) => {
     try {
-      const { data } = await supabase
-        .from('grants')
-        .select(`*, grant_categories(categories(*)), grant_locations(locations(*))`)
-        .eq('id', grantId)
-        .single();
-      if (data) {
-        let orgData = null;
-        if (data.organization_id) {
-          const { data: organizationData } = await supabase
-            .from('organizations')
-            .select('name, image_url')
-            .eq('id', data.organization_id)
-            .single();
-          orgData = organizationData;
-        }
+      const result = await getGrantById(grantId, session?.user?.id);
+      
+      if (result?.grant) {
+        const grant = result.grant;
         openDetail({
-          ...data,
-          foundationName: orgData?.name || 'Unknown Organization',
-          funderLogoUrl: orgData?.image_url || null,
-          categories: data.grant_categories?.map((gc) => gc.categories) || [],
-          locations: data.grant_locations?.map((gl) => gl.locations) || [],
-          dueDate: data.deadline,
+          ...grant,
+          foundationName: grant.organization?.name || 'Unknown Organization',
+          funderLogoUrl: grant.organization?.logo_url || null,
+          categories: grant.categories || [],
+          locations: grant.locations || [],
+          dueDate: grant.deadline,
         });
       }
     } catch (error) {
       console.error('Error fetching grant details:', error);
     }
-  }, [openDetail]);
+  }, [openDetail, session?.user?.id]);
 
   const handleSaveGrant = useCallback(
     async (grantId) => {

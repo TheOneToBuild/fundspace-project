@@ -88,7 +88,7 @@ const TrendingNewsSection = () => {
   return (
     <div className="mb-6">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-bold text-slate-800">Trending World News</h2>
+        <h2 className="text-xl font-bold text-slate-800">Trending Bay Area News</h2>
         <div className="flex space-x-2">
           <button onClick={() => scrollNews('left')} className="p-2 bg-white border rounded-lg hover:bg-slate-50">
             <ChevronLeft size={16} />
@@ -192,11 +192,9 @@ export default function HelloWorldChannel() {
     if (!hasMore) return;
     setIsLoading(true);
     try {
-      // Always use RPC for all pages
       const dashboardData = await getDashboardData(profile?.id);
       const helloWorldPosts = dashboardData?.posts?.filter(post => post.channel === 'hello-world') || [];
       
-      // Map to include profile data if available
       const enrichedPosts = helloWorldPosts.map(post => ({
         ...post,
         profiles: dashboardData?.profiles?.[post.profile_id] || post.profiles,
@@ -206,7 +204,6 @@ export default function HelloWorldChannel() {
       if (page === 0) {
         setPosts(enrichedPosts);
       } else {
-        // For pagination beyond what RPC returns, fall back to direct query
         if (enrichedPosts.length >= POSTS_PER_PAGE) {
           setPosts(prevPosts => [...prevPosts, ...enrichedPosts.slice(page * POSTS_PER_PAGE)]);
         } else {
@@ -261,13 +258,9 @@ export default function HelloWorldChannel() {
         },
         onLikeChange: (payload) => {
           const postId = payload.new?.post_id || payload.old?.post_id;
-          // The count is now updated via database triggers and re-fetched.
-          // No client-side action needed here for counts.
         },
         onCommentChange: (payload) => {
           const postId = payload.new?.post_id || payload.old?.post_id;
-          // The count is now updated via database triggers and re-fetched.
-          // No client-side action needed here for counts.
         }
       }
     );

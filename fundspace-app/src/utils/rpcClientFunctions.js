@@ -244,6 +244,84 @@ export const getUserOrganizationMembership = async (userId) => {
   }
 };
 
+export const getGrantById = async (grantId, userId = null) => {
+  const cacheKey = getCacheKey('grant', { grantId, userId });
+  const cached = getCachedData(cacheKey);
+  if (cached) return cached;
+  
+  try {
+    const { data, error } = await supabase.rpc('get_grant_by_id', {
+      p_grant_id: grantId,
+      p_user_id: userId
+    });
+    
+    if (error) throw error;
+    
+    setCachedData(cacheKey, data);
+    trackRPCUsage('get_grant_by_id', true);
+    return data;
+  } catch (error) {
+    console.error('Error fetching grant by ID:', error);
+    trackRPCUsage('get_grant_by_id', false);
+    throw error;
+  }
+};
+
+export const getLocationData = async (location, locationQuery, limits = {}) => {
+  const {
+    orgLimit = 12,
+    grantLimit = 12,
+    postLimit = 12
+  } = limits;
+  
+  const cacheKey = getCacheKey('location_data', { location, locationQuery, orgLimit, grantLimit, postLimit });
+  const cached = getCachedData(cacheKey);
+  if (cached) return cached;
+  
+  try {
+    const { data, error } = await supabase.rpc('get_location_data', {
+      p_location: location,
+      p_location_query: locationQuery,
+      p_org_limit: orgLimit,
+      p_grant_limit: grantLimit,
+      p_post_limit: postLimit
+    });
+    
+    if (error) throw error;
+    
+    setCachedData(cacheKey, data);
+    trackRPCUsage('get_location_data', true);
+    return data;
+  } catch (error) {
+    console.error('Error fetching location data:', error);
+    trackRPCUsage('get_location_data', false);
+    throw error;
+  }
+};
+
+export const getUserTrackedGrants = async (userId, organizationId = null) => {
+  const cacheKey = getCacheKey('tracked_grants', { userId, organizationId });
+  const cached = getCachedData(cacheKey);
+  if (cached) return cached;
+  
+  try {
+    const { data, error } = await supabase.rpc('get_user_tracked_grants', {
+      p_user_id: userId,
+      p_organization_id: organizationId
+    });
+    
+    if (error) throw error;
+    
+    setCachedData(cacheKey, data);
+    trackRPCUsage('get_user_tracked_grants', true);
+    return data;
+  } catch (error) {
+    console.error('Error fetching tracked grants:', error);
+    trackRPCUsage('get_user_tracked_grants', false);
+    throw error;
+  }
+};
+
 export const invalidateCache = (pattern) => {
   const keys = Array.from(cache.keys());
   keys.forEach(key => {

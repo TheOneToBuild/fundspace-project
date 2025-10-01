@@ -52,12 +52,9 @@ import ConnectionsPage from './components/ConnectionsPage.jsx';
 import { getProfileById } from './utils/profileHelpers';
 import GrantsPortalPage from './components/GrantsPortalPage.jsx';
 
-// ✅ OPTIMIZATION: Import RPC functions instead of API Request Optimizer
 import { getUserProfileComplete, getDashboardData, invalidateCache } from './utils/rpcClientFunctions';
 
-// ✅ OPTIONAL: Add RPC call monitoring in development
 if (process.env.NODE_ENV === 'development') {
-  // Monitor RPC vs API call usage
   const originalFetch = window.fetch;
   let rpcCallCount = 0;
   let apiCallCount = 0;
@@ -77,7 +74,6 @@ if (process.env.NODE_ENV === 'development') {
         apiCallCount++;
         console.log(`📡 API Call #${apiCallCount}: ${endpoint}`);
         
-        // Warn about unoptimized calls
         if (apiCallCount > 10) {
           console.warn('⚠️ HIGH INDIVIDUAL API USAGE - Consider using RPC functions!');
         }
@@ -89,7 +85,6 @@ if (process.env.NODE_ENV === 'development') {
     return originalFetch.apply(this, args);
   };
   
-  // Log optimization stats periodically
   setInterval(() => {
     const totalCalls = rpcCallCount + apiCallCount;
     if (totalCalls > 0) {
@@ -107,7 +102,7 @@ if (process.env.NODE_ENV === 'development') {
       rpcCallCount = 0;
       apiCallCount = 0;
     }
-  }, 60000); // Every minute
+  }, 60000);
 }
 
 export const LayoutContext = createContext({ setPageBgColor: () => {} });
@@ -236,7 +231,6 @@ export default function App() {
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
 
-  // ✅ OPTIMIZED: Use RPC function for session data
 const fetchSessionData = async (session) => {
     if (!session) {
       setProfile(null);
@@ -264,7 +258,6 @@ const fetchSessionData = async (session) => {
     }
   };
 
-  // ✅ OPTIMIZED: Use RPC function for profile refresh
   const refreshProfile = async () => {
     if (!session?.user?.id) return;
     
@@ -273,7 +266,6 @@ const fetchSessionData = async (session) => {
       if (profileData?.profile) {
         setProfile(profileData.profile);
         
-        // Invalidate cache to ensure fresh data next time
         invalidateCache('profile');
         
         if (process.env.NODE_ENV === 'development') {
@@ -282,7 +274,6 @@ const fetchSessionData = async (session) => {
       }
     } catch (error) {
       console.error('Error refreshing profile with RPC:', error);
-      // Fallback to individual API call
       try {
         const { data, error } = await supabase.from('profiles').select('*').eq('id', session.user.id).single();
         if (!error && data) setProfile(data);

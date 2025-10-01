@@ -153,24 +153,13 @@ const OrganizationProfilePage = () => {
     setError(null);
 
     try {
-      const isNumeric = /^\d+$/.test(slug);
-      const query = supabase
-        .from('organizations')
-        .select('*')
-        .single();
-      
-      if (isNumeric) {
-        query.eq('id', parseInt(slug, 10));
-      } else {
-        query.eq('slug', slug);
+      const fullOrgData = await getOrganizationData(slug, session?.user?.id);
+
+      if (!fullOrgData?.organization) {
+        const err = new Error("Organization not found");
+        console.error('Error in getOrganizationData RPC:', fullOrgData?.error || err);
+        throw err;
       }
-
-      const { data: orgData, error: orgError } = await query;
-      if (orgError) throw orgError;
-      if (!orgData) throw new Error("Organization not found");
-
-      // Use RPC to get all organization data
-      const fullOrgData = await getOrganizationData(orgData.id, session?.user?.id);
 
       if (fullOrgData) {
         setOrganization(fullOrgData.organization);
@@ -182,8 +171,6 @@ const OrganizationProfilePage = () => {
         if (fullOrgData.posts && fullOrgData.posts.length > 0) {
           loadPostsPageData(fullOrgData.posts);
         }
-      } else {
-        setOrganization(orgData); // Fallback to basic data
       }
 
     } catch (err) {

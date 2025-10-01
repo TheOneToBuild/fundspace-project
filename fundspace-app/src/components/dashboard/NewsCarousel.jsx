@@ -64,7 +64,7 @@ const NewsCarousel = ({ news }) => {
     return (
         <div>
             <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-bold text-slate-800">Trending World News</h2>
+                <h2 className="text-xl font-bold text-slate-800">Trending Bay Area News</h2>
                 <div className="flex space-x-2">
                     <button
                         onClick={() => scrollNews('left')}
