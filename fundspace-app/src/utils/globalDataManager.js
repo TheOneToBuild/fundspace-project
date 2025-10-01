@@ -1,5 +1,6 @@
 import { supabase } from '../supabaseClient';
 import { getProfilesBatch } from './profileHelpers';
+import { getCommunityPosts } from './rpcClientFunctions';
 
 class GlobalDataManager {
   constructor() {
@@ -483,18 +484,9 @@ class GlobalDataManager {
 
   async _fetchPostsByChannel(channel, limit) {
     try {
-      const { data, error } = await supabase
-        .from('posts')
-        .select(`
-          id, content, created_at, likes_count, comments_count, channel, tags, image_urls,
-          profiles:profile_id(id, full_name, avatar_url, title, organization_name, role, organization_type)
-        `)
-        .eq('channel', channel)
-        .order('created_at', { ascending: false })
-        .limit(limit);
-
-      if (error) throw error;
-      return data || [];
+      // Use RPC function instead of direct REST query
+      const result = await getCommunityPosts(channel, limit, null);
+      return result?.posts || [];
     } catch (error) {
       console.error('Error fetching posts by channel:', error);
       return [];

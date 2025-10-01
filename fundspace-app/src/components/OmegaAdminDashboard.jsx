@@ -80,19 +80,6 @@ export default function OmegaAdminDashboard() {
         try {
             setLoading(true);
             setError('');
-            
-            // ✅ BEFORE (Multiple direct queries causing high API volume):
-            // const [usersRes, organizationsRes, grantsRes, membershipRes, activeGrantsRes] = await Promise.all([
-            //     supabase.from('profiles').select('id', { count: 'exact', head: true }),
-            //     supabase.from('organizations').select('type'),
-            //     supabase.from('grants').select('id', { count: 'exact', head: true }),
-            //     supabase.from('organization_memberships').select('role'),
-            //     supabase.from('grants').select('id', { count: 'exact', head: true }).gt('deadline', new Date().toISOString())
-            // ]);
-
-            // ✅ AFTER (Optimized with globalDataManager):
-            
-            // Get basic counts first with minimal queries
             const [usersCountRes, membershipRes] = await Promise.all([
                 supabase.from('profiles').select('id', { count: 'exact', head: true }),
                 supabase.from('organization_memberships').select('role')
