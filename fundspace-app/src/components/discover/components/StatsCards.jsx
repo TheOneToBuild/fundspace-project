@@ -7,7 +7,7 @@ export default function StatsCards({ stats, isVisible }) {
     const cards = [
         {
             title: 'Organizations',
-            value: stats?.totalOrgs || '12',
+            value: stats?.totalOrgs ?? 0,
             subtitle: 'Active in community',
             icon: Building,
             gradient: 'from-indigo-400 via-purple-400 to-pink-400',
@@ -19,7 +19,7 @@ export default function StatsCards({ stats, isVisible }) {
         },
         {
             title: 'Active Grants',
-            value: stats?.totalGrants || '12',
+            value: stats?.totalGrants ?? 0,
             subtitle: '$2.4M total funding',
             icon: DollarSign,
             gradient: 'from-emerald-400 via-teal-400 to-cyan-400',
@@ -31,7 +31,7 @@ export default function StatsCards({ stats, isVisible }) {
         },
         {
             title: 'Community Posts',
-            value: stats?.totalPosts || '11',
+            value: stats?.totalPosts ?? 0,
             subtitle: 'This week',
             icon: MessageSquare,
             gradient: 'from-violet-400 via-purple-400 to-fuchsia-400',

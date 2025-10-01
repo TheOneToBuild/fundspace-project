@@ -18,33 +18,38 @@ export function useLocationData(selectedLocation, viewType) {
         
         setLoading(true);
         try {
+            let locationParam;
             let locationQuery;
             let demographics = null;
 
             if (location === 'bay-area') {
-                locationQuery = '%Bay Area%,%California%';
+                locationParam = 'bay-area';
+                locationQuery = '%';
                 demographics = DEMOGRAPHICS_DATA['bay-area'];
+            } else if (type === 'counties') {
+                // Pass the slug directly as locationParam
+                locationParam = location; // e.g., "santa-clara-county"
+                locationQuery = `%${BAY_AREA_COUNTIES[location]?.name || location}%`;
+                demographics = DEMOGRAPHICS_DATA[location];
             } else {
-                locationQuery = type === 'counties' 
-                    ? `%${BAY_AREA_COUNTIES[location]?.name || location}%`
-                    : `%${location}%`;
-                
+                // Cities
+                locationParam = location;
+                locationQuery = `%${location}%`;
                 demographics = DEMOGRAPHICS_DATA[location];
                 
-                if (!demographics && type === 'cities') {
+                if (!demographics) {
                     const capitalizedLocation = location.charAt(0).toUpperCase() + location.slice(1);
                     demographics = DEMOGRAPHICS_DATA[capitalizedLocation];
                 }
             }
 
-            // Single RPC call instead of 3 REST queries
-            const data = await getLocationData(location, locationQuery);
+            const data = await getLocationData(locationParam, locationQuery);
 
             const finalData = {
-                organizations: data.organizations || [],
-                grants: data.grants || [],
-                posts: data.posts || [],
-                stats: data.stats || {
+                organizations: data?.organizations || [],
+                grants: data?.grants || [],
+                posts: data?.posts || [],
+                stats: data?.stats || {
                     totalOrgs: 0,
                     totalGrants: 0,
                     totalPosts: 0

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { MapPin, Building, DollarSign, MessageSquare, ArrowUpRight, Clock } from 'lucide-react';
 import { BAY_AREA_COUNTIES } from '../data/locationData.js';
+import { useDashboardStats } from '../hooks/useDashboardStats.js';
 import StatsCards from './StatsCards.jsx';
 import DemographicsSection from './DemographicsSection.jsx';
 import DashboardBanner from './DashboardBanner.jsx';
@@ -186,7 +187,7 @@ const OverviewGrid = ({ locationData, setActiveTab, isVisible }) => {
     );
 };
 
-const TabContent = ({ activeTab, locationData, isVisible }) => {
+const TabContent = ({ activeTab, locationData, isVisible, dashboardStats }) => {
     const EmptyState = ({ icon: Icon, title, description, bgColor }) => (
         <div className="text-center py-16">
             <div className={`w-24 h-24 bg-gradient-to-br ${bgColor} rounded-full mx-auto mb-6 flex items-center justify-center`}>
@@ -206,7 +207,14 @@ const TabContent = ({ activeTab, locationData, isVisible }) => {
                         isVisible={isVisible} 
                     />
                 )}
-                <StatsCards stats={locationData?.stats} isVisible={isVisible} />
+                <StatsCards 
+                    stats={{
+                        totalOrgs: dashboardStats.totalOrganizations,
+                        totalGrants: locationData?.stats?.totalGrants ?? 0,
+                        totalPosts: locationData?.stats?.totalPosts ?? 0
+                    }} 
+                    isVisible={isVisible} 
+                />
                 <OverviewGrid locationData={locationData} setActiveTab={() => {}} isVisible={isVisible} />
             </div>
         );
@@ -308,6 +316,8 @@ export default function ContentSection({
     const [isVisible, setIsVisible] = useState(false);
     const [previousLocation, setPreviousLocation] = useState(selectedLocation);
     const [previousTab, setPreviousTab] = useState(activeTab);
+    
+    const dashboardStats = useDashboardStats(selectedLocation);
 
     useEffect(() => {
         if (selectedLocation !== previousLocation) {
@@ -374,6 +384,7 @@ export default function ContentSection({
                 activeTab={activeTab} 
                 locationData={locationData} 
                 isVisible={isVisible} 
+                dashboardStats={dashboardStats}
             />
         </>
     );

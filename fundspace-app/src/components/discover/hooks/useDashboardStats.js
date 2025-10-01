@@ -81,18 +81,46 @@ function buildLocationFilters(selectedLocation) {
 
 async function fetchTotalOrganizations(locationFilters) {
     try {
-        // Use RPC function to get organization data
-        const locationQuery = locationFilters.type === 'bay-area' ? 'bay-area' : 
-                            locationFilters.counties[0] || locationFilters.cities[0];
+        let locationParam;
+        let locationQuery;
         
-        const data = await getLocationData('organizations', locationQuery, { orgLimit: 1000 });
-        const orgs = data?.organizations || [];
+        if (locationFilters.type === 'bay-area') {
+            locationParam = 'bay-area';
+            locationQuery = '%';
+        } else if (locationFilters.type === 'county') {
+            // Use the county name for the query
+            locationParam = buildCountySlug(locationFilters.counties[0]);
+            locationQuery = `%${locationFilters.counties[0]}%`;
+        } else {
+            locationParam = locationFilters.cities[0];
+            locationQuery = `%${locationFilters.cities[0]}%`;
+        }
+        
+        const data = await getLocationData(locationParam, locationQuery);
+        const count = data?.stats?.totalOrgs || 0;
 
-        return { total: orgs.length, change: Math.floor(Math.random() * 20) + 10 };
+        return { total: count, change: Math.floor(Math.random() * 20) + 10 };
     } catch (error) {
         console.error('Error fetching organizations data:', error);
         return { total: 0, change: 0 };
     }
+}
+
+// Helper function to convert county name to slug
+function buildCountySlug(countyName) {
+    // Map county names back to slugs
+    const countyMap = {
+        'Santa Clara County': 'santa-clara-county',
+        'San Francisco County': 'san-francisco-county',
+        'Alameda County': 'alameda-county',
+        'San Mateo County': 'san-mateo-county',
+        'Contra Costa County': 'contra-costa-county',
+        'Marin County': 'marin-county',
+        'Solano County': 'solano-county',
+        'Sonoma County': 'sonoma-county',
+        'Napa County': 'napa-county'
+    };
+    return countyMap[countyName] || countyName.toLowerCase().replace(/\s+/g, '-');
 }
 
 const parseFundingAmount = (text) => {
@@ -155,9 +183,39 @@ async function fetchTotalActiveFunds(locationFilters) {
 
 async function fetchTotalChampions(locationFilters) {
     try {
-        // For now, keep this as-is since there's no direct RPC for profile counts by location
-        // Or return estimated data
-        return { total: 150, change: Math.floor(Math.random() * 10) + 2 };
+        let locationParam;
+        let locationQuery;
+        
+        if (locationFilters.type === 'bay-area') {
+            locationParam = 'bay-area';
+            locationQuery = '%';
+        } else if (locationFilters.type === 'county') {
+            locationParam = buildCountySlug(locationFilters.counties[0]);
+            locationQuery = `%${locationFilters.counties[0]}%`;
+        } else {
+            locationParam = locationFilters.cities[0];
+            locationQuery = `%${locationFilters.cities[0]}%`;
+        }
+        
+        const data = await getLocationData(locationParam, locationQuery);
+        const orgs = data?.organizations || [];
+        
+        if (orgs.length === 0) {
+            return { total: 0, change: 0 };
+        }
+
+        const orgIds = orgs.map(org => org.id);
+        
+        const { data: memberships, error } = await supabase
+            .from('organization_memberships')
+            .select('profile_id')
+            .in('organization_id', orgIds);
+
+        if (error) throw error;
+
+        const uniqueMembers = new Set(memberships?.map(m => m.profile_id) || []);
+        
+        return { total: uniqueMembers.size, change: Math.floor(Math.random() * 10) + 2 };
     } catch (error) {
         console.error('Error fetching champions data:', error);
         return { total: 0, change: 0 };
