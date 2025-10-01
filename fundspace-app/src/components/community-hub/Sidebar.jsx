@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { TrendingUp, MessageCircle, Heart } from 'lucide-react';
-import { supabase } from '../../supabaseClient';
+import { getCommunityPosts } from '../../utils/rpcClientFunctions';
 import PropTypes from 'prop-types';
+import { supabase } from '../../supabaseClient';
 
 const TrendingPosts = ({ activeChannelConfig, onTrendingPostClick, posts }) => {
   const [trendingPosts, setTrendingPosts] = useState([]);
@@ -23,28 +24,13 @@ const TrendingPosts = ({ activeChannelConfig, onTrendingPostClick, posts }) => {
       const sevenDaysAgo = new Date();
       sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-      const { data: fetchedPosts, error } = await supabase
-        .from('posts')
-        .select(`
-          id,
-          content,
-          created_at,
-          likes_count,
-          comments_count,
-          profiles:profile_id(
-            id,
-            full_name,
-            avatar_url
-          )
-        `)
-        .eq('channel', channelFilter)
-        .gte('created_at', sevenDaysAgo.toISOString())
-        .order('created_at', { ascending: false })
-        .limit(100);
+      // Use RPC function
+      const result = await getCommunityPosts(channelFilter, 100, null);
+      const fetchedPosts = (result?.posts || []).filter(post => 
+        new Date(post.created_at) >= sevenDaysAgo
+      );
 
-      if (error) throw error;
-
-      const postsWithTrendingScore = fetchedPosts?.map(post => {
+      const postsWithTrendingScore = fetchedPosts.map(post => {
         const hoursOld = (new Date() - new Date(post.created_at)) / (1000 * 60 * 60);
         const daysOld = hoursOld / 24;
         const ageWeight = Math.max(0.05, Math.exp(-daysOld * 0.3));

@@ -166,7 +166,15 @@ export default function DashboardHeader({ profile }) {
 
         return () => {
             activeSubscriptions.current.delete(subscriptionKey);
-            supabase.removeChannel(channel);
+            
+            // Handle WebSocket cleanup gracefully
+            if (channel) {
+                channel.unsubscribe().catch(() => {
+                    // Ignore cleanup errors - WebSocket may already be closed
+                });
+                supabase.removeChannel(channel);
+            }
+            
             if (notificationRefreshTimeoutRef.current) {
                 clearTimeout(notificationRefreshTimeoutRef.current);
             }

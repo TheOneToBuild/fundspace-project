@@ -231,7 +231,7 @@ export default function App() {
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
 
-const fetchSessionData = async (session) => {
+  const fetchSessionData = async (session) => {
     if (!session) {
       setProfile(null);
       setNotifications([]);
@@ -239,20 +239,65 @@ const fetchSessionData = async (session) => {
       setLoading(false);
       return;
     }
-
+  
     try {
-      const [profileRes, { data: notificationsData, error: notificationsError }] = await Promise.all([
-        supabase.from('profiles').select('*').eq('id', session.user.id).single(),
+      // Use RPC for profile but handle the response structure correctly
+      const [profileData, notificationsResult] = await Promise.all([
+        getUserProfileComplete(session.user.id).catch(err => {
+          console.error('RPC profile fetch failed:', err);
+          return null;
+        }),
         supabase.rpc('get_user_notifications', { p_limit: 50, p_unread_only: false })
       ]);
-
-      if (notificationsError) throw notificationsError;
-
-      setProfile(profileRes.data);
-      setNotifications(notificationsData || []);
-      setUnreadCount(notificationsData?.filter(n => !n.is_read).length || 0);
+  
+      // FIX: profileData IS the profile, not profileData.profile
+      let profile = profileData || null;
+      
+      // If RPC failed or returned null, use direct query as fallback
+      if (!profile) {
+        console.log('Profile from RPC was null, using fallback query');
+        const { data: directProfileData, error: directError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', session.user.id)
+          .single();
+        
+        if (!directError && directProfileData) {
+          profile = directProfileData;
+        }
+      }
+      
+      if (notificationsResult.error) {
+        console.error('Notifications error:', notificationsResult.error);
+        setNotifications([]);
+        setUnreadCount(0);
+      } else {
+        setNotifications(notificationsResult.data || []);
+        setUnreadCount(notificationsResult.data?.filter(n => !n.is_read).length || 0);
+      }
+  
+      setProfile(profile);
+      
     } catch (error) {
-      console.error('Error fetching session data:', error);
+      console.error('Critical error in fetchSessionData:', error);
+      
+      // Last resort fallback - try to get profile one more time
+      try {
+        const { data: profileData, error: fallbackError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', session.user.id)
+          .single();
+        
+        if (!fallbackError && profileData) {
+          setProfile(profileData);
+        } else {
+          setProfile(null);
+        }
+      } catch (fallbackError) {
+        console.error('Fallback profile fetch failed:', fallbackError);
+        setProfile(null);
+      }
     } finally {
       setLoading(false);
     }
@@ -263,8 +308,9 @@ const fetchSessionData = async (session) => {
     
     try {
       const profileData = await getUserProfileComplete(session.user.id);
-      if (profileData?.profile) {
-        setProfile(profileData.profile);
+      // FIX: profileData IS the profile
+      if (profileData) {
+        setProfile(profileData);
         
         invalidateCache('profile');
         

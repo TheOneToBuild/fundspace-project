@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { DollarSign, Plus, Search, Filter } from 'lucide-react';
 import { supabase } from '../../supabaseClient.js';
+import { getGrantsWithDetails, getLocationData } from '../../utils/rpcClientFunctions.js';
 import GrantCard from '../GrantCard.jsx';
 import GrantDetailModal from '../../GrantDetailModal.jsx';
 
@@ -21,23 +22,15 @@ const OrganizationGrantsFixed = ({ organization, userMembership, session }) => {
 
       setLoading(true);
 
-      try {
-        const { data, error } = await supabase
-          .from('grants')
-          .select('*')
-          .eq('organization_id', organization.id)
-          .order('deadline', { ascending: true });
-
-        if (error) {
-          console.error('Error fetching grants:', error);
-          setGrants([]);
-          return;
-        }
+        try {
+            // Use RPC to get all grants, then filter by organization
+            const allGrants = await getGrantsWithDetails({ limit: 1000 });
+            const data = allGrants.filter(g => g.organization_id === organization.id);
 
         const formatted = (data || []).map(grant => ({
           ...grant,
           foundationName: organization.name,
-          fundingAmount: grant.funding_amount_text,
+          fundingAmount: grant.max_funding_amount || grant.funding_amount_text,
           dueDate: grant.deadline,
           dateAdded: grant.date_added,
           grantType: grant.grant_type,
@@ -50,16 +43,15 @@ const OrganizationGrantsFixed = ({ organization, userMembership, session }) => {
         }));
 
         setGrants(formatted);
-      } catch (err) {
-        console.error('Error in fetchGrants:', err);
-        setGrants([]);
-      } finally {
-        setLoading(false);
-      }
+        } catch (err) {
+            console.error('Error in fetchGrants:', err);
+            setGrants([]);
+        } finally {
+            setLoading(false);
+        }
     };
-
     fetchGrants();
-  }, [organization?.id]);
+  }, [organization?.id, organization?.name, organization?.slug, organization?.image_url, organization?.banner_image_url]);
 
   const handleGrantClick = (grant) => {
     setSelectedGrant(grant);

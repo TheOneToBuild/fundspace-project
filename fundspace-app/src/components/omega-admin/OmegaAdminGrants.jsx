@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useOutletContext, Link } from 'react-router-dom';
 import { supabase } from '../../supabaseClient';
-import { 
+import {
     FileCheck, 
     Search, 
     Filter, 
@@ -21,6 +21,7 @@ import {
     Users,
     Star
 } from 'lucide-react';
+import { getGrantsWithDetails, getLocationData } from '../../utils/rpcClientFunctions';
 import { isPlatformAdmin } from '../../utils/permissions.js';
 
 const ITEMS_PER_PAGE = 20;
@@ -62,15 +63,11 @@ export default function OmegaAdminGrants() {
             setLoading(true);
             setError('');
 
-            // Fetch all grants with organization information
-            const { data: grantsData, error: grantsError } = await supabase
-                .from('grants')
-                .select(`
-                    *,
-                    organizations(id, name, type, image_url)
-                `);
-
-            if (grantsError) throw grantsError;
+            // Use RPC function to fetch grants with organization details
+            const grantsData = await getGrantsWithDetails({ 
+                limit: 1000,
+                offset: 0
+            });
 
             setGrants(grantsData || []);
             

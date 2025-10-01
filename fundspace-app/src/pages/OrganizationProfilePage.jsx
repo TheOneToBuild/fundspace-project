@@ -20,7 +20,7 @@ import EditableOrganizationPrograms from '../components/organization-profile/Edi
 import { useOrganizationSocial } from '../hooks/useOrganizationSocial.js';
 import { hasPermission, PERMISSIONS } from '../utils/organizationPermissions.js';
 import { getProfilesBatch } from '../utils/profileHelpers';
-import { getOrganizationData } from '../utils/rpcClientFunctions.js';
+import { getOrganizationData, getOrganizationBySlug } from '../utils/rpcClientFunctions.js';
 
 const ORG_TYPE_CONFIGS = {
   foundation: {
@@ -153,7 +153,17 @@ const OrganizationProfilePage = () => {
     setError(null);
 
     try {
-      const fullOrgData = await getOrganizationData(slug, session?.user?.id);
+      // Check if identifier is numeric (ID) or string (slug)
+      let orgId;
+      if (typeof slug === 'string' && isNaN(slug)) {
+        // It's a slug, resolve it first
+        orgId = await getOrganizationBySlug(slug);
+        if (!orgId) throw new Error('Organization not found');
+      } else {
+        // It's already an ID
+        orgId = slug;
+      }
+      const fullOrgData = await getOrganizationData(orgId, session?.user?.id);
 
       if (!fullOrgData?.organization) {
         const err = new Error("Organization not found");

@@ -73,6 +73,22 @@ export const getOrganizationData = async (organizationId, viewerId = null) => {
   }
 };
 
+export const getOrganizationBySlug = async (slug) => {
+  try {
+    const { data, error } = await supabase
+      .from('organizations')
+      .select('id')
+      .eq('slug', slug)
+      .single();
+    
+    if (error) throw error;
+    return data?.id;
+  } catch (error) {
+    console.error('Error fetching organization by slug:', error);
+    throw error;
+  }
+};
+
 export const getGrantsWithDetails = async (options = {}) => {
   const {
     userId = null,

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, Plus, Users, UserCheck } from 'lucide-react';
 import { supabase } from '../../supabaseClient';
 import { getDashboardData } from '../../utils/rpcClientFunctions';
+import globalDataManager from '../../utils/globalDataManager';
 import PropTypes from 'prop-types';
 
 const ConnectionAvatar = ({ person, hasRecentPost, type, onClick }) => {
@@ -123,20 +124,18 @@ const ConnectionsAvatars = ({ currentUserProfile }) => {
 
                 let usersWithRecentPosts = new Set();
                 try {
-                    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-                    const { data: recentPosts, error } = await supabase
-                        .from('posts')
-                        .select('profile_id')
-                        .in('profile_id', allUserIds)
-                        .gte('created_at', twentyFourHoursAgo);
-                    if (!error && recentPosts) {
-                        usersWithRecentPosts = new Set(recentPosts.map(post => post.profile_id));
-                    }
+                    const postsData = await globalDataManager.getPostsForUsers(allUserIds, 50);
+                    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+                    usersWithRecentPosts = new Set(
+                        Object.entries(postsData)
+                            .filter(([userId, posts]) => 
+                                posts.some(p => new Date(p.created_at) >= twentyFourHoursAgo)
+                            )
+                            .map(([userId]) => userId)
+                    );
                 } catch (error) {
                     console.error('Error checking recent posts:', error);
                 }
-
-                setRecentPostUsers(usersWithRecentPosts);
 
                 const networkData = [];
                 const seenUserIds = new Set();
@@ -186,6 +185,7 @@ const ConnectionsAvatars = ({ currentUserProfile }) => {
                 });
 
                 setNetworkMembers(sortedMembers);
+                setRecentPostUsers(usersWithRecentPosts);
 
                 const connectionsCount = connectionUserIds.size;
                 const followingCount = followingUserIds.size;
