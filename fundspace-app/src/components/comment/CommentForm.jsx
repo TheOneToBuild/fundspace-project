@@ -14,6 +14,7 @@ import 'tippy.js/dist/tippy.css';
 
 // --- CUSTOM COMPONENT IMPORTS ---
 import MentionList from '../mentions/MentionList';
+import { useImageUpload, IMAGE_UPLOAD_PRESETS } from '../../hooks/useImageUpload';
 
 export default function CommentForm({ 
     post, 
@@ -24,7 +25,15 @@ export default function CommentForm({
     organization = null // For organization context
 }) {
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [images, setImages] = useState([]);
+    const {
+      images,
+      uploading: uploadingImages,
+      handleImageSelect,
+      removeImage,
+      uploadImages,
+      error: imageError,
+      reset: cleanupImages
+    } = useImageUpload(IMAGE_UPLOAD_PRESETS.comment);
     const navigate = useNavigate();
 
     // User profile state for avatar display
@@ -64,6 +73,12 @@ export default function CommentForm({
 
         loadUserProfile();
     }, []);
+
+    useEffect(() => {
+        return () => {
+            cleanupImages(); // Clean up image previews
+        };
+    }, [cleanupImages]);
 
     // Determine post type and table names
     const isOrganizationPost = post._isOrganizationPost;
@@ -202,61 +217,6 @@ export default function CommentForm({
         }
     };
 
-    // Handle image selection
-    const handleImageSelect = (event) => {
-        const files = Array.from(event.target.files);
-        if (files.length === 0) return;
-
-        const validFiles = files.filter(file => 
-            file.type.startsWith('image/') && file.size <= 10 * 1024 * 1024
-        ).slice(0, 1); // Limit to 1 image
-
-        if (validFiles.length > 0) {
-            const imageObjects = validFiles.map(file => ({
-                file,
-                preview: URL.createObjectURL(file),
-                id: Math.random().toString(36).substr(2, 9)
-            }));
-            setImages(imageObjects);
-        }
-    };
-
-    // Remove image
-    const removeImage = (imageId) => {
-        setImages(prev => {
-            const updated = prev.filter(img => img.id !== imageId);
-            const removedImage = prev.find(img => img.id === imageId);
-            if (removedImage) {
-                URL.revokeObjectURL(removedImage.preview);
-            }
-            return updated;
-        });
-    };
-
-    // Upload images to storage
-    const uploadImages = async () => {
-        if (images.length === 0) return [];
-
-        const uploadPromises = images.map(async (imageObj) => {
-            const fileExt = imageObj.file.name.split('.').pop();
-            const fileName = `comment_${Date.now()}_${Math.random().toString(36).substring(2)}.${fileExt}`;
-            
-            const { data, error } = await supabase.storage
-                .from('avatars')
-                .upload(`comments/${fileName}`, imageObj.file);
-
-            if (error) throw error;
-
-            const { data: urlData } = supabase.storage
-                .from('avatars')
-                .getPublicUrl(`comments/${fileName}`);
-
-            return urlData.publicUrl;
-        });
-
-        return Promise.all(uploadPromises);
-    };
-
     // Handle comment submission
     const handleCommentSubmit = async (e) => {
         e.preventDefault();
@@ -332,7 +292,7 @@ export default function CommentForm({
 
             // Clear form
             editor.commands.clearContent();
-            setImages([]);
+            cleanupImages();
             setHasContent(false);
             
             // Update comment count for organization posts
@@ -416,7 +376,7 @@ export default function CommentForm({
                                 type="button"
                                 onClick={() => document.getElementById(`comment-images-${post.id}`)?.click()}
                                 className="p-1.5 text-slate-500 hover:text-slate-700 rounded-full hover:bg-slate-200 transition-colors"
-                                disabled={isSubmitting}
+                                disabled={isSubmitting || uploadingImages}
                                 title="Add photos"
                             >
                                 <Camera size={18} />
@@ -424,7 +384,7 @@ export default function CommentForm({
                             
                             <button 
                                 type="submit" 
-                                disabled={(!hasContent && images.length === 0) || isSubmitting} 
+                                disabled={(!hasContent && images.length === 0) || isSubmitting || uploadingImages} 
                                 className="p-1.5 text-blue-600 disabled:text-slate-400 rounded-full hover:bg-blue-100 disabled:hover:bg-transparent transition-colors"
                                 onMouseDown={(e) => e.preventDefault()}
                             >
@@ -460,13 +420,21 @@ export default function CommentForm({
                 </div>
             )}
 
+            {imageError && (
+                <div className="ml-11 text-sm text-red-600">
+                    <p>
+                        <strong>Image Error:</strong> {imageError}
+                    </p>
+                </div>
+            )}
+
             <input
                 type="file"
                 accept="image/*"
                 onChange={handleImageSelect}
                 className="hidden"
                 id={`comment-images-${post.id}`}
-                disabled={isSubmitting}
+                disabled={isSubmitting || uploadingImages}
             />
         </form>
     );

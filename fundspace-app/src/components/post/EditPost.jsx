@@ -13,14 +13,22 @@ import 'tippy.js/dist/tippy.css';
 // --- CUSTOM COMPONENT IMPORTS ---
 import MentionList from '../mentions/MentionList';
 import { searchProfiles } from '../../utils/profileHelpers';
+import { useImageUpload, IMAGE_UPLOAD_PRESETS } from '../../hooks/useImageUpload';
 
 export default function EditPost({ post, onSave, onCancel }) {
     const [editedTags, setEditedTags] = useState([]);
     const [editedImages, setEditedImages] = useState([]);
     const [showTagSelector, setShowTagSelector] = useState(false);
     const [customTagInput, setCustomTagInput] = useState('');
-    const [newImages, setNewImages] = useState([]);
-    const [uploading, setUploading] = useState(false);
+    const {
+      images: newImages,
+      uploading: uploadingNewImages,
+      handleImageSelect,
+      removeImage: removeNewImage,
+      uploadImages: uploadNewImages,
+      error: imageError,
+      reset: cleanupImages
+    } = useImageUpload(IMAGE_UPLOAD_PRESETS.post);
     const fileInputRef = useRef(null);
     const isComponentMounted = useRef(true);
 
@@ -127,7 +135,11 @@ export default function EditPost({ post, onSave, onCancel }) {
         setEditedImages(displayImages);
         const displayTags = post.tags ? (typeof post.tags === 'string' ? JSON.parse(post.tags) : post.tags) : [];
         setEditedTags(displayTags);
-        return () => { isComponentMounted.current = false; };
+        return () => { 
+            isComponentMounted.current = false;
+            // Cleanup handled automatically by hook
+            cleanupImages();
+        };
     }, [post]);
 
     const predefinedTags = [
@@ -163,16 +175,13 @@ export default function EditPost({ post, onSave, onCancel }) {
     const addCustomTag = () => { if (customTagInput.trim() && !editedTags.find(t => t.label.toLowerCase() === customTagInput.trim().toLowerCase())) { const customTag = { id: `custom-${Date.now()}`, label: customTagInput.trim(), color: getRandomTagColor(), isCustom: true }; setEditedTags(prev => [...prev, customTag]); setCustomTagInput(''); } };
     const removeTag = (tagId) => setEditedTags(prev => prev.filter(tag => tag.id !== tagId));
     const removeImage = (imageUrl) => setEditedImages(prev => prev.filter(url => url !== imageUrl));
-    const removeNewImage = (imageId) => setNewImages(prev => { const updated = prev.filter(img => img.id !== imageId); const removedImage = prev.find(img => img.id === imageId); if (removedImage) URL.revokeObjectURL(removedImage.preview); return updated; });
-    const handleImageSelect = (event) => { const files = Array.from(event.target.files); const maxImages = 6; if (editedImages.length + newImages.length + files.length > maxImages) { alert(`You can only have up to ${maxImages} images per post.`); return; } const validFiles = files.filter(file => file.type.startsWith('image/') && file.size <= 10 * 1024 * 1024); if (validFiles.length < files.length) alert('Some images were invalid (must be under 10MB).'); if (validFiles.length > 0) { const imageObjects = validFiles.map(file => ({ file, preview: URL.createObjectURL(file), id: Math.random().toString(36).substr(2, 9) })); setNewImages(prev => [...prev, ...imageObjects]); } };
-    const uploadNewImages = async () => { if (newImages.length === 0) return []; const uploadPromises = newImages.map(async (imageObj) => { const fileExt = imageObj.file.name.split('.').pop(); const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`; const { data, error } = await supabase.storage.from('post-images').upload(fileName, imageObj.file); if (error) throw error; const { data: urlData } = supabase.storage.from('post-images').getPublicUrl(fileName); return urlData.publicUrl; }); return Promise.all(uploadPromises); };
 
     const handleSave = async () => {
         if (!editor) return;
-        setUploading(true);
         try {
             let finalImageUrls = [...editedImages];
-            if (newImages.length > 0) { const uploadedUrls = await uploadNewImages(); finalImageUrls = [...finalImageUrls, ...uploadedUrls]; }
+            const uploadedUrls = await uploadNewImages();
+            finalImageUrls = [...finalImageUrls, ...uploadedUrls];
             const editorHtmlContent = editor.getHTML();
             const mentionsForStorage = []; const editorJsonContent = editor.getJSON();
             if (editorJsonContent?.content) { editorJsonContent.content.forEach((node) => { if (node.content) { node.content.forEach((inlineNode) => { if (inlineNode.type === 'mention' && inlineNode.attrs) { const { id, label, type } = inlineNode.attrs; if (id && label && type) { mentionsForStorage.push({ displayName: label, id: id, type: type }); } } }); } }); }
@@ -180,6 +189,7 @@ export default function EditPost({ post, onSave, onCancel }) {
             onSave(updatedPost);
         } catch (error) { console.error('Error saving post:', error); alert('Failed to save post. Please try again.'); } finally { setUploading(false); }
     };
+    const hasMaxImages = (editedImages.length + newImages.length) >= 6;
 
     return (
         <div className="space-y-4">
@@ -215,15 +225,23 @@ export default function EditPost({ post, onSave, onCancel }) {
                 </div>
             )}
 
+            {imageError && (
+                <div className="text-sm text-red-600 mt-2">
+                    <p>
+                        <strong>Image Error:</strong> {imageError}
+                    </p>
+                </div>
+            )}
+
             <div className="flex items-center justify-between pt-4 border-t border-slate-100">
                 <div className="flex items-center space-x-2">
-                    <button onClick={() => fileInputRef.current?.click()} className="flex items-center space-x-2 px-3 py-2 text-slate-600 hover:text-slate-800 hover:bg-slate-50 rounded-lg transition-colors" disabled={uploading}>
+                    <button onClick={() => fileInputRef.current?.click()} className="flex items-center space-x-2 px-3 py-2 text-slate-600 hover:text-slate-800 hover:bg-slate-50 rounded-lg transition-colors" disabled={uploadingNewImages || hasMaxImages}>
                         <Camera size={18} />
-                        <span className="text-sm">Add Photos</span>
+                        <span className="text-sm">{hasMaxImages ? '6 Images Max' : 'Add Photos'}</span>
                     </button>
 
                     <div className="relative">
-                        <button onClick={() => setShowTagSelector(!showTagSelector)} className="flex items-center space-x-2 px-3 py-2 text-slate-600 hover:text-slate-800 hover:bg-slate-50 rounded-lg transition-colors" disabled={uploading}>
+                        <button onClick={() => setShowTagSelector(!showTagSelector)} className="flex items-center space-x-2 px-3 py-2 text-slate-600 hover:text-slate-800 hover:bg-slate-50 rounded-lg transition-colors" disabled={uploadingNewImages}>
                             <span className="text-sm">#</span>
                             <span className="text-sm">Tags</span>
                         </button>
@@ -254,9 +272,9 @@ export default function EditPost({ post, onSave, onCancel }) {
                 </div>
 
                 <div className="flex items-center space-x-3">
-                    <button onClick={onCancel} disabled={uploading} className="px-4 py-2 text-slate-600 hover:text-slate-800 transition-colors disabled:opacity-50">Cancel</button>
-                    <button onClick={handleSave} disabled={uploading} className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors">
-                        {uploading ? (<><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />Saving...</>) : ('Save Changes')}
+                    <button onClick={onCancel} disabled={uploadingNewImages} className="px-4 py-2 text-slate-600 hover:text-slate-800 transition-colors disabled:opacity-50">Cancel</button>
+                    <button onClick={handleSave} disabled={uploadingNewImages} className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors">
+                        {uploadingNewImages ? (<><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />Saving...</>) : ('Save Changes')}
                     </button>
                 </div>
             </div>

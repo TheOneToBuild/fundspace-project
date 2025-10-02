@@ -7,7 +7,7 @@ import CreatePostActions from './CreatePostActions';
 import ImageUpload from './ImageUpload';
 import TagSelector from './TagSelector';
 import { usePostEditor } from './hooks/usePostEditor';
-import { useImageUpload } from './hooks/useImageUpload';
+import { useImageUpload, IMAGE_UPLOAD_PRESETS } from '../../hooks/useImageUpload';
 import { usePostSubmission } from './hooks/usePostSubmission';
 import { generatePlaceholder } from './utils/postDataHelpers';
 import { AVAILABLE_TAGS } from './utils/constants';
@@ -35,13 +35,13 @@ export default function CreatePostModal({
 
   // Custom hooks
   const {
-    selectedImages,
+    images: selectedImages,
     uploading,
-    addImages,
+    handleImageSelect,
     removeImage,
-    uploadImages,  
+    uploadImages,
     clearImages
-  } = useImageUpload();
+  } = useImageUpload(IMAGE_UPLOAD_PRESETS.post);
 
   const { isLoading, error, submitPost, setError } = usePostSubmission();
 
@@ -230,7 +230,7 @@ export default function CreatePostModal({
               {/* Image previews */}
               <ImageUpload
                 selectedImages={selectedImages}
-                onImageSelect={addImages}
+                onImageSelect={handleImageSelect}
                 onRemoveImage={removeImage}
                 fileInputRef={fileInputRef}
                 uploading={uploading}

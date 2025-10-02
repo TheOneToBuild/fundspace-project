@@ -1,6 +1,6 @@
 // src/components/comment/EditComment.jsx
 import React, { useState, useRef, useEffect } from 'react';
-import { supabase } from '../../supabaseClient';
+import { supabase } from '../../supabaseClient'; // Note: This import might be removable if not used elsewhere after refactor
 import { Camera, X, Check, XIcon } from 'lucide-react';
 
 // --- TIPTAP IMPORTS ---
@@ -12,6 +12,7 @@ import 'tippy.js/dist/tippy.css';
 
 // --- CUSTOM COMPONENT IMPORTS ---
 import MentionList from '../mentions/MentionList';
+import { useImageUpload, IMAGE_UPLOAD_PRESETS } from '../../hooks/useImageUpload';
 import { searchProfiles } from '../../utils/profileHelpers';
 
 export default function EditComment({ 
@@ -21,10 +22,17 @@ export default function EditComment({
     onCancel 
 }) {
     const [editedImages, setEditedImages] = useState([]);
-    const [newImages, setNewImages] = useState([]);
-    const [uploading, setUploading] = useState(false);
     const fileInputRef = useRef(null);
     const isComponentMounted = useRef(true);
+    const {
+      images: newImages,
+      uploading: uploadingNewImages,
+      handleImageSelect,
+      removeImage: removeNewImage,
+      uploadImages: uploadNewImages,
+      error: imageError,
+      reset: cleanupImages
+    } = useImageUpload(IMAGE_UPLOAD_PRESETS.comment);
 
     // --- TIPTAP EDITOR HOOK ---
     const editor = useEditor({
@@ -129,59 +137,21 @@ export default function EditComment({
         setEditedImages(displayImages);
         
         return () => { 
-            isComponentMounted.current = false; 
+            isComponentMounted.current = false;
+            cleanupImages(); // Clean up image previews
         };
-    }, [comment]);
+    }, [comment, cleanup]);
 
     const removeImage = (imageUrl) => setEditedImages(prev => prev.filter(url => url !== imageUrl));
-    const removeNewImage = (imageId) => setNewImages(prev => { 
-        const updated = prev.filter(img => img.id !== imageId); 
-        const removedImage = prev.find(img => img.id === imageId); 
-        if (removedImage) URL.revokeObjectURL(removedImage.preview); 
-        return updated; 
-    });
-
-    const handleImageSelect = (event) => { 
-        const files = Array.from(event.target.files); 
-        const maxImages = 1; // Limit comments to 1 image
-        if (editedImages.length + newImages.length + files.length > maxImages) { 
-            alert(`You can only have ${maxImages} image per comment.`); 
-            return; 
-        } 
-        const validFiles = files.filter(file => file.type.startsWith('image/') && file.size <= 10 * 1024 * 1024); 
-        if (validFiles.length < files.length) alert('Some images were invalid (must be under 10MB).'); 
-        if (validFiles.length > 0) { 
-            const imageObjects = validFiles.map(file => ({ 
-                file, 
-                preview: URL.createObjectURL(file), 
-                id: Math.random().toString(36).substr(2, 9) 
-            })); 
-            setNewImages(prev => [...prev, ...imageObjects]); 
-        } 
-    };
-
-    const uploadNewImages = async () => { 
-        if (newImages.length === 0) return []; 
-        const uploadPromises = newImages.map(async (imageObj) => { 
-            const fileExt = imageObj.file.name.split('.').pop(); 
-            const fileName = `comment_${Math.random().toString(36).substring(2)}.${fileExt}`; 
-            const { data, error } = await supabase.storage.from('comment-images').upload(fileName, imageObj.file); 
-            if (error) throw error; 
-            const { data: urlData } = supabase.storage.from('comment-images').getPublicUrl(fileName); 
-            return urlData.publicUrl; 
-        }); 
-        return Promise.all(uploadPromises); 
-    };
 
     const handleSave = async () => {
         if (!editor) return;
-        setUploading(true);
         
         try {
             // Upload any new images
             let finalImageUrls = [...editedImages];
             if (newImages.length > 0) { 
-                const uploadedUrls = await uploadNewImages(); 
+                const uploadedUrls = await uploadNewImages();
                 finalImageUrls = [...finalImageUrls, ...uploadedUrls]; 
             }
             
@@ -218,10 +188,10 @@ export default function EditComment({
         } catch (error) { 
             console.error('Error saving comment:', error); 
             alert('Failed to save comment. Please try again.'); 
-        } finally { 
-            setUploading(false); 
         }
     };
+
+    const hasMaxImages = (editedImages.length + newImages.length) >= 1;
 
     return (
         <div className="space-y-3 bg-white p-3 rounded-lg border border-slate-200">
@@ -258,26 +228,26 @@ export default function EditComment({
                 <button 
                     onClick={() => fileInputRef.current?.click()} 
                     className="flex items-center space-x-2 px-3 py-1.5 text-slate-600 hover:text-slate-800 hover:bg-slate-50 rounded-lg transition-colors text-sm" 
-                    disabled={uploading}
+                    disabled={uploadingNewImages || hasMaxImages}
                 >
                     <Camera size={16} />
-                    <span>Add Photos</span>
+                    <span>{hasMaxImages ? '1 Image Max' : 'Add Photo'}</span>
                 </button>
 
                 <div className="flex items-center space-x-2 ml-auto">
                     <button 
-                        onClick={onCancel} 
-                        disabled={uploading} 
+                        onClick={onCancel}
+                        disabled={uploadingNewImages}
                         className="px-3 py-1.5 text-slate-600 hover:text-slate-800 transition-colors text-sm disabled:opacity-50"
                     >
                         Cancel
                     </button>
                     <button 
                         onClick={handleSave} 
-                        disabled={uploading} 
+                        disabled={uploadingNewImages}
                         className="inline-flex items-center px-3 py-1.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
                     >
-                        {uploading ? (
+                        {uploadingNewImages ? (
                             <>
                                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
                                 Saving...
@@ -292,7 +262,20 @@ export default function EditComment({
                 </div>
             </div>
 
-            <input ref={fileInputRef} type="file" accept="image/*" multiple onChange={handleImageSelect} className="hidden" />
+            {imageError && (
+                <div className="text-sm text-red-600 mt-2">
+                    <p>
+                        <strong>Image Error:</strong> {imageError}
+                    </p>
+                </div>
+            )}
+
+            <input 
+                ref={fileInputRef} 
+                type="file" 
+                accept="image/*" 
+                onChange={handleImageSelect} 
+                className="hidden" />
         </div>
     );
 }

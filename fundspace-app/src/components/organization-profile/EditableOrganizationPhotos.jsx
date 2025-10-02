@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Camera, X, Upload, Trash2, Heart, MessageCircle, Share, MoreHorizontal, Plus } from 'lucide-react';
 import { supabase } from '../../supabaseClient.js';
+import { useImageUpload, IMAGE_UPLOAD_PRESETS } from '../../hooks/useImageUpload';
 import { hasPermission, PERMISSIONS } from '../../utils/organizationPermissions.js';
 import Avatar from '../Avatar.jsx';
 
@@ -15,14 +16,22 @@ const EditableOrganizationPhotos = ({
   const [loading, setLoading] = useState(true);
   const [selectedPhoto, setSelectedPhoto] = useState(null);
   const [isCreatingPost, setIsCreatingPost] = useState(false);
-  const [newPost, setNewPost] = useState({ caption: '', image: null });
-  const [uploading, setUploading] = useState(false);
+  const [newPost, setNewPost] = useState({ caption: '' });
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState('view'); // 'view' or 'manage'
   const [managingPhotos, setManagingPhotos] = useState([]);
   const [saving, setSaving] = useState(false);
   const [draggedIndex, setDraggedIndex] = useState(null);
   const fileInputRef = useRef(null);
+
+  const {
+    images: photoImages,
+    uploading: uploadingPhoto,
+    handleImageSelect,
+    uploadImages,
+    error: uploadError,
+    reset
+  } = useImageUpload(IMAGE_UPLOAD_PRESETS.organizationPhotos);
 
   // Check if user can create photo posts (must be admin/super_admin member)
   const canCreatePhotoPosts = userMembership && hasPermission(
@@ -70,81 +79,45 @@ const EditableOrganizationPhotos = ({
     }
   }, [organization?.id]);
 
-  // Handle file selection
-  const handleFileSelect = (event) => {
-    const file = event.target.files[0];
-    if (!file) return;
-
-    // Validate file
-    if (file.size > 5 * 1024 * 1024) {
-      setError('File is too large. Max size is 5MB.');
-      return;
-    }
-
-    if (!file.type.startsWith('image/')) {
-      setError('Please select an image file.');
-      return;
-    }
-
-    setNewPost({ ...newPost, image: file });
-    setError('');
-  };
-
   // Handle photo upload and post creation
   const handleCreatePhotoPost = async () => {
-    if (!newPost.image || !newPost.caption.trim()) {
+    if (photoImages.length === 0 || !newPost.caption.trim()) {
       setError('Please add both a photo and caption.');
       return;
     }
 
     try {
-      setUploading(true);
+      // setUploading(true); // This is now handled by the hook
       setError('');
 
-      // Upload image to Supabase storage
-      const fileExt = newPost.image.name.split('.').pop();
-      const fileName = `org-${organization.id}-photo-${Date.now()}.${fileExt}`;
-      const filePath = `organizations/photos/${fileName}`;
-
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('avatars')
-        .upload(filePath, newPost.image, {
-          cacheControl: '3600',
-          upsert: false
-        });
-
-      if (uploadError) throw uploadError;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('avatars')
-        .getPublicUrl(filePath);
+      // Upload image
+      const imageUrls = await uploadImages();
+      const imageUrl = imageUrls[0];
 
       // Create photo post in database
       const { error: insertError } = await supabase
         .from('organization_photos')
         .insert({
           organization_id: organization.id,
-          image_url: publicUrl,
+          image_url: imageUrl,
           caption: newPost.caption.trim(),
           alt_text: newPost.caption.trim(),
           uploaded_by_user_id: session?.user?.id,
-          display_order: photos.length // Add to end of current photos
+          display_order: photos.length
         });
 
       if (insertError) throw insertError;
 
-      // Reset form and refresh
-      setNewPost({ caption: '', image: null });
+      // Reset
+      setNewPost({ caption: '' });
+      reset();
       setIsCreatingPost(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
       await fetchPhotos();
 
       if (onUpdate) await onUpdate();
     } catch (err) {
       console.error('Error creating photo post:', err);
       setError('Failed to create photo post: ' + err.message);
-    } finally {
-      setUploading(false);
     }
   };
 
@@ -444,9 +417,9 @@ const EditableOrganizationPhotos = ({
                 <button
                   onClick={() => {
                     setIsCreatingPost(false);
-                    setNewPost({ caption: '', image: null });
+                    setNewPost({ caption: '' });
                     setError('');
-                    if (fileInputRef.current) fileInputRef.current.value = '';
+                    reset();
                   }}
                   className="text-slate-400 hover:text-slate-600"
                 >
@@ -463,11 +436,11 @@ const EditableOrganizationPhotos = ({
                   ref={fileInputRef}
                   type="file"
                   accept="image/*"
-                  onChange={handleFileSelect}
+                  onChange={handleImageSelect}
                   className="hidden"
                 />
                 
-                {!newPost.image ? (
+                {photoImages.length === 0 ? (
                   <button
                     onClick={() => fileInputRef.current?.click()}
                     className="w-full p-8 border-2 border-dashed border-slate-300 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition-colors flex flex-col items-center gap-3 text-slate-600"
@@ -481,15 +454,12 @@ const EditableOrganizationPhotos = ({
                 ) : (
                   <div className="relative">
                     <img 
-                      src={URL.createObjectURL(newPost.image)}
+                      src={photoImages[0].preview}
                       alt="Preview"
                       className="w-full max-h-64 object-cover rounded-lg"
                     />
                     <button
-                      onClick={() => {
-                        setNewPost({ ...newPost, image: null });
-                        if (fileInputRef.current) fileInputRef.current.value = '';
-                      }}
+                      onClick={() => reset()}
                       className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors"
                     >
                       <X className="w-4 h-4" />
@@ -521,21 +491,21 @@ const EditableOrganizationPhotos = ({
               <button
                 onClick={() => {
                   setIsCreatingPost(false);
-                  setNewPost({ caption: '', image: null });
+                  setNewPost({ caption: '' });
                   setError('');
-                  if (fileInputRef.current) fileInputRef.current.value = '';
+                  reset();
                 }}
-                disabled={uploading}
+                disabled={uploadingPhoto}
                 className="flex-1 px-4 py-2 text-slate-600 font-medium border border-slate-200 rounded-lg hover:bg-slate-100 transition-colors disabled:opacity-50"
               >
                 Cancel
               </button>
               <button
                 onClick={handleCreatePhotoPost}
-                disabled={!newPost.image || !newPost.caption.trim() || uploading}
+                disabled={photoImages.length === 0 || !newPost.caption.trim() || uploadingPhoto}
                 className="flex-1 px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
               >
-                {uploading ? (
+                {uploadingPhoto ? (
                   <>
                     <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
                     Posting...

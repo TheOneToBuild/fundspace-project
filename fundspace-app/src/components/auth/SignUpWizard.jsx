@@ -12,6 +12,47 @@ import FollowUsersStep from './steps/FollowUsersStep';
 import NavigationButtons from './shared/NavigationButtons';
 import MessageDisplay from './shared/MessageDisplay';
 
+const uploadAvatar = async (file) => {
+  try {
+    let uploadFile = file;
+
+    if (typeof file === 'string' && file.startsWith('data:')) {
+      const response = await fetch(file);
+      const blob = await response.blob();
+      uploadFile = new File([blob], 'avatar.jpg', { type: 'image/jpeg' });
+    }
+
+    if (!(uploadFile instanceof File)) {
+      throw new Error('Invalid file type');
+    }
+
+    const fileExt = uploadFile.name?.split('.').pop() || 'jpg';
+    const fileName = `avatar-${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('avatars')
+      .upload(fileName, uploadFile, {
+        cacheControl: '3600',
+        upsert: false
+      });
+
+    if (uploadError) throw uploadError;
+
+    const { data: urlData } = supabase.storage
+      .from('avatars')
+      .getPublicUrl(fileName);
+
+    if (!urlData?.publicUrl) {
+      throw new Error('Failed to get public URL');
+    }
+
+    return `${urlData.publicUrl}?v=${Date.now()}`;
+  } catch (error) {
+    console.error('Error uploading avatar:', error);
+    return null;
+  }
+};
+
 export default function SignUpWizard({ onSwitchToLogin }) {
   const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState(1);
@@ -119,77 +160,6 @@ export default function SignUpWizard({ onSwitchToLogin }) {
   // Helper functions
   const validateEmail = (email) => {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email || '');
-  };
-
-  // FIXED uploadAvatar function - matches working Settings approach exactly
-  const uploadAvatar = async (file) => {
-    try {
-      console.log('🔍 Avatar upload input:', { 
-        fileType: typeof file, 
-        isFile: file instanceof File,
-        fileName: file instanceof File ? file.name : 'N/A',
-        fileSize: file instanceof File ? file.size : 'N/A'
-      });
-
-      // Ensure we have a File object
-      let uploadFile = file;
-      
-      // If it's a data URL, convert to File
-      if (typeof file === 'string' && file.startsWith('data:')) {
-        console.log('🔄 Converting data URL to file...');
-        const response = await fetch(file);
-        const blob = await response.blob();
-        uploadFile = new File([blob], 'avatar.jpg', { type: 'image/jpeg' });
-        console.log('✅ Converted to file:', { size: uploadFile.size, type: uploadFile.type });
-      }
-
-      if (!(uploadFile instanceof File)) {
-        throw new Error('Invalid file type: must be File object or data URL string');
-      }
-
-      // CRITICAL: Use EXACT same approach as Settings page
-      const fileExt = uploadFile.name?.split('.').pop() || 'jpg';
-      const fileName = `avatar-${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
-
-      console.log('📤 Uploading avatar file to avatars bucket:', { fileName, fileSize: uploadFile.size, fileType: uploadFile.type });
-
-      // Upload to Supabase storage - EXACT same as Settings
-      const { data, error: uploadError } = await supabase.storage
-        .from('avatars')
-        .upload(fileName, uploadFile, {
-          cacheControl: '3600',
-          upsert: false
-        });
-
-      if (uploadError) {
-        console.error('❌ Avatar upload error:', uploadError);
-        throw new Error(`Upload failed: ${uploadError.message}`);
-      }
-
-      console.log('✅ Upload data:', data);
-
-      // Get public URL - EXACT same as Settings
-      const { data: urlData } = supabase.storage
-        .from('avatars')
-        .getPublicUrl(fileName);
-
-      if (!urlData?.publicUrl) {
-        throw new Error('Failed to get public URL for uploaded image');
-      }
-
-      const imageUrl = urlData.publicUrl;
-      console.log('🔗 Avatar upload successful. Public URL:', imageUrl);
-      
-      // Add cache busting like Settings page does
-      const cacheBustedUrl = `${imageUrl}?v=${Date.now()}`;
-      console.log('🔄 Cache-busted URL:', cacheBustedUrl);
-      
-      return cacheBustedUrl;
-    } catch (error) {
-      console.error('❌ Error uploading avatar:', error);
-      // IMPORTANT: Return null instead of throwing, so signup doesn't fail
-      return null;
-    }
   };
 
   const uploadOrganizationLogo = async (file) => {
