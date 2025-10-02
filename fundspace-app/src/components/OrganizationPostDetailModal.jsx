@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { X, ThumbsUp, Heart, Lightbulb, PartyPopper, MessageCircle, Share2, Send } from 'lucide-react';
+import ReactorsText from './post/ReactorsText';
+import ReactionsPreview from './post/ReactionsPreview';
 import { formatDistanceToNow } from 'date-fns';
 
 const reactions = [
@@ -30,6 +32,9 @@ export default function OrganizationPostDetailModal({
   const [submittingComment, setSubmittingComment] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [showReactionPicker, setShowReactionPicker] = useState(false);
+  const [reactors, setReactors] = useState([]);
+  const [showReactorsPreview, setShowReactorsPreview] = useState(false);
+  const reactorsTimeoutRef = React.useRef(null);
 
   const canInteract = !!currentUserId;
   const images = post?.image_urls || [];
@@ -71,6 +76,56 @@ export default function OrganizationPostDetailModal({
 
     loadData();
   }, [post?.id, currentUserId, preloadedReactions]);
+
+  useEffect(() => {
+    // Fetch reactor preview data when modal opens
+    const fetchReactorPreview = async () => {
+      if (totalLikes > 0 && (!reactors || reactors.length === 0) && post?.id) {
+        try {
+          const { data: reactionData, error: reactionsError } = await supabase
+            .from('organization_post_likes')
+            .select('user_id, reaction_type, created_at')
+            .eq('organization_post_id', post.id)
+            .order('created_at', { ascending: false })
+            .limit(3);
+  
+          if (reactionsError) throw reactionsError;
+  
+          if (reactionData && reactionData.length > 0) {
+            const userIds = reactionData.map(r => r.user_id);
+            
+            const { data: profilesData, error: profilesError } = await supabase
+              .from('profiles')
+              .select('id, full_name, avatar_url, title, organization_name, role')
+              .in('id', userIds);
+  
+            if (profilesError) throw profilesError;
+  
+            const transformedReactors = reactionData.map(like => {
+              const profile = profilesData?.find(p => p.id === like.user_id);
+              return {
+                user_id: like.user_id,
+                profile_id: profile?.id,
+                full_name: profile?.full_name,
+                avatar_url: profile?.avatar_url,
+                title: profile?.title,
+                organization_name: profile?.organization_name,
+                role: profile?.role,
+                reaction_type: like.reaction_type,
+                created_at: like.created_at
+              };
+            }).filter(reactor => reactor.full_name);
+            
+            setReactors(transformedReactors);
+          }
+        } catch (error) {
+          console.error('Error fetching reactor preview:', error);
+        }
+      }
+    };
+  
+    fetchReactorPreview();
+  }, [totalLikes, post?.id]);
 
   const handleReaction = async (reactionType) => {
     if (!canInteract || !post?.id) return;
@@ -165,6 +220,71 @@ export default function OrganizationPostDetailModal({
       setSubmittingComment(false);
     }
   };
+
+  const handleReactorsEnter = async () => {
+    if (reactorsTimeoutRef.current) {
+      clearTimeout(reactorsTimeoutRef.current);
+    }
+  
+    // Only fetch all reactors if we don't have full list yet
+    if (totalLikes > 0 && reactors.length < totalLikes && post?.id) {
+      try {
+        const { data: reactionData, error: reactionsError } = await supabase
+          .from('organization_post_likes')
+          .select('user_id, reaction_type, created_at')
+          .eq('organization_post_id', post.id)
+          .order('created_at', { ascending: false });
+  
+        if (reactionsError) throw reactionsError;
+  
+        if (reactionData && reactionData.length > 0) {
+          const userIds = reactionData.map(r => r.user_id);
+          
+          const { data: profilesData, error: profilesError } = await supabase
+            .from('profiles')
+            .select('id, full_name, avatar_url, title, organization_name, role')
+            .in('id', userIds);
+  
+          if (profilesError) throw profilesError;
+  
+          const transformedReactors = reactionData.map(like => {
+            const profile = profilesData?.find(p => p.id === like.user_id);
+            return {
+              user_id: like.user_id,
+              profile_id: profile?.id,
+              full_name: profile?.full_name,
+              avatar_url: profile?.avatar_url,
+              title: profile?.title,
+              organization_name: profile?.organization_name,
+              role: profile?.role,
+              reaction_type: like.reaction_type,
+              created_at: like.created_at
+            };
+          }).filter(reactor => reactor.full_name);
+          
+          setReactors(transformedReactors);
+        }
+      } catch (error) {
+        console.error('Error fetching all reactors:', error);
+      }
+    }
+  
+    setShowReactorsPreview(true);
+  };
+  
+  const handleReactorsLeave = () => {
+    reactorsTimeoutRef.current = setTimeout(() => {
+      setShowReactorsPreview(false);
+    }, 300);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (reactorsTimeoutRef.current) {
+        clearTimeout(reactorsTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const nextImage = () => {
     setCurrentImageIndex((prev) => (prev + 1) % images.length);
@@ -262,26 +382,43 @@ export default function OrganizationPostDetailModal({
             )}
           </div>
 
-          {totalLikes > 0 && (
-            <div className="px-6 py-3 border-b border-slate-200">
-              <div className="flex items-center space-x-2">
-                <div className="flex items-center -space-x-1">
-                  {reactionSummary.sort((a, b) => b.count - a.count).slice(0, 3).map(({ type }) => {
-                    const reaction = reactions.find(r => r.type === type);
-                    if (!reaction) return null;
-                    return (
-                      <div key={type} className={`p-0.5 rounded-full ${reaction.color} border-2 border-white`}>
-                        <reaction.Icon size={12} className="text-white" />
-                      </div>
-                    );
-                  })}
+          <div className="px-6 py-3 border-b border-slate-200">
+            <div 
+              className="relative"
+              onMouseEnter={handleReactorsEnter}
+              onMouseLeave={handleReactorsLeave}
+            >
+              {totalLikes > 0 ? (
+                <div className="flex items-center cursor-pointer">
+                  <div className="flex items-center -space-x-1">
+                    {(reactionSummary || []).sort((a, b) => b.count - a.count).slice(0, 3).map(({ type }) => {
+                      const reaction = reactions.find(r => r.type === type);
+                      if (!reaction) return null;
+                      return (
+                        <div key={type} className={`p-0.5 rounded-full ${reaction.color} border-2 border-white`}>
+                          <reaction.Icon size={12} className="text-white" />
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <ReactorsText 
+                    likeCount={totalLikes} 
+                    reactors={reactors}
+                    onViewReactions={() => {/* handle open reactions modal if needed */}}
+                  />
                 </div>
-                <span className="text-sm text-slate-600">
-                  {totalLikes} {totalLikes === 1 ? 'reaction' : 'reactions'}
-                </span>
-              </div>
+              ) : (
+                <span className="text-slate-400">No reactions yet</span>
+              )}
+              {showReactorsPreview && totalLikes > 0 && (
+                <ReactionsPreview 
+                  reactors={reactors}
+                  likeCount={totalLikes}
+                  onViewAll={() => {/* handle view all if needed */}}
+                />
+              )}
             </div>
-          )}
+          </div>
 
           <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
             <div className="relative">

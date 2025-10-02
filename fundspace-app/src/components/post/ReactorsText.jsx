@@ -2,23 +2,29 @@
 import React from 'react';
 
 export default function ReactorsText({ likeCount, reactors, onViewReactions }) {
-    const actualCount = reactors?.length || 0;
-    const displayCount = Math.max(likeCount, actualCount);
+    if (!likeCount || likeCount < 1) return null;
 
-    if (!displayCount || displayCount < 1) return null;
-
-    const firstName = reactors?.[0]?.full_name?.split(' ')?.[0];
-    const hasMultiple = displayCount > 1;
-
+    // Only show names if we have reactor data loaded
+    const hasReactorData = reactors && reactors.length > 0;
+    
     let displayText;
-    if (displayCount === 1 && firstName) {
-        displayText = firstName;
-    } else if (displayCount === 2 && firstName) {
-        displayText = `${firstName} + 1 other`;
-    } else if (hasMultiple && firstName) {
-        displayText = `${firstName} + ${displayCount - 1} others`;
+    
+    if (hasReactorData && reactors.length > 0) {
+        const firstName = reactors[0]?.full_name?.split(' ')?.[0];
+        
+        if (likeCount === 1 && firstName) {
+            displayText = firstName;
+        } else if (likeCount === 2 && firstName) {
+            displayText = `${firstName} + 1 other`;
+        } else if (likeCount > 2 && firstName) {
+            displayText = `${firstName} + ${likeCount - 1} others`;
+        } else {
+            // Fallback if we don't have name data
+            displayText = `${likeCount} ${likeCount === 1 ? 'reaction' : 'reactions'}`;
+        }
     } else {
-        displayText = `${displayCount} ${displayCount === 1 ? 'reaction' : 'reactions'}`;
+        // Default format when we don't have reactor details yet
+        displayText = `${likeCount} ${likeCount === 1 ? 'reaction' : 'reactions'}`;
     }
 
     return (
@@ -29,4 +35,4 @@ export default function ReactorsText({ likeCount, reactors, onViewReactions }) {
             {displayText}
         </span>
     );
-};
+}

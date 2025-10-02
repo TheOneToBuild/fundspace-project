@@ -5,6 +5,9 @@ import PostBody from '../post/PostBody';
 import PostActions from '../post/PostActions';
 import CommentSection from '../CommentSection';
 import { reactions } from '../post/constants';
+import ReactorsText from '../post/ReactorsText';
+import ReactionsPreview from '../post/ReactionsPreview';
+import ReactionsModal from '../post/ReactionsModal';
 import PropTypes from 'prop-types';
 
 const PostDetailModal = ({ post, isOpen, onClose, currentUserProfile, pageData, postsLikesData, onPostLike }) => {
@@ -74,6 +77,7 @@ const PostDetailModal = ({ post, isOpen, onClose, currentUserProfile, pageData, 
     const [showComments, setShowComments] = useState(false);
     const [showReactorsPreview, setShowReactorsPreview] = useState(false);
     const [showReactionPicker, setShowReactionPicker] = useState(false);
+    const [showReactionsModal, setShowReactionsModal] = useState(false);
 
     useEffect(() => {
         if (post && isOpen) {
@@ -92,6 +96,38 @@ const PostDetailModal = ({ post, isOpen, onClose, currentUserProfile, pageData, 
         if (likesData?.reactors) setReactors(likesData.reactors);
         if (likesData?.reaction_summary) setReactionSummary(likesData.reaction_summary);
     }, [likesData]);
+
+    useEffect(() => {
+        // Fetch reactor preview data when modal opens if there are reactions
+        const fetchReactorPreview = async () => {
+            if (likeCount > 0 && (!reactors || reactors.length === 0) && isOpen) {
+                try {
+                    const { data, error } = await supabase
+                        .rpc('get_post_reactors', { post_id: post.id })
+                        .limit(3);
+                    
+                    if (error) throw error;
+                    
+                    if (data && data.length > 0) {
+                        const formattedReactors = data.map(reactor => ({
+                            profile_id: reactor.user_id,
+                            user_id: reactor.user_id,
+                            full_name: reactor.full_name,
+                            avatar_url: reactor.avatar_url,
+                            reaction_type: reactor.reaction_type,
+                            organization_name: reactor.organization_name || ''
+                        }));
+                        
+                        setReactors(formattedReactors);
+                    }
+                } catch (error) {
+                    console.error('Error fetching reactor preview:', error);
+                }
+            }
+        };
+    
+        fetchReactorPreview();
+    }, [likeCount, post?.id, isOpen]);
 
     const formatTimeAgo = useCallback((dateString) => {
         const now = new Date();
@@ -142,18 +178,71 @@ const PostDetailModal = ({ post, isOpen, onClose, currentUserProfile, pageData, 
         }
     }, [currentUserProfile, post?.id, selectedReaction, onPostLike]);
 
-    const handleReactorsEnter = useCallback(() => {
+    const handleReactorsEnter = useCallback(async () => {
         if (reactorsTimeoutRef.current) {
             clearTimeout(reactorsTimeoutRef.current);
         }
+        
+        if (likeCount > 0 && reactors.length < likeCount && post?.id) {
+            try {
+                const { data, error } = await supabase
+                    .rpc('get_post_reactors', { post_id: post.id });
+                
+                if (error) throw error;
+                
+                const formattedReactors = data.map(reactor => ({
+                    profile_id: reactor.user_id,
+                    user_id: reactor.user_id,
+                    full_name: reactor.full_name,
+                    avatar_url: reactor.avatar_url,
+                    reaction_type: reactor.reaction_type,
+                    organization_name: reactor.organization_name || ''
+                }));
+                
+                setReactors(formattedReactors);
+            } catch (error) {
+                console.error('Error fetching reactors:', error);
+            }
+        }
+        
         setShowReactorsPreview(true);
-    }, []);
+    }, [likeCount, reactors.length, post?.id]);
 
     const handleReactorsLeave = useCallback(() => {
         reactorsTimeoutRef.current = setTimeout(() => {
             setShowReactorsPreview(false);
         }, 300);
     }, []);
+
+    const handleOpenReactionsModal = useCallback(async () => {
+        if (likeCount === 0) return;
+        
+        if (reactors && reactors.length > 0) {
+            setShowReactionsModal(true);
+            return;
+        }
+        
+        try {
+            const { data, error } = await supabase
+                .rpc('get_post_reactors', { post_id: post.id });
+            
+            if (error) throw error;
+            
+            const formattedReactors = data.map(reactor => ({
+                profile_id: reactor.user_id,
+                user_id: reactor.user_id,
+                full_name: reactor.full_name,
+                avatar_url: reactor.avatar_url,
+                reaction_type: reactor.reaction_type,
+                organization_name: reactor.organization_name || ''
+            }));
+            
+            setReactors(formattedReactors);
+            setShowReactionsModal(true);
+        } catch (error) {
+            console.error('Error fetching reactors:', error);
+        }
+    }, [post?.id, likeCount, reactors]);
 
     const handleBackdropClick = useCallback((event) => {
         if (event.target === event.currentTarget) {
@@ -273,20 +362,21 @@ const PostDetailModal = ({ post, isOpen, onClose, currentUserProfile, pageData, 
                                             );
                                         })}
                                     </div>
-                                    <span className="ml-2 text-sm text-slate-600">
-                                        {likeCount} {likeCount === 1 ? 'reaction' : 'reactions'}
-                                    </span>
+                                    <ReactorsText 
+                                        likeCount={likeCount} 
+                                        reactors={reactors}
+                                        onViewReactions={handleOpenReactionsModal}
+                                    />
                                 </div>
                             ) : (
                                 <span className="text-slate-400">No reactions yet</span>
                             )}
                             {showReactorsPreview && likeCount > 0 && (
-                                <div className="absolute top-full left-0 mt-2 p-3 bg-white rounded-lg shadow-lg border border-slate-200 z-10">
-                                    <div className="text-xs text-slate-600">
-                                        {reactors.slice(0, 3).map(reactor => reactor.profile?.full_name || reactor.full_name).join(', ')}
-                                        {reactors.length > 3 && ` and ${reactors.length - 3} others`}
-                                    </div>
-                                </div>
+                                <ReactionsPreview 
+                                    reactors={reactors}
+                                    likeCount={likeCount}
+                                    onViewAll={handleOpenReactionsModal}
+                                />
                             )}
                         </div>
                         {commentCount > 0 ? (
@@ -320,6 +410,15 @@ const PostDetailModal = ({ post, isOpen, onClose, currentUserProfile, pageData, 
                                 pageData={pageData}
                             />
                         </div>
+                    )}
+                    {showReactionsModal && (
+                        <ReactionsModal 
+                            isOpen={showReactionsModal} 
+                            onClose={() => setShowReactionsModal(false)} 
+                            reactors={reactors} 
+                            likeCount={likeCount} 
+                            reactionSummary={reactionSummary} 
+                        />
                     )}
                 </div>
             </div>

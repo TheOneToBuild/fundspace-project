@@ -404,7 +404,7 @@ export default function OrganizationPostCard({
           onMouseEnter={handleReactorsEnter} 
           onMouseLeave={handleReactorsLeave}
         >
-          {totalLikes > 0 && (
+          {totalLikes > 0 ? (
             <div className="flex items-center cursor-pointer">
               <div className="flex items-center -space-x-1">
                 {(reactionSummary || []).sort((a, b) => b.count - a.count).slice(0, 3).map(({ type }) => {
@@ -417,31 +417,21 @@ export default function OrganizationPostCard({
                   );
                 })}
               </div>
-              <span className="ml-2 text-sm text-slate-600">
-                {totalLikes} {totalLikes === 1 ? 'like' : 'likes'}
-              </span>
+              <ReactorsText 
+                likeCount={totalLikes} 
+                reactors={reactors}
+                onViewReactions={() => {/* handle open modal if needed */}}
+              />
             </div>
+          ) : (
+            <span className="text-slate-400">No reactions yet</span>
           )}
-          {showReactorsPreview && totalLikes > 0 && reactors.length > 0 && (
-            <div className="absolute left-0 bottom-full mb-2 bg-white border border-slate-200 rounded-lg shadow-lg p-3 z-20 min-w-[200px]">
-              <div className="space-y-2">
-                {reactors.slice(0, 5).map((reactor, index) => (
-                  <div key={index} className="flex items-center space-x-2">
-                    <div className="w-6 h-6 rounded-full bg-slate-300 flex-shrink-0">
-                      {reactor.avatar_url ? (
-                        <img src={reactor.avatar_url} alt="" className="w-6 h-6 rounded-full object-cover" />
-                      ) : (
-                        <span className="text-xs text-white">{reactor.full_name?.charAt(0)}</span>
-                      )}
-                    </div>
-                    <span className="text-sm text-slate-700 truncate">{reactor.full_name}</span>
-                  </div>
-                ))}
-                {reactors.length > 5 && (
-                  <div className="text-xs text-slate-500">and {reactors.length - 5} others</div>
-                )}
-              </div>
-            </div>
+          {showReactorsPreview && totalLikes > 0 && (
+            <ReactionsPreview 
+              reactors={reactors}
+              likeCount={totalLikes}
+              onViewAll={() => {/* handle view all if needed */}}
+            />
           )}
         </div>
         {commentsCount > 0 && (
