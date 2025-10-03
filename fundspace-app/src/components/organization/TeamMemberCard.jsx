@@ -10,8 +10,7 @@ import {
     getRoleBadgeColor, 
     hasPermission,
     PERMISSIONS,
-    canPromoteToRole,
-    canDemoteFromRole
+    canManageUser
 } from '../../utils/organizationPermissions.js';
 
 export default function TeamMemberCard({ 
@@ -56,45 +55,42 @@ export default function TeamMemberCard({
             return;
         }
 
+        // Add a more specific permission check
+        if (!canManageUser(userRole, member.role, isOmegaAdmin)) {
+            setError("You don't have permission to manage this user.");
+            return;
+        }
+
         try {
             let updateData = {};
             let successMessage = '';
             
             switch(action) {
                 case 'promote':
-                    if (member.role === 'member' && canPromoteToRole(userRole, 'admin', isOmegaAdmin)) {
-                        updateData = { role: 'admin' };
+                    if (member.role === 'member') {
+                        updateData = { role: ROLES.ADMIN };
                         successMessage = `Successfully promoted ${member.profiles.full_name} to Admin`;
-                    } else if (member.role === 'admin' && canPromoteToRole(userRole, 'super_admin', isOmegaAdmin)) {
+                    } else if (member.role === 'admin') {
                         updateData = { role: 'super_admin' };
                         successMessage = `Successfully promoted ${member.profiles.full_name} to Super Admin`;
-                    } else {
-                        throw new Error('You do not have permission to promote this member.');
                     }
                     break;
                 case 'demote':
-                    if (member.role === 'super_admin' && canDemoteFromRole(userRole, 'super_admin', isOmegaAdmin)) {
-                        updateData = { role: 'admin' };
+                    if (member.role === 'super_admin') {
+                        updateData = { role: ROLES.ADMIN };
                         successMessage = `Successfully changed ${member.profiles.full_name}'s role to Admin`;
-                    } else if (member.role === 'admin' && canDemoteFromRole(userRole, 'admin', isOmegaAdmin)) {
-                        updateData = { role: 'member' };
+                    } else if (member.role === 'admin') {
+                        updateData = { role: ROLES.MEMBER };
                         successMessage = `Successfully changed ${member.profiles.full_name}'s role to Member`;
-                    } else {
-                        throw new Error('You do not have permission to demote this member.');
                     }
                     break;
                 case 'remove':
-                    if (!canManageMembers) {
-                        throw new Error('You do not have permission to remove members.');
-                    }
                     const { error: removeError } = await supabase
                         .from('organization_memberships')
                         .delete()
                         .eq('id', member.id);
                     
                     if (removeError) throw removeError;
-
-                    console.log(`Successfully removed ${member.profiles.full_name}`);
                     
                     if (onMemberAction) {
                         onMemberAction();
@@ -110,8 +106,6 @@ export default function TeamMemberCard({
                     .eq('id', member.id);
 
                 if (error) throw error;
-
-                console.log(successMessage);
 
                 if (onMemberAction) {
                     onMemberAction();
@@ -170,7 +164,7 @@ export default function TeamMemberCard({
                         {showDropdown && (
                             <div className="absolute right-0 top-full mt-2 w-48 bg-white border border-slate-200 rounded-lg shadow-lg z-50 py-1">
                                 {/* Role Management */}
-                                {canManageMembers && (
+                                {canManageAdmins && (
                                     <>
                                         {member.role === 'member' && (
                                             <button
@@ -185,7 +179,7 @@ export default function TeamMemberCard({
                                             </button>
                                         )}
                                         
-                                        {member.role === 'admin' && canManageAdmins && (
+                                        {member.role === 'admin' && (
                                             <>
                                                 <button
                                                     onClick={(e) => {
@@ -210,7 +204,7 @@ export default function TeamMemberCard({
                                             </>
                                         )}
 
-                                        {member.role === 'super_admin' && canManageAdmins && (
+                                        {member.role === 'super_admin' && (
                                             <button
                                                 onClick={(e) => {
                                                     e.stopPropagation();

@@ -117,3 +117,28 @@ export const getTabsForOrganizationType = (organizationType, canViewAnalytics = 
 
     return baseTabs;
 };
+
+/**
+ * Check if a user can manage another user based on their roles
+ * @param {string} userRole - The role of the user performing the action
+ * @param {string} targetRole - The role of the user being managed
+ * @param {boolean} isOmegaAdmin - Whether the user is an omega admin
+ * @returns {boolean} - Whether the user can manage the target user
+ */
+export function canManageUser(userRole, targetRole, isOmegaAdmin = false) {
+  // Omega admins can manage anyone
+  if (isOmegaAdmin) return true;
+  
+  // Super admins can manage admins and members
+  if (userRole === ROLES.SUPER_ADMIN) {
+    return targetRole === ROLES.ADMIN || targetRole === ROLES.MEMBER;
+  }
+  
+  // Admins can manage members only
+  if (userRole === ROLES.ADMIN) {
+    return targetRole === ROLES.MEMBER;
+  }
+  
+  // Members cannot manage anyone
+  return false;
+};
