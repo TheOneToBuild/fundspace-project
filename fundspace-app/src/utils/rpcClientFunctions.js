@@ -318,6 +318,113 @@ export const getGrantsBatch = async (grantIds, userId = null) => {
   }
 };
 
+// ====================================
+// ORGANIZATION MEMBERSHIPS OPTIMIZATION
+// ====================================
+
+/**
+ * Get memberships for multiple profiles in one call
+ * Replaces individual organization_memberships queries
+ */
+export const getMembershipsBatch = async (profileIds) => {
+  if (!profileIds || profileIds.length === 0) return {};
+
+  const cacheKey = getCacheKey('memberships_batch', { profileIds });
+  const cached = getCachedData(cacheKey);
+  if (cached) return cached;
+
+  try {
+    const { data, error } = await supabase.rpc('get_memberships_batch', {
+      p_profile_ids: profileIds
+    });
+
+    if (error) throw error;
+    const result = data || {};
+    setCachedData(cacheKey, result);
+    return result;
+  } catch (error) {
+    console.error('Error fetching memberships batch:', error);
+    return {};
+  }
+};
+
+/**
+ * Get all memberships for a single user (users can have multiple orgs)
+ * Replaces getUserOrganizationMembership
+ */
+export const getUserAllMemberships = async (profileId) => {
+  if (!profileId) return { memberships: [] };
+
+  const cacheKey = getCacheKey('user_all_memberships', { profileId });
+  const cached = getCachedData(cacheKey);
+  if (cached) return cached;
+
+  try {
+    const { data, error } = await supabase.rpc('get_user_all_memberships', {
+      p_profile_id: profileId
+    });
+
+    if (error) throw error;
+    setCachedData(cacheKey, data);
+    return data;
+  } catch (error) {
+    console.error('Error fetching user memberships:', error);
+    return { memberships: [] };
+  }
+};
+
+/**
+ * Check organization access for multiple users at once
+ */
+export const checkOrgAccessBatch = async (organizationId, profileIds) => {
+  if (!organizationId || !profileIds || profileIds.length === 0) return {};
+
+  const cacheKey = getCacheKey('org_access_batch', { organizationId, profileIds });
+  const cached = getCachedData(cacheKey);
+  if (cached) return cached;
+
+  try {
+    const { data, error } = await supabase.rpc('check_org_access_batch', {
+      p_organization_id: organizationId,
+      p_profile_ids: profileIds
+    });
+
+    if (error) throw error;
+    const result = data || {};
+    setCachedData(cacheKey, result);
+    return result;
+  } catch (error) {
+    console.error('Error checking org access batch:', error);
+    return {};
+  }
+};
+
+/**
+ * Get organization members with full profile info
+ * Replaces the multiple queries in member list pages
+ */
+export const getOrganizationMembersComplete = async (organizationId, organizationType = null) => {
+  if (!organizationId) return { members: [] };
+
+  const cacheKey = getCacheKey('org_members_complete', { organizationId, organizationType });
+  const cached = getCachedData(cacheKey);
+  if (cached) return cached;
+
+  try {
+    const { data, error } = await supabase.rpc('get_organization_members_complete', {
+      p_organization_id: organizationId,
+      p_organization_type: organizationType
+    });
+
+    if (error) throw error;
+    setCachedData(cacheKey, data);
+    return data;
+  } catch (error) {
+    console.error('Error fetching organization members:', error);
+    return { members: [] };
+  }
+};
+
 export const getBatchConnectionStatus = async (viewerId, profileIds) => {
   if (!viewerId || !profileIds || profileIds.length === 0) {
     return { connections: {} };
