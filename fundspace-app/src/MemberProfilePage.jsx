@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useOutletContext } from 'react-router-dom';
 import PublicPageLayout from './components/PublicPageLayout.jsx';
 import { supabase } from './supabaseClient';
-import { getUserProfileComplete } from './utils/rpcClientFunctions';
+import { getUserProfileComplete, getUserExperiencesComplete } from './utils/rpcClientFunctions';
 import { followUser, unfollowUser, checkFollowStatus } from './utils/followUtils';
 import MemberProfileHeader from './components/member-profile/MemberProfileHeader';
 import MemberProfileActivity from './components/member-profile/MemberProfileActivity';
@@ -17,6 +17,7 @@ export default function MemberProfilePage() {
     const memberIdToUse = memberId || profileId;
     
     const [memberData, setMemberData] = useState(null);
+    const [experiences, setExperiences] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [isFollowing, setIsFollowing] = useState(false);
@@ -32,7 +33,11 @@ const loadMemberData = async () => {
 
     setLoading(true);
     try {
-      const profileData = await getUserProfileComplete(memberIdToUse, currentUserProfile?.id);
+      // Fetch profile and experiences in parallel
+      const [profileData, experiencesResult] = await Promise.all([
+        getUserProfileComplete(memberIdToUse, currentUserProfile?.id),
+        getUserExperiencesComplete(memberIdToUse)
+      ]);
 
       if (!profileData) {
         setError('Member not found');
@@ -97,6 +102,8 @@ const loadMemberData = async () => {
         followers: enrichedFollowers,
         following: enrichedFollowing
       });
+      
+      setExperiences(experiencesResult.experiences || []);
 
     } catch (error) {
       console.error('Error loading member data:', error);
@@ -204,6 +211,7 @@ const loadMemberData = async () => {
                 return (
                     <MemberProfileExperience 
                         member={memberData}
+                        experiences={experiences}
                         loading={loading}
                         currentUserId={currentUserProfile?.id}
                         isCurrentUser={isCurrentUser}
@@ -226,6 +234,9 @@ const loadMemberData = async () => {
                         loading={loading}
                         currentUserId={currentUserProfile?.id}
                         isCurrentUser={isCurrentUser}
+                        connections={memberData.connections || []}
+                        followers={memberData.followers || []}
+                        following={memberData.following || []}
                         currentUserProfile={currentUserProfile}
                     />
                 );

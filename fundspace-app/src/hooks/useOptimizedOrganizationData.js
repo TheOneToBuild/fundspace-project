@@ -1,7 +1,7 @@
 // src/hooks/useOptimizedOrganizationData.js - Fixed version for multiple memberships
 import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
-import globalDataManager from '../utils/globalDataManager';
+import { getPostsBatch, getOrganizationsBatch } from '../utils/rpcClientFunctions';
 
 // Batch manager for organization data
 class OrganizationDataManager {
@@ -85,14 +85,9 @@ class OrganizationDataManager {
 
   async _fetchOrganizationDetails(organizationId) {
     try {
-      const { data: organization, error } = await supabase
-        .from('organizations')
-        .select('*')
-        .eq('id', organizationId)
-        .single();
-
-      if (error) throw error;
-      return organization;
+      const orgsData = await getOrganizationsBatch([organizationId]);
+      const organization = orgsData?.[organizationId];
+      return organization || null;
     } catch (error) {
       console.error('Error fetching organization details:', error);
       return null;
@@ -184,45 +179,23 @@ class OrganizationDataManager {
       this.pendingRequests.delete(cacheKey);
     }
   }
-
+  
   async _fetchOrganizationPosts(organizationId) {
     try {
-      const { data: posts, error } = await supabase
-        .from('posts')
-        .select(`
-          *,
-          profiles (
-            id,
-            full_name,
-            avatar_url,
-            title,
-            organizational_role
-          )
-        `)
-        .eq('organization_id', organizationId)
-        .order('created_at', { ascending: false })
-        .limit(20);
-
-      if (error) throw error;
-
-      // Batch load post likes for all posts
-      if (posts?.length > 0) {
-        const postIds = posts.map(post => post.id);
-        const postLikesData = await globalDataManager.getBatchPostLikes(postIds);
-        
-        return posts.map(post => ({
-          ...post,
-          likes_count: postLikesData[post.id]?.likes_count || 0,
-          user_reaction: postLikesData[post.id]?.user_reaction || null
-        }));
-      }
-
+      // Use the new RPC function to fetch posts for the organization
+      // This assumes getPostsBatch can be called with organizationId
+      // and it returns an array of post objects, already enriched.
+      const posts = await getPostsBatch({ organizationId: organizationId });
+      
+      // The RPC function is expected to return an array of posts.
+      // The previous implementation returned an array, so we ensure this one does too.
       return posts || [];
     } catch (error) {
       console.error('Error fetching organization posts:', error);
       return [];
     }
   }
+
 
   // Get organization programs
   async getOrganizationPrograms(organizationId) {

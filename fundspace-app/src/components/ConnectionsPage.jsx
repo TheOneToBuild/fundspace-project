@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useOutletContext, Link } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 // 1. UPDATED IMPORTS: Added getDashboardData
-import { getBatchConnectionStatus, getUserProfileComplete, getDashboardData } from '../utils/rpcClientFunctions'; 
+import { getUserConnectionsComplete } from '../utils/rpcClientFunctions'; 
 import { Users, UserCheck, UserX, ArrowLeft, Clock, Building, MapPin, Search, Filter } from 'lucide-react';
 import Avatar from './Avatar';
 import PublicPageLayout from './PublicPageLayout'; 
@@ -50,72 +50,40 @@ class ConnectionsDataManager {
       if (!authUserId) {
         throw new Error('No authenticated user found');
       }
-  
-      const dashboardData = await getDashboardData(authUserId);
-  
-      if (!dashboardData) {
-        return {
-          connections: [],
-          pendingRequests: [],
-          connectedProfileIds: new Set(),
-          authUserId
-        };
-      }
-  
-      const connections = dashboardData.connections || [];
-      const profiles = dashboardData.profiles || {};
-  
-      const establishedConnections = connections.filter(conn =>
-        conn.status === 'accepted'
-      );
-  
-      const incomingRequests = connections.filter(conn =>
-        conn.status === 'pending' && conn.recipient_id === authUserId
-      );
-  
-      const outgoingRequests = connections.filter(conn =>
-        conn.status === 'pending' && conn.requester_id === authUserId
-      );
-  
-      const processedConnections = establishedConnections.map(conn => {
-        const otherUserId = conn.requester_id === authUserId
-          ? conn.recipient_id
-          : conn.requester_id;
-  
-        const userProfile = profiles[otherUserId] || {
-          id: otherUserId,
-          full_name: 'Unknown User'
-        };
-  
-        return {
-          id: conn.id,
-          connected_at: conn.updated_at || conn.created_at,
-          user: userProfile
-        };
-      });
-  
-      const processedPendingRequests = [
-        ...incomingRequests.map(req => ({
-          id: req.id,
-          created_at: req.created_at,
-          type: 'incoming',
-          isIncoming: true,
-          user_profile: profiles[req.requester_id] || {
-            id: req.requester_id,
-            full_name: 'Unknown User'
-          }
-        })),
-        ...outgoingRequests.map(req => ({
-          id: req.id,
-          created_at: req.created_at,
-          type: 'outgoing',
-          isIncoming: false,
-          user_profile: profiles[req.recipient_id] || {
-            id: req.recipient_id,
-            full_name: 'Unknown User'
-          }
-        }))
-      ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+      // Fetch accepted and pending connections in parallel
+      const [acceptedResult, pendingResult] = await Promise.all([
+        getUserConnectionsComplete(authUserId, 'accepted'),
+        getUserConnectionsComplete(authUserId, 'pending')
+      ]);
+
+      const processedConnections = (acceptedResult.connections || []).map(conn => ({
+        id: conn.connection_id,
+        connected_at: conn.updated_at,
+        user: {
+          id: conn.profile_id,
+          full_name: conn.full_name,
+          avatar_url: conn.avatar_url,
+          title: conn.title,
+          organization_name: conn.organization_name,
+          location: conn.location
+        }
+      }));
+
+      const processedPendingRequests = (pendingResult.connections || []).map(req => ({
+        id: req.connection_id,
+        created_at: req.created_at,
+        type: req.requester_id === authUserId ? 'outgoing' : 'incoming',
+        isIncoming: req.requester_id !== authUserId,
+        user_profile: {
+          id: req.profile_id,
+          full_name: req.full_name,
+          avatar_url: req.avatar_url,
+          title: req.title,
+          organization_name: req.organization_name,
+          location: req.location
+        }
+      })).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
   
       const connectedProfileIds = new Set([
         ...processedConnections.map(c => c.user.id),

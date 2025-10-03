@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../supabaseClient';
+import { getOrganizationsBatch } from '../utils/rpcClientFunctions';
 
 const pendingRequests = new Map();
 
@@ -111,13 +112,9 @@ export function useOrganizationMembership(profileId) {
         if (membershipData && membershipData.length > 0) {
           const membership = membershipData[0];
           
-          const { data: orgData, error: orgError } = await supabase
-            .from('organizations')
-            .select('id, name, tagline, image_url')
-            .eq('id', membership.organization_id)
-            .single();
-
-          if (!orgError && orgData) {
+          const orgsData = await getOrganizationsBatch([membership.organization_id]);
+          const orgData = orgsData?.[membership.organization_id];
+          if (orgData) {
             const result = {
               ...membership,
               organization: orgData
@@ -215,13 +212,9 @@ export async function getOrganizationMembership(profileId) {
       if (membershipData && membershipData.length > 0) {
         const membership = membershipData[0];
         
-        const { data: orgData, error: orgError } = await supabase
-          .from('organizations')
-          .select('id, name, tagline, image_url')
-          .eq('id', membership.organization_id)
-          .single();
-
-        if (!orgError && orgData) {
+        const orgsData = await getOrganizationsBatch([membership.organization_id]);
+        const orgData = orgsData?.[membership.organization_id];
+        if (orgData) {
           return {
             ...membership,
             organization: orgData

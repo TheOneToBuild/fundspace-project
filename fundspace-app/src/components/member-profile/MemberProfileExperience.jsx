@@ -13,12 +13,10 @@ import {
 } from 'lucide-react';
 import { supabase } from '../../supabaseClient';
 import { useNavigate } from 'react-router-dom';
-
-const MemberProfileExperience = ({ member, loading, currentUserId, isCurrentUser }) => {
+const MemberProfileExperience = ({ member, experiences, loading, currentUserId, isCurrentUser, refreshData }) => {
     const navigate = useNavigate();
     
-    const [experiences, setExperiences] = useState([]);
-    const [experiencesLoading, setExperiencesLoading] = useState(true);
+    // experiences and loading state are now managed by the parent component
     const [activeTab, setActiveTab] = useState('work');
     const [showAddForm, setShowAddForm] = useState(false);
     const [editingExperience, setEditingExperience] = useState(null);
@@ -76,10 +74,6 @@ const MemberProfileExperience = ({ member, loading, currentUserId, isCurrentUser
             console.error('Error navigating to organization:', error);
         }
     };
-
-    useEffect(() => {
-        fetchExperiences();
-    }, [member?.id]);
 
     useEffect(() => {
         if (showAddForm && !editingExperience) {
@@ -147,31 +141,6 @@ const MemberProfileExperience = ({ member, loading, currentUserId, isCurrentUser
         fetchTitleSuggestions();
     }, []);
 
-    const fetchExperiences = async () => {
-        if (!member?.id) return;
-        
-        setExperiencesLoading(true);
-        try {
-            const { data, error } = await supabase
-                .from('user_experiences')
-                .select(`
-                    *,
-                    organization:organizations(id, name, image_url, type)
-                `)
-                .eq('user_id', member.id)
-                .eq('is_visible', true)
-                .order('is_current', { ascending: false })
-                .order('start_date', { ascending: false });
-
-            if (error) throw error;
-            setExperiences(data || []);
-        } catch (error) {
-            console.error('Error fetching experiences:', error);
-        } finally {
-            setExperiencesLoading(false);
-        }
-    };
-
     const handleSubmit = async (e) => {
         e.preventDefault();
         if (!isCurrentUser) return;
@@ -218,7 +187,7 @@ const MemberProfileExperience = ({ member, loading, currentUserId, isCurrentUser
             setShowAddForm(false);
             setEditingExperience(null);
             resetForm();
-            fetchExperiences();
+            if (refreshData) refreshData();
         } catch (error) {
             console.error('Error saving experience:', error);
             alert('Error saving experience. Please try again.');
@@ -245,7 +214,7 @@ const MemberProfileExperience = ({ member, loading, currentUserId, isCurrentUser
                 .delete()
                 .eq('id', deleteConfirm.id);
             if (error) throw error;
-            fetchExperiences();
+            if (refreshData) refreshData();
         } catch (error) {
             console.error('Error deleting experience:', error);
             alert('Error deleting experience. Please try again.');
@@ -414,7 +383,7 @@ const MemberProfileExperience = ({ member, loading, currentUserId, isCurrentUser
         return types[type] || type;
     };
 
-    if (experiencesLoading) {
+    if (loading) {
         return (
             <div className="max-w-7xl mx-auto px-8 py-8">
                 <div className="animate-pulse space-y-6">

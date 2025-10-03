@@ -254,65 +254,33 @@ export const withdrawConnectionRequest = async (requesterId, recipientId) => {
 };
 
 export const getUserConnections = async (userId, limit = 50) => {
+  if (!userId) return { connections: [], error: 'User ID is required' };
+
   try {
-    const profileData = await getUserProfileComplete(userId);
-    
-    if (profileData?.connections) {
-      return { connections: profileData.connections.slice(0, limit) };
+    // Use the optimized RPC function to get connections with profile data included
+    const result = await getUserConnectionsComplete(userId, 'accepted');
+
+    if (result.error) {
+      throw result.error;
     }
 
-    const { data: connectionsData, error: connectionsError } = await supabase
-      .from('user_connections')
-      .select('id, requester_id, recipient_id, created_at')
-      .eq('status', 'accepted')
-      .or(`requester_id.eq.${userId},recipient_id.eq.${userId}`)
-      .order('created_at', { ascending: false })
-      .limit(limit);
-
-    if (connectionsError) {
-      return { connections: [], error: connectionsError.message };
-    }
-
-    if (!connectionsData || connectionsData.length === 0) {
-      return { connections: [] };
-    }
-
-    const otherUserIds = connectionsData.map(conn => 
-      conn.requester_id === userId ? conn.recipient_id : conn.requester_id
-    );
-
-    const { data: profilesData, error: profilesError } = await supabase
-      .from('profiles')
-      .select('id, full_name, avatar_url, title, organization_name')
-      .in('id', otherUserIds);
-
-    if (profilesError) {
-      return { connections: [], error: profilesError.message };
-    }
-
-    const profilesMap = {};
-    profilesData?.forEach(profile => {
-      profilesMap[profile.id] = profile;
-    });
-
-    const formattedConnections = connectionsData.map(conn => {
-      const otherUserId = conn.requester_id === userId ? conn.recipient_id : conn.requester_id;
-      const otherUser = profilesMap[otherUserId];
-      
+    // The RPC function returns a complete payload, we just need to format it
+    const formattedConnections = (result.connections || []).map(conn => {
       return {
-        id: conn.id,
-        user: otherUser || {
-          id: otherUserId,
-          full_name: 'Unknown User',
-          avatar_url: null,
-          title: null,
-          organization_name: null
+        id: conn.connection_id,
+        user: {
+          id: conn.profile_id,
+          full_name: conn.full_name,
+          avatar_url: conn.avatar_url,
+          title: conn.title,
+          organization_name: conn.organization_name,
+          location: conn.location
         },
-        connected_at: conn.created_at
+        connected_at: conn.updated_at || conn.created_at
       };
     });
 
-    return { connections: formattedConnections };
+    return { connections: formattedConnections.slice(0, limit) };
   } catch (error) {
     return { connections: [], error: error.message };
   }

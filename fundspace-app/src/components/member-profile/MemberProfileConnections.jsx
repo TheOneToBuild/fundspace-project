@@ -6,79 +6,36 @@ import {
     acceptConnectionRequest, 
     declineConnectionRequest,
     withdrawConnectionRequest,
-    removeConnection 
+    removeConnection,
+    getBatchConnectionStatuses
 } from '../../utils/userConnectionsUtils';
-import { getUserProfileComplete, getBatchConnectionStatus } from '../../utils/rpcClientFunctions';
 
-const MemberProfileConnections = ({ member, loading, currentUserId, isCurrentUser }) => {
+const MemberProfileConnections = ({ 
+    member, 
+    loading, 
+    currentUserId, 
+    isCurrentUser,
+    connections,
+    followers,
+    following
+}) => {
     const [activeSubTab, setActiveSubTab] = useState('connections');
-    const [connectionsData, setConnectionsData] = useState({
-        connections: [],
-        followers: [],
-        following: [],
-        loading: true,
-        error: null
-    });
     const [connectionActions, setConnectionActions] = useState({});
+    const [isDataLoading, setIsDataLoading] = useState(true);
 
     useEffect(() => {
-        fetchConnectionsData();
-    }, [member?.id]);
-
-    const fetchConnectionsData = async () => {
-        if (!member?.id) return;
-
-        try {
-            setConnectionsData(prev => ({ ...prev, loading: true }));
-
-            const profileData = await getUserProfileComplete(member.id, currentUserId);
-
-            if (!profileData) {
-                throw new Error('Failed to load profile data');
-            }
-
-            const connections = (profileData.connections || []).map(conn => ({
-                id: conn.id,
-                user: conn.profile || { id: conn.user_id, full_name: 'Unknown User' },
-                created_at: conn.created_at,
-                type: 'connection'
-            }));
-
-            const followers = (profileData.followers || []).map(follow => ({
-                id: follow.id,
-                user: follow.profile || { id: follow.follower_id, full_name: 'Unknown User' },
-                created_at: follow.created_at,
-                type: 'follower'
-            }));
-
-            const following = (profileData.following || []).map(follow => ({
-                id: follow.id,
-                user: follow.profile || { id: follow.following_id, full_name: 'Unknown User' },
-                created_at: follow.created_at,
-                type: 'following'
-            }));
-
-            setConnectionsData({
-                connections,
-                followers,
-                following,
-                loading: false,
-                error: null
-            });
-
+        const initializeData = async () => {
+            setIsDataLoading(true);
             if (currentUserId && currentUserId !== member.id) {
                 await fetchConnectionStatuses([...connections, ...followers, ...following]);
             }
+            setIsDataLoading(false);
+        };
 
-        } catch (error) {
-            console.error('Error fetching connections data:', error);
-            setConnectionsData(prev => ({
-                ...prev,
-                loading: false,
-                error: error.message
-            }));
+        if (!loading) {
+            initializeData();
         }
-    };
+    }, [member?.id, currentUserId, loading, connections, followers, following]);
 
     const fetchConnectionStatuses = async (allUsers) => {
         const targetUserIds = allUsers
@@ -88,7 +45,7 @@ const MemberProfileConnections = ({ member, loading, currentUserId, isCurrentUse
         if (targetUserIds.length === 0) return;
 
         try {
-            const batchStatuses = await getBatchConnectionStatus(currentUserId, targetUserIds);
+            const batchStatuses = await getBatchConnectionStatuses(currentUserId, targetUserIds);
             setConnectionActions(batchStatuses.connections || {});
         } catch (error) {
             console.error('Error fetching batch connection statuses:', error);
@@ -98,6 +55,10 @@ const MemberProfileConnections = ({ member, loading, currentUserId, isCurrentUse
             });
             setConnectionActions(fallbackStatuses);
         }
+    };
+    
+    const refreshParentData = () => {
+        // This would ideally call a refresh function passed from MemberProfilePage
     };
 
     const handleConnectionAction = async (targetUserId, action) => {
@@ -123,7 +84,7 @@ const MemberProfileConnections = ({ member, loading, currentUserId, isCurrentUse
                             ...prev,
                             [targetUserId]: { status: 'accepted', isRequester: false }
                         }));
-                        await fetchConnectionsData();
+                        refreshParentData();
                     }
                     break;
                     
@@ -154,7 +115,7 @@ const MemberProfileConnections = ({ member, loading, currentUserId, isCurrentUse
                             ...prev,
                             [targetUserId]: { status: 'none', isRequester: false }
                         }));
-                        await fetchConnectionsData();
+                        refreshParentData();
                     }
                     break;
             }
@@ -266,7 +227,7 @@ const MemberProfileConnections = ({ member, loading, currentUserId, isCurrentUse
         </div>
     );
 
-    if (loading || connectionsData.loading) {
+    if (loading || isDataLoading) {
         return (
             <div className="max-w-7xl mx-auto px-8 py-8">
                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
@@ -279,21 +240,7 @@ const MemberProfileConnections = ({ member, loading, currentUserId, isCurrentUse
         );
     }
 
-    if (connectionsData.error) {
-        return (
-            <div className="max-w-7xl mx-auto px-8 py-8">
-                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-                    <div className="text-center py-12">
-                        <div className="text-red-500 text-lg font-medium mb-2">Error</div>
-                        <p className="text-slate-600">{connectionsData.error}</p>
-                    </div>
-                </div>
-            </div>
-        );
-    }
-
-    const { connections, followers, following } = connectionsData;
-    const firstName = member.full_name?.split(' ')[0] || member.full_name;
+    const firstName = member.full_name?.split(' ')[0] || 'This user';
 
     return (
         <div className="max-w-7xl mx-auto px-8 py-8">

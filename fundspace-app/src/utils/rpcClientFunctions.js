@@ -37,10 +37,6 @@ export const getDashboardData = async (userId = null) => {
   }
 };
 
-/**
- * Get all comments for a post with reactions in one call
- * Replaces CommentSection.jsx individual fetches
- */
 export const getPostCommentsWithReactions = async (postId, userId, isOrgPost = false) => {
   const cacheKey = getCacheKey('comments_with_reactions', { postId, userId, isOrgPost });
   const cached = getCachedData(cacheKey);
@@ -62,10 +58,6 @@ export const getPostCommentsWithReactions = async (postId, userId, isOrgPost = f
   }
 };
 
-/**
- * Get organizations with all their categories in one call
- * Replaces ExploreOrganizations.jsx N+1 queries
- */
 export const getOrganizationsWithCategories = async (orgIds = null) => {
   const cacheKey = getCacheKey('orgs_with_categories', { orgIds });
   const cached = getCachedData(cacheKey);
@@ -85,10 +77,6 @@ export const getOrganizationsWithCategories = async (orgIds = null) => {
   }
 };
 
-/**
- * Get complete member profile with all stats in one call
- * Replaces MemberProfileHeader.jsx multiple fetches
- */
 export const getMemberProfileComplete = async (profileId, currentUserId = null) => {
   const cacheKey = getCacheKey('member_complete', { profileId, currentUserId });
   const cached = getCachedData(cacheKey);
@@ -109,10 +97,6 @@ export const getMemberProfileComplete = async (profileId, currentUserId = null) 
   }
 };
 
-/**
- * Get organization posts with all metadata in one call
- * Replaces OrganizationPostsManager.jsx fetches
- */
 export const getOrganizationPostsComplete = async (
   orgId,
   orgType,
@@ -239,10 +223,6 @@ export const getGrantsWithDetails = async (options = {}) => {
   }
 };
 
-/**
- * Get reactions for multiple posts in one call
- * For feed pages with multiple posts
- */
 export const getPostsWithReactionsBatch = async (postIds, userId, isOrgPost = false) => {
   if (!postIds || postIds.length === 0) return {};
 
@@ -267,9 +247,6 @@ export const getPostsWithReactionsBatch = async (postIds, userId, isOrgPost = fa
   }
 };
 
-/**
- * Get multiple user profiles with org info in one call
- */
 export const getProfilesWithOrgsBatch = async (profileIds) => {
   if (!profileIds || profileIds.length === 0) return {};
 
@@ -292,9 +269,6 @@ export const getProfilesWithOrgsBatch = async (profileIds) => {
   }
 };
 
-/**
- * Get multiple grants with save status in one call
- */
 export const getGrantsBatch = async (grantIds, userId = null) => {
   if (!grantIds || grantIds.length === 0) return {};
 
@@ -318,14 +292,6 @@ export const getGrantsBatch = async (grantIds, userId = null) => {
   }
 };
 
-// ====================================
-// ORGANIZATION MEMBERSHIPS OPTIMIZATION
-// ====================================
-
-/**
- * Get memberships for multiple profiles in one call
- * Replaces individual organization_memberships queries
- */
 export const getMembershipsBatch = async (profileIds) => {
   if (!profileIds || profileIds.length === 0) return {};
 
@@ -348,10 +314,6 @@ export const getMembershipsBatch = async (profileIds) => {
   }
 };
 
-/**
- * Get all memberships for a single user (users can have multiple orgs)
- * Replaces getUserOrganizationMembership
- */
 export const getUserAllMemberships = async (profileId) => {
   if (!profileId) return { memberships: [] };
 
@@ -373,9 +335,6 @@ export const getUserAllMemberships = async (profileId) => {
   }
 };
 
-/**
- * Check organization access for multiple users at once
- */
 export const checkOrgAccessBatch = async (organizationId, profileIds) => {
   if (!organizationId || !profileIds || profileIds.length === 0) return {};
 
@@ -399,10 +358,6 @@ export const checkOrgAccessBatch = async (organizationId, profileIds) => {
   }
 };
 
-/**
- * Get organization members with full profile info
- * Replaces the multiple queries in member list pages
- */
 export const getOrganizationMembersComplete = async (organizationId, organizationType = null) => {
   if (!organizationId) return { members: [] };
 
@@ -628,6 +583,95 @@ export const getUserTrackedGrants = async (userId, organizationId = null) => {
     throw error;
   }
 };
+
+export const getUserExperiencesComplete = async (userId) => {
+  if (!userId) return { experiences: [] };
+
+  const cacheKey = getCacheKey('user_experiences', { userId });
+  const cached = getCachedData(cacheKey);
+  if (cached) return cached;
+
+  try {
+    const { data, error } = await supabase.rpc('get_user_experiences_complete', {
+      p_user_id: userId
+    });
+
+    if (error) throw error;
+    setCachedData(cacheKey, data);
+    return data;
+  } catch (error) {
+    console.error('Error fetching user experiences:', error);
+    return { experiences: [] };
+  }
+};
+
+export const getUserConnectionsComplete = async (userId, status = 'accepted') => {
+  if (!userId) return { connections: [] };
+
+  const cacheKey = getCacheKey('user_connections', { userId, status });
+  const cached = getCachedData(cacheKey);
+  if (cached) return cached;
+
+  try {
+    const { data, error } = await supabase.rpc('get_user_connections_complete', {
+      p_user_id: userId,
+      p_status: status
+    });
+
+    if (error) throw error;
+    setCachedData(cacheKey, data);
+    return data;
+  } catch (error) {
+    console.error('Error fetching user connections:', error);
+    return { connections: [] };
+  }
+};
+
+export const getPostsBatch = async (postIds, userId = null) => {
+  if (!postIds || postIds.length === 0) return {};
+
+  const cacheKey = getCacheKey('posts_batch', { postIds, userId });
+  const cached = getCachedData(cacheKey);
+  if (cached) return cached;
+
+  try {
+    const { data, error } = await supabase.rpc('get_posts_batch', {
+      p_post_ids: postIds,
+      p_user_id: userId
+    });
+
+    if (error) throw error;
+    const result = data || {};
+    setCachedData(cacheKey, result);
+    return result;
+  } catch (error) {
+    console.error('Error fetching posts batch:', error);
+    return {};
+  }
+};
+
+export const getOrganizationsBatch = async (orgIds) => {
+  if (!orgIds || orgIds.length === 0) return {};
+
+  const cacheKey = getCacheKey('organizations_batch', { orgIds });
+  const cached = getCachedData(cacheKey);
+  if (cached) return cached;
+
+  try {
+    const { data, error } = await supabase.rpc('get_organizations_batch', {
+      p_org_ids: orgIds
+    });
+
+    if (error) throw error;
+    const result = data || {};
+    setCachedData(cacheKey, result);
+    return result;
+  } catch (error) {
+    console.error('Error fetching organizations batch:', error);
+    return {};
+  }
+};
+
 
 export const invalidateCache = (pattern) => {
   if (pattern) {

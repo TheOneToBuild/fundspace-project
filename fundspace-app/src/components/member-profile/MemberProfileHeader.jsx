@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   sendConnectionRequest, 
@@ -9,6 +9,78 @@ import {
 } from '../../utils/userConnectionsUtils';
 import { getMemberProfileComplete } from '../../utils/rpcClientFunctions';
 import { UserPlus, UserCheck, User, Users, UserX, Linkedin, Twitter, Globe } from 'lucide-react';
+
+const ConnectionButtons = ({ status, isRequester, onAction, isLoading }) => {
+    switch (status) {
+        case 'none':
+            return (
+                <button
+                    onClick={() => onAction('connect')}
+                    disabled={isLoading}
+                    className="inline-flex items-center px-6 py-3 text-sm font-medium bg-white border border-slate-300 text-slate-700 rounded-full hover:bg-slate-50 transition-colors disabled:opacity-50"
+                >
+                    <Users className="w-4 h-4 mr-2" />
+                    {isLoading ? 'Connecting...' : 'Connect'}
+                </button>
+            );
+        case 'pending':
+            if (isRequester) {
+                return (
+                    <button
+                        onClick={() => onAction('withdraw')}
+                        disabled={isLoading}
+                        className="inline-flex items-center px-6 py-3 text-sm font-medium bg-white border border-slate-300 text-slate-700 rounded-full hover:bg-slate-50 transition-colors disabled:opacity-50"
+                    >
+                        <UserX className="w-4 h-4 mr-2" />
+                        {isLoading ? 'Withdrawing...' : 'Withdraw'}
+                    </button>
+                );
+            }
+            return (
+                <div className="flex gap-2">
+                    <button
+                        onClick={() => onAction('accept')}
+                        disabled={isLoading}
+                        className="inline-flex items-center px-4 py-3 text-sm font-medium bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors disabled:opacity-50"
+                    >
+                        <UserCheck className="w-4 h-4 mr-1" />
+                        {isLoading ? 'Accepting...' : 'Accept'}
+                    </button>
+                    <button
+                        onClick={() => onAction('decline')}
+                        disabled={isLoading}
+                        className="inline-flex items-center px-4 py-3 text-sm font-medium bg-white border border-slate-300 text-slate-700 rounded-full hover:bg-slate-50 transition-colors disabled:opacity-50"
+                    >
+                        <UserX className="w-4 h-4 mr-1" />
+                        {isLoading ? 'Declining...' : 'Decline'}
+                    </button>
+                </div>
+            );
+        case 'accepted':
+            return (
+                <button
+                    onClick={() => onAction('disconnect')}
+                    disabled={isLoading}
+                    className="inline-flex items-center px-6 py-3 text-sm font-medium bg-gradient-to-r from-blue-500 via-blue-600 to-blue-700 text-white rounded-full hover:from-blue-600 hover:via-blue-700 hover:to-blue-800 transition-all duration-300 disabled:opacity-50 shadow-lg"
+                >
+                    <UserCheck className="w-4 h-4 mr-2" />
+                    {isLoading ? 'Disconnecting...' : 'Connected'}
+                </button>
+            );
+        default:
+            return null;
+    }
+};
+
+const initialProfileData = {
+    followersCount: 0,
+    followingCount: 0,
+    connectionsCount: 0,
+    connectionStatus: 'none',
+    isRequester: false,
+    mutualConnections: 0,
+    isFollowing: false,
+};
 
 const MemberProfileHeader = ({ 
     member, 
@@ -21,42 +93,27 @@ const MemberProfileHeader = ({
     onTabChange,
     activeTab = 'activity'
 }) => {
-    const [localIsFollowing, setLocalIsFollowing] = useState(isFollowing);
     const navigate = useNavigate();
-    const [followStats, setFollowStats] = useState({
-        followersCount: 0,
-        followingCount: 0
-    });
-    const [connectionStats, setConnectionStats] = useState({
-        connectionStatus: 'none',
-        isRequester: false,
-        mutualConnections: 0,
-        connectionsCount: 0
-    });
+    const [profileData, setProfileData] = useState({ ...initialProfileData, isFollowing });
     const [statsLoading, setStatsLoading] = useState(true);
     const [connectionLoading, setConnectionLoading] = useState(false);
 
     useEffect(() => {
-        const fetchMemberData = async () => {
-            if (!member?.id) return;
+        const fetchMemberData = async (memberId, currentUserId) => {
             try {
                 setStatsLoading(true);
                 
-                const result = await getMemberProfileComplete(member.id, currentUserId);
+                const result = await getMemberProfileComplete(memberId, currentUserId);
                 
-                setFollowStats({
-                    followersCount: result.stats?.followers_count || 0,
-                    followingCount: result.stats?.following_count || 0
-                });
-                
-                setConnectionStats({
+                setProfileData({
+                    followersCount: result.stats?.followers_count ?? 0,
+                    followingCount: result.stats?.following_count ?? 0,
+                    connectionsCount: result.stats?.connections_count ?? 0,
                     connectionStatus: result.connection_status?.status || 'none',
                     isRequester: result.connection_status?.is_requester || false,
                     mutualConnections: result.mutual_connections || 0,
-                    connectionsCount: result.stats?.connections_count || 0
+                    isFollowing: result.is_following || false,
                 });
-                
-                setLocalIsFollowing(result.is_following || false);
                 
             } catch (error) {
                 console.error('Error:', error);
@@ -64,13 +121,15 @@ const MemberProfileHeader = ({
                 setStatsLoading(false);
             }
         };
-        fetchMemberData();
+        if (member?.id) {
+            fetchMemberData(member.id, currentUserId);
+        }
     }, [member?.id, currentUserId]);
 
     if (!member) return null;
 
     const handleFollowClick = () => {
-        if (isFollowing) {
+        if (profileData.isFollowing) {
             onUnfollow(member.id);
         } else {
             onFollow(member.id);
@@ -86,7 +145,7 @@ const MemberProfileHeader = ({
                 case 'connect':
                     result = await sendConnectionRequest(currentUserId, member.id);
                     if (result.success) {
-                        setConnectionStats(prev => ({ 
+                        setProfileData(prev => ({ 
                             ...prev, 
                             connectionStatus: 'pending', 
                             isRequester: true 
@@ -96,7 +155,7 @@ const MemberProfileHeader = ({
                 case 'accept':
                     result = await acceptConnectionRequest(currentUserId, member.id);
                     if (result.success) {
-                        setConnectionStats(prev => ({ 
+                        setProfileData(prev => ({ 
                             ...prev, 
                             connectionStatus: 'accepted',
                             connectionsCount: prev.connectionsCount + 1
@@ -106,7 +165,7 @@ const MemberProfileHeader = ({
                 case 'decline':
                     result = await declineConnectionRequest(currentUserId, member.id);
                     if (result.success) {
-                        setConnectionStats(prev => ({ 
+                        setProfileData(prev => ({ 
                             ...prev, 
                             connectionStatus: 'none' 
                         }));
@@ -115,7 +174,7 @@ const MemberProfileHeader = ({
                 case 'withdraw':
                     result = await withdrawConnectionRequest(currentUserId, member.id);
                     if (result.success) {
-                        setConnectionStats(prev => ({ 
+                        setProfileData(prev => ({ 
                             ...prev, 
                             connectionStatus: 'none', 
                             isRequester: false 
@@ -125,7 +184,7 @@ const MemberProfileHeader = ({
                 case 'disconnect':
                     result = await removeConnection(currentUserId, member.id);
                     if (result.success) {
-                        setConnectionStats(prev => ({ 
+                        setProfileData(prev => ({ 
                             ...prev, 
                             connectionStatus: 'none',
                             connectionsCount: Math.max(0, prev.connectionsCount - 1)
@@ -140,89 +199,21 @@ const MemberProfileHeader = ({
         }
     };
 
-    const getConnectionButton = () => {
-        const { connectionStatus, isRequester } = connectionStats;
-        switch (connectionStatus) {
-            case 'none':
-                return (
-                    <button
-                        onClick={() => handleConnectionAction('connect')}
-                        disabled={connectionLoading}
-                        className="inline-flex items-center px-6 py-3 text-sm font-medium bg-white border border-slate-300 text-slate-700 rounded-full hover:bg-slate-50 transition-colors disabled:opacity-50"
-                    >
-                        <Users className="w-4 h-4 mr-2" />
-                        {connectionLoading ? 'Connecting...' : 'Connect'}
-                    </button>
-                );
-            case 'pending':
-                if (isRequester) {
-                    return (
-                        <button
-                            onClick={() => handleConnectionAction('withdraw')}
-                            disabled={connectionLoading}
-                            className="inline-flex items-center px-6 py-3 text-sm font-medium bg-white border border-slate-300 text-slate-700 rounded-full hover:bg-slate-50 transition-colors disabled:opacity-50"
-                        >
-                            <UserX className="w-4 h-4 mr-2" />
-                            {connectionLoading ? 'Withdrawing...' : 'Withdraw'}
-                        </button>
-                    );
-                } else {
-                    return (
-                        <div className="flex gap-2">
-                            <button
-                                onClick={() => handleConnectionAction('accept')}
-                                disabled={connectionLoading}
-                                className="inline-flex items-center px-4 py-3 text-sm font-medium bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors disabled:opacity-50"
-                            >
-                                <UserCheck className="w-4 h-4 mr-1" />
-                                {connectionLoading ? 'Accepting...' : 'Accept'}
-                            </button>
-                            <button
-                                onClick={() => handleConnectionAction('decline')}
-                                disabled={connectionLoading}
-                                className="inline-flex items-center px-4 py-3 text-sm font-medium bg-white border border-slate-300 text-slate-700 rounded-full hover:bg-slate-50 transition-colors disabled:opacity-50"
-                            >
-                                <UserX className="w-4 h-4 mr-1" />
-                                {connectionLoading ? 'Declining...' : 'Decline'}
-                            </button>
-                        </div>
-                    );
-                }
-            case 'accepted':
-                return (
-                    <button
-                        onClick={() => handleConnectionAction('disconnect')}
-                        disabled={connectionLoading}
-                        className="inline-flex items-center px-6 py-3 text-sm font-medium bg-gradient-to-r from-blue-500 via-blue-600 to-blue-700 text-white rounded-full hover:from-blue-600 hover:via-blue-700 hover:to-blue-800 transition-all duration-300 disabled:opacity-50 shadow-lg"
-                    >
-                        <UserCheck className="w-4 h-4 mr-2" />
-                        {connectionLoading ? 'Disconnecting...' : 'Connected'}
-                    </button>
-                );
-            default:
-                return null;
-        }
-    };
-
     const getMutualConnectionsText = () => {
-        const { mutualConnections } = connectionStats;
+        const { mutualConnections } = profileData;
         if (mutualConnections > 0) {
             return `${mutualConnections} mutual connection${mutualConnections === 1 ? '' : 's'}`;
         }
         return 'Connect to see mutual connections';
     };
 
-    const handleConnectionsClick = () => {
-        if (onTabChange) {
-            onTabChange('connections');
-        }
-    };
+    const handleConnectionsClick = () => onTabChange?.('connections');
 
     const getDisplayTitle = () => {
         return member.title || null;
     };
 
-    const getOrganizationDisplay = () => {
+    const organizationDisplay = useMemo(() => {
         if (member.organization_name) {
             const hasOrgId = member.organization_id || member.selected_organization_id;
             const orgSlug = member.organization_slug;
@@ -252,9 +243,9 @@ const MemberProfileHeader = ({
             }
         }
         return null;
-    };
+    }, [member.organization_name, member.organization_id, member.selected_organization_id, member.organization_slug, navigate]);
 
-    const getSocialProfiles = () => {
+    const socialProfiles = useMemo(() => {
         const profiles = [];
         if (member.linkedin_url) {
             profiles.push({
@@ -281,9 +272,7 @@ const MemberProfileHeader = ({
             });
         }
         return profiles;
-    };
-
-    const socialProfiles = getSocialProfiles();
+    }, [member.linkedin_url, member.twitter_url, member.website_url]);
 
     return (
         <>
@@ -334,7 +323,7 @@ const MemberProfileHeader = ({
                                 <div className="text-lg text-slate-600 space-y-1">
                                     {(() => {
                                         const title = getDisplayTitle();
-                                        const orgDisplay = getOrganizationDisplay();
+                                        const orgDisplay = organizationDisplay;
                                         
                                         if (title && orgDisplay) {
                                             return (
@@ -342,9 +331,11 @@ const MemberProfileHeader = ({
                                                     {title}, {orgDisplay}
                                                 </p>
                                             );
-                                        } else if (title) {
+                                        } 
+                                        if (title) {
                                             return <p>{title}</p>;
-                                        } else if (orgDisplay) {
+                                        } 
+                                        if (orgDisplay) {
                                             return <p>{orgDisplay}</p>;
                                         } else {
                                             return null;
@@ -370,7 +361,7 @@ const MemberProfileHeader = ({
 
                             {!isCurrentUser && currentUserId && member?.id && (
                                 <div className="flex gap-3 mb-6">
-                                    {localIsFollowing ? (
+                                    {profileData.isFollowing ? (
                                         <button
                                             onClick={handleFollowClick}
                                             disabled={followingInProgress}
@@ -390,7 +381,12 @@ const MemberProfileHeader = ({
                                         </button>
                                     )}
                                     
-                                    {getConnectionButton()}
+                                    <ConnectionButtons 
+                                        status={profileData.connectionStatus}
+                                        isRequester={profileData.isRequester}
+                                        onAction={handleConnectionAction}
+                                        isLoading={connectionLoading}
+                                    />
                                 </div>
                             )}
                         </div>
@@ -402,10 +398,10 @@ const MemberProfileHeader = ({
                                     onClick={handleConnectionsClick}
                                 >
                                     <div className="text-2xl font-bold text-slate-900">
-                                        {statsLoading ? '...' : connectionStats.connectionsCount}
+                                        {statsLoading ? '...' : profileData.connectionsCount}
                                     </div>
                                     <div className="text-sm text-slate-500 font-medium">
-                                        {connectionStats.connectionsCount === 1 ? 'Connection' : 'Connections'}
+                                        {profileData.connectionsCount === 1 ? 'Connection' : 'Connections'}
                                     </div>
                                 </div>
                                 <div 
@@ -413,10 +409,10 @@ const MemberProfileHeader = ({
                                     onClick={handleConnectionsClick}
                                 >
                                     <div className="text-2xl font-bold text-slate-900">
-                                        {statsLoading ? '...' : followStats.followersCount}
+                                        {statsLoading ? '...' : profileData.followersCount}
                                     </div>
                                     <div className="text-sm text-slate-500 font-medium">
-                                        {followStats.followersCount === 1 ? 'Follower' : 'Followers'}
+                                        {profileData.followersCount === 1 ? 'Follower' : 'Followers'}
                                     </div>
                                 </div>
                                 <div 
@@ -424,7 +420,7 @@ const MemberProfileHeader = ({
                                     onClick={handleConnectionsClick}
                                 >
                                     <div className="text-2xl font-bold text-slate-900">
-                                        {statsLoading ? '...' : followStats.followingCount}
+                                        {statsLoading ? '...' : profileData.followingCount}
                                     </div>
                                     <div className="text-sm text-slate-500 font-medium">Following</div>
                                 </div>
