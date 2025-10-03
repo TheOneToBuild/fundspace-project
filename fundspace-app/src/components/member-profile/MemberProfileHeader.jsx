@@ -7,7 +7,7 @@ import {
   withdrawConnectionRequest,
   removeConnection,
 } from '../../utils/userConnectionsUtils';
-import { getUserSocialConnections, getBatchConnectionStatus } from '../../utils/rpcClientFunctions';
+import { getMemberProfileComplete } from '../../utils/rpcClientFunctions';
 import { UserPlus, UserCheck, User, Users, UserX, Linkedin, Twitter, Globe } from 'lucide-react';
 
 const MemberProfileHeader = ({ 
@@ -21,6 +21,7 @@ const MemberProfileHeader = ({
     onTabChange,
     activeTab = 'activity'
 }) => {
+    const [localIsFollowing, setLocalIsFollowing] = useState(isFollowing);
     const navigate = useNavigate();
     const [followStats, setFollowStats] = useState({
         followersCount: 0,
@@ -36,34 +37,34 @@ const MemberProfileHeader = ({
     const [connectionLoading, setConnectionLoading] = useState(false);
 
     useEffect(() => {
-        const fetchStats = async () => {
+        const fetchMemberData = async () => {
             if (!member?.id) return;
             try {
                 setStatsLoading(true);
-                const [socialData, connectionData] = await Promise.all([
-                    getUserSocialConnections(member.id, 'both'),
-                    currentUserId ? getBatchConnectionStatus(currentUserId, [member.id]) : null
-                ]);
+                
+                const result = await getMemberProfileComplete(member.id, currentUserId);
+                
                 setFollowStats({
-                    followersCount: socialData?.stats?.followers_count || 0,
-                    followingCount: socialData?.stats?.following_count || 0
+                    followersCount: result.stats?.followers_count || 0,
+                    followingCount: result.stats?.following_count || 0
                 });
-                if (connectionData && currentUserId) {
-                    const status = connectionData.connections?.[member.id] || { status: 'none', isRequester: false };
-                    setConnectionStats({
-                        connectionStatus: status.status,
-                        isRequester: status.isRequester,
-                        mutualConnections: status.mutualConnections || 0,
-                        connectionsCount: socialData?.stats?.connections_count || 0
-                    });
-                }
+                
+                setConnectionStats({
+                    connectionStatus: result.connection_status?.status || 'none',
+                    isRequester: result.connection_status?.is_requester || false,
+                    mutualConnections: result.mutual_connections || 0,
+                    connectionsCount: result.stats?.connections_count || 0
+                });
+                
+                setLocalIsFollowing(result.is_following || false);
+                
             } catch (error) {
-                console.error('Error fetching stats:', error);
+                console.error('Error:', error);
             } finally {
                 setStatsLoading(false);
             }
         };
-        fetchStats();
+        fetchMemberData();
     }, [member?.id, currentUserId]);
 
     if (!member) return null;
@@ -369,7 +370,7 @@ const MemberProfileHeader = ({
 
                             {!isCurrentUser && currentUserId && member?.id && (
                                 <div className="flex gap-3 mb-6">
-                                    {isFollowing ? (
+                                    {localIsFollowing ? (
                                         <button
                                             onClick={handleFollowClick}
                                             disabled={followingInProgress}

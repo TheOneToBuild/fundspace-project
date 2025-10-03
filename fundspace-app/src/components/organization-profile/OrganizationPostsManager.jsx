@@ -9,7 +9,7 @@ import CreatePost from '../CreatePost.jsx';
 import { hasPermission, PERMISSIONS } from '../../utils/organizationPermissions.js';
 import { realtimeManager } from '../../utils/realtimeManager.js';
 import globalDataManager from '../../utils/globalDataManager.js'; // ✅ ADD THIS IMPORT
-import { getOrganizationData, getUserProfileComplete } from '../../utils/rpcClientFunctions.js'; // ✅ ADD THIS IMPORT
+import { getOrganizationPostsComplete, getUserProfileComplete } from '../../utils/rpcClientFunctions.js'; // ✅ ADD THIS IMPORT
 
 const OrganizationPostsManager = ({ 
   organization, 
@@ -95,25 +95,26 @@ const OrganizationPostsManager = ({
 
   // ✅ OPTIMIZED: Fetch organization posts using RPC function
   const fetchOrganizationPosts = useCallback(async () => {
-    if (!organization?.id) return;
-
+    if (!organization?.id || !organization?.type) return;
     try {
-      setLoading(true);
-      setError('');
-      
-      // ✅ FIX: Use getOrganizationData for batched loading without fallback
-      const orgData = await getOrganizationData(organization.id, session?.user?.id);
-      if (orgData?.posts) {
-        setOrganizationPosts(orgData.posts);
-      } else {
-        setOrganizationPosts([]);
-      }
-      
+        setLoading(true);
+        setError('');
+        
+        const result = await getOrganizationPostsComplete(
+            organization.id,
+            organization.type,
+            session?.user?.id,
+            20, // limit
+            0   // offset
+        );
+        
+        setOrganizationPosts(result.posts || []);
+        
     } catch (err) {
-      console.error('Error fetching organization posts:', err);
-      setError('Failed to load posts');
+        console.error('Error:', err);
+        setError('Failed to load posts');
     } finally {
-      setLoading(false);
+        setLoading(false);
     }
   }, [organization?.id, organization?.type, session?.user?.id]);
 

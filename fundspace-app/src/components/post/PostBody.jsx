@@ -1,26 +1,18 @@
 // src/components/post/PostBody.jsx - Fixed Organization Mention Navigation & White Dots
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../supabaseClient';
 import ImageMosaic from './ImageMosaic';
 import TagDisplay from './TagDisplay';
-import MentionHoverCard from './MentionHoverCard';
 
 export default function PostBody({ content, images, tags, onImageClick }) {
     const navigate = useNavigate();
     const MAX_CHARS = 300;
+    const postBodyRef = useRef(null);
 
     // Enhanced shouldTruncate logic - don't truncate content with mentions
     const containsMentions = content && content.includes('<span') && content.includes('data-type');
     const shouldTruncate = content && content.length > MAX_CHARS && !content.includes('<img') && !containsMentions;
-
-    // Hover state
-    const [hoveredMention, setHoveredMention] = useState(null);
-    const [hoverPosition, setHoverPosition] = useState(null);
-    
-    const hideTimeoutRef = useRef(null);
-    const postBodyRef = useRef(null);
-    const isHoveringRef = useRef(false);
 
     // Function to get organization slug from ID (same as CommentCard.jsx)
     const getOrganizationSlug = async (orgType, orgId) => {
@@ -145,95 +137,6 @@ export default function PostBody({ content, images, tags, onImageClick }) {
         return cleanedHTML;
     };
 
-    const showHoverCard = (mention, position) => {
-        setHoveredMention(mention);
-        setHoverPosition(position);
-        
-        if (hideTimeoutRef.current) {
-            clearTimeout(hideTimeoutRef.current);
-            hideTimeoutRef.current = null;
-        }
-    };
-
-    const hideHoverCard = () => {
-        hideTimeoutRef.current = setTimeout(() => {
-            if (!isHoveringRef.current) {
-                setHoveredMention(null);
-                setHoverPosition(null);
-            }
-        }, 300);
-    };
-
-    const forceHideHoverCard = () => {
-        if (hideTimeoutRef.current) {
-            clearTimeout(hideTimeoutRef.current);
-            hideTimeoutRef.current = null;
-        }
-        setHoveredMention(null);
-        setHoverPosition(null);
-    };
-
-    // Handle hover events for mentions
-    useEffect(() => {
-        const currentPostBodyRef = postBodyRef.current;
-        if (!currentPostBodyRef) return;
-
-        const handleMouseMove = (e) => {
-            const target = e.target;
-            
-            // Check if we're over a mention
-            if (target.tagName === 'SPAN' && target.classList.contains('mention')) {
-                const mentionId = target.dataset.id;
-                const mentionType = target.dataset.type;
-                const mentionLabel = target.dataset.label;
-                
-                if (mentionId && mentionType) {
-                    isHoveringRef.current = true;
-                    
-                    // Check if this is the same mention we're already hovering
-                    const isSameMention = hoveredMention && 
-                        hoveredMention.id === mentionId && 
-                        hoveredMention.entityType === mentionType;
-                    
-                    if (!isSameMention) {
-                        const mention = {
-                            id: mentionId,
-                            displayName: mentionLabel,
-                            entityType: mentionType
-                        };
-
-                        const rect = target.getBoundingClientRect();
-                        const position = {
-                            top: rect.bottom + window.scrollY + 8,
-                            left: rect.left + window.scrollX
-                        };
-
-                        showHoverCard(mention, position);
-                    }
-                } else {
-                    // Not over a mention
-                    isHoveringRef.current = false;
-                    
-                    // Check if we're over the hover card itself
-                    const isOverHoverCard = target.closest('.mention-hover-card-wrapper');
-                    
-                    if (!isOverHoverCard) {
-                        hideHoverCard();
-                    }
-                }
-            }
-        };
-
-        currentPostBodyRef.addEventListener('mousemove', handleMouseMove);
-
-        return () => {
-            currentPostBodyRef.removeEventListener('mousemove', handleMouseMove);
-            if (hideTimeoutRef.current) {
-                clearTimeout(hideTimeoutRef.current);
-            }
-        };
-    }, [hoveredMention]);
-
     const renderTruncatedContent = (htmlContent) => {
         if (!htmlContent) return null;
 
@@ -311,36 +214,6 @@ export default function PostBody({ content, images, tags, onImageClick }) {
             )}
             {tags && (
                 <TagDisplay tags={tags} />
-            )}
-
-            {/* Hover card */}
-            {hoveredMention && hoverPosition && (
-                <div
-                    className="mention-hover-card-wrapper"
-                    style={{
-                        position: 'absolute',
-                        top: hoverPosition.top,
-                        left: hoverPosition.left,
-                        zIndex: 10000,
-                        pointerEvents: 'auto'
-                    }}
-                    onMouseEnter={() => {
-                        isHoveringRef.current = true;
-                        if (hideTimeoutRef.current) {
-                            clearTimeout(hideTimeoutRef.current);
-                            hideTimeoutRef.current = null;
-                        }
-                    }}
-                    onMouseLeave={() => {
-                        isHoveringRef.current = false;
-                        forceHideHoverCard();
-                    }}
-                >
-                    <MentionHoverCard
-                        mention={hoveredMention}
-                        position={{ top: 0, left: 0 }}
-                    />
-                </div>
             )}
         </div>
     );

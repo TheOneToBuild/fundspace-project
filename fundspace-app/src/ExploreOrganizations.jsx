@@ -1,6 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback, useContext } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { supabase } from './supabaseClient.js';
 import { Search, MapPin, LayoutGrid, List, SlidersHorizontal, Building, Heart, Shield, GraduationCap, Stethoscope, Church, XCircle, ChevronDown, TrendingUp, Sparkles, Star, Target } from './components/Icons.jsx';
 import FilterBar from './components/FilterBar.jsx';
 import Pagination from './components/Pagination.jsx';
@@ -11,6 +10,7 @@ import usePaginatedFilteredData from './hooks/usePaginatedFilteredData.js';
 import { filterOrganizations } from './filtering.js';
 import { sortOrganizations } from './sorting.js';
 import { LayoutContext } from './App.jsx';
+import { getOrganizationsWithCategories } from './utils/rpcClientFunctions';
 import EnhancedSearchInput from './components/EnhancedSearchInput.jsx';
 
 // Organization type configurations (for filtering UI)
@@ -184,80 +184,20 @@ const ExploreOrganizations = ({ isProfileView = false }) => {
     }
   }, [location.state]);
 
-  // OPTIMIZED: Batch all category queries instead of individual requests
   useEffect(() => {
     const fetchOrganizations = async () => {
-      setLoading(true);
-      setError('');
-      try {
-        // Step 1: Get basic organizations data
-        const { data: orgsData, error: orgsError } = await supabase
-          .from('organizations')
-          .select('*');
-
-        if (orgsError) {
-          console.error('❌ Database error:', orgsError);
-          throw orgsError;
+        setLoading(true);
+        setError('');
+        try {
+            const result = await getOrganizationsWithCategories();
+            setOrganizations(result.organizations || []);
+        } catch (error) {
+            console.error('Error:', error);
+            setError('Failed to load organizations');
+        } finally {
+            setLoading(false);
         }
-
-        if (!orgsData || orgsData.length === 0) {
-          setOrganizations([]);
-          return;
-        }
-
-        // Step 2: Get ALL organization categories in one batch query
-        const orgIds = orgsData.map(org => org.id);
-        const { data: allCategoryData } = await supabase
-          .from('organization_categories')
-          .select('organization_id, category_id')
-          .in('organization_id', orgIds);
-
-        // Step 3: Get all unique category IDs and fetch their names in one query
-        let categoryMap = {};
-        if (allCategoryData && allCategoryData.length > 0) {
-          const uniqueCategoryIds = [...new Set(allCategoryData.map(c => c.category_id))];
-          
-          const { data: categoryNames } = await supabase
-            .from('categories')
-            .select('id, name')
-            .in('id', uniqueCategoryIds);
-
-          // Create a map of category ID to name
-          const categoryIdToName = {};
-          categoryNames?.forEach(cat => {
-            categoryIdToName[cat.id] = cat.name;
-          });
-
-          // Create a map of organization ID to category names
-          allCategoryData.forEach(item => {
-            if (!categoryMap[item.organization_id]) {
-              categoryMap[item.organization_id] = [];
-            }
-            const categoryName = categoryIdToName[item.category_id];
-            if (categoryName) {
-              categoryMap[item.organization_id].push(categoryName);
-            }
-          });
-        }
-
-        // Step 4: Combine organizations with their categories
-        const orgsWithCategories = orgsData.map(org => ({
-          ...org,
-          focus_areas: categoryMap[org.id] || [],
-          followers_count: 0, // Default since we're not using engagement view
-          likes_count: 0      // Default since we're not using engagement view
-        }));
-
-        setOrganizations(orgsWithCategories);
-        
-      } catch (error) {
-        console.error('💥 Error fetching organizations:', error);
-        setError('Failed to load organizations. Please try again.');
-      } finally {
-        setLoading(false);
-      }
     };
-
     fetchOrganizations();
   }, []);
 

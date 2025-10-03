@@ -2,7 +2,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../supabaseClient';
 import Avatar from '../Avatar';
-import { getCommentReactionsBatch } from '../../utils/rpcClientFunctions';
 import { reactions } from './constants';
 
 export default function CommentReactions({ 
@@ -26,41 +25,14 @@ export default function CommentReactions({
     const commentReactionsTable = isOrganizationPost ? 'organization_post_comment_likes' : 'post_comment_likes';
 
     useEffect(() => {
-      let isMounted = true;
-      
-      const loadReactions = async () => {
-        // Use preloaded if available
+        // Data comes preloaded from parent via getPostCommentsWithReactions
         if (preloadedCommentReactions?.[comment.id]) {
-          const data = preloadedCommentReactions[comment.id];
-          if (isMounted) {
+            const data = preloadedCommentReactions[comment.id];
             setSelectedReaction(data.userReaction || null);
             setReactionSummary(data.summary || []);
             setTotalLikes(data.count || 0);
-          }
-          return;
         }
-        
-        // Fallback: load directly
-        if (!currentUserProfile?.id || !comment?.id) return;
-        
-        try {
-          const reactions = await getCommentReactionsBatch([comment.id], currentUserProfile.id);
-          const commentData = reactions[comment.id];
-          
-          if (commentData && isMounted) {
-            setSelectedReaction(commentData.userReaction || null);
-            setReactionSummary(commentData.summary || []);
-            setTotalLikes(commentData.count || 0);
-          }
-        } catch (error) {
-          console.error('Error loading comment reactions:', error);
-        }
-      };
-      
-      loadReactions();
-      
-      return () => { isMounted = false; };
-    }, [comment.id, currentUserProfile?.id, preloadedCommentReactions]);
+    }, [comment.id, preloadedCommentReactions]);
 
     const handleReaction = async (reactionType) => {
         if (!currentUserProfile?.id || !comment?.id || isLoading) return;

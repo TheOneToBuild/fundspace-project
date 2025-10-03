@@ -1,5 +1,5 @@
 // src/components/comment/CommentForm.jsx - Final clean version with working avatar
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Send, Camera, X } from 'lucide-react';
 import { supabase } from '../../supabaseClient';
@@ -35,44 +35,6 @@ export default function CommentForm({
       reset: cleanupImages
     } = useImageUpload(IMAGE_UPLOAD_PRESETS.comment);
     const navigate = useNavigate();
-
-    // User profile state for avatar display
-    const [userProfileData, setUserProfileData] = useState(null);
-
-    useEffect(() => {
-        const loadUserProfile = async () => {
-            try {
-                const { data: { session } } = await supabase.auth.getSession();
-                if (!session?.user) return;
-
-                // Fetch profile from database using the same method as CommentSection
-                const { data: profileData, error } = await supabase
-                    .from('profiles')
-                    .select('id, full_name, avatar_url, organization_name')
-                    .eq('id', session.user.id)
-                    .single();
-
-                if (error) {
-                    // Use session data as fallback
-                    setUserProfileData({
-                        id: session.user.id,
-                        full_name: session.user.user_metadata?.full_name || 
-                                  session.user.user_metadata?.name || 
-                                  session.user.email?.split('@')[0],
-                        avatar_url: session.user.user_metadata?.avatar_url || 
-                                   session.user.user_metadata?.picture,
-                        organization_name: null
-                    });
-                } else {
-                    setUserProfileData(profileData);
-                }
-            } catch (err) {
-                console.error('Error loading user profile:', err);
-            }
-        };
-
-        loadUserProfile();
-    }, []);
 
     useEffect(() => {
         return () => {
@@ -221,7 +183,7 @@ export default function CommentForm({
     const handleCommentSubmit = async (e) => {
         e.preventDefault();
         
-        if (!editor || !userProfileData) return;
+        if (!editor || !currentUserProfile) return;
         
         const editorHtmlContent = editor.getHTML();
         const editorTextContent = editor.getText().trim();
@@ -261,7 +223,7 @@ export default function CommentForm({
             // Prepare comment data
             const commentData = {
                 content: editorHtmlContent,
-                profile_id: userProfileData.id,
+                profile_id: currentUserProfile.id,
                 user_id: user.id,
                 image_urls: imageUrls.length > 0 ? imageUrls : null,
                 mentions: mentionsForStorage.length > 0 ? mentionsForStorage : null
@@ -318,16 +280,17 @@ export default function CommentForm({
     return (
         <form onSubmit={handleCommentSubmit} className="space-y-3">
             <div className="flex items-start space-x-3">
-                <div
-                    onClick={(e) => handleProfileClick(e, userProfileData?.id)}
+                <button
+                    type="button"
+                    onClick={(e) => handleProfileClick(e, currentUserProfile?.id)}
                     className="cursor-pointer"
                 >
                     <Avatar 
-                        src={userProfileData?.avatar_url} 
-                        fullName={userProfileData?.full_name || 'User'} 
+                        src={currentUserProfile?.avatar_url} 
+                        fullName={currentUserProfile?.full_name || 'User'} 
                         size="sm" 
                     />
-                </div>
+                </button>
                 
                 <div className="flex-1 relative">
                     <div className="relative">

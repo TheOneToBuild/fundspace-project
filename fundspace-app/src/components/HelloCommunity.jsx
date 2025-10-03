@@ -9,7 +9,7 @@ import { rssNewsService as newsService } from '../services/rssNewsService.js';
 import { addOrganizationEventListener } from '../utils/organizationEvents';
 import { getOrganizationInfoForCommunity } from '../utils/membershipQueries.js';
 import { usePageDataLoader } from '../hooks/usePageDataLoader';
-import { getDashboardData } from '../utils/rpcClientFunctions';
+import { getDashboardData, getPostsWithReactionsBatch } from '../utils/rpcClientFunctions';
 
 const ORGANIZATION_CHANNELS = {
   'nonprofit': { 
@@ -137,28 +137,6 @@ export default function HelloCommunity() {
   const organizationType = getOrgType(organizationInfo?.type);
   const channelConfig = organizationType ? ORGANIZATION_CHANNELS[organizationType] : null;
 
-  const batchLoadPostLikes = useCallback(async (postIds, userId) => {
-    if (!postIds.length || !userId) return {};
-    try {
-      const dashboardData = await getDashboardData(userId);
-      const likesLookup = {};
-      postIds.forEach(postId => {
-        likesLookup[postId] = { userReaction: null };
-      });
-      if (dashboardData?.post_likes) {
-        dashboardData.post_likes.forEach(like => {
-          if (postIds.includes(like.post_id) && like.user_id === userId) {
-            likesLookup[like.post_id].userReaction = like.reaction_type;
-          }
-        });
-      }
-      return likesLookup;
-    } catch (error) {
-      console.error('Error in batchLoadPostLikes:', error);
-      return {};
-    }
-  }, []);
-
   const handlePostLike = useCallback(async (postId, currentReaction, newReaction) => {
     if (!profile?.id) return;
     try {
@@ -225,13 +203,18 @@ export default function HelloCommunity() {
 
   const loadAllPostData = useCallback(async () => {
     if (posts.length === 0 || !profile?.id) return;
+    
     const postIds = posts.map(p => p.id);
-    const [generalPageData, userLikesData] = await Promise.all([
-      loadPostsPageData(posts),
-      batchLoadPostLikes(postIds, profile.id)
-    ]);
-    setPostsLikesData(userLikesData);
-  }, [posts, profile?.id, loadPostsPageData, batchLoadPostLikes]);
+    
+    // Single batch call for all post reactions
+    const reactionsData = await getPostsWithReactionsBatch(
+        postIds, 
+        profile.id, 
+        false // isOrgPost
+    );
+    
+    setPostsLikesData(reactionsData);
+  }, [posts, profile?.id]);
 
   useEffect(() => {
     loadAllPostData();

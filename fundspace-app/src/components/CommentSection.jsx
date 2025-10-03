@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, Suspense, lazy } from 'react';
 import { supabase } from '../supabaseClient';
+import { getPostCommentsWithReactions } from '../utils/rpcClientFunctions';
 import CommentCard from './comment/CommentCard';
 import CommentForm from './comment/CommentForm';
 
@@ -26,44 +27,21 @@ export default function CommentSection({
     const postIdField = isOrganizationPost ? 'organization_post_id' : 'post_id';
 
     const fetchComments = useCallback(async () => {
-        if (!post?.id) return;
-        
+        if (!post?.id || !currentUserProfile?.id) return;
         setLoading(true);
         try {
-            const profileFields = 'id, full_name, avatar_url, organization_name';
-
-            const { data, error } = await supabase
-                .from(commentsTable)
-                .select(`
-                    *,
-                    profiles:profile_id (${profileFields})
-                `)
-                .eq(postIdField, post.id)
-                .order('created_at', { ascending: true });
-
-            if (error) {
-                console.error("Error fetching comments:", error);
-                return;
-            }
-
-            let processedComments = data || [];
-            if (isOrganizationPost && organization) {
-                processedComments = processedComments.map(comment => ({
-                    ...comment,
-                    profiles: {
-                        ...comment.profiles,
-                        organization_name: organization.name
-                    }
-                }));
-            }
-
-            setComments(processedComments);
+            const result = await getPostCommentsWithReactions(
+                post.id, 
+                currentUserProfile.id, 
+                isOrganizationPost
+            );
+            setComments(result.comments || []);
         } catch (error) {
-            console.error("Unexpected error fetching comments:", error);
+            console.error("Error fetching comments:", error);
         } finally {
             setLoading(false);
         }
-    }, [post?.id, commentsTable, postIdField, isOrganizationPost, organization]);
+    }, [post?.id, currentUserProfile?.id, isOrganizationPost]);
 
     useEffect(() => {
         fetchComments();

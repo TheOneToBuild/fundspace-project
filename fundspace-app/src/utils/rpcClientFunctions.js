@@ -37,6 +37,111 @@ export const getDashboardData = async (userId = null) => {
   }
 };
 
+/**
+ * Get all comments for a post with reactions in one call
+ * Replaces CommentSection.jsx individual fetches
+ */
+export const getPostCommentsWithReactions = async (postId, userId, isOrgPost = false) => {
+  const cacheKey = getCacheKey('comments_with_reactions', { postId, userId, isOrgPost });
+  const cached = getCachedData(cacheKey);
+  if (cached) return cached;
+
+  try {
+    const { data, error } = await supabase.rpc('get_post_comments_with_reactions', {
+      p_post_id: postId,
+      p_user_id: userId,
+      p_is_org_post: isOrgPost
+    });
+
+    if (error) throw error;
+    setCachedData(cacheKey, data);
+    return data;
+  } catch (error) {
+    console.error('Error fetching comments with reactions:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get organizations with all their categories in one call
+ * Replaces ExploreOrganizations.jsx N+1 queries
+ */
+export const getOrganizationsWithCategories = async (orgIds = null) => {
+  const cacheKey = getCacheKey('orgs_with_categories', { orgIds });
+  const cached = getCachedData(cacheKey);
+  if (cached) return cached;
+
+  try {
+    const { data, error } = await supabase.rpc('get_organizations_with_categories', {
+      p_org_ids: orgIds
+    });
+
+    if (error) throw error;
+    setCachedData(cacheKey, data);
+    return data;
+  } catch (error) {
+    console.error('Error fetching organizations with categories:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get complete member profile with all stats in one call
+ * Replaces MemberProfileHeader.jsx multiple fetches
+ */
+export const getMemberProfileComplete = async (profileId, currentUserId = null) => {
+  const cacheKey = getCacheKey('member_complete', { profileId, currentUserId });
+  const cached = getCachedData(cacheKey);
+  if (cached) return cached;
+
+  try {
+    const { data, error } = await supabase.rpc('get_member_profile_complete', {
+      p_profile_id: profileId,
+      p_current_user_id: currentUserId
+    });
+
+    if (error) throw error;
+    setCachedData(cacheKey, data);
+    return data;
+  } catch (error) {
+    console.error('Error fetching member profile complete:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get organization posts with all metadata in one call
+ * Replaces OrganizationPostsManager.jsx fetches
+ */
+export const getOrganizationPostsComplete = async (
+  orgId,
+  orgType,
+  userId = null,
+  limit = 20,
+  offset = 0
+) => {
+  const cacheKey = getCacheKey('org_posts_complete', { orgId, orgType, userId, limit, offset });
+  const cached = getCachedData(cacheKey);
+  if (cached) return cached;
+
+  try {
+    const { data, error } = await supabase.rpc('get_organization_posts_complete', {
+      p_org_id: orgId,
+      p_org_type: orgType,
+      p_user_id: userId,
+      p_limit: limit,
+      p_offset: offset
+    });
+
+    if (error) throw error;
+    setCachedData(cacheKey, data);
+    return data;
+  } catch (error) {
+    console.error('Error fetching organization posts complete:', error);
+    throw error;
+  }
+};
+
 export const getUserProfileComplete = async (profileId, viewerId = null) => {
   const cacheKey = getCacheKey('profile', { profileId, viewerId });
   const cached = getCachedData(cacheKey);
@@ -131,6 +236,85 @@ export const getGrantsWithDetails = async (options = {}) => {
   } catch (error) {
     console.error('Error fetching grants:', error);
     throw error;
+  }
+};
+
+/**
+ * Get reactions for multiple posts in one call
+ * For feed pages with multiple posts
+ */
+export const getPostsWithReactionsBatch = async (postIds, userId, isOrgPost = false) => {
+  if (!postIds || postIds.length === 0) return {};
+
+  const cacheKey = getCacheKey('posts_reactions_batch', { postIds, userId, isOrgPost });
+  const cached = getCachedData(cacheKey);
+  if (cached) return cached;
+
+  try {
+    const { data, error } = await supabase.rpc('get_posts_with_reactions_batch', {
+      p_post_ids: postIds,
+      p_user_id: userId,
+      p_is_org_post: isOrgPost
+    });
+
+    if (error) throw error;
+    const result = data || {};
+    setCachedData(cacheKey, result);
+    return result;
+  } catch (error) {
+    console.error('Error fetching posts reactions batch:', error);
+    return {};
+  }
+};
+
+/**
+ * Get multiple user profiles with org info in one call
+ */
+export const getProfilesWithOrgsBatch = async (profileIds) => {
+  if (!profileIds || profileIds.length === 0) return {};
+
+  const cacheKey = getCacheKey('profiles_orgs_batch', { profileIds });
+  const cached = getCachedData(cacheKey);
+  if (cached) return cached;
+
+  try {
+    const { data, error } = await supabase.rpc('get_profiles_with_orgs_batch', {
+      p_profile_ids: profileIds
+    });
+
+    if (error) throw error;
+    const result = data || {};
+    setCachedData(cacheKey, result);
+    return result;
+  } catch (error) {
+    console.error('Error fetching profiles with orgs batch:', error);
+    return {};
+  }
+};
+
+/**
+ * Get multiple grants with save status in one call
+ */
+export const getGrantsBatch = async (grantIds, userId = null) => {
+  if (!grantIds || grantIds.length === 0) return {};
+
+  const cacheKey = getCacheKey('grants_batch', { grantIds, userId });
+  const cached = getCachedData(cacheKey);
+  if (cached) return cached;
+
+  try {
+    const { data, error } = await supabase.rpc('get_grants_batch', {
+      p_grant_ids: grantIds,
+      p_user_id: userId
+    });
+
+    if (error) throw error;
+    const result = data || {};
+    setCachedData(cacheKey, result);
+    return result;
+  } catch (error) {
+    console.error('Error fetching grants batch:', error);
+    return {};
   }
 };
 
@@ -339,12 +523,16 @@ export const getUserTrackedGrants = async (userId, organizationId = null) => {
 };
 
 export const invalidateCache = (pattern) => {
-  const keys = Array.from(cache.keys());
-  keys.forEach(key => {
-    if (key.includes(pattern)) {
-      cache.delete(key);
-    }
-  });
+  if (pattern) {
+    const keys = Array.from(cache.keys());
+    keys.forEach(key => {
+      if (key.includes(pattern)) {
+        cache.delete(key);
+      }
+    });
+  } else {
+    clearCache();
+  }
 };
 
 export const clearCache = () => {
