@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../supabaseClient';
-import { getOrganizationsBatch } from '../utils/rpcClientFunctions';
 
 const pendingRequests = new Map();
 
@@ -101,39 +100,24 @@ export function useOrganizationMembership(profileId) {
           }
         }
 
-        const { data: membershipData, error: membershipError } = await supabase
-          .from('organization_memberships')
-          .select('*')
-          .eq('user_id', profileId)
-          .limit(1);
+        // Use the new RPC function from membershipQueries
+        const { getUserAllMemberships } = await import('../utils/membershipQueries.js');
+        const result = await getUserAllMemberships(profileId);
 
-        if (membershipError) throw membershipError;
-
-        if (membershipData && membershipData.length > 0) {
-          const membership = membershipData[0];
+        if (result.memberships && result.memberships.length > 0) {
+          const membership = result.memberships[0];
           
-          const orgsData = await getOrganizationsBatch([membership.organization_id]);
-          const orgData = orgsData?.[membership.organization_id];
-          if (orgData) {
-            const result = {
+          if (isMountedRef.current) {
+            setMembership({
               ...membership,
-              organization: orgData
-            };
-            
-            if (isMountedRef.current) {
-              setMembership(result);
-            }
-          } else {
-            if (isMountedRef.current) {
-              setMembership(membership);
-            }
+              organization: membership.organization
+            });
           }
         } else {
           if (isMountedRef.current) {
             setMembership(null);
           }
         }
-
       } catch (err) {
         console.error('Error fetching membership:', err);
         
@@ -174,58 +158,15 @@ export async function getOrganizationMembership(profileId) {
   }
 
   const promise = (async () => {
-    try {
-      const { data: funcData, error: funcError } = await supabase
-        .rpc('get_user_organization_membership', { 
-          user_id: profileId 
-        });
+    try {      
+      // Use the optimized function from membershipQueries
+      const { getUserAllMemberships } = await import('../utils/membershipQueries.js');
+      const result = await getUserAllMemberships(profileId);
 
-      if (!funcError && funcData && funcData.length > 0) {
-        const membership = funcData[0];
-        return {
-          id: membership.id,
-          profile_id: membership.profile_id,
-          organization_id: membership.organization_id,
-          organization_type: membership.organization_type,
-          role: membership.role,
-          joined_at: membership.joined_at,
-          functional_role: membership.functional_role,
-          membership_type: membership.membership_type,
-          is_public: membership.is_public,
-          organization: {
-            id: membership.organization_id,
-            name: membership.organization_name,
-            tagline: membership.organization_tagline,
-            image_url: membership.organization_image_url
-          }
-        };
+      if (result.memberships && result.memberships.length > 0) {
+        return result.memberships[0];
       }
-
-      const { data: membershipData, error: membershipError } = await supabase
-        .from('organization_memberships')
-        .select('*')
-        .eq('user_id', profileId)
-        .limit(1);
-
-      if (membershipError) throw membershipError;
-
-      if (membershipData && membershipData.length > 0) {
-        const membership = membershipData[0];
-        
-        const orgsData = await getOrganizationsBatch([membership.organization_id]);
-        const orgData = orgsData?.[membership.organization_id];
-        if (orgData) {
-          return {
-            ...membership,
-            organization: orgData
-          };
-        }
-        
-        return membership;
-      }
-
       return null;
-
     } catch (err) {
       console.error('Error getting organization membership:', err);
       return null;
@@ -239,53 +180,7 @@ export async function getOrganizationMembership(profileId) {
 }
 
 export async function getBulkOrganizationMemberships(profileIds) {
-  if (!profileIds || profileIds.length === 0) return {};
-
-  const queryKey = `bulk-memberships-${profileIds.sort().join(',')}`;
-  
-  if (pendingRequests.has(queryKey)) {
-    return pendingRequests.get(queryKey);
-  }
-
-  const promise = (async () => {
-    try {
-      const { data: membershipData, error: membershipError } = await supabase
-        .from('organization_memberships')
-        .select('user_id, role, organization_id')
-        .in('user_id', profileIds);
-
-      if (membershipError) throw membershipError;
-
-      if (membershipData && membershipData.length > 0) {
-        const orgIds = [...new Set(membershipData.map(m => m.organization_id))];
-        
-        const { data: orgData, error: orgError } = await supabase
-          .from('organizations')
-          .select('id, name, type')
-          .in('id', orgIds);
-
-        if (!orgError && orgData) {
-          const membershipMap = {};
-          membershipData.forEach(membership => {
-            const org = orgData.find(o => o.id === membership.organization_id);
-            membershipMap[membership.user_id] = {
-              ...membership,
-              organizations: org
-            };
-          });
-          return membershipMap;
-        }
-      }
-      
-      return {};
-    } catch (err) {
-      console.error('Error getting bulk memberships:', err);
-      return {};
-    } finally {
-      pendingRequests.delete(queryKey);
-    }
-  })();
-
-  pendingRequests.set(queryKey, promise);
-  return promise;
+  // Delegate to the optimized version in membershipQueries
+  const { getBulkOrganizationMemberships: optimizedFn } = await import('../utils/membershipQueries.js');
+  return optimizedFn(profileIds);
 }

@@ -58,30 +58,30 @@ class ConnectionsDataManager {
       ]);
 
       const processedConnections = (acceptedResult.connections || []).map(conn => ({
-        id: conn.connection_id,
+        id: conn.id, // Use the connection ID from RPC
         connected_at: conn.updated_at,
         user: {
-          id: conn.profile_id,
-          full_name: conn.full_name,
-          avatar_url: conn.avatar_url,
-          title: conn.title,
-          organization_name: conn.organization_name,
-          location: conn.location
+          id: conn.other_user_id, // RPC returns other_user_id
+          full_name: conn.profile.full_name,
+          avatar_url: conn.profile.avatar_url,
+          title: conn.profile.title,
+          organization_name: conn.profile.organization_name,
+          location: conn.profile.location
         }
       }));
-
+      
       const processedPendingRequests = (pendingResult.connections || []).map(req => ({
-        id: req.connection_id,
+        id: req.id, // Use the connection ID
         created_at: req.created_at,
-        type: req.requester_id === authUserId ? 'outgoing' : 'incoming',
-        isIncoming: req.requester_id !== authUserId,
+        type: req.is_requester ? 'outgoing' : 'incoming',
+        isIncoming: !req.is_requester,
         user_profile: {
-          id: req.profile_id,
-          full_name: req.full_name,
-          avatar_url: req.avatar_url,
-          title: req.title,
-          organization_name: req.organization_name,
-          location: req.location
+          id: req.other_user_id,
+          full_name: req.profile.full_name,
+          avatar_url: req.profile.avatar_url,
+          title: req.profile.title,
+          organization_name: req.profile.organization_name,
+          location: req.profile.location
         }
       })).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
   

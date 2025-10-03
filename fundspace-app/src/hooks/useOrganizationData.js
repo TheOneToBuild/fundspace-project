@@ -15,33 +15,23 @@ export function useOrganizationData(profile, session) {
             setLoading(false);
             return;
         }
-
+    
         setLoading(true);
         setError('');
-
+    
         try {
-            const { data: memberships, error: membershipError } = await supabase
-                .from('organization_memberships')
-                .select('*')
-                .eq('profile_id', profile.id)
-                .order('joined_at', { ascending: false })
-                .limit(1);
-
-            if (membershipError) {
-                setError('Error checking membership');
-                setLoading(false);
-                return;
-            }
-
-            if (memberships && memberships.length > 0) {
-                setUserMembership(memberships[0]);
+        const { getUserAllMemberships } = await import('../utils/rpcClientFunctions');
+        const result = await getUserAllMemberships(profile.id);
+        
+        if (result.memberships && result.memberships.length > 0) {
+            setUserMembership(result.memberships[0]);
             } else {
                 setUserMembership(null);
                 setOrganization(null);
                 setMembers([]);
             }
         } catch (err) {
-            setError('Error checking membership');
+        setError('Error checking membership');    
             setUserMembership(null);
             setOrganization(null);
             setMembers([]);
@@ -79,41 +69,21 @@ export function useOrganizationData(profile, session) {
                 contact_email: orgData.contact_email || '',
             });
 
-            const { data: memberData, error: memberError } = await supabase
-                .from('organization_memberships')
-                .select(`
-                    *,
-                    profiles (
-                        id,
-                        full_name,
-                        avatar_url,
-                        title,
-                        is_omega_admin,
-                        organizational_role
-                    )
-                `)
-                .eq('organization_id', userMembership.organization_id)
-                .eq('organization_type', userMembership.organization_type)
-                .order('role', { ascending: false })
-                .order('joined_at', { ascending: true });
-
-            if (!memberError && memberData) {
-                const validMembers = memberData.filter(member => {
-                    if (!member.profiles || !member.profiles.id) {
-                        console.warn('Filtering out member with invalid profile data:', {
-                            membershipId: member.id,
-                            profileId: member.profile_id,
-                            hasProfiles: !!member.profiles,
-                            profilesId: member.profiles?.id
-                        });
-                        return false;
-                    }
-                    return true;
-                });
-                
+            const { getOrganizationMembersComplete } = await import('../utils/rpcClientFunctions');
+            const membersResult = await getOrganizationMembersComplete(
+                userMembership.organization_id,
+                userMembership.organization_type
+            );
+            
+            if (membersResult?.members) {
+                const validMembers = membersResult.members
+                    .filter(m => m.profile && m.profile.id)
+                    .map(m => ({
+                        ...m,
+                        profiles: m.profile
+                    }));
                 setMembers(validMembers);
             } else {
-                console.error('Member fetch error:', memberError);
                 setMembers([]);
             }
         } catch (err) {
