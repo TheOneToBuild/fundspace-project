@@ -17,11 +17,9 @@ export default function JoinOrganizationTab({ session, onSuccess, onError, onSwi
             if (!userId) throw new Error('You must be logged in to join an organization');
 
             // Check for existing super admins
-            const { data: existingSuperAdmins } = await supabase
-                .from('organization_memberships')
-                .select('id')
-                .eq('organization_id', organization.id)
-                .eq('role', 'super_admin');
+            const { data: existingSuperAdmins } = await supabase.rpc('get_organization_super_admins', {
+                org_id: organization.id
+            });
 
             const role = (!existingSuperAdmins || existingSuperAdmins.length === 0) ? 'super_admin' : 'member';
 

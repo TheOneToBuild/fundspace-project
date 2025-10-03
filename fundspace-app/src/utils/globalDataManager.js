@@ -60,10 +60,9 @@ class GlobalDataManager {
 
   async _fetchPostLikes(postIds) {
     try {
-      const { data: likesData, error } = await supabase
-        .from('post_likes')
-        .select('post_id, user_id, reaction_type, created_at')
-        .in('post_id', postIds);
+      const { data: likesData, error } = await supabase.rpc('get_post_likes_batch', {
+        post_ids: postIds,
+      });
 
       if (error) throw error;
 

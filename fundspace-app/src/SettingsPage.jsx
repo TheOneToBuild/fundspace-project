@@ -54,14 +54,10 @@ export default function SettingsPage() {
 
   const fetchOrganizationName = async (profileId) => {
     if (!profileId) return '';
-    const { data } = await supabase
-      .from('organization_memberships')
-      .select('organizations!inner(name)')
-      .eq('profile_id', profileId)
-      .order('joined_at', { ascending: false })
-      .limit(1)
-      .single();
-    return data?.organizations?.name || '';
+    const { getUserAllMemberships } = await import('./utils/rpcClientFunctions');
+    const result = await getUserAllMemberships(profileId);
+    const orgName = result?.memberships?.[0]?.organization?.name || '';
+    return orgName;
   };
   
   const showMessage = (msg, isError = false) => {

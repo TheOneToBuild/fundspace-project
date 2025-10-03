@@ -51,9 +51,8 @@ export const createMentionNotifications = async (postId, mentions, actorId, isOr
     const organizationMentions = mentions.filter(m => m.type === 'organization');
     if (organizationMentions.length > 0) {
       const orgMemberQueries = organizationMentions.map(mention => {
-        const [orgType, orgId] = mention.id.split('-');
-        return supabase
-          .from('organization_memberships')
+        const [orgType, orgId] = mention.id.split('-'); // e.g., "nonprofit-123"
+        return supabase.from('organization_memberships')
           .select('profile_id')
           .eq('organization_id', parseInt(orgId))
           .eq('organization_type', orgType);

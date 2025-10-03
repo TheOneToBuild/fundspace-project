@@ -45,14 +45,11 @@ class OrganizationDataManager {
 
   async _fetchUserMemberships(profileId) {
     try {
-      const { data: memberships, error } = await supabase
-        .from('organization_memberships')
-        .select('organization_id, role, membership_type, organization_type, joined_at')
-        .eq('profile_id', profileId)
-        .order('joined_at', { ascending: false });
+      const { getUserAllMemberships } = await import('../utils/rpcClientFunctions');
+      const result = await getUserAllMemberships(profileId);
+      const memberships = result?.memberships || [];
 
-      if (error) throw error;
-      return memberships || [];
+      return memberships;
     } catch (error) {
       console.error('Error fetching user memberships:', error);
       return [];
@@ -99,8 +96,8 @@ class OrganizationDataManager {
   }
 
   // Get organization members
-  async getOrganizationMembers(organizationId) {
-    const cacheKey = `org-members-${organizationId}`;
+  async getOrganizationMembers(organizationId, orgType) {
+    const cacheKey = `org-members-${organizationId}-${orgType}`;
     
     if (this.cache.has(cacheKey)) {
       const cached = this.cache.get(cacheKey);
@@ -114,7 +111,7 @@ class OrganizationDataManager {
       return this.pendingRequests.get(cacheKey);
     }
 
-    const promise = this._fetchOrganizationMembers(organizationId);
+    const promise = this._fetchOrganizationMembers(organizationId, orgType);
     this.pendingRequests.set(cacheKey, promise);
 
     try {
@@ -126,30 +123,12 @@ class OrganizationDataManager {
     }
   }
 
-  async _fetchOrganizationMembers(organizationId) {
+  async _fetchOrganizationMembers(organizationId, orgType) {
     try {
-      const { data: members, error } = await supabase
-        .from('organization_memberships')
-        .select(`
-          id,
-          profile_id,
-          role,
-          membership_type,
-          joined_at,
-          profiles (
-            id,
-            full_name,
-            avatar_url,
-            title,
-            organizational_role
-          )
-        `)
-        .eq('organization_id', organizationId)
-        .order('role', { ascending: false })
-        .order('joined_at', { ascending: true });
-
-      if (error) throw error;
-      return members?.filter(member => member.profiles) || [];
+      const { getOrganizationMembersComplete } = await import('../utils/rpcClientFunctions');
+      const result = await getOrganizationMembersComplete(organizationId, orgType);
+      const members = result?.members || [];
+      return members;
     } catch (error) {
       console.error('Error fetching organization members:', error);
       return [];
@@ -286,16 +265,17 @@ export default function useOptimizedOrganizationData(profile, session) {
       }
 
       const selectedOrgId = selectedMembership.organization_id;
+      const selectedOrgType = selectedMembership.organization_type;
 
       // Load all data for the selected organization in parallel
       const [
         organization,
         members,
         posts, 
-        details
+        details,
       ] = await Promise.all([
         organizationDataManager.getOrganizationDetails(selectedOrgId),
-        organizationDataManager.getOrganizationMembers(selectedOrgId),
+        organizationDataManager.getOrganizationMembers(selectedOrgId, selectedOrgType),
         organizationDataManager.getOrganizationPosts(selectedOrgId),
         organizationDataManager.getOrganizationDetailsBatch(selectedOrgId, session?.user?.id)
       ]);

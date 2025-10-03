@@ -125,12 +125,10 @@ const OrganizationProfilePage = () => {
       }
 
       try {
-        const { data: membership } = await supabase
-          .from('organization_memberships')
-          .select('role, joined_at')
-          .eq('organization_id', organization.id)
-          .eq('profile_id', session.user.id)
-          .maybeSingle();
+        const { data: membership } = await supabase.rpc('get_user_organization_membership', {
+          org_id: organization.id,
+          org_type: organization.type,
+        });
 
         setUserMembership(membership);
       } catch (error) {

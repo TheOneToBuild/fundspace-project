@@ -160,13 +160,10 @@ export default function CreateOrganizationTab({ session, onSuccess, onError }) {
                 is_public: true
             };
 
+            // Keep as is - INSERT operations can remain direct
             const { error: membershipError } = await supabase
                 .from('organization_memberships')
                 .insert(membershipData);
-
-            if (membershipError) {
-                throw new Error(`Organization created but failed to set up membership: ${membershipError.message}`);
-            }
 
             // Update user profile with organization info
             const profileUpdates = {

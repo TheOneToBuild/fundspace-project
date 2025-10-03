@@ -207,9 +207,9 @@ async function fetchTotalChampions(locationFilters) {
         const orgIds = orgs.map(org => org.id);
         
         const { data: memberships, error } = await supabase
-            .from('organization_memberships')
-            .select('profile_id')
-            .in('organization_id', orgIds);
+            .rpc('get_organization_members_profiles', {
+                org_ids: orgIds
+            });
 
         if (error) throw error;
 

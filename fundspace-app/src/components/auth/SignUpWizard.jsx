@@ -353,12 +353,10 @@ export default function SignUpWizard({ onSwitchToLogin }) {
     
     try {
       // Check if organization has existing super admins
-      const { data: existingSuperAdmins, error: checkError } = await supabase
-        .from('organization_memberships')
-        .select('id')
-        .eq('organization_id', selectedOrgData.id)
-        .eq('role', 'super_admin');
-    
+      const { data: existingSuperAdmins, error: checkError } = await supabase.rpc('get_organization_super_admins', {
+        org_id: selectedOrgData.id
+      });
+
       if (checkError) {
         console.error('Error checking existing super admins:', checkError);
         throw checkError;
