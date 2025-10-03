@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useOutletContext } from 'react-router-dom';
+import { useOutletContext, useLocation } from 'react-router-dom';
 import { Globe, Building, MapPin } from 'lucide-react';
 import { supabase } from '../../supabaseClient';
 import CreatePost from '../CreatePost.jsx';
@@ -14,8 +14,9 @@ import { BAY_AREA_COUNTIES, ORGANIZATION_CHANNELS, getOrgBaseType } from './cons
 
 export default function CommunityHub() {
   const { profile } = useOutletContext();
-  const [activeChannel, setActiveChannel] = useState('hello-world');
+  const location = useLocation();
   const [postsLikesData, setPostsLikesData] = useState({});
+  const [activeChannel, setActiveChannel] = useState(location.state?.channel || 'hello-world');
   
   const {
     posts,

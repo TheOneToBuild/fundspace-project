@@ -303,11 +303,11 @@ const enhancedPageData = React.useMemo(() => {
     };
 
     const handleViewMorePosts = () => {
-        navigate('/profile/hello-world');
+        navigate('/profile/community-hub');
     };
 
     const handleViewMoreCommunity = () => {
-        navigate('/profile/hello-community');
+        navigate('/profile/community-hub', { state: { channel: 'hello-community' } });
     };
 
     if (loading || rpcLoading) {

@@ -35,12 +35,12 @@ const MemberProfileConnections = ({
         if (!loading) {
             initializeData();
         }
-    }, [member?.id, currentUserId, loading, connections, followers, following]);
+    }, [member?.id, currentUserId, loading]);
 
     const fetchConnectionStatuses = async (allUsers) => {
         const targetUserIds = allUsers
-            .filter(item => item.user?.id && item.user.id !== currentUserId)
-            .map(item => item.user.id);
+            .filter(item => item?.profile?.id && item.profile.id !== currentUserId)
+            .map(item => item.profile.id);
         
         if (targetUserIds.length === 0) return;
 
@@ -124,17 +124,17 @@ const MemberProfileConnections = ({
         }
     };
 
-    const getConnectionButton = (user) => {
-        if (!currentUserId || currentUserId === user.id) return null;
+    const getConnectionButton = (person) => {
+        if (!currentUserId || !person || currentUserId === person.id) return null;
 
-        const status = connectionActions[user.id];
+        const status = connectionActions[person.id];
         if (!status) return null;
 
         switch (status.status) {
             case 'none':
                 return (
                     <button
-                        onClick={() => handleConnectionAction(user.id, 'connect')}
+                        onClick={() => handleConnectionAction(person.id, 'connect')}
                         className="inline-flex items-center px-3 py-1.5 text-xs font-medium bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors"
                     >
                         <UserPlus className="w-3 h-3 mr-1" />
@@ -145,7 +145,7 @@ const MemberProfileConnections = ({
                 if (status.isRequester) {
                     return (
                         <button
-                            onClick={() => handleConnectionAction(user.id, 'withdraw')}
+                            onClick={() => handleConnectionAction(person.id, 'withdraw')}
                             className="inline-flex items-center px-3 py-1.5 text-xs font-medium bg-slate-600 text-white rounded-full hover:bg-slate-700 transition-colors"
                         >
                             <Clock className="w-3 h-3 mr-1" />
@@ -156,13 +156,13 @@ const MemberProfileConnections = ({
                     return (
                         <div className="flex gap-1">
                             <button
-                                onClick={() => handleConnectionAction(user.id, 'accept')}
+                                onClick={() => handleConnectionAction(person.id, 'accept')}
                                 className="inline-flex items-center px-2 py-1 text-xs font-medium bg-green-600 text-white rounded-full hover:bg-green-700 transition-colors"
                             >
                                 <UserCheck className="w-3 h-3" />
                             </button>
                             <button
-                                onClick={() => handleConnectionAction(user.id, 'decline')}
+                                onClick={() => handleConnectionAction(person.id, 'decline')}
                                 className="inline-flex items-center px-2 py-1 text-xs font-medium bg-red-600 text-white rounded-full hover:bg-red-700 transition-colors"
                             >
                                 <UserX className="w-3 h-3" />
@@ -173,7 +173,7 @@ const MemberProfileConnections = ({
             case 'accepted':
                 return (
                     <button
-                        onClick={() => handleConnectionAction(user.id, 'disconnect')}
+                        onClick={() => handleConnectionAction(person.id, 'disconnect')}
                         className="inline-flex items-center px-3 py-1.5 text-xs font-medium bg-green-600 text-white rounded-full hover:bg-green-700 transition-colors"
                     >
                         <UserCheck className="w-3 h-3 mr-1" />
@@ -185,47 +185,54 @@ const MemberProfileConnections = ({
         }
     };
 
-    const PersonCard = ({ person, type, showConnectionButton = true }) => (
-        <div className="flex items-center justify-between p-4 bg-white border border-slate-200 rounded-lg hover:shadow-sm transition-shadow">
-            <div className="flex items-center space-x-3">
-                <Link to={`/profile/${person.user.id}`} className="flex-shrink-0">
-                    <div className="w-12 h-12 rounded-full overflow-hidden bg-slate-200">
-                        {person.user.avatar_url ? (
-                            <img 
-                                src={person.user.avatar_url} 
-                                alt={person.user.full_name}
-                                className="w-full h-full object-cover"
-                            />
-                        ) : (
-                            <div className="w-full h-full flex items-center justify-center">
-                                <User className="w-6 h-6 text-slate-400" />
-                            </div>
+    const PersonCard = ({ person, type, showConnectionButton = true }) => {
+        // Add safety check
+        if (!person || !person.id) {
+            return null;
+        }
+    
+        return (
+            <div className="flex items-center justify-between p-4 bg-white border border-slate-200 rounded-lg hover:shadow-sm transition-shadow">
+                <div className="flex items-center space-x-3">
+                    <Link to={`/profile/${person.id}`} className="flex-shrink-0">
+                        <div className="w-12 h-12 rounded-full overflow-hidden bg-slate-200">
+                            {person.avatar_url ? (
+                                <img 
+                                    src={person.avatar_url} 
+                                    alt={person.full_name}
+                                    className="w-full h-full object-cover"
+                                />
+                            ) : (
+                                <div className="w-full h-full flex items-center justify-center">
+                                    <User className="w-6 h-6 text-slate-400" />
+                                </div>
+                            )}
+                        </div>
+                    </Link>
+                    <div className="min-w-0 flex-1">
+                        <Link to={`/profile/${person.id}`} className="block">
+                            <h4 className="text-sm font-medium text-slate-900 hover:text-blue-600 transition-colors">
+                                {person.full_name}
+                            </h4>
+                        </Link>
+                        {person.title && (
+                            <p className="text-xs text-slate-600">{person.title}</p>
+                        )}
+                        {person.organization_name && (
+                            <p className="text-xs text-slate-500">{person.organization_name}</p>
+                        )}
+                        {person.location && (
+                            <p className="text-xs text-slate-500">{person.location}</p>
                         )}
                     </div>
-                </Link>
-                <div className="min-w-0 flex-1">
-                    <Link to={`/profile/${person.user.id}`} className="block">
-                        <h4 className="text-sm font-medium text-slate-900 hover:text-blue-600 transition-colors">
-                            {person.user.full_name}
-                        </h4>
-                    </Link>
-                    {person.user.title && (
-                        <p className="text-xs text-slate-600">{person.user.title}</p>
-                    )}
-                    {person.user.organization_name && (
-                        <p className="text-xs text-slate-500">{person.user.organization_name}</p>
-                    )}
-                    {person.user.location && (
-                        <p className="text-xs text-slate-500">{person.user.location}</p>
-                    )}
+                </div>
+                <div className="flex items-center space-x-2">
+                    <span className="text-xs text-slate-400 capitalize">{type}</span>
+                    {showConnectionButton && getConnectionButton(person)}
                 </div>
             </div>
-            <div className="flex items-center space-x-2">
-                <span className="text-xs text-slate-400 capitalize">{type}</span>
-                {showConnectionButton && getConnectionButton(person.user)}
-            </div>
-        </div>
-    );
+        );
+    };
 
     if (loading || isDataLoading) {
         return (
@@ -308,8 +315,8 @@ const MemberProfileConnections = ({
                                 <div className="space-y-3">
                                     {connections.map(connection => (
                                         <PersonCard 
-                                            key={connection.id} 
-                                            person={connection} 
+                                            key={connection.profile?.id || connection.id} 
+                                            person={connection.profile} 
                                             type="connection"
                                             showConnectionButton={!isCurrentUser}
                                         />
@@ -340,8 +347,8 @@ const MemberProfileConnections = ({
                                 <div className="space-y-3">
                                     {followers.map(follower => (
                                         <PersonCard 
-                                            key={follower.id} 
-                                            person={follower} 
+                                            key={follower.profile?.id || follower.id} 
+                                            person={follower.profile} 
                                             type="follower"
                                             showConnectionButton={!isCurrentUser}
                                         />
@@ -372,8 +379,8 @@ const MemberProfileConnections = ({
                                 <div className="space-y-3">
                                     {following.map(follow => (
                                         <PersonCard 
-                                            key={follow.id} 
-                                            person={follow} 
+                                            key={follow.profile?.id || follow.id} 
+                                            person={follow.profile} 
                                             type="following"
                                             showConnectionButton={!isCurrentUser}
                                         />
