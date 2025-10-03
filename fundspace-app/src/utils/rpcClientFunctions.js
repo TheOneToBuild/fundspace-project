@@ -672,6 +672,123 @@ export const getOrganizationsBatch = async (orgIds) => {
   }
 };
 
+// ====================================
+// ORGANIZATION PHOTOS OPTIMIZATION
+// ====================================
+
+/**
+ * Get organization photos with likes in one call
+ */
+export const getOrganizationPhotosComplete = async (organizationId, userId = null) => {
+  if (!organizationId) return { photos: [] };
+
+  const cacheKey = getCacheKey('org_photos', { organizationId, userId });
+  const cached = getCachedData(cacheKey);
+  if (cached) return cached;
+
+  try {
+    const { data, error } = await supabase.rpc('get_organization_photos_complete', {
+      p_organization_id: organizationId,
+      p_user_id: userId
+    });
+
+    if (error) throw error;
+    setCachedData(cacheKey, data);
+    return data;
+  } catch (error) {
+    console.error('Error fetching organization photos:', error);
+    return { photos: [] };
+  }
+};
+
+
+// ====================================
+// ORGANIZATION PROGRAMS OPTIMIZATION
+// ====================================
+
+/**
+ * Get organization programs in one call
+ */
+export const getOrganizationProgramsComplete = async (organizationId) => {
+  if (!organizationId) return { programs: [] };
+
+  const cacheKey = getCacheKey('org_programs', { organizationId });
+  const cached = getCachedData(cacheKey);
+  if (cached) return cached;
+
+  try {
+    const { data, error } = await supabase.rpc('get_organization_programs_complete', {
+      p_organization_id: organizationId
+    });
+
+    if (error) throw error;
+    setCachedData(cacheKey, data);
+    return data;
+  } catch (error) {
+    console.error('Error fetching organization programs:', error);
+    return { programs: [] };
+  }
+};
+
+
+// ====================================
+// ORGANIZATION NORTH STARS OPTIMIZATION
+// ====================================
+
+/**
+ * Get organization north stars in one call
+ */
+export const getOrganizationNorthStarsComplete = async (organizationId) => {
+  if (!organizationId) return { north_stars: [] };
+
+  const cacheKey = getCacheKey('org_north_stars', { organizationId });
+  const cached = getCachedData(cacheKey);
+  if (cached) return cached;
+
+  try {
+    const { data, error } = await supabase.rpc('get_organization_north_stars_complete', {
+      p_organization_id: organizationId
+    });
+
+    if (error) throw error;
+    setCachedData(cacheKey, data);
+    return data;
+  } catch (error) {
+    console.error('Error fetching organization north stars:', error);
+    return { north_stars: [] };
+  }
+};
+
+
+// ====================================
+// BATCH ALL ORGANIZATION DETAILS
+// ====================================
+
+/**
+ * Get all organization details (photos, programs, north_stars) in ONE call
+ * Most efficient - use this when you need all three
+ */
+export const getOrganizationDetailsBatch = async (organizationId, userId = null) => {
+  if (!organizationId) return { photos: [], programs: [], north_stars: [] };
+
+  const cacheKey = getCacheKey('org_details_batch', { organizationId, userId });
+  const cached = getCachedData(cacheKey);
+  if (cached) return cached;
+
+  try {
+    const { data, error } = await supabase.rpc('get_organization_details_batch', {
+      p_organization_id: organizationId,
+      p_user_id: userId
+    });
+
+    if (error) throw error;
+    setCachedData(cacheKey, data);
+    return data;
+  } catch (error) {
+    console.error('Error fetching organization details batch:', error);
+    return { photos: [], programs: [], north_stars: [] };
+  }
+};
 
 export const invalidateCache = (pattern) => {
   if (pattern) {

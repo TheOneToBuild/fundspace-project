@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ClipboardList, MapPin, Users, Target, Calendar, ExternalLink, Plus, Edit3, Eye, Building2 } from 'lucide-react';
 import { supabase } from '../../supabaseClient.js';
-import { getOrganizationData } from '../../utils/rpcClientFunctions.js';
+import { getOrganizationProgramsComplete } from '../../utils/rpcClientFunctions.js';
 import ProgramDetailModal from './ProgramDetailModal.jsx';
 
 const OrganizationPrograms = ({ 
@@ -27,27 +27,8 @@ const OrganizationPrograms = ({
   const fetchPrograms = async () => {
     try {
       setLoading(true);
-      
-      const orgData = await getOrganizationData(organization.id);
-      
-      if (orgData?.programs) {
-        setPrograms(orgData.programs);
-      } else {
-        const { data, error } = await supabase
-          .from('organization_programs')
-          .select(`
-            *,
-            funded_by_organizations:funded_by_organization_ids (
-              id, name, image_url, type
-            )
-          `)
-          .eq('organization_id', organization.id)
-          .eq('is_active', true)
-          .order('display_order', { ascending: true });
-
-        if (error) throw error;
-        setPrograms(data || []);
-      }
+      const result = await getOrganizationProgramsComplete(organization.id);
+      setPrograms(result.programs || []);
     } catch (err) {
       console.error('Error fetching programs:', err);
       setError('Failed to load programs');

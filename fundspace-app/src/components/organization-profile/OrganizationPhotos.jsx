@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Camera, Heart, MessageCircle, Share, X, Send } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../supabaseClient.js';
+import { getOrganizationPhotosComplete } from '../../utils/rpcClientFunctions.js';
 
 const OrganizationPhotos = ({ 
   organization, 
@@ -18,12 +19,6 @@ const OrganizationPhotos = ({
   const [newComment, setNewComment] = useState('');
   const [loadingComments, setLoadingComments] = useState(false);
   const [userProfile, setUserProfile] = useState(null);
-  
-  const [hasMore, setHasMore] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [offset, setOffset] = useState(0);
-  const observerRef = useRef();
-  const PHOTOS_PER_PAGE = 9;
 
   useEffect(() => {
     const fetchUserProfile = async () => {
@@ -76,99 +71,35 @@ const OrganizationPhotos = ({
     fetchUserProfile();
   }, [session?.user?.id, currentUserProfile]);
 
-  const fetchPhotos = async (isLoadMore = false) => {
+  const fetchPhotos = useCallback(async () => {
+    if (!organization?.id) return;
+
+    setLoading(true);
+    setError('');
     try {
-      if (!isLoadMore) {
-        setLoading(true);
-        setOffset(0);
-      } else {
-        setLoadingMore(true);
-      }
-      
-      const currentOffset = isLoadMore ? offset : 0;
-      
-      const { data, error } = await supabase
-        .from('organization_photos')
-        .select(`
-          id,
-          image_url,
-          caption,
-          alt_text,
-          created_at,
-          uploaded_by_user_id,
-          is_featured,
-          display_order,
-          likes_count,
-          comments_count
-        `)
-        .eq('organization_id', organization.id)
-        .order('display_order', { ascending: true })
-        .range(currentOffset, currentOffset + PHOTOS_PER_PAGE - 1);
+      const result = await getOrganizationPhotosComplete(organization.id, session?.user?.id);
+      setPhotos(result.photos || []);
 
-      if (error) throw error;
-      
-      const photosWithCounts = await Promise.all((data || []).map(async (photo) => {
-        let likesCount = photo.likes_count;
-        let commentsCount = photo.comments_count;
-
-        if (likesCount === null || likesCount === undefined) {
-          const { count: actualLikesCount } = await supabase
-            .from('organization_photo_likes')
-            .select('*', { count: 'exact', head: true })
-            .eq('photo_id', photo.id);
-          likesCount = actualLikesCount || 0;
+      // The RPC also returns user-specific likes, so we can set them here.
+      const likedPhotoIds = new Set();
+      (result.photos || []).forEach(photo => {
+        if (photo.user_has_liked) {
+          likedPhotoIds.add(photo.id);
         }
+      });
+      setUserLikes(likedPhotoIds);
 
-        if (commentsCount === null || commentsCount === undefined) {
-          const { count: actualCommentsCount } = await supabase
-            .from('organization_photo_comments')
-            .select('*', { count: 'exact', head: true })
-            .eq('photo_id', photo.id);
-          commentsCount = actualCommentsCount || 0;
-        }
-
-        return {
-          ...photo,
-          likes_count: likesCount || 0,
-          comments_count: commentsCount || 0
-        };
-      }));
-      
-      if (isLoadMore) {
-        setPhotos(prev => [...prev, ...photosWithCounts]);
-        setOffset(currentOffset + PHOTOS_PER_PAGE);
-      } else {
-        setPhotos(photosWithCounts);
-        setOffset(PHOTOS_PER_PAGE);
-      }
-      
-      setHasMore(photosWithCounts.length === PHOTOS_PER_PAGE);
-      
     } catch (err) {
       console.error('Error fetching photos:', err);
       setError('Failed to load photos');
     } finally {
       setLoading(false);
-      setLoadingMore(false);
     }
-  };
+  }, [organization?.id, session?.user?.id]);
 
   useEffect(() => {
-    if (organization?.id) {
-      fetchPhotos();
-    }
-  }, [organization?.id]);
-
-  const lastPhotoElementRef = useCallback(node => {
-    if (loading || loadingMore) return;
-    if (observerRef.current) observerRef.current.disconnect();
-    observerRef.current = new IntersectionObserver(entries => {
-      if (entries[0].isIntersecting && hasMore) {
-        fetchPhotos(true);
-      }
-    });
-    if (node) observerRef.current.observe(node);
-  }, [loading, loadingMore, hasMore]);
+    fetchPhotos();
+  }, [fetchPhotos]);
 
   const openPhotoModal = (photo, index) => {
     setSelectedPhoto({ ...photo, index });
@@ -199,23 +130,6 @@ const OrganizationPhotos = ({
   };
 
   const [userLikes, setUserLikes] = useState(new Set());
-  
-  const fetchUserLikes = async () => {
-    if (!session?.user || photos.length === 0) return;
-    
-    try {
-      const { data } = await supabase
-        .from('organization_photo_likes')
-        .select('photo_id')
-        .eq('user_id', session.user.id)
-        .in('photo_id', photos.map(p => p.id));
-      
-      const likedPhotoIds = new Set(data?.map(like => like.photo_id) || []);
-      setUserLikes(likedPhotoIds);
-    } catch (err) {
-      console.error('Error fetching user likes:', err);
-    }
-  };
 
   const fetchComments = async (photoId) => {
     if (!photoId) return;
@@ -294,10 +208,6 @@ const OrganizationPhotos = ({
   };
 
   useEffect(() => {
-    fetchUserLikes();
-  }, [photos, session?.user?.id]);
-
-  useEffect(() => {
     const handleKeyDown = (event) => {
       if (event.key === 'Escape' && selectedPhoto) {
         closePhotoModal();
@@ -363,7 +273,6 @@ const OrganizationPhotos = ({
             {photos.map((photo, index) => (
               <div 
                 key={photo.id}
-                ref={index === photos.length - 1 ? lastPhotoElementRef : null}
                 className="relative aspect-square bg-slate-100 group cursor-pointer overflow-hidden rounded-xl"
                 onClick={() => openPhotoModal(photo, index)}
               >
@@ -388,19 +297,6 @@ const OrganizationPhotos = ({
               </div>
             ))}
           </div>
-          
-          {loadingMore && (
-            <div className="flex justify-center items-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-2 border-blue-600 border-t-transparent"></div>
-              <span className="ml-3 text-slate-500">Loading more photos...</span>
-            </div>
-          )}
-          
-          {!hasMore && photos.length > 0 && (
-            <div className="text-center py-8">
-              <p className="text-slate-500 text-sm">You've seen all photos</p>
-            </div>
-          )}
         </>
       ) : (
         <div className="bg-white rounded-xl border border-slate-200 p-12 text-center">

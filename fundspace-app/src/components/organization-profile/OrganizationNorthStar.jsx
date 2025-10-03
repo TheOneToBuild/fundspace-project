@@ -1,7 +1,8 @@
 // src/components/organization-profile/OrganizationNorthStar.jsx - Fixed with Global Edit Mode Support
 import React, { useState, useEffect } from 'react';
 import { Edit3, Plus } from 'lucide-react';
-import { supabase } from '../../supabaseClient.js';
+import { supabase } from '../../supabaseClient.js'; // Keep for save logic
+import { getOrganizationDetailsBatch } from '../../utils/rpcClientFunctions.js';
 import { hasPermission, PERMISSIONS } from '../../utils/organizationPermissions.js';
 import NorthStarEditView from './north-star/NorthStarEditView.jsx';
 import NorthStarPublicView from './north-star/NorthStarPublicView.jsx';
@@ -36,33 +37,24 @@ const OrganizationNorthStar = ({ organization, userMembership, session, isEditMo
 
   // Fetch page data
   useEffect(() => {
-    const fetchPageData = async () => {
-      if (!organization?.id) return;
+    if (!organization?.id) return;
 
+    const loadDetails = async () => {
       setLoading(true);
       try {
-        const { data, error } = await supabase
-          .from('organization_north_stars')
-          .select('*')
-          .eq('organization_id', organization.id)
-          .eq('is_published', true)
-          .maybeSingle();
-
-        if (error && error.code !== 'PGRST116') {
-          throw error;
-        }
-
-        setPageData(data);
+        // The userId is not strictly needed for fetching public north stars, but passing it for consistency with the batch function signature.
+        const details = await getOrganizationDetailsBatch(organization.id, session?.user?.id);
+        // The RPC returns an array, but this component expects a single object or null.
+        setPageData(details.north_stars?.[0] || null);
       } catch (err) {
         console.error('Error fetching North Star data:', err);
-        setError('Failed to load page data');
+        setError('Failed to load North Star data');
       } finally {
         setLoading(false);
       }
     };
-
-    fetchPageData();
-  }, [organization?.id]);
+    loadDetails();
+  }, [organization?.id, session?.user?.id]);
 
   // Initialize edit mode with flexible structure
   const startEditing = () => {

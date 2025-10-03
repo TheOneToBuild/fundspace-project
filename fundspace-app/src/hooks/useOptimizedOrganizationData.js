@@ -1,7 +1,11 @@
 // src/hooks/useOptimizedOrganizationData.js - Fixed version for multiple memberships
 import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
-import { getPostsBatch, getOrganizationsBatch } from '../utils/rpcClientFunctions';
+import { 
+  getPostsBatch, 
+  getOrganizationsBatch,
+  getOrganizationDetailsBatch
+} from '../utils/rpcClientFunctions';
 
 // Batch manager for organization data
 class OrganizationDataManager {
@@ -196,10 +200,9 @@ class OrganizationDataManager {
     }
   }
 
-
-  // Get organization programs
-  async getOrganizationPrograms(organizationId) {
-    const cacheKey = `org-programs-${organizationId}`;
+  // Get organization details (photos, programs, north stars)
+  async getOrganizationDetailsBatch(organizationId, userId) {
+    const cacheKey = `org-details-batch-${organizationId}-${userId}`;
     
     if (this.cache.has(cacheKey)) {
       const cached = this.cache.get(cacheKey);
@@ -210,83 +213,12 @@ class OrganizationDataManager {
     }
 
     try {
-      const { data: programs, error } = await supabase
-        .from('organization_programs')
-        .select('*')
-        .eq('organization_id', organizationId)
-        .eq('is_active', true)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      
-      const result = programs || [];
-      this.cache.set(cacheKey, { data: result, timestamp: Date.now() });
-      return result;
+      const details = await getOrganizationDetailsBatch(organizationId, userId);
+      this.cache.set(cacheKey, { data: details, timestamp: Date.now() });
+      return details;
     } catch (error) {
-      console.error('Error fetching organization programs:', error);
-      return [];
-    }
-  }
-
-  // Get organization photos
-  async getOrganizationPhotos(organizationId) {
-    const cacheKey = `org-photos-${organizationId}`;
-    
-    if (this.cache.has(cacheKey)) {
-      const cached = this.cache.get(cacheKey);
-      if (Date.now() - cached.timestamp < this.CACHE_TTL) {
-        return cached.data;
-      }
-      this.cache.delete(cacheKey);
-    }
-
-    try {
-      const { data: photos, error } = await supabase
-        .from('organization_photos')
-        .select('*')
-        .eq('organization_id', organizationId)
-        .order('created_at', { ascending: false })
-        .limit(20);
-
-      if (error) throw error;
-      
-      const result = photos || [];
-      this.cache.set(cacheKey, { data: result, timestamp: Date.now() });
-      return result;
-    } catch (error) {
-      console.error('Error fetching organization photos:', error);
-      return [];
-    }
-  }
-
-  // Get organization north stars
-  async getOrganizationNorthStars(organizationId) {
-    const cacheKey = `org-north-stars-${organizationId}`;
-    
-    if (this.cache.has(cacheKey)) {
-      const cached = this.cache.get(cacheKey);
-      if (Date.now() - cached.timestamp < this.CACHE_TTL) {
-        return cached.data;
-      }
-      this.cache.delete(cacheKey);
-    }
-
-    try {
-      const { data: northStars, error } = await supabase
-        .from('organization_north_stars')
-        .select('*')
-        .eq('organization_id', organizationId)
-        .eq('is_published', true)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      
-      const result = northStars || [];
-      this.cache.set(cacheKey, { data: result, timestamp: Date.now() });
-      return result;
-    } catch (error) {
-      console.error('Error fetching organization north stars:', error);
-      return [];
+      console.error('Error fetching org details batch:', error);
+      return { photos: [], programs: [], north_stars: [] };
     }
   }
 }
@@ -359,29 +291,25 @@ export default function useOptimizedOrganizationData(profile, session) {
       const [
         organization,
         members,
-        posts,
-        photos,
-        programs,
-        northStars
+        posts, 
+        details
       ] = await Promise.all([
         organizationDataManager.getOrganizationDetails(selectedOrgId),
         organizationDataManager.getOrganizationMembers(selectedOrgId),
         organizationDataManager.getOrganizationPosts(selectedOrgId),
-        organizationDataManager.getOrganizationPhotos(selectedOrgId),
-        organizationDataManager.getOrganizationPrograms(selectedOrgId),
-        organizationDataManager.getOrganizationNorthStars(selectedOrgId)
+        organizationDataManager.getOrganizationDetailsBatch(selectedOrgId, session?.user?.id)
       ]);
 
       setState(prev => ({
         ...prev,
         loading: false,
-        organization,
+        organization: { ...organization, ...details.organization_details },
         userMembership: selectedMembership,
         members,
         organizationPosts: posts,
-        organizationPhotos: photos,
-        organizationPrograms: programs,
-        organizationNorthStars: northStars,
+        organizationPhotos: details.photos || [],
+        organizationPrograms: details.programs || [],
+        organizationNorthStars: details.north_stars || [],
         allMemberships: memberships,
         selectedOrganization: selectedOrgId
       }));
