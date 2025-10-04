@@ -8,7 +8,7 @@ import { supabase } from '../supabaseClient';
 import GlobalSearch from './GlobalSearch.jsx';
 import headerLogoImage from '../assets/fundspace-logo2.png';
 import { isPlatformAdmin } from '../utils/permissions.js';
-import { getOrganizationForProfileNav } from '../utils/membershipQueries.js';
+import { getUserAllMemberships } from '../utils/rpcClientFunctions.js';
 
 function useRequestDeduplication() {
     const pendingRequests = useRef(new Map());
@@ -57,24 +57,19 @@ export default function DashboardHeader({ profile }) {
         
         return deduplicate(`profile-stats-${profile.id}`, async () => {
             try {
-                const [followersRes, followingRes, connectionsRes] = await Promise.allSettled([
+                const [followersRes, followingRes] = await Promise.allSettled([
                     supabase.rpc('get_user_followers', { p_user_id: profile.id, p_limit: 9999 }),
-                    supabase.rpc('get_user_following', { p_user_id: profile.id, p_limit: 9999 }),
-                    supabase.from('user_connections').select('id', { count: 'exact', head: true }).or(`requester_id.eq.${profile.id},recipient_id.eq.${profile.id}`).eq('status', 'accepted')
+                    supabase.rpc('get_user_following', { p_user_id: profile.id, p_limit: 9999 })
                 ]);
 
                 const followersCount = followersRes.status === 'fulfilled' && followersRes.value.data ? followersRes.value.data.length : 0;
                 if (followersRes.status === 'fulfilled' && followersRes.value.error) console.error('Error fetching followers:', followersRes.value.error);
                 if (followersRes.status === 'rejected') console.error('Error fetching followers:', followersRes.reason);
-
                 const followingCount = followingRes.status === 'fulfilled' && followingRes.value.data ? followingRes.value.data.length : 0;
                 if (followingRes.status === 'fulfilled' && followingRes.value.error) console.error('Error fetching following:', followingRes.value.error);
                 if (followingRes.status === 'rejected') console.error('Error fetching following:', followingRes.reason);
-
-                const connectionsCount = connectionsRes.status === 'fulfilled' ? connectionsRes.value.count : 0;
-                if (connectionsRes.status === 'fulfilled' && connectionsRes.value.error) console.error('Error fetching connections count:', connectionsRes.value.error);
-                if (connectionsRes.status === 'rejected') console.error('Error fetching connections count:', connectionsRes.reason);
-
+                // Use the connections_count from the profile object, which is fetched via RPC in App.jsx
+                const connectionsCount = profile.connections_count || 0;
                 setStats({
                     followersCount,
                     followingCount,
@@ -84,7 +79,7 @@ export default function DashboardHeader({ profile }) {
                 console.error('Error fetching profile stats:', error);
             }
         });
-    }, [profile?.id, deduplicate]);
+    }, [profile?.id, profile?.connections_count, deduplicate]);
 
     const fetchNotificationStats = useCallback(async () => {
         if (!profile?.id) return;
@@ -110,15 +105,10 @@ export default function DashboardHeader({ profile }) {
         
         return deduplicate(`org-access-${profile.id}`, async () => {
             try {
-                const { data } = await supabase
-                    .from('organization_memberships')
-                    .select('id')
-                    .eq('profile_id', profile.id)
-                    .limit(1);
-                
-                setHasOrganizationAccess(data && data.length > 0);
+                const { memberships } = await getUserAllMemberships(profile.id);
+                setHasOrganizationAccess(memberships && memberships.length > 0);
             } catch (error) {
-                console.error('Error checking organization access:', error);
+                console.error('Error checking organization access via RPC:', error);
                 setHasOrganizationAccess(false);
             }
         });
@@ -130,7 +120,7 @@ export default function DashboardHeader({ profile }) {
             fetchNotificationStats();
             checkOrganizationAccess();
         }
-    }, [profile?.id]);
+    }, [profile?.id, fetchProfileStats, fetchNotificationStats, checkOrganizationAccess]);
 
     useEffect(() => {
         if (!profile?.id) return;

@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { X, ThumbsUp, Heart, Lightbulb, PartyPopper, MessageCircle, Share2, Send } from 'lucide-react';
+import { getPostCommentsWithReactions } from '../utils/rpcClientFunctions';
 import ReactorsText from './post/ReactorsText';
 import ReactionsPreview from './post/ReactionsPreview';
 import { formatDistanceToNow } from 'date-fns';
-
+ 
 const reactions = [
   { type: 'like', Icon: ThumbsUp, color: 'bg-blue-500', label: 'Like' },
   { type: 'love', Icon: Heart, color: 'bg-red-500', label: 'Love' },
@@ -45,30 +46,22 @@ export default function OrganizationPostDetailModal({
       if (!post?.id) return;
 
       try {
-        // Remove direct queries, use props instead
+        // Use the batch RPC instead of 3 separate queries
+        const result = await getPostCommentsWithReactions(post.id, currentUserId, true);
+        
+        setComments(result?.comments?.comments || []);
+        
+        // Reactions are already in preloadedReactions props
         if (preloadedReactions) {
           setSelectedReaction(preloadedReactions.userReaction || null);
           setReactionSummary(preloadedReactions.summary || []);
           setTotalLikes(preloadedReactions.count || 0);
+          
+          // FIX: Extract reactors from preloadedReactions if available
+          if (preloadedReactions.reactors) {
+            setReactors(preloadedReactions.reactors);
+          }
         }
-        
-        const { data: commentsData, error: commentsError } = await supabase
-          .from('organization_post_comments')
-          .select(`
-            *,
-            profiles:profile_id (
-              id,
-              full_name,
-              avatar_url
-            )
-          `)
-          .eq('organization_post_id', post.id)
-          .order('created_at', { ascending: true });
-
-        if (commentsError) throw commentsError;
-
-        setComments(commentsData || []);
-
       } catch (error) {
         console.error('Error loading modal data:', error);
       }
@@ -77,106 +70,44 @@ export default function OrganizationPostDetailModal({
     loadData();
   }, [post?.id, currentUserId, preloadedReactions]);
 
-  useEffect(() => {
-    // Fetch reactor preview data when modal opens
-    const fetchReactorPreview = async () => {
-      if (totalLikes > 0 && (!reactors || reactors.length === 0) && post?.id) {
-        try {
-          const { data: reactionData, error: reactionsError } = await supabase
-            .from('organization_post_likes')
-            .select('user_id, reaction_type, created_at')
-            .eq('organization_post_id', post.id)
-            .order('created_at', { ascending: false })
-            .limit(3);
-  
-          if (reactionsError) throw reactionsError;
-  
-          if (reactionData && reactionData.length > 0) {
-            const userIds = reactionData.map(r => r.user_id);
-            
-            const { data: profilesData, error: profilesError } = await supabase
-              .from('profiles')
-              .select('id, full_name, avatar_url, title, organization_name, role')
-              .in('id', userIds);
-  
-            if (profilesError) throw profilesError;
-  
-            const transformedReactors = reactionData.map(like => {
-              const profile = profilesData?.find(p => p.id === like.user_id);
-              return {
-                user_id: like.user_id,
-                profile_id: profile?.id,
-                full_name: profile?.full_name,
-                avatar_url: profile?.avatar_url,
-                title: profile?.title,
-                organization_name: profile?.organization_name,
-                role: profile?.role,
-                reaction_type: like.reaction_type,
-                created_at: like.created_at
-              };
-            }).filter(reactor => reactor.full_name);
-            
-            setReactors(transformedReactors);
-          }
-        } catch (error) {
-          console.error('Error fetching reactor preview:', error);
-        }
-      }
-    };
-  
-    fetchReactorPreview();
-  }, [totalLikes, post?.id]);
-
   const handleReaction = async (reactionType) => {
     if (!canInteract || !post?.id) return;
 
+    const wasSelected = selectedReaction === reactionType;
+    const oldReaction = selectedReaction;
+    
+    // Optimistic update
+    setSelectedReaction(wasSelected ? null : reactionType);
+    setTotalLikes(prev => wasSelected ? prev - 1 : (oldReaction ? prev : prev + 1));
+    
     try {
-      if (selectedReaction === reactionType) {
-        const { error } = await supabase
+      if (wasSelected) {
+        await supabase
           .from('organization_post_likes')
           .delete()
           .eq('organization_post_id', post.id)
           .eq('user_id', currentUserId);
-
-        if (error) throw error;
-        setSelectedReaction(null);
       } else {
-        const { error } = await supabase
+        await supabase
           .from('organization_post_likes')
           .upsert({
             organization_post_id: post.id,
             user_id: currentUserId,
             reaction_type: reactionType
           });
-
-        if (error) throw error;
-        setSelectedReaction(reactionType);
       }
 
+      // Trigger count update
       await supabase.rpc('update_organization_post_likes_count', { 
         post_id: post.id 
       });
 
-      const { data: reactionData } = await supabase
-        .from('organization_post_likes')
-        .select('reaction_type')
-        .eq('organization_post_id', post.id);
-
-      if (reactionData) {
-        const counts = {};
-        reactionData.forEach(like => {
-          const type = like.reaction_type || 'like';
-          counts[type] = (counts[type] || 0) + 1;
-        });
-
-        const summary = Object.entries(counts).map(([type, count]) => ({ type, count }));
-        setReactionSummary(summary);
-        setTotalLikes(reactionData.length);
-      }
-
       setShowReactionPicker(false);
     } catch (error) {
       console.error('Error handling reaction:', error);
+      // Revert on error
+      setSelectedReaction(oldReaction);
+      setTotalLikes(prev => wasSelected ? prev + 1 : (oldReaction ? prev : prev - 1));
     }
   };
 
@@ -224,51 +155,9 @@ export default function OrganizationPostDetailModal({
   const handleReactorsEnter = async () => {
     if (reactorsTimeoutRef.current) {
       clearTimeout(reactorsTimeoutRef.current);
-    }
-  
-    // Only fetch all reactors if we don't have full list yet
-    if (totalLikes > 0 && reactors.length < totalLikes && post?.id) {
-      try {
-        const { data: reactionData, error: reactionsError } = await supabase
-          .from('organization_post_likes')
-          .select('user_id, reaction_type, created_at')
-          .eq('organization_post_id', post.id)
-          .order('created_at', { ascending: false });
-  
-        if (reactionsError) throw reactionsError;
-  
-        if (reactionData && reactionData.length > 0) {
-          const userIds = reactionData.map(r => r.user_id);
-          
-          const { data: profilesData, error: profilesError } = await supabase
-            .from('profiles')
-            .select('id, full_name, avatar_url, title, organization_name, role')
-            .in('id', userIds);
-  
-          if (profilesError) throw profilesError;
-  
-          const transformedReactors = reactionData.map(like => {
-            const profile = profilesData?.find(p => p.id === like.user_id);
-            return {
-              user_id: like.user_id,
-              profile_id: profile?.id,
-              full_name: profile?.full_name,
-              avatar_url: profile?.avatar_url,
-              title: profile?.title,
-              organization_name: profile?.organization_name,
-              role: profile?.role,
-              reaction_type: like.reaction_type,
-              created_at: like.created_at
-            };
-          }).filter(reactor => reactor.full_name);
-          
-          setReactors(transformedReactors);
-        }
-      } catch (error) {
-        console.error('Error fetching all reactors:', error);
-      }
-    }
-  
+    }    
+    // Reactors come from preloadedReactions prop, which should contain
+    // a sample of reactors. We just need to show the preview.
     setShowReactorsPreview(true);
   };
   

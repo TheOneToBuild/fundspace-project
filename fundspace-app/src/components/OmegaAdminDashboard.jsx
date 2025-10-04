@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useOutletContext, Link } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
-import globalDataManager from '../utils/globalDataManager'; // ✅ CRITICAL IMPORT
+import { getAdminDashboardStats } from '../utils/rpcClientFunctions';
 import { 
     Crown,
     Users, 
@@ -80,31 +80,16 @@ export default function OmegaAdminDashboard() {
         try {
             setLoading(true);
             setError('');
-            const [usersCountRes, membershipRes] = await Promise.all([
-                supabase.from('profiles').select('id', { count: 'exact', head: true }),
-                supabase.from('organization_memberships').select('role')
-            ]);
-
-            if (usersCountRes.error) {
-                throw new Error('Failed to fetch user count');
-            }
-
-            // Use globalDataManager for organizations and grants data
-            const [organizationsData, grantsData] = await Promise.all([
-                globalDataManager.getOrganizations([]), // Get all organizations
-                globalDataManager.getGrants([]) // Get all grants
-            ]);
-
-            // Process organizations data
-            const allOrganizations = Object.values(organizationsData);
+            
+            // ✅ OPTIMIZED: Use the dedicated RPC function
+            const adminStats = await getAdminDashboardStats();
+            if (!adminStats) throw new Error("Could not fetch admin statistics.");
             
             // Count organizations by type using the expanded taxonomy
-            const orgsByType = allOrganizations.reduce((acc, org) => {
-                // Handle legacy 'funder' type by mapping to foundation
-                const type = org.type === 'funder' ? 'foundation' : org.type;
-                acc[type] = (acc[type] || 0) + 1;
+            const orgsByType = adminStats.organizations_by_type.reduce((acc, item) => {
+                acc[item.type] = item.count;
                 return acc;
-            }, {
+            }, { // Ensure all keys exist
                 nonprofit: 0,
                 foundation: 0,
                 education: 0,
@@ -112,39 +97,29 @@ export default function OmegaAdminDashboard() {
                 government: 0,
                 religious: 0,
                 forprofit: 0,
-                international: 0
+                international: 0,
+                funder: 0 // Handle legacy type if it appears
             });
+            // Map legacy 'funder' to 'foundation'
+            if (orgsByType.funder > 0) {
+                orgsByType.foundation = (orgsByType.foundation || 0) + orgsByType.funder;
+            }
 
-            // Process grants data
-            const allGrants = Object.values(grantsData);
-            const currentDate = new Date().toISOString();
-            const activeGrants = allGrants.filter(grant => 
-                grant.deadline && new Date(grant.deadline) > new Date(currentDate)
-            );
-
-            // Count membership roles
-            const roleStats = (membershipRes.data || []).reduce((acc, membership) => {
-                const role = membership.role === 'super_admin' ? 'super_admins' : 
-                           membership.role === 'admin' ? 'admins' : 'members';
-                acc[role] = (acc[role] || 0) + 1;
-                return acc;
-            }, {
+            setStats({
+                totalUsers: adminStats.total_users || 0,
+                totalOrganizations: adminStats.total_organizations || 0,
+                totalGrants: adminStats.total_grants || 0,
+                activeToday: adminStats.active_today || 0,
+                newThisWeek: adminStats.new_this_week || 0,
+                organizationsByType: orgsByType,
+                membershipStats: adminStats.membership_stats || {
                 super_admins: 0,
                 admins: 0,
                 members: 0
-            });
-
-            setStats({
-                totalUsers: usersCountRes.count || 0,
-                totalOrganizations: allOrganizations.length,
-                totalGrants: allGrants.length,
-                activeToday: Math.floor((usersCountRes.count || 0) * 0.15), // Simulated active users
-                newThisWeek: Math.floor((usersCountRes.count || 0) * 0.05), // Simulated new users
-                organizationsByType: orgsByType,
-                membershipStats: roleStats,
-                grantStats: {
-                    total: allGrants.length,
-                    activeDeadlines: activeGrants.length
+                },
+                grantStats: adminStats.grant_stats || {
+                    total: 0,
+                    activeDeadlines: 0
                 },
                 recentActivity: []
             });

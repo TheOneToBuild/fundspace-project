@@ -923,6 +923,31 @@ export const getCompleteProfilePageData = async (userId) => {
   }
 };
 
+export const getOrganizationSocialMetrics = async (organizationId, daysBack = 30) => {
+  const cacheKey = getCacheKey('org_social_metrics', { organizationId, daysBack });
+  const cached = getCachedData(cacheKey);
+  if (cached) return cached;
+
+  try {
+    const { data, error } = await supabase.rpc('get_organization_social_metrics', {
+      p_org_id: organizationId,
+      p_days_back: daysBack
+    });
+
+    if (error) throw error;
+    setCachedData(cacheKey, data);
+    return data;
+  } catch (error) {
+    console.error('Error fetching organization social metrics:', error);
+    return {
+      followers_count: 0,
+      bookmarks_count: 0,
+      recent_follows: [],
+      recent_bookmarks: []
+    };
+  }
+};
+
 export const invalidateCache = (pattern) => {
   if (pattern) {
     const keys = Array.from(cache.keys());

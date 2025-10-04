@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { Eye, Heart, TrendingUp, Users, Calendar, ChevronDown } from 'lucide-react';
-import { hasPermission, PERMISSIONS } from '../utils/permissions.js';
+import { hasPermission, PERMISSIONS } from '../utils/permissions';
+import { getOrganizationSocialMetrics } from '../utils/rpcClientFunctions';
 
 const SocialMetricsCard = ({ organization, organizationType, userRole, isOmegaAdmin }) => {
   const [metrics, setMetrics] = useState({
@@ -20,52 +21,18 @@ const SocialMetricsCard = ({ organization, organizationType, userRole, isOmegaAd
   useEffect(() => {
     const fetchSocialMetrics = async () => {
       if (!organization?.id || !canViewSocialMetrics) return;
-      
+
       try {
         setLoading(true);
 
         if (organizationType === 'funder') {
-          const { count: followersCount, error: followersError } = await supabase
-            .from('funder_follows')
-            .select('*', { count: 'exact', head: true })
-            .eq('funder_id', organization.id);
-
-          const { count: likesCount, error: likesError } = await supabase
-            .from('funder_bookmarks')
-            .select('*', { count: 'exact', head: true })
-            .eq('funder_id', organization.id);
-
-          const { data: recentFollowIds, error: recentFollowError } = await supabase
-            .from('funder_follows')
-            .select('user_id, created_at')
-            .eq('funder_id', organization.id)
-            .gte('created_at', new Date(Date.now() - parseInt(timeRange) * 24 * 60 * 60 * 1000).toISOString())
-            .order('created_at', { ascending: false })
-            .limit(5);
-
-          const { data: recentBookmarkIds, error: recentBookmarkError } = await supabase
-            .from('funder_bookmarks')
-            .select('user_id, created_at')
-            .eq('funder_id', organization.id)
-            .gte('created_at', new Date(Date.now() - parseInt(timeRange) * 24 * 60 * 60 * 1000).toISOString())
-            .order('created_at', { ascending: false })
-            .limit(5);
-
-          if (followersError) {
-            console.warn('Could not fetch followers count:', followersError.message);
-          }
-          if (likesError) {
-            console.warn('Could not fetch likes count:', likesError.message);
-          }
-          if (recentFollowError) {
-            console.warn('Could not fetch recent followers:', recentFollowError.message);
-          }
-          if (recentBookmarkError) {
-            console.warn('Could not fetch recent bookmarks:', recentBookmarkError.message);
-          }
+          const data = await getOrganizationSocialMetrics(
+            organization.id,
+            parseInt(timeRange)
+          );
 
           const combinedActivity = [
-            ...(recentFollowIds || []).map(item => ({
+            ...(data.recent_follows || []).map(item => ({
               type: 'follow',
               user: {
                 full_name: 'Someone',
@@ -74,7 +41,7 @@ const SocialMetricsCard = ({ organization, organizationType, userRole, isOmegaAd
               },
               timestamp: item.created_at
             })),
-            ...(recentBookmarkIds || []).map(item => ({
+            ...(data.recent_bookmarks || []).map(item => ({
               type: 'bookmark',
               user: {
                 full_name: 'Someone',
@@ -86,8 +53,8 @@ const SocialMetricsCard = ({ organization, organizationType, userRole, isOmegaAd
           ].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
           setMetrics({
-            followers: followersCount || 0,
-            likes: likesCount || 0,
+            followers: data.followers_count || 0,
+            likes: data.bookmarks_count || 0,
             recentActivity: combinedActivity
           });
         }
@@ -97,7 +64,6 @@ const SocialMetricsCard = ({ organization, organizationType, userRole, isOmegaAd
         setLoading(false);
       }
     };
-
     fetchSocialMetrics();
   }, [organization?.id, organizationType, timeRange, canViewSocialMetrics]);
 
