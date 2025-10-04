@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { TrendingUp, MessageCircle, Heart } from 'lucide-react';
-import { getCommunityPosts } from '../../utils/rpcClientFunctions';
+import { getFeedPostsComplete } from '../../utils/rpcClientFunctions';
 import PropTypes from 'prop-types';
 import { supabase } from '../../supabaseClient';
 
@@ -24,8 +24,8 @@ const TrendingPosts = ({ activeChannelConfig, onTrendingPostClick, posts }) => {
       const sevenDaysAgo = new Date();
       sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-      // Use RPC function
-      const result = await getCommunityPosts(channelFilter, 100, null);
+      // Use optimized batch function that includes reactions
+      const result = await getFeedPostsComplete(channelFilter, null, 100, 0);
       const fetchedPosts = (result?.posts || []).filter(post => 
         new Date(post.created_at) >= sevenDaysAgo
       );

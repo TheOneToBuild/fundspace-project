@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
-import { getCommunityPosts } from '../utils/rpcClientFunctions';
+import { getFeedPostsComplete } from '../utils/rpcClientFunctions';
 
 const ORGANIZATION_CHANNELS = {
   'nonprofit': { dbChannel: 'nonprofit-community' },
@@ -40,8 +40,7 @@ export const useHelloCommunityPosts = (organizationInfo, profile) => {
             return;
           }
     
-          // Always use RPC - no fallback
-          const result = await getCommunityPosts(channelInfo.dbChannel, 10, profile?.id);
+          const result = await getFeedPostsComplete(channelInfo.dbChannel, profile?.id, 10, 0);
           
           if (result?.posts) {
             setHelloCommunityPosts(result.posts);

@@ -68,38 +68,6 @@ function PostCard({
     }
   }, [userReaction]);
 
-  useEffect(() => {
-    // Fetch reactor preview data when post loads if there are reactions
-    const fetchReactorPreview = async () => {
-      if (likeCount > 0 && (!reactors || reactors.length === 0)) {
-        try {
-          const { data, error } = await supabase
-            .rpc('get_post_reactors', { post_id: post.id })
-            .limit(3); // Only get first 3 for preview
-          
-          if (error) throw error;
-          
-          if (data && data.length > 0) {
-            const formattedReactors = data.map(reactor => ({
-              profile_id: reactor.user_id,
-              user_id: reactor.user_id,
-              full_name: reactor.full_name,
-              avatar_url: reactor.avatar_url,
-              reaction_type: reactor.reaction_type,
-              organization_name: reactor.organization_name || ''
-            }));
-            
-            setReactors(formattedReactors);
-          }
-        } catch (error) {
-          console.error('Error fetching reactor preview:', error);
-        }
-      }
-    };
-  
-    fetchReactorPreview();
-  }, [likeCount, post.id]); // Only depend on likeCount and post.id
-
   const reactionDebounceRef = useRef(null);
   const mountedRef = useRef(true);
 
@@ -143,36 +111,12 @@ function PostCard({
   }, [showOrganizationAsAuthor, organization, individualAuthor, batchedProfiles, pageData, batchedOrganizations]);
 
   const handleOpenReactionsModal = useCallback(async () => {
-    if (likeCount === 0) return;
-    
-    // If we already have reactors (from hover), just open the modal
-    if (reactors && reactors.length > 0) {
+    if (likeCount > 0) {
+      // The reactors should already be loaded from props.
+      // If not, this will open an empty modal, which is acceptable for now.
       setShowReactionsModal(true);
-      return;
     }
-    
-    // Otherwise fetch them first
-    try {
-      const { data, error } = await supabase
-        .rpc('get_post_reactors', { post_id: post.id });
-      
-      if (error) throw error;
-      
-      const formattedReactors = data.map(reactor => ({
-        profile_id: reactor.user_id,
-        user_id: reactor.user_id,
-        full_name: reactor.full_name,
-        avatar_url: reactor.avatar_url,
-        reaction_type: reactor.reaction_type,
-        organization_name: reactor.organization_name || ''
-      }));
-      
-      setReactors(formattedReactors);
-      setShowReactionsModal(true);
-    } catch (error) {
-      console.error('Error fetching reactors:', error);
-    }
-  }, [post.id, likeCount, reactors]);
+  }, [likeCount]);
 
   const handleReaction = useCallback(async (reactionType) => {
     if (!currentUserProfile || !post?.id || disabled || isProcessingReaction) return;
@@ -304,32 +248,9 @@ function PostCard({
     if (reactorsTimeoutRef.current) {
       clearTimeout(reactorsTimeoutRef.current);
     }
-    
-    // Only fetch all reactors if we're about to show preview and don't have full list
-    if (likeCount > 0 && reactors.length < likeCount) {
-      try {
-        const { data, error } = await supabase
-          .rpc('get_post_reactors', { post_id: post.id });
-        
-        if (error) throw error;
-        
-        const formattedReactors = data.map(reactor => ({
-          profile_id: reactor.user_id,
-          user_id: reactor.user_id,
-          full_name: reactor.full_name,
-          avatar_url: reactor.avatar_url,
-          reaction_type: reactor.reaction_type,
-          organization_name: reactor.organization_name || ''
-        }));
-        
-        setReactors(formattedReactors);
-      } catch (error) {
-        console.error('Error fetching reactors:', error);
-      }
-    }
-    
+    // Reactors are passed via props, so we just need to show the preview.
     setShowReactorsPreview(true);
-  }, [likeCount, reactors.length, post.id]);
+  }, []);
 
   const handleReactorsLeave = () => {
     reactorsTimeoutRef.current = setTimeout(() => {

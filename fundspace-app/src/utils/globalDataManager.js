@@ -1,6 +1,6 @@
 import { supabase } from '../supabaseClient';
 import { getProfilesBatch } from './profileHelpers';
-import { getCommunityPosts } from './rpcClientFunctions';
+import { getFeedPostsComplete, getPostCommentsBatch } from './rpcClientFunctions';
 
 class GlobalDataManager {
   constructor() {
@@ -460,8 +460,8 @@ class GlobalDataManager {
     }
   }
 
-  async getPostsByChannel(channel, limit = 20) {
-    const cacheKey = this.getCacheKey('posts-by-channel', { channel, limit });
+  async getPostsByChannel(channel, limit = 20, userId = null) {
+    const cacheKey = this.getCacheKey('posts-by-channel', { channel, limit, userId });
     const cached = this.getCache(cacheKey);
     if (cached) return cached;
 
@@ -469,7 +469,7 @@ class GlobalDataManager {
       return this.pendingRequests.get(cacheKey);
     }
 
-    const promise = this._fetchPostsByChannel(channel, limit);
+    const promise = this._fetchPostsByChannel(channel, limit, userId);
     this.pendingRequests.set(cacheKey, promise);
 
     try {
@@ -481,10 +481,9 @@ class GlobalDataManager {
     }
   }
 
-  async _fetchPostsByChannel(channel, limit) {
+  async _fetchPostsByChannel(channel, limit, userId = null) {
     try {
-      // Use RPC function instead of direct REST query
-      const result = await getCommunityPosts(channel, limit, null);
+      const result = await getFeedPostsComplete(channel, userId, limit, 0);
       return result?.posts || [];
     } catch (error) {
       console.error('Error fetching posts by channel:', error);
@@ -924,31 +923,10 @@ class GlobalDataManager {
     }
   }
 
-  async _fetchPostComments(postIds) {
+  async _fetchPostComments(postIds, userId = null) {
     try {
-      const { data: commentsData, error } = await supabase
-        .from('post_comments')
-        .select(`
-          id, post_id, content, created_at, likes_count, image_urls,
-          profiles:profile_id(id, full_name, avatar_url)
-        `)
-        .in('post_id', postIds)
-        .order('created_at', { ascending: true });
-
-      if (error) throw error;
-
-      const commentsByPost = {};
-      postIds.forEach(postId => {
-        commentsByPost[postId] = [];
-      });
-
-      commentsData?.forEach(comment => {
-        if (commentsByPost[comment.post_id]) {
-          commentsByPost[comment.post_id].push(comment);
-        }
-      });
-
-      return commentsByPost;
+      const result = await getPostCommentsBatch(postIds, userId, false);
+      return result;
     } catch (error) {
       console.error('Error fetching batch comments:', error);
       return {};

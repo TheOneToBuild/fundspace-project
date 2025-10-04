@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, Suspense, lazy } from 'react';
 import { supabase } from '../supabaseClient';
-import { getPostCommentsWithReactions } from '../utils/rpcClientFunctions';
+import { getPostCommentsBatch } from '../utils/rpcClientFunctions';
 import CommentCard from './comment/CommentCard';
 import CommentForm from './comment/CommentForm';
 
@@ -30,12 +30,12 @@ export default function CommentSection({
         if (!post?.id || !currentUserProfile?.id) return;
         setLoading(true);
         try {
-            const result = await getPostCommentsWithReactions(
-                post.id, 
+            const allComments = await getPostCommentsBatch(
+                [post.id], 
                 currentUserProfile.id, 
                 isOrganizationPost
             );
-            setComments(result.comments || []);
+            setComments(allComments[post.id] || []);
         } catch (error) {
             console.error("Error fetching comments:", error);
         } finally {

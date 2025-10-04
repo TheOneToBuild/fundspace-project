@@ -97,38 +97,6 @@ const PostDetailModal = ({ post, isOpen, onClose, currentUserProfile, pageData, 
         if (likesData?.reaction_summary) setReactionSummary(likesData.reaction_summary);
     }, [likesData]);
 
-    useEffect(() => {
-        // Fetch reactor preview data when modal opens if there are reactions
-        const fetchReactorPreview = async () => {
-            if (likeCount > 0 && (!reactors || reactors.length === 0) && isOpen) {
-                try {
-                    const { data, error } = await supabase
-                        .rpc('get_post_reactors', { post_id: post.id })
-                        .limit(3);
-                    
-                    if (error) throw error;
-                    
-                    if (data && data.length > 0) {
-                        const formattedReactors = data.map(reactor => ({
-                            profile_id: reactor.user_id,
-                            user_id: reactor.user_id,
-                            full_name: reactor.full_name,
-                            avatar_url: reactor.avatar_url,
-                            reaction_type: reactor.reaction_type,
-                            organization_name: reactor.organization_name || ''
-                        }));
-                        
-                        setReactors(formattedReactors);
-                    }
-                } catch (error) {
-                    console.error('Error fetching reactor preview:', error);
-                }
-            }
-        };
-    
-        fetchReactorPreview();
-    }, [likeCount, post?.id, isOpen]);
-
     const formatTimeAgo = useCallback((dateString) => {
         const now = new Date();
         const postDate = new Date(dateString);
@@ -178,35 +146,12 @@ const PostDetailModal = ({ post, isOpen, onClose, currentUserProfile, pageData, 
         }
     }, [currentUserProfile, post?.id, selectedReaction, onPostLike]);
 
-    const handleReactorsEnter = useCallback(async () => {
+    const handleReactorsEnter = useCallback(() => {
         if (reactorsTimeoutRef.current) {
             clearTimeout(reactorsTimeoutRef.current);
         }
-        
-        if (likeCount > 0 && reactors.length < likeCount && post?.id) {
-            try {
-                const { data, error } = await supabase
-                    .rpc('get_post_reactors', { post_id: post.id });
-                
-                if (error) throw error;
-                
-                const formattedReactors = data.map(reactor => ({
-                    profile_id: reactor.user_id,
-                    user_id: reactor.user_id,
-                    full_name: reactor.full_name,
-                    avatar_url: reactor.avatar_url,
-                    reaction_type: reactor.reaction_type,
-                    organization_name: reactor.organization_name || ''
-                }));
-                
-                setReactors(formattedReactors);
-            } catch (error) {
-                console.error('Error fetching reactors:', error);
-            }
-        }
-        
         setShowReactorsPreview(true);
-    }, [likeCount, reactors.length, post?.id]);
+    }, []);
 
     const handleReactorsLeave = useCallback(() => {
         reactorsTimeoutRef.current = setTimeout(() => {
@@ -214,35 +159,11 @@ const PostDetailModal = ({ post, isOpen, onClose, currentUserProfile, pageData, 
         }, 300);
     }, []);
 
-    const handleOpenReactionsModal = useCallback(async () => {
-        if (likeCount === 0) return;
-        
-        if (reactors && reactors.length > 0) {
+    const handleOpenReactionsModal = useCallback(() => {
+        if (likeCount > 0) {
             setShowReactionsModal(true);
-            return;
         }
-        
-        try {
-            const { data, error } = await supabase
-                .rpc('get_post_reactors', { post_id: post.id });
-            
-            if (error) throw error;
-            
-            const formattedReactors = data.map(reactor => ({
-                profile_id: reactor.user_id,
-                user_id: reactor.user_id,
-                full_name: reactor.full_name,
-                avatar_url: reactor.avatar_url,
-                reaction_type: reactor.reaction_type,
-                organization_name: reactor.organization_name || ''
-            }));
-            
-            setReactors(formattedReactors);
-            setShowReactionsModal(true);
-        } catch (error) {
-            console.error('Error fetching reactors:', error);
-        }
-    }, [post?.id, likeCount, reactors]);
+    }, [likeCount]);
 
     const handleBackdropClick = useCallback((event) => {
         if (event.target === event.currentTarget) {

@@ -270,6 +270,54 @@ export const getPostReactorsBatch = async (postIds, userId = null) => {
   }
 };
 
+export const getUserReactionsBatch = async (postIds, userId, isOrgPost = false) => {
+  if (!postIds || postIds.length === 0 || !userId) return {};
+
+  const cacheKey = getCacheKey('user_reactions_batch', { postIds, userId, isOrgPost });
+  const cached = getCachedData(cacheKey);
+  if (cached) return cached;
+
+  try {
+    const { data, error } = await supabase.rpc('get_user_reactions_batch', {
+      p_post_ids: postIds,
+      p_user_id: userId,
+      p_is_org_post: isOrgPost
+    });
+
+    if (error) throw error;
+    const result = data || {};
+    setCachedData(cacheKey, result);
+    return result;
+  } catch (error) {
+    console.error('Error fetching user reactions batch:', error);
+    return {};
+  }
+};
+
+export const getPostCommentsBatch = async (postIds, userId = null, isOrgPost = false) => {
+  if (!postIds || postIds.length === 0) return {};
+
+  const cacheKey = getCacheKey('post_comments_batch', { postIds, userId, isOrgPost });
+  const cached = getCachedData(cacheKey);
+  if (cached) return cached;
+
+  try {
+    const { data, error } = await supabase.rpc('get_post_comments_batch', {
+      p_post_ids: postIds,
+      p_user_id: userId,
+      p_is_org_post: isOrgPost
+    });
+
+    if (error) throw error;
+    const result = data || {};
+    setCachedData(cacheKey, result);
+    return result;
+  } catch (error) {
+    console.error('Error fetching post comments batch:', error);
+    return {};
+  }
+};
+
 export const getProfilesWithOrgsBatch = async (profileIds) => {
   if (!profileIds || profileIds.length === 0) return {};
 
@@ -490,6 +538,30 @@ export const getCommunityPosts = async (channel, limit = 10, userId = null) => {
     return data;
   } catch (error) {
     console.error('Error fetching community posts:', error);
+    throw error;
+  }
+};
+
+export const getFeedPostsComplete = async (channel, userId = null, limit = 20, offset = 0) => {
+  const cacheKey = getCacheKey('feed_posts_complete', { channel, userId, limit, offset });
+  const cached = getCachedData(cacheKey);
+  if (cached) return cached;
+
+  try {
+    const { data, error } = await supabase.rpc('get_feed_posts_complete', {
+      p_channel: channel,
+      p_user_id: userId,
+      p_limit: limit,
+      p_offset: offset
+    });
+
+    if (error) throw error;
+    setCachedData(cacheKey, data);
+    trackRPCUsage('get_feed_posts_complete', true);
+    return data;
+  } catch (error) {
+    console.error('Error fetching feed posts complete:', error);
+    trackRPCUsage('get_feed_posts_complete', false);
     throw error;
   }
 };

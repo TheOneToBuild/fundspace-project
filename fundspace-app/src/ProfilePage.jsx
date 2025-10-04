@@ -14,7 +14,6 @@ export default function ProfilePage() {
     trendingGrants: [],
     savedGrants: [],
     posts: [],
-    postsLikesData: {},
     isDetailModalOpen: false,
     selectedGrant: null,
     dataLoading: false,
@@ -44,7 +43,6 @@ export default function ProfilePage() {
     trendingGrants,
     savedGrants,
     posts,
-    postsLikesData,
     isDetailModalOpen,
     selectedGrant,
     dataLoading,
@@ -71,7 +69,6 @@ export default function ProfilePage() {
       
       // Extract all data
       const posts = pageData.posts || [];
-      const postsLikesData = pageData.post_likes_lookup || {};
       const savedGrants = pageData.saved_grants || [];
       const trendingGrants = pageData.trending_grants || [];
       const communityMembers = pageData.trending_profiles || [];
@@ -93,7 +90,6 @@ export default function ProfilePage() {
         ...prev,
         dataLoading: false,
         posts,
-        postsLikesData,
         savedGrants,
         trendingGrants,
         totalPosts: posts.length,
@@ -185,17 +181,14 @@ export default function ProfilePage() {
           {
             ...newPostData,
             profiles: profile,
-            reactions: { summary: [], sample: [] },
+            reaction_summary: [],
+            user_reaction: null,
             likes_count: 0,
             comments_count: 0,
           },
           ...prev.posts,
         ],
         totalPosts: prev.totalPosts + 1,
-        postsLikesData: {
-          ...prev.postsLikesData,
-          [newPostData.id]: { userReaction: null }
-        }
       }));
       clearPageData();
     },
@@ -208,9 +201,6 @@ export default function ProfilePage() {
         ...prev,
         posts: prev.posts.filter((p) => p.id !== deletedPostId),
         totalPosts: Math.max(0, prev.totalPosts - 1),
-        postsLikesData: Object.fromEntries(
-          Object.entries(prev.postsLikesData).filter(([postId]) => postId !== deletedPostId.toString())
-        )
       }));
       clearPageData();
     },
@@ -269,13 +259,14 @@ export default function ProfilePage() {
 
   const handlePostLike = useCallback(async (postId, currentReaction, newReaction) => {
     if (!session?.user?.id) return;
-    setAppState(prev => ({
-      ...prev,
-      postsLikesData: {
-        ...prev.postsLikesData,
-        [postId]: { userReaction: newReaction }
-      }
-    }));
+    
+    setAppState(prev => {
+      const newPosts = prev.posts.map(p => 
+        p.id === postId ? { ...p, user_reaction: newReaction } : p
+      );
+      return { ...prev, posts: newPosts };
+    });
+
     try {
       if (currentReaction) {
         if (newReaction === null) {
@@ -302,13 +293,12 @@ export default function ProfilePage() {
       }
     } catch (error) {
       console.error('Error updating post reaction:', error);
-      setAppState(prev => ({
-        ...prev,
-        postsLikesData: {
-          ...prev.postsLikesData,
-          [postId]: { userReaction: currentReaction }
-        }
-      }));
+      setAppState(prev => {
+        const newPosts = prev.posts.map(p => 
+          p.id === postId ? { ...p, user_reaction: currentReaction } : p
+        );
+        return { ...prev, posts: newPosts };
+      });
     }
   }, [session]);
 
@@ -317,7 +307,6 @@ export default function ProfilePage() {
       ...appContext,
       profile,
       posts,
-      postsLikesData,
       pageData,
       handleNewPost,
       handleDeletePost,
@@ -345,7 +334,6 @@ export default function ProfilePage() {
       appContext,
       profile,
       posts,
-      postsLikesData,
       pageData,
       handleNewPost,
       handleDeletePost,
