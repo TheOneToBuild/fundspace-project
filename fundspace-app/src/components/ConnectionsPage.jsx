@@ -30,31 +30,38 @@ class ConnectionsDataManager {
     return this.isValidCache(item) ? item.data : null;
   }
 
-  async getCurrentAuthUserId() {
+  async getCurrentAuthUserId(skipCache = false) {
+    const cacheKey = 'current-auth-user-id';
+    if (!skipCache) {
+      const cached = this.getCache(cacheKey);
+      if (cached) return cached;
+    }
     try {
       const { data: { user } } = await supabase.auth.getUser();
+      this.setCache(cacheKey, user?.id);
       return user?.id;
     } catch (error) {
       console.error('Error getting current user:', error);
       return null;
     }
   }
-
-  async loadAllConnectionData() {
+  async loadAllConnectionData(skipCache = false) {
     const cacheKey = this.getCacheKey('all-data', {});
-    const cached = this.getCache(cacheKey);
-    if (cached) return cached;
+    if (!skipCache) {
+      const cached = this.getCache(cacheKey);
+      if (cached) return cached;
+    }
   
     try {
-      const authUserId = await this.getCurrentAuthUserId();
+      const authUserId = await this.getCurrentAuthUserId(skipCache);
       if (!authUserId) {
         throw new Error('No authenticated user found');
       }
 
       // Fetch accepted and pending connections in parallel
       const [acceptedResult, pendingResult] = await Promise.all([
-        getUserConnectionsComplete(authUserId, 'accepted'),
-        getUserConnectionsComplete(authUserId, 'pending')
+        getUserConnectionsComplete(authUserId, 'accepted', skipCache),
+        getUserConnectionsComplete(authUserId, 'pending', skipCache)
       ]);
 
       const processedConnections = (acceptedResult.connections || []).map(conn => ({
@@ -111,13 +118,16 @@ class ConnectionsDataManager {
     }
   }
   // 2. REPLACED METHOD: Switched to fetching suggested users via RPC and filtering client-side
-  async loadDiscoveryData(searchQuery = '', filterType = 'all', connectedProfileIds = new Set()) {
+  async loadDiscoveryData(searchQuery = '', filterType = 'all', connectedProfileIds = new Set(), skipCache = false) {
     const cacheKey = this.getCacheKey('discovery', { searchQuery, filterType });
-    const cached = this.getCache(cacheKey);
-    if (cached) return cached;
-  
+    
+    if (!skipCache) {
+      const cached = this.getCache(cacheKey);
+      if (cached) return cached;
+    }
+
     try {
-      const authUserId = await this.getCurrentAuthUserId();
+      const authUserId = await this.getCurrentAuthUserId(skipCache);
       if (!authUserId) return [];
   
       // Build the query
@@ -174,6 +184,7 @@ export default function ConnectionsPage() {
   const [activeTab, setActiveTab] = useState('connections');
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState('all');
+  const [disconnectModal, setDisconnectModal] = useState({ show: false, connectionId: null, profileId: null, userName: '' });
   
   const connectedProfileIdsRef = useRef(new Set());
   const authUserIdRef = useRef(null);
@@ -198,16 +209,25 @@ export default function ConnectionsPage() {
     }
   }, [currentUserProfile?.id]);
 
-  const loadDiscoveryData = useCallback(async () => {
+  const loadDiscoveryData = useCallback(async (forceRefresh = false) => {
     if (!currentUserProfile?.id) return;
     
     setDiscoverLoading(true);
     
     try {
+      if (forceRefresh) {
+        // When forcing a refresh, we need to ensure we have the latest set of connected IDs first.
+        const freshConnectionData = await connectionsDataManager.loadAllConnectionData(true);
+        setConnections(freshConnectionData.connections);
+        setPendingRequests(freshConnectionData.pendingRequests);
+        connectedProfileIdsRef.current = freshConnectionData.connectedProfileIds;
+      }
+
       const data = await connectionsDataManager.loadDiscoveryData(
         searchQuery,
         filterType,
-        connectedProfileIdsRef.current
+        connectedProfileIdsRef.current,
+        forceRefresh
       );
       
       setDiscoveredMembers(data);
@@ -225,9 +245,9 @@ export default function ConnectionsPage() {
 
   useEffect(() => {
     if (activeTab === 'discover') {
-      loadDiscoveryData();
+      loadDiscoveryData(true); // Always fetch fresh discovery data when tab becomes active
     }
-  }, [activeTab, loadDiscoveryData]);
+  }, [activeTab]);
 
   const handleSendConnectionRequest = useCallback(async (profileId) => {
     if (actionInProgress.has(profileId)) return;
@@ -236,19 +256,44 @@ export default function ConnectionsPage() {
     setActionInProgress(prev => new Set(prev).add(profileId));
 
     try {
-      const { error } = await supabase
+      // Check if there's already a pending request FROM them TO you
+      const { data: existingRequest } = await supabase
         .from('user_connections')
-        .insert({
-          requester_id: authUserIdRef.current,
-          recipient_id: profileId,
-          status: 'pending'
-        });
-      
-      if (error) throw error;
+        .select('id, status')
+        .eq('requester_id', profileId)
+        .eq('recipient_id', authUserIdRef.current)
+        .eq('status', 'pending')
+        .maybeSingle();
+
+      if (existingRequest) {
+        // Accept their existing request instead of creating a new one
+        const { error: updateError } = await supabase
+          .from('user_connections')
+          .update({ status: 'accepted', updated_at: new Date().toISOString() })
+          .eq('id', existingRequest.id);
+        
+        if (updateError) throw updateError;
+      } else {
+        // No existing request, create new one
+        const { error: insertError } = await supabase
+          .from('user_connections')
+          .insert({
+            requester_id: authUserIdRef.current,
+            recipient_id: profileId,
+            status: 'pending'
+          });
+        
+        if (insertError) throw insertError;
+      }
       
       connectionsDataManager.clearCache();
+      const freshData = await connectionsDataManager.loadAllConnectionData(true);
+      
+      // Remove AFTER data is loaded, not before
       setDiscoveredMembers(prev => prev.filter(member => member.id !== profileId));
-      await loadConnectionData();
+      setConnections(freshData.connections);
+      setPendingRequests(freshData.pendingRequests);
+      connectedProfileIdsRef.current = freshData.connectedProfileIds;
       
     } catch (error) {
       console.error('Error sending connection request:', error);
@@ -259,7 +304,7 @@ export default function ConnectionsPage() {
         return newSet;
       });
     }
-  }, [loadConnectionData]);
+  }, []);
 
   const handleAcceptRequest = useCallback(async (requestId, profileId) => {
     if (actionInProgress.has(profileId)) return;
@@ -274,8 +319,17 @@ export default function ConnectionsPage() {
       
       if (error) throw error;
       
+      // Immediately update local state to move request to connections
+      setPendingRequests(prev => prev.filter(req => req.id !== requestId));
+      
       connectionsDataManager.clearCache();
-      await loadConnectionData();
+      const freshData = await connectionsDataManager.loadAllConnectionData(true);
+      setConnections(freshData.connections);
+      setPendingRequests(freshData.pendingRequests);
+      connectedProfileIdsRef.current = freshData.connectedProfileIds;
+
+      // Also refresh discovery data in case it's visible
+      await loadDiscoveryData(true);
       
     } catch (error) {
       console.error('Error accepting connection request:', error);
@@ -286,7 +340,7 @@ export default function ConnectionsPage() {
         return newSet;
       });
     }
-  }, [loadConnectionData]);
+  }, [loadDiscoveryData]);
 
   const handleDeclineRequest = useCallback(async (requestId, profileId) => {
     if (actionInProgress.has(profileId)) return;
@@ -302,7 +356,12 @@ export default function ConnectionsPage() {
       if (error) throw error;
       
       connectionsDataManager.clearCache();
-      await loadConnectionData();
+      // Force refresh
+      const freshData = await connectionsDataManager.loadAllConnectionData(true);
+      setConnections(freshData.connections);
+      setPendingRequests(freshData.pendingRequests);
+      connectedProfileIdsRef.current = freshData.connectedProfileIds;
+      await loadDiscoveryData(true); // Reload discovery data as well
       
     } catch (error) {
       console.error('Error declining connection request:', error);
@@ -313,7 +372,7 @@ export default function ConnectionsPage() {
         return newSet;
       });
     }
-  }, [loadConnectionData]);
+  }, [loadDiscoveryData]);
 
   const handleWithdrawRequest = useCallback(async (requestId, profileId) => {
     if (actionInProgress.has(profileId)) return;
@@ -329,8 +388,24 @@ export default function ConnectionsPage() {
       if (error) throw error;
       
       connectionsDataManager.clearCache();
-      await loadConnectionData();
-      await loadDiscoveryData();
+      const freshData = await connectionsDataManager.loadAllConnectionData(true);
+      
+      // Update all state together after data loads
+      setPendingRequests(freshData.pendingRequests);
+      setConnections(freshData.connections);
+      setPendingRequests(freshData.pendingRequests);
+      connectedProfileIdsRef.current = freshData.connectedProfileIds;
+      
+      // Reload discovery to show the person again
+      if (activeTab === 'discover') {
+        const discoveryData = await connectionsDataManager.loadDiscoveryData(
+          searchQuery,
+          filterType,
+          freshData.connectedProfileIds,
+          true // force refresh
+        );
+        setDiscoveredMembers(discoveryData);
+      }
       
     } catch (error) {
       console.error('Error withdrawing request:', error);
@@ -341,18 +416,19 @@ export default function ConnectionsPage() {
         return newSet;
       });
     }
-  }, [loadConnectionData, loadDiscoveryData]);
+  }, [activeTab, searchQuery, filterType]);
 
-  const handleDisconnect = useCallback(async (connectionId, profileId) => {
+  const handleDisconnect = useCallback((connectionId, profileId, userName) => {
+    setDisconnectModal({ show: true, connectionId, profileId, userName });
+  }, []);
+
+  const confirmDisconnect = useCallback(async () => {
+    const { connectionId, profileId } = disconnectModal;
     if (actionInProgress.has(profileId)) return;
-    // ⚠️ WARNING: Replaced window.confirm with a console message/error as per instructions
-    console.error('ACTION BLOCKED: Use a custom modal instead of window.confirm for production environments.');
-
-    // Simulate confirming the action since we cannot use window.confirm
-    // In a real application, replace this with a custom modal UI
     
     setActionInProgress(prev => new Set(prev).add(profileId));
-
+    setDisconnectModal({ show: false, connectionId: null, profileId: null, userName: '' });
+  
     try {
       const { error } = await supabase
         .from('user_connections')
@@ -362,7 +438,12 @@ export default function ConnectionsPage() {
       if (error) throw error;
       
       connectionsDataManager.clearCache();
-      await loadConnectionData();
+      // Force refresh
+      const freshData = await connectionsDataManager.loadAllConnectionData(true);
+      setConnections(freshData.connections);
+      setPendingRequests(freshData.pendingRequests);
+      connectedProfileIdsRef.current = freshData.connectedProfileIds;
+      await loadDiscoveryData(true);
       
     } catch (error) {
       console.error('Error disconnecting:', error);
@@ -373,7 +454,7 @@ export default function ConnectionsPage() {
         return newSet;
       });
     }
-  }, [loadConnectionData]);
+  }, [disconnectModal, loadDiscoveryData]);
 
   const formatDate = useCallback((dateString) => {
     const date = new Date(dateString);
@@ -410,7 +491,9 @@ export default function ConnectionsPage() {
     }
 
     return (
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 hover:shadow-md transition-shadow">
+      <div className={`bg-white rounded-xl shadow-sm border border-slate-200 p-6 hover:shadow-md transition-all duration-300 ${
+        isActionInProgress ? 'opacity-0 scale-95' : 'opacity-100 scale-100'
+      }`}>
         <div className="flex items-start justify-between">
           <div className="flex items-start space-x-4 flex-grow">
             <Link to={`/profile/members/${user.id}`}>
@@ -475,7 +558,7 @@ export default function ConnectionsPage() {
           <div className="flex-shrink-0 ml-4">
             {type === 'connection' ? (
               <button
-                onClick={() => handleDisconnect(connection.id, user.id)}
+                onClick={() => handleDisconnect(connection.id, user.id, user.full_name)}
                 disabled={isActionInProgress}
                 className="inline-flex items-center px-3 py-2 text-sm font-medium bg-green-100 text-green-700 rounded-lg hover:bg-red-100 hover:text-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed group"
                 title="Disconnect"
@@ -503,7 +586,7 @@ export default function ConnectionsPage() {
                   {isActionInProgress ? 'Declining...' : 'Decline'}
                 </button>
               </div>
-            ) : (
+            ) : !connection.isIncoming ? (
               <button
                 onClick={() => handleWithdrawRequest(connection.id, user.id)}
                 disabled={isActionInProgress}
@@ -512,6 +595,8 @@ export default function ConnectionsPage() {
                 <UserX className="w-4 h-4 mr-1" />
                 {isActionInProgress ? 'Withdrawing...' : 'Withdraw'}
               </button>
+            ) : (
+              <div /> /* Should not happen */
             )}
           </div>
         </div>
@@ -523,7 +608,9 @@ export default function ConnectionsPage() {
     const isActionInProgress = actionInProgress.has(member.id);
 
     return (
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 hover:shadow-md transition-shadow">
+      <div className={`bg-white rounded-xl shadow-sm border border-slate-200 p-6 hover:shadow-md transition-all duration-300 ${
+        isActionInProgress ? 'opacity-0 scale-95' : 'opacity-100 scale-100'
+      }`}>
         <div className="flex items-start justify-between">
           <div className="flex items-start space-x-4 flex-grow">
             <Link to={`/profile/members/${member.id}`}>
@@ -792,6 +879,30 @@ export default function ConnectionsPage() {
           )}
         </div>
       </div>
+      {disconnectModal.show && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-xl shadow-xl max-w-md w-full mx-4">
+            <h3 className="text-lg font-semibold text-slate-800 mb-2">Remove Connection?</h3>
+            <p className="text-slate-600 mb-4">
+              Are you sure you want to disconnect from <strong>{disconnectModal.userName}</strong>?
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setDisconnectModal({ show: false, connectionId: null, profileId: null, userName: '' })}
+                className="flex-1 px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDisconnect}
+                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+              >
+                Remove
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </PublicPageLayout>
   );
 }

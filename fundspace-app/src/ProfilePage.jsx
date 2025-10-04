@@ -3,8 +3,8 @@ import { supabase } from './supabaseClient';
 import { Outlet, useOutletContext } from 'react-router-dom';
 import PublicPageLayout from './components/PublicPageLayout.jsx';
 import GrantDetailModal from './GrantDetailModal.jsx';
-import { usePageDataLoader } from './hooks/usePageDataLoader';
-import { getUserProfileComplete, getDashboardData, trackRPCUsage, getGrantById } from './utils/rpcClientFunctions';
+import { usePageDataLoader } from './hooks/usePageDataLoader.js';
+import { getCompleteProfilePageData, trackRPCUsage, getGrantById } from './utils/rpcClientFunctions';
 
 export default function ProfilePage() {
   const appContext = useOutletContext();
@@ -64,51 +64,56 @@ export default function ProfilePage() {
   const fetchPageData = useCallback(async (userId) => {
     if (!userId) return;
     setAppState((prev) => ({ ...prev, dataLoading: true, error: null }));
+    
     try {
-      const [profileData, dashboardData] = await Promise.all([
-        getUserProfileComplete(userId, userId),
-        getDashboardData(userId)
-      ]);
-      const posts = profileData.posts || [];
-      const postsLikesData = profileData.post_likes_lookup || {};
-      const trendingGrants = dashboardData.recent_grants || [];
-      const communityMembers = dashboardData.trending_profiles || [];
+      // ONE MEGA RPC CALL - gets everything
+      const pageData = await getCompleteProfilePageData(userId);
+      
+      // Extract all data
+      const posts = pageData.posts || [];
+      const postsLikesData = pageData.post_likes_lookup || {};
+      const savedGrants = pageData.saved_grants || [];
+      const trendingGrants = pageData.trending_grants || [];
+      const communityMembers = pageData.trending_profiles || [];
+      const followerUsers = pageData.followers || [];
+      const followingUsers = pageData.following || [];
+      
       const impactMetrics = {
         grantsApplied: Math.floor(Math.random() * 15) + 5,
         grantsReceived: Math.floor(Math.random() * 5) + 1,
         totalFunding: Math.floor(Math.random() * 500000) + 50000,
-        communitiesHelped: profileData.follower_count || 0,
+        communitiesHelped: pageData.profile?.follower_count || 0,
         postsShared: posts.length,
-        connectionsGrown: (profileData.follower_count || 0) + (profileData.following_count || 0),
+        connectionsGrown: (pageData.profile?.follower_count || 0) + (pageData.profile?.following_count || 0),
       };
-      const stories = [
-        { id: 1, type: 'grant_success', title: 'Grant Success', image: null, viewed: false },
-        { id: 2, type: 'community_event', title: 'Workshop', image: null, viewed: true },
-        { id: 3, type: 'team_update', title: 'Team News', image: null, viewed: false },
-      ];
+      
       await loadProfilePageData(userId, posts);
+      
       setAppState((prev) => ({
         ...prev,
         dataLoading: false,
         posts,
         postsLikesData,
-        savedGrants: profileData.saved_grants || [],
+        savedGrants,
         trendingGrants,
         totalPosts: posts.length,
-        followerUsers: profileData.followers || [],
-        totalFollowers: profileData.follower_count || 0,
-        followingUsers: profileData.following || [],
-        totalFollowing: profileData.following_count || 0,
+        followerUsers,
+        totalFollowers: pageData.profile?.follower_count || 0,
+        followingUsers,
+        totalFollowing: pageData.profile?.following_count || 0,
         communityMembers,
         suggestedConnections: communityMembers.slice(0, 5),
         impactMetrics,
-        stories,
+        stories: [
+          { id: 1, type: 'grant_success', title: 'Grant Success', image: null, viewed: false },
+          { id: 2, type: 'community_event', title: 'Workshop', image: null, viewed: true },
+          { id: 3, type: 'team_update', title: 'Team News', image: null, viewed: false },
+        ],
       }));
-      trackRPCUsage('get_user_profile_complete', true);
-      trackRPCUsage('get_dashboard_data', true);
+      
+      trackRPCUsage('get_complete_profile_page_data', true);
     } catch (error) {
-      console.error('Error loading profile page RPC:', error);
-      trackRPCUsage('get_user_profile_complete', false);
+      console.error('Error loading profile page:', error);
       setAppState((prev) => ({
         ...prev,
         dataLoading: false,

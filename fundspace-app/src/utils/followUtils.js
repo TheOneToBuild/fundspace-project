@@ -39,18 +39,10 @@ export const followUser = async (followerId, followingId) => {
       return { success: false, error: 'Cannot follow yourself' };
     }
 
-    const { data: existingFollow, error: checkError } = await supabase
-      .from('followers')
-      .select('id')
-      .eq('follower_id', followerId)
-      .eq('following_id', followingId)
-      .single();
-
-    if (checkError && checkError.code !== 'PGRST116') {
-      return { success: false, error: checkError.message };
-    }
-
-    if (existingFollow) {
+    // Use the RPC function instead of direct query
+    const followStatus = await checkFollowStatus(followerId, followingId);
+    
+    if (followStatus.isFollowing) {
       return { success: false, error: 'Already following this user' };
     }
 
@@ -130,18 +122,17 @@ export const checkFollowStatus = async (followerId, followingId) => {
       return { isFollowing: false };
     }
 
-    const { data, error } = await supabase
-      .from('followers')
-      .select('id')
-      .eq('follower_id', followerId)
-      .eq('following_id', followingId)
-      .single();
+    const { data, error } = await supabase.rpc('check_follow_status', {
+      p_follower_id: followerId,
+      p_following_id: followingId
+    });
 
-    if (error && error.code !== 'PGRST116') {
+    if (error) {
+      console.error('Error checking follow status:', error);
       return { isFollowing: false, error: error.message };
     }
 
-    return { isFollowing: !!data };
+    return { isFollowing: data };
   } catch (error) {
     console.error('Error checking follow status:', error);
     return { isFollowing: false, error: error.message };

@@ -607,6 +607,23 @@ export const getUserTrackedGrants = async (userId, organizationId = null) => {
   }
 };
 
+export const getUserExperienceSuggestions = async () => {
+  const cacheKey = getCacheKey('experience_suggestions', {});
+  const cached = getCachedData(cacheKey);
+  if (cached) return cached;
+
+  try {
+    const { data, error } = await supabase.rpc('get_user_experience_suggestions');
+
+    if (error) throw error;
+    setCachedData(cacheKey, data);
+    return data;
+  } catch (error) {
+    console.error('Error fetching user experience suggestions:', error);
+    return { locations: [], organizations: [], titles: [] };
+  }
+};
+
 export const getUserExperiencesComplete = async (userId) => {
   if (!userId) return { experiences: [] };
 
@@ -628,13 +645,15 @@ export const getUserExperiencesComplete = async (userId) => {
   }
 };
 
-export const getUserConnectionsComplete = async (userId, status = 'accepted') => {
+export const getUserConnectionsComplete = async (userId, status = 'accepted', skipCache = false) => {
   if (!userId) return { connections: [] };
 
   const cacheKey = getCacheKey('user_connections', { userId, status });
-  const cached = getCachedData(cacheKey);
-  if (cached) return cached;
-
+  if (!skipCache) {
+    const cached = getCachedData(cacheKey);
+    if (cached) return cached;
+  }
+  
   try {
     const { data, error } = await supabase.rpc('get_user_connections_complete', {
       p_user_id: userId,
@@ -810,6 +829,25 @@ export const getOrganizationDetailsBatch = async (organizationId, userId = null)
   } catch (error) {
     console.error('Error fetching organization details batch:', error);
     return { photos: [], programs: [], north_stars: [] };
+  }
+};
+
+export const getCompleteProfilePageData = async (userId) => {
+  const cacheKey = getCacheKey('complete_profile_page', { userId });
+  const cached = getCachedData(cacheKey);
+  if (cached) return cached;
+
+  try {
+    const { data, error } = await supabase.rpc('get_complete_profile_page_data', {
+      p_user_id: userId
+    });
+
+    if (error) throw error;
+    setCachedData(cacheKey, data);
+    return data;
+  } catch (error) {
+    console.error('Error fetching complete profile page data:', error);
+    throw error;
   }
 };
 

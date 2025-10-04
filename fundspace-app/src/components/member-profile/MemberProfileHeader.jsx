@@ -98,6 +98,14 @@ const MemberProfileHeader = ({
     const [statsLoading, setStatsLoading] = useState(true);
     const [connectionLoading, setConnectionLoading] = useState(false);
 
+    // Add this useEffect to sync with parent's isFollowing prop
+    useEffect(() => {
+        setProfileData(prev => ({
+            ...prev,
+            isFollowing: isFollowing
+        }));
+    }, [isFollowing]);
+
     useEffect(() => {
         const fetchMemberData = async (memberId, currentUserId) => {
             try {
@@ -128,11 +136,13 @@ const MemberProfileHeader = ({
 
     if (!member) return null;
 
-    const handleFollowClick = () => {
+    const handleFollowClick = async () => {
         if (profileData.isFollowing) {
-            onUnfollow(member.id);
+            await onUnfollow(member.id);
+            setProfileData(prev => ({ ...prev, isFollowing: false }));
         } else {
-            onFollow(member.id);
+            await onFollow(member.id);
+            setProfileData(prev => ({ ...prev, isFollowing: true }));
         }
     };
 

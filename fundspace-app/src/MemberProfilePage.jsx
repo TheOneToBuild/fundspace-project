@@ -113,12 +113,12 @@ const loadMemberData = async () => {
     }
   };
 
-    const handleFollow = async () => {
+    const handleFollow = async (profileIdToFollow) => {  // ✅ Accept parameter
         if (!currentUserProfile?.id || followingInProgress) return;
         
         setFollowingInProgress(true);
         try {
-            const result = await followUser(currentUserProfile.id, memberIdToUse);
+            const result = await followUser(currentUserProfile.id, profileIdToFollow || memberIdToUse);
             if (result.success) {
                 setIsFollowing(true);
             }
@@ -129,12 +129,12 @@ const loadMemberData = async () => {
         }
     };
 
-    const handleUnfollow = async () => {
+    const handleUnfollow = async (profileIdToUnfollow) => {  // ✅ Accept parameter
         if (!currentUserProfile?.id || followingInProgress) return;
         
         setFollowingInProgress(true);
         try {
-            const result = await unfollowUser(currentUserProfile.id, memberIdToUse);
+            const result = await unfollowUser(currentUserProfile.id, profileIdToUnfollow || memberIdToUse);
             if (result.success) {
                 setIsFollowing(false);
             }

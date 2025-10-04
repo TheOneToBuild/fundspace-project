@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '../../supabaseClient';
 import { useNavigate } from 'react-router-dom';
+import { getUserExperienceSuggestions } from '../../utils/rpcClientFunctions';
 const MemberProfileExperience = ({ member, experiences, loading, currentUserId, isCurrentUser, refreshData }) => {
     const navigate = useNavigate();
     
@@ -54,25 +55,11 @@ const MemberProfileExperience = ({ member, experiences, loading, currentUserId, 
         achievements: []
     });
 
-    const handleOrganizationClick = async (organization) => {
+    const handleOrganizationClick = (organization) => {
         if (!organization?.id) return;
         
-        try {
-            const { data: orgData, error } = await supabase
-                .from('organizations')
-                .select('slug')
-                .eq('id', organization.id)
-                .single();
-            
-            if (!error && orgData?.slug) {
-                navigate(`/organizations/${orgData.slug}`);
-            } else {
-                console.warn('Organization slug not found, using ID fallback');
-                navigate(`/organizations/${organization.id}`);
-            }
-        } catch (error) {
-            console.error('Error navigating to organization:', error);
-        }
+        const slug = organization.slug || organization.id;
+        navigate(`/organizations/${slug}`);
     };
 
     useEffect(() => {
@@ -80,65 +67,21 @@ const MemberProfileExperience = ({ member, experiences, loading, currentUserId, 
             setFormData(prev => ({ ...prev, type: activeTab }));
         }
     }, [activeTab, showAddForm, editingExperience]);
-
+    
     useEffect(() => {
-        const fetchLocationSuggestions = async () => {
+        const fetchSuggestions = async () => {
             try {
-                const { data, error } = await supabase
-                    .from('user_experiences')
-                    .select('location')
-                    .not('location', 'is', null)
-                    .neq('location', '');
-
-                if (error) throw error;
+                const data = await getUserExperienceSuggestions();
                 
-                const uniqueLocations = [...new Set(data.map(item => item.location))].sort();
-                setLocationSuggestions(uniqueLocations);
+                setLocationSuggestions(data?.locations || []);
+                setOrganizationSuggestions(data?.organizations || []);
+                setTitleSuggestions(data?.titles || []);
             } catch (error) {
-                console.error('Error fetching location suggestions:', error);
+                console.error('Error fetching suggestions:', error);
             }
         };
-
-        fetchLocationSuggestions();
-    }, []);
-
-    useEffect(() => {
-        const fetchOrganizationSuggestions = async () => {
-            try {
-                const { data, error } = await supabase
-                    .from('organizations')
-                    .select('id, name, image_url, type')
-                    .order('name');
-
-                if (error) throw error;
-                setOrganizationSuggestions(data || []);
-            } catch (error) {
-                console.error('Error fetching organization suggestions:', error);
-            }
-        };
-
-        fetchOrganizationSuggestions();
-    }, []);
-
-    useEffect(() => {
-        const fetchTitleSuggestions = async () => {
-            try {
-                const { data, error } = await supabase
-                    .from('user_experiences')
-                    .select('title')
-                    .not('title', 'is', null)
-                    .neq('title', '');
-
-                if (error) throw error;
-                
-                const uniqueTitles = [...new Set(data.map(item => item.title))].sort();
-                setTitleSuggestions(uniqueTitles);
-            } catch (error) {
-                console.error('Error fetching title suggestions:', error);
-            }
-        };
-
-        fetchTitleSuggestions();
+    
+        fetchSuggestions();
     }, []);
 
     const handleSubmit = async (e) => {
@@ -513,7 +456,7 @@ const MemberProfileExperience = ({ member, experiences, loading, currentUserId, 
                                 {showOrganizationSuggestions && filteredOrganizations.length > 0 && (
                                     <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
                                         {filteredOrganizations.map((org) => (
-                                            <button
+                                            <button // The `org` object here now includes the slug
                                                 key={org.id}
                                                 type="button"
                                                 onClick={() => selectOrganization(org)}

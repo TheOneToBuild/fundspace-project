@@ -346,24 +346,19 @@ const createConnectionNotification = async (actorId, recipientId, type, connecti
       return { success: true };
     }
 
-    const notificationData = {
-      user_id: recipientId,
-      type: type,
-      is_read: false
-    };
-
-    const { data, error } = await supabase
-      .from('notifications')
-      .insert(notificationData)
-      .select('id')
-      .single();
+    const { data, error } = await supabase.rpc('create_connection_notification', {
+      p_actor_id: actorId,
+      p_recipient_id: recipientId,
+      p_notification_type: type,
+      p_connection_id: connectionId
+    });
 
     if (error) {
       console.error('Notification creation error:', error);
       return { success: false, error: error.message };
     }
 
-    return { success: true, notificationId: data.id };
+    return { success: true, notificationId: data };
   } catch (error) {
     console.error('Notification creation failed:', error);
     return { success: false, error: error.message };
