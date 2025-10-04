@@ -1,22 +1,7 @@
 // hooks/useImageUpload.js - Universal Image Upload Hook
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../supabaseClient';
 
-/**
- * Universal image upload hook for all upload scenarios
- * 
- * @param {Object} config - Configuration object
- * @param {string} config.bucket - Storage bucket name (default: 'avatars')
- * @param {string} config.folder - Optional subfolder within bucket (e.g., 'comments/')
- * @param {number} config.maxImages - Maximum number of images (default: 1)
- * @param {number} config.maxSizeMB - Maximum file size in MB (default: 10)
- * @param {Array} config.allowedTypes - Allowed MIME types
- * @param {boolean} config.autoUpload - Upload immediately on selection (default: false)
- * @param {Function} config.onUploadComplete - Callback after successful upload
- * @param {Function} config.onError - Error callback
- * 
- * @returns {Object} Image upload state and methods
- */
 export const useImageUpload = ({
   bucket = 'avatars',
   folder = '',
@@ -31,6 +16,9 @@ export const useImageUpload = ({
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
   const [uploadProgress, setUploadProgress] = useState(0);
+
+  // Use ref to track if component is mounted
+  const isMountedRef = useRef(true);
 
   // Validate a single file
   const validateFile = useCallback((file) => {
@@ -55,7 +43,106 @@ export const useImageUpload = ({
     return `${prefix}${bucket}-${timestamp}-${randomString}.${extension}`;
   }, [bucket, folder]);
 
-  // Handle file selection
+  // Upload single image to storage
+  const uploadSingleImage = useCallback(async (imageObj) => {
+    const fileName = generateFileName(imageObj.file);
+
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from(bucket)
+      .upload(fileName, imageObj.file, {
+        cacheControl: '3600',
+        upsert: false
+      });
+
+    if (uploadError) throw uploadError;
+
+    const { data: urlData } = supabase.storage
+      .from(bucket)
+      .getPublicUrl(fileName);
+
+    if (!urlData?.publicUrl) {
+      throw new Error('Failed to get public URL');
+    }
+
+    return urlData.publicUrl;
+  }, [bucket, generateFileName]);
+
+  // Upload all images - USE REF VERSION TO AVOID DEPENDENCY CYCLE
+  const uploadImagesRef = useRef(null);
+  
+  uploadImagesRef.current = async (imagesToUpload = null) => {
+    // Use current images from state if not provided
+    let targetImages = imagesToUpload;
+    if (!targetImages) {
+      await new Promise(resolve => {
+        setImages(prev => {
+          targetImages = prev;
+          resolve();
+          return prev;
+        });
+      });
+    }
+    
+    const unuploadedImages = targetImages.filter(img => !img.uploaded);
+
+    if (unuploadedImages.length === 0) {
+      return targetImages.filter(img => img.url).map(img => img.url);
+    }
+
+    if (!isMountedRef.current) return [];
+
+    setUploading(true);
+    setError('');
+    setUploadProgress(0);
+
+    try {
+      const uploadPromises = unuploadedImages.map(async (imageObj, index) => {
+        const url = await uploadSingleImage(imageObj);
+        
+        if (isMountedRef.current) {
+          setUploadProgress(Math.round(((index + 1) / unuploadedImages.length) * 100));
+        }
+        
+        return { ...imageObj, url, uploaded: true };
+      });
+
+      const uploadedImages = await Promise.all(uploadPromises);
+      const uploadedUrls = uploadedImages.map(img => img.url);
+
+      if (isMountedRef.current) {
+        setImages(prev => {
+          const updated = [...prev];
+          uploadedImages.forEach(uploaded => {
+            const index = updated.findIndex(img => img.id === uploaded.id);
+            if (index !== -1) {
+              updated[index] = uploaded;
+            }
+          });
+          return updated;
+        });
+
+        if (onUploadComplete) {
+          onUploadComplete(uploadedUrls);
+        }
+      }
+
+      return uploadedUrls;
+    } catch (err) {
+      const errorMsg = err.message || 'Upload failed';
+      if (isMountedRef.current) {
+        setError(errorMsg);
+      }
+      if (onError) onError(err);
+      throw err;
+    } finally {
+      if (isMountedRef.current) {
+        setUploading(false);
+        setUploadProgress(0);
+      }
+    }
+  };
+
+  // Handle file selection - use state updater pattern to access current images
   const handleImageSelect = useCallback(async (event) => {
     try {
       setError('');
@@ -65,8 +152,15 @@ export const useImageUpload = ({
 
       if (files.length === 0) return;
 
+      // Get current images count
+      let currentImagesCount = 0;
+      setImages(prev => {
+        currentImagesCount = prev.length;
+        return prev;
+      });
+
       // Check max images limit
-      const availableSlots = maxImages - images.length;
+      const availableSlots = maxImages - currentImagesCount;
       if (availableSlots <= 0) {
         throw new Error(`Maximum ${maxImages} image${maxImages > 1 ? 's' : ''} allowed`);
       }
@@ -99,11 +193,21 @@ export const useImageUpload = ({
         url: null
       }));
 
-      setImages(prev => [...prev, ...imageObjects]);
+      // Store both current and new images for auto-upload
+      let allImages = [];
+      setImages(prev => {
+        allImages = [...prev, ...imageObjects];
+        return allImages;
+      });
 
-      // Auto-upload if enabled
+      // Auto-upload if enabled - USE REF TO AVOID DEPENDENCY CYCLE
       if (autoUpload && validFiles.length > 0) {
-        await uploadImages([...images, ...imageObjects]);
+        // Use setTimeout to ensure state is updated before upload
+        setTimeout(() => {
+          if (uploadImagesRef.current) {
+            uploadImagesRef.current(allImages);
+          }
+        }, 0);
       }
 
       // Reset file input if it's an event
@@ -114,15 +218,14 @@ export const useImageUpload = ({
       setError(err.message);
       if (onError) onError(err);
     }
-  }, [images, maxImages, validateFile, autoUpload, onError]);
+  }, [maxImages, validateFile, autoUpload, onError]); // NO images dependency!
 
-  // Remove an image
+  // Remove an image - use state updater to avoid dependency on images
   const removeImage = useCallback((imageId) => {
     setImages(prev => {
       const updated = prev.filter(img => img.id !== imageId);
       const removedImage = prev.find(img => img.id === imageId);
       
-      // Cleanup preview URL
       if (removedImage?.preview) {
         URL.revokeObjectURL(removedImage.preview);
       }
@@ -130,103 +233,30 @@ export const useImageUpload = ({
       return updated;
     });
     setError('');
-  }, []);
+  }, []); // No dependencies!
 
-  // Upload single image to storage
-  const uploadSingleImage = useCallback(async (imageObj) => {
-    const fileName = generateFileName(imageObj.file);
-
-    const { data: uploadData, error: uploadError } = await supabase.storage
-      .from(bucket)
-      .upload(fileName, imageObj.file, {
-        cacheControl: '3600',
-        upsert: false
-      });
-
-    if (uploadError) throw uploadError;
-
-    const { data: urlData } = supabase.storage
-      .from(bucket)
-      .getPublicUrl(fileName);
-
-    if (!urlData?.publicUrl) {
-      throw new Error('Failed to get public URL');
-    }
-
-    return urlData.publicUrl;
-  }, [bucket, generateFileName]);
-
-  // Upload all images
-  const uploadImages = useCallback(async (imagesToUpload = null) => {
-    const targetImages = imagesToUpload || images;
-    const unuploadedImages = targetImages.filter(img => !img.uploaded);
-
-    if (unuploadedImages.length === 0) {
-      // Return already uploaded URLs
-      return targetImages.filter(img => img.url).map(img => img.url);
-    }
-
-    setUploading(true);
-    setError('');
-    setUploadProgress(0);
-
-    try {
-      const uploadPromises = unuploadedImages.map(async (imageObj, index) => {
-        const url = await uploadSingleImage(imageObj);
-        
-        // Update progress
-        setUploadProgress(Math.round(((index + 1) / unuploadedImages.length) * 100));
-        
-        // Update image object
-        return { ...imageObj, url, uploaded: true };
-      });
-
-      const uploadedImages = await Promise.all(uploadPromises);
-      const uploadedUrls = uploadedImages.map(img => img.url);
-
-      // Update state with uploaded images
-      setImages(prev => {
-        const updated = [...prev];
-        uploadedImages.forEach(uploaded => {
-          const index = updated.findIndex(img => img.id === uploaded.id);
-          if (index !== -1) {
-            updated[index] = uploaded;
-          }
-        });
-        return updated;
-      });
-
-      if (onUploadComplete) {
-        onUploadComplete(uploadedUrls);
-      }
-
-      return uploadedUrls;
-    } catch (err) {
-      const errorMsg = err.message || 'Upload failed';
-      setError(errorMsg);
-      if (onError) onError(err);
-      throw err;
-    } finally {
-      setUploading(false);
-      setUploadProgress(0);
-    }
-  }, [images, uploadSingleImage, onUploadComplete, onError]);
-
-  // Get all image URLs (uploaded only)
+  // Get all image URLs (uploaded only) - use state updater to avoid dependency
   const getImageUrls = useCallback(() => {
-    return images.filter(img => img.uploaded && img.url).map(img => img.url);
-  }, [images]);
-
-  // Clear all images
-  const clearImages = useCallback(() => {
-    images.forEach(img => {
-      if (img.preview) {
-        URL.revokeObjectURL(img.preview);
-      }
+    let urls = [];
+    setImages(prev => {
+      urls = prev.filter(img => img.uploaded && img.url).map(img => img.url);
+      return prev; // Don't modify state
     });
-    setImages([]);
+    return urls;
+  }, []); // No dependencies!
+
+  // Clear all images - use state updater to avoid dependency on images
+  const clearImages = useCallback(() => {
+    setImages(prev => {
+      prev.forEach(img => {
+        if (img.preview) {
+          URL.revokeObjectURL(img.preview);
+        }
+      });
+      return [];
+    });
     setError('');
-  }, [images]);
+  }, []); // No dependencies!
 
   // Reset to initial state
   const reset = useCallback(() => {
@@ -238,7 +268,10 @@ export const useImageUpload = ({
 
   // Cleanup on unmount
   useEffect(() => {
+    isMountedRef.current = true;
+    
     return () => {
+      isMountedRef.current = false;
       images.forEach(img => {
         if (img.preview) {
           URL.revokeObjectURL(img.preview);
@@ -256,10 +289,10 @@ export const useImageUpload = ({
     hasImages: images.length > 0,
     canAddMore: images.length < maxImages,
     
-    // Methods
+    // Methods - wrap uploadImages to use ref
     handleImageSelect,
     removeImage,
-    uploadImages,
+    uploadImages: (...args) => uploadImagesRef.current?.(...args),
     getImageUrls,
     clearImages,
     reset,
@@ -271,7 +304,6 @@ export const useImageUpload = ({
 
 // Preset configurations for common use cases
 export const IMAGE_UPLOAD_PRESETS = {
-  // Avatar upload (single, 5MB max)
   avatar: {
     bucket: 'avatars',
     folder: '',
@@ -279,8 +311,6 @@ export const IMAGE_UPLOAD_PRESETS = {
     maxSizeMB: 5,
     autoUpload: false
   },
-  
-  // Comment images (1 image, 10MB max, comments subfolder in avatars)
   comment: {
     bucket: 'avatars',
     folder: 'comments',
@@ -288,8 +318,6 @@ export const IMAGE_UPLOAD_PRESETS = {
     maxSizeMB: 10,
     autoUpload: false
   },
-  
-  // Post images (up to 6 images, 10MB max each)
   post: {
     bucket: 'post-images',
     folder: '',
@@ -297,8 +325,6 @@ export const IMAGE_UPLOAD_PRESETS = {
     maxSizeMB: 10,
     autoUpload: false
   },
-  
-  // Organization logo (single, 5MB max)
   organizationLogo: {
     bucket: 'avatars',
     folder: 'organizations',
@@ -306,8 +332,6 @@ export const IMAGE_UPLOAD_PRESETS = {
     maxSizeMB: 5,
     autoUpload: false
   },
-  
-  // Organization photos (multiple, 5MB max each)
   organizationPhotos: {
     bucket: 'avatars',
     folder: 'organizations/photos',

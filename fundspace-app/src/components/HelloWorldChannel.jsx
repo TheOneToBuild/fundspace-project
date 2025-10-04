@@ -8,7 +8,7 @@ import { rssNewsService as newsService } from '../services/rssNewsService.js';
 import { addOrganizationEventListener } from '../utils/organizationEvents.js';
 import { getOrganizationInfoForDashboard } from '../utils/membershipQueries.js';
 import { realtimeManager } from '../utils/realtimeManager.js';
-import { getDashboardData } from '../utils/rpcClientFunctions';
+import { getDashboardData, getPostReactorsBatch } from '../utils/rpcClientFunctions';
 import PropTypes from 'prop-types';
 
 const NewsCard = memo(({ title, timeAgo, image, url, category }) => {
@@ -130,6 +130,7 @@ export default function HelloWorldChannel() {
   const [isLoading, setIsLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [organizationInfo, setOrganizationInfo] = useState(null);
+  const [postReactorsData, setPostReactorsData] = useState({});
 
   const enhancedPageData = React.useMemo(() => ({
     ...pageData,
@@ -221,6 +222,18 @@ export default function HelloWorldChannel() {
   };
   fetchPosts();
   }, [page, hasMore, profile?.id]);
+
+  useEffect(() => {
+    const loadReactors = async () => {
+      if (posts.length === 0 || !profile?.id) return;
+      
+      const postIds = posts.map(p => p.id);
+      const reactorsData = await getPostReactorsBatch(postIds, profile.id);
+      setPostReactorsData(reactorsData);
+    };
+    
+    loadReactors();
+  }, [posts, profile?.id]);
 
   useEffect(() => {
     if (!profile) return;
@@ -315,6 +328,7 @@ export default function HelloWorldChannel() {
                 onDelete={handleDeletePostLocal}
                 pageData={enhancedPageData}
                 postsLikesData={postsLikesData}
+                postReactorsData={postReactorsData}
                 onPostLike={handlePostLike}
                 userReaction={enhancedPageData.postLikes?.[post.id]?.userReaction}
                 batchedProfiles={enhancedPageData.profiles}

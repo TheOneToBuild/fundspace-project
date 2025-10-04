@@ -247,6 +247,29 @@ export const getPostsWithReactionsBatch = async (postIds, userId, isOrgPost = fa
   }
 };
 
+export const getPostReactorsBatch = async (postIds, userId = null) => {
+  if (!postIds || postIds.length === 0) return {};
+
+  const cacheKey = getCacheKey('post_reactors_batch', { postIds, userId });
+  const cached = getCachedData(cacheKey);
+  if (cached) return cached;
+
+  try {
+    const { data, error } = await supabase.rpc('get_post_likes_batch', {
+      p_post_ids: postIds,
+      p_user_id: userId
+    });
+
+    if (error) throw error;
+    const result = data || {};
+    setCachedData(cacheKey, result);
+    return result;
+  } catch (error) {
+    console.error('Error fetching post reactors batch:', error);
+    return {};
+  }
+};
+
 export const getProfilesWithOrgsBatch = async (profileIds) => {
   if (!profileIds || profileIds.length === 0) return {};
 
