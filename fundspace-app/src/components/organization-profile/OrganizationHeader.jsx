@@ -128,10 +128,18 @@ const OrganizationHeader = ({
 
   // Icon mapping for tabs
   const iconMap = {
+    // Legacy icon name mapping (keep for backwards compatibility)
     Globe: '🌐', Building: '🏢', Users: '👥', Rocket: '🚀', TrendingUp: '📈', 
     Star: '⭐', DollarSign: '💰', HandHeart: '🤝', BarChart3: '📊', Heart: '❤️', 
     Award: '🏆', BookOpen: '📚', Microscope: '🔬', Building2: '🏛️', Flag: '🚩', 
-    Briefcase: '💼', Target: '🎯', Camera: '📷'
+    Briefcase: '💼', Target: '🎯', Camera: '📷',
+    // Direct emoji mapping (new)
+    '📋': '📋',
+    '👥': '👥', 
+    '⭐': '⭐',
+    '🎯': '🎯',
+    '📸': '📸',
+    '💰': '💰'
   };
 
   return (

@@ -250,24 +250,15 @@ export default function App() {
     
     try {
       const profileData = await getUserProfileComplete(session.user.id);
-      // FIX: profileData IS the profile
       if (profileData) {
         setProfile(profileData);
-        
         invalidateCache('profile');
-        
-        if (import.meta.env.DEV) {
-          console.log('🚀 Profile refreshed with RPC optimization');
-        }
       }
     } catch (error) {
-      console.error('Error refreshing profile with RPC:', error);
-      try {
-        const { data, error } = await supabase.from('profiles').select('*').eq('id', session.user.id).single();
-        if (!error && data) setProfile(data);
-      } catch (fallbackError) {
-        console.error('Fallback profile refresh failed:', fallbackError);
-      }
+      console.error('Error refreshing profile:', error);
+      // The RPC call is considered reliable, so we won't use a fallback.
+      // If it fails, the error is logged, and the UI will show the stale profile data
+      // until the next successful refresh.
     }
   };
 

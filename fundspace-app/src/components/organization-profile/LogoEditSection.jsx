@@ -36,40 +36,32 @@ const LogoEditSection = ({
 
   return (
     <>
-      <div className="relative -mt-20">
-        <div className="w-40 h-40 rounded-2xl bg-white border-4 border-white shadow-xl overflow-hidden">
-          {organization.image_url ? (
-            <img 
-              src={organization.image_url} 
-              alt={`${organization.name} logo`} 
-              className="w-full h-full object-cover" 
-            />
-          ) : (
-            <div className="w-full h-full bg-slate-100 flex items-center justify-center text-4xl font-bold text-slate-600">
-              {organization.name?.charAt(0)?.toUpperCase() || '?'}
-            </div>
-          )}
-        </div>
+      <div className="relative w-full h-full group">
+        {/* Logo Image */}
+        {organization.image_url ? (
+          <img 
+            src={organization.image_url} 
+            alt={`${organization.name} logo`} 
+            className="w-full h-full object-cover" 
+          />
+        ) : (
+          <div className="w-full h-full bg-slate-100 flex items-center justify-center text-4xl font-bold text-slate-600">
+            {organization.name?.charAt(0)?.toUpperCase()}
+          </div>
+        )}
         
-        {/* Edit Controls - Always visible */}
+        {/* Edit Overlay - ABSOLUTE positioned */}
         {canEdit && (
-          <div className="absolute -bottom-2 -right-2 flex gap-2">
-            <button
-              onClick={() => setIsEditing(true)}
-              className="bg-white hover:bg-slate-50 text-slate-700 p-2 rounded-full shadow-md border border-slate-200"
-              title={organization.image_url ? "Edit Logo" : "Add Logo"}
-            >
-              <Camera className="w-4 h-4" />
-            </button>
-            {organization.image_url && (
+          <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-60 transition-opacity flex items-center justify-center opacity-0 group-hover:opacity-100">
+            <div className="flex items-center gap-3">
               <button
-                onClick={handleRemove}
-                className="bg-red-100 hover:bg-red-200 text-red-700 p-2 rounded-full shadow-md border border-red-200"
-                title="Remove Logo"
+                onClick={() => setIsEditing(true)}
+                className="bg-white/90 text-slate-800 hover:bg-white px-4 py-2 rounded-full shadow-lg text-sm font-medium flex items-center gap-2"
               >
-                <Trash2 className="w-4 h-4" />
+                <Camera className="w-4 h-4" />
+                {organization.image_url ? 'Edit' : 'Add'}
               </button>
-            )}
+            </div>
           </div>
         )}
       </div>

@@ -21,7 +21,20 @@ const TrendingNews = ({ channelType }) => {
         } else {
           newsData = await newsService.getGlobalBreakingNews();
         }
-        setNews(Array.isArray(newsData) ? newsData.slice(0, 9) : []);
+        
+        // Deduplicate by URL (or title if URL not available)
+        const uniqueNews = Array.isArray(newsData) 
+          ? newsData.reduce((acc, item) => {
+              const key = item.url || item.title;
+              if (!acc.seen.has(key)) {
+                acc.seen.add(key);
+                acc.items.push(item);
+              }
+              return acc;
+            }, { seen: new Set(), items: [] }).items.slice(0, 9)
+          : [];
+        
+        setNews(uniqueNews);
       } catch (error) {
         console.error('Error fetching news:', error);
         setNews([]);
@@ -67,7 +80,7 @@ const TrendingNews = ({ channelType }) => {
         style={{ scrollBehavior: 'smooth' }}
       >
         {news.map(item => (
-          <div key={item.id} className="flex-shrink-0 w-72">
+          <div key={item.url || item.id} className="flex-shrink-0 w-72">
             <NewsCard 
               title={item.title}
               category={item.category}

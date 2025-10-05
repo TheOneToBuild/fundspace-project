@@ -125,11 +125,11 @@ const OrganizationProfilePage = () => {
       }
 
       try {
-        const { data: membership } = await supabase.rpc('get_user_organization_membership', {
-          org_id: organization.id,
-          org_type: organization.type,
+        const { data: memberships } = await supabase.rpc('get_user_organization_membership', {
+          user_id: session.user.id
         });
-
+        // Find the specific membership for the organization being viewed
+        const membership = memberships?.find(m => m.organization_id === organization.id);
         setUserMembership(membership);
       } catch (error) {
         console.error('Error checking membership:', error);
@@ -250,12 +250,12 @@ const OrganizationProfilePage = () => {
     const hasGrants = organization.grants && organization.grants.length > 0;
 
     const tabs = [
-      { id: 'home', label: 'Overview', available: true },
-      { id: 'team', label: 'Team', available: true },
-      { id: 'northstar', label: 'North Star', available: orgConfig.showNorthStar },
-      { id: 'programs', label: 'Programs', available: orgConfig.showPrograms },
-      { id: 'photos', label: 'Photos', available: orgConfig.showPhotos },
-      { id: 'grants', label: 'Grants', available: hasGrants }
+      { id: 'home', label: 'Overview', icon: '📋', available: true },
+      { id: 'team', label: 'Team', icon: '👥', available: true },
+      { id: 'northstar', label: 'North Star', icon: '⭐', available: orgConfig.showNorthStar },
+      { id: 'programs', label: 'Programs', icon: '🎯', available: orgConfig.showPrograms },
+      { id: 'photos', label: 'Photos', icon: '📸', available: orgConfig.showPhotos },
+      { id: 'grants', label: 'Grants', icon: '💰', available: hasGrants }
     ];
 
     return tabs.filter(tab => tab.available);

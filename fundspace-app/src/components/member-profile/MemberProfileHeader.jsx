@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { 
   sendConnectionRequest, 
   acceptConnectionRequest, 
@@ -89,14 +89,16 @@ const MemberProfileHeader = ({
     onUnfollow, 
     isCurrentUser, 
     followingInProgress = false,
-    currentUserId,
+    currentUserId, // This is the ID of the logged-in user
     onTabChange,
-    activeTab = 'activity'
+    activeTab = 'activity',
+    onNetworkSubTabChange
 }) => {
-    const navigate = useNavigate();
     const [profileData, setProfileData] = useState({ ...initialProfileData, isFollowing });
     const [statsLoading, setStatsLoading] = useState(true);
     const [connectionLoading, setConnectionLoading] = useState(false);
+    // ADD THIS STATE:
+    const [enrichedMember, setEnrichedMember] = useState(member);
 
     // Add this useEffect to sync with parent's isFollowing prop
     useEffect(() => {
@@ -112,6 +114,9 @@ const MemberProfileHeader = ({
                 setStatsLoading(true);
                 
                 const result = await getMemberProfileComplete(memberId, currentUserId);
+                
+                // UPDATE STATE INSTEAD OF MUTATING PROP:
+                setEnrichedMember(result.profile);
                 
                 setProfileData({
                     followersCount: result.stats?.followers_count ?? 0,
@@ -134,14 +139,14 @@ const MemberProfileHeader = ({
         }
     }, [member?.id, currentUserId]);
 
-    if (!member) return null;
+    if (!enrichedMember) return null;
 
     const handleFollowClick = async () => {
         if (profileData.isFollowing) {
-            await onUnfollow(member.id);
+            await onUnfollow(enrichedMember.id);
             setProfileData(prev => ({ ...prev, isFollowing: false }));
         } else {
-            await onFollow(member.id);
+            await onFollow(enrichedMember.id);
             setProfileData(prev => ({ ...prev, isFollowing: true }));
         }
     };
@@ -153,7 +158,7 @@ const MemberProfileHeader = ({
             let result;
             switch (action) {
                 case 'connect':
-                    result = await sendConnectionRequest(currentUserId, member.id);
+                    result = await sendConnectionRequest(currentUserId, enrichedMember.id);
                     if (result.success) {
                         setProfileData(prev => ({ 
                             ...prev, 
@@ -163,7 +168,7 @@ const MemberProfileHeader = ({
                     }
                     break;
                 case 'accept':
-                    result = await acceptConnectionRequest(currentUserId, member.id);
+                    result = await acceptConnectionRequest(currentUserId, enrichedMember.id);
                     if (result.success) {
                         setProfileData(prev => ({ 
                             ...prev, 
@@ -173,7 +178,7 @@ const MemberProfileHeader = ({
                     }
                     break;
                 case 'decline':
-                    result = await declineConnectionRequest(currentUserId, member.id);
+                    result = await declineConnectionRequest(currentUserId, enrichedMember.id);
                     if (result.success) {
                         setProfileData(prev => ({ 
                             ...prev, 
@@ -182,7 +187,7 @@ const MemberProfileHeader = ({
                     }
                     break;
                 case 'withdraw':
-                    result = await withdrawConnectionRequest(currentUserId, member.id);
+                    result = await withdrawConnectionRequest(currentUserId, enrichedMember.id);
                     if (result.success) {
                         setProfileData(prev => ({ 
                             ...prev, 
@@ -192,7 +197,7 @@ const MemberProfileHeader = ({
                     }
                     break;
                 case 'disconnect':
-                    result = await removeConnection(currentUserId, member.id);
+                    result = await removeConnection(currentUserId, enrichedMember.id);
                     if (result.success) {
                         setProfileData(prev => ({ 
                             ...prev, 
@@ -220,78 +225,67 @@ const MemberProfileHeader = ({
     const handleConnectionsClick = () => onTabChange?.('connections');
 
     const getDisplayTitle = () => {
-        return member.title || null;
+        return enrichedMember.title || null;
     };
 
     const organizationDisplay = useMemo(() => {
-        if (member.organization_name) {
-            const hasOrgId = member.organization_id || member.selected_organization_id;
-            const orgSlug = member.organization_slug;
-            if (hasOrgId) {
-                const handleOrgClick = async () => {
-                    try {
-                        if (orgSlug) {
-                            navigate(`/organizations/${orgSlug}`);
-                            return;
-                        }
-                        navigate(`/organizations/${hasOrgId}`);
-                    } catch (error) {
-                        console.error('Error navigating to organization:', error);
-                        navigate(`/organizations?search=${encodeURIComponent(member.organization_name)}`);
-                    }
-                };
+        if (enrichedMember.organization_name) {
+            // Prioritize slug for the URL, but fall back to ID if slug is not present.
+            const orgIdentifier = enrichedMember.organization_slug || enrichedMember.organization_id;
+
+            if (orgIdentifier) {
                 return (
-                    <button
-                        onClick={handleOrgClick}
-                        className="text-blue-600 hover:text-blue-800 hover:underline transition-colors bg-transparent border-none p-0 cursor-pointer font-inherit text-lg leading-relaxed"
+                    <Link
+                        to={`/organizations/${enrichedMember.organization_slug || enrichedMember.organization_id}`}
+                        className="text-blue-600 hover:text-blue-700 transition-colors font-medium"
                     >
-                        {member.organization_name}
-                    </button>
+                        {enrichedMember.organization_name}
+                    </Link>
                 );
             } else {
-                return <span className="text-lg leading-relaxed">{member.organization_name}</span>;
+                return <span className="text-lg leading-relaxed">{enrichedMember.organization_name}</span>;
             }
         }
         return null;
-    }, [member.organization_name, member.organization_id, member.selected_organization_id, member.organization_slug, navigate]);
+    }, [enrichedMember.organization_name, enrichedMember.organization_id, enrichedMember.organization_slug]);
 
     const socialProfiles = useMemo(() => {
         const profiles = [];
-        if (member.linkedin_url) {
+        if (enrichedMember.linkedin_url) {
             profiles.push({
                 platform: 'LinkedIn',
-                url: member.linkedin_url,
+                url: enrichedMember.linkedin_url,
                 icon: Linkedin,
                 color: 'bg-blue-600 hover:bg-blue-700'
             });
         }
-        if (member.twitter_url) {
+        if (enrichedMember.twitter_url) {
             profiles.push({
                 platform: 'Twitter/X',
-                url: member.twitter_url,
+                url: enrichedMember.twitter_url,
                 icon: Twitter,
                 color: 'bg-slate-900 hover:bg-slate-800'
             });
         }
-        if (member.website_url) {
+        if (enrichedMember.website_url) {
             profiles.push({
                 platform: 'Website',
-                url: member.website_url,
+                url: enrichedMember.website_url,
                 icon: Globe,
                 color: 'bg-green-600 hover:bg-green-700'
             });
         }
         return profiles;
-    }, [member.linkedin_url, member.twitter_url, member.website_url]);
+    }, [enrichedMember.linkedin_url, enrichedMember.twitter_url, enrichedMember.website_url]);
 
     return (
         <>
             <div className="relative">
                 <div className="h-80 bg-gradient-to-br from-slate-100 via-white to-slate-100 overflow-hidden rounded-t-3xl">
-                    {member.banner_image_url ? (
+                    {enrichedMember.banner_image_url ? (
                         <img 
-                            src={member.banner_image_url} 
-                            alt={`${member.full_name} banner`}
+                            src={enrichedMember.banner_image_url} 
+                            alt={`${enrichedMember.full_name} banner`}
                             className="w-full h-full object-cover"
                         />
                     ) : (
@@ -310,10 +304,10 @@ const MemberProfileHeader = ({
                     <div className="flex items-start gap-6 pb-6">
                         <div className="relative -mt-20">
                             <div className="w-48 h-48 rounded-2xl bg-white border-4 border-white shadow-xl overflow-hidden">
-                                {member.avatar_url ? (
+                                {enrichedMember.avatar_url ? (
                                     <img 
-                                        src={member.avatar_url} 
-                                        alt={member.full_name}
+                                        src={enrichedMember.avatar_url} 
+                                        alt={enrichedMember.full_name}
                                         className="w-full h-full object-cover"
                                     />
                                 ) : (
@@ -327,7 +321,7 @@ const MemberProfileHeader = ({
                         <div className="flex-1 py-4">
                             <div className="mb-3">
                                 <h1 className="text-4xl font-bold text-slate-900 mb-2">
-                                    {member.full_name}
+                                    {enrichedMember.full_name}
                                 </h1>
                                 
                                 <div className="text-lg text-slate-600 space-y-1">
@@ -337,7 +331,7 @@ const MemberProfileHeader = ({
                                         
                                         if (title && orgDisplay) {
                                             return (
-                                                <p>
+                                                <p className="text-lg leading-relaxed">
                                                     {title}, {orgDisplay}
                                                 </p>
                                             );
@@ -351,15 +345,15 @@ const MemberProfileHeader = ({
                                             return null;
                                         }
                                     })()}
-                                    {member.location && (
-                                        <p>Based in {member.location}</p>
+                                    {enrichedMember.location && (
+                                        <p>Based in {enrichedMember.location}</p>
                                     )}
                                 </div>
                             </div>
 
-                            {member.bio && (
+                            {enrichedMember.bio && (
                                 <p className="text-slate-700 leading-relaxed mb-4">
-                                    {member.bio}
+                                    {enrichedMember.bio}
                                 </p>
                             )}
 
@@ -369,7 +363,7 @@ const MemberProfileHeader = ({
                                 </p>
                             )}
 
-                            {!isCurrentUser && currentUserId && member?.id && (
+                            {!isCurrentUser && currentUserId && enrichedMember?.id && (
                                 <div className="flex gap-3 mb-6">
                                     {profileData.isFollowing ? (
                                         <button
@@ -402,39 +396,64 @@ const MemberProfileHeader = ({
                         </div>
 
                         <div className="flex-shrink-0 py-4">
-                            <div className="flex space-x-6 text-center">
-                                <div 
-                                    className="cursor-pointer hover:bg-slate-50 p-2 rounded-lg transition-colors"
-                                    onClick={handleConnectionsClick}
-                                >
-                                    <div className="text-2xl font-bold text-slate-900">
-                                        {statsLoading ? '...' : profileData.connectionsCount}
-                                    </div>
-                                    <div className="text-sm text-slate-500 font-medium">
-                                        {profileData.connectionsCount === 1 ? 'Connection' : 'Connections'}
-                                    </div>
-                                </div>
-                                <div 
-                                    className="cursor-pointer hover:bg-slate-50 p-2 rounded-lg transition-colors"
-                                    onClick={handleConnectionsClick}
-                                >
-                                    <div className="text-2xl font-bold text-slate-900">
-                                        {statsLoading ? '...' : profileData.followersCount}
-                                    </div>
-                                    <div className="text-sm text-slate-500 font-medium">
-                                        {profileData.followersCount === 1 ? 'Follower' : 'Followers'}
-                                    </div>
-                                </div>
-                                <div 
-                                    className="cursor-pointer hover:bg-slate-50 p-2 rounded-lg transition-colors"
-                                    onClick={handleConnectionsClick}
-                                >
-                                    <div className="text-2xl font-bold text-slate-900">
-                                        {statsLoading ? '...' : profileData.followingCount}
-                                    </div>
-                                    <div className="text-sm text-slate-500 font-medium">Following</div>
-                                </div>
+                          <div className="flex space-x-6 text-center">
+                            <div 
+                              className="cursor-pointer hover:bg-slate-50 p-2 rounded-lg transition-colors"
+                              onClick={() => {
+                                if (activeTab === 'network') {
+                                  // Already on network tab, just change sub-tab
+                                  onNetworkSubTabChange?.('connections');
+                                } else {
+                                  // Switch to network tab and set sub-tab
+                                  onTabChange('network');
+                                  sessionStorage.setItem('networkSubTab', 'connections');
+                                }
+                              }}
+                            >
+                              <div className="text-2xl font-bold text-slate-900">
+                                {statsLoading ? '...' : profileData.connectionsCount}
+                              </div>
+                              <div className="text-sm text-slate-500 font-medium">
+                                {profileData.connectionsCount === 1 ? 'Connection' : 'Connections'}
+                              </div>
                             </div>
+                            <div 
+                              className="cursor-pointer hover:bg-slate-50 p-2 rounded-lg transition-colors"
+                              onClick={() => {
+                                if (activeTab === 'network') {
+                                  onNetworkSubTabChange?.('followers');
+                                } else {
+                                  onTabChange('network');
+                                  sessionStorage.setItem('networkSubTab', 'followers');
+                                }
+                              }}
+                            >
+                              <div className="text-2xl font-bold text-slate-900">
+                                {statsLoading ? '...' : profileData.followersCount}
+                              </div>
+                              <div className="text-sm text-slate-500 font-medium">
+                                {profileData.followersCount === 1 ? 'Follower' : 'Followers'}
+                              </div>
+                            </div>
+                            <div 
+                              className="cursor-pointer hover:bg-slate-50 p-2 rounded-lg transition-colors"
+                              onClick={() => {
+                                if (activeTab === 'network') {
+                                  onNetworkSubTabChange?.('following');
+                                } else {
+                                  onTabChange('network');
+                                  sessionStorage.setItem('networkSubTab', 'following');
+                                }
+                              }}
+                            >
+                              <div className="text-2xl font-bold text-slate-900">
+                                {statsLoading ? '...' : profileData.followingCount}
+                              </div>
+                              <div className="text-sm text-slate-500 font-medium">
+                                {profileData.followingCount === 1 ? 'Following' : 'Following'}
+                              </div>
+                            </div>
+                          </div>
                         </div>
                     </div>
 
@@ -450,7 +469,7 @@ const MemberProfileHeader = ({
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             className={`w-10 h-10 rounded-full flex items-center justify-center text-white transition-all duration-200 hover:scale-110 hover:shadow-lg ${profile.color}`}
-                                            title={`View ${member.full_name}'s ${profile.platform}`}
+                                            title={`View ${enrichedMember.full_name}'s ${profile.platform}`}
                                         >
                                             <IconComponent className="w-5 h-5" />
                                         </a>
@@ -465,8 +484,8 @@ const MemberProfileHeader = ({
                             {[
                                 { id: 'activity', label: 'Activity', icon: '📝' },
                                 { id: 'experience', label: 'Experience', icon: '💼' },
+                                { id: 'network', label: 'Network', icon: '🤝' }, // Changed from 'connections'
                                 { id: 'photos', label: 'Photos', icon: '📸' },
-                                { id: 'connections', label: 'Network', icon: '🤝' }
                             ].map((tab) => (
                                 <button
                                     key={tab.id}

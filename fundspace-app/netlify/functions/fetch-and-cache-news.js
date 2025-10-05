@@ -41,22 +41,22 @@ function extractImage(item) {
 
 function isExcludedTopic(item, { excludedKeywords, allowedKeywords }) {
   const content = `${item.title || ''} ${item.contentSnippet || ''}`.toLowerCase();
-  let score = 0;
-
-  for (const keyword of excludedKeywords) {
-    if (new RegExp(`\\b${keyword}\\b`).test(content)) {
-      score++;
-    }
-  }
-
-  for (const keyword of allowedKeywords) {
-    if (new RegExp(`\\b${keyword}\\b`).test(content)) {
-      score--;
-    }
-  }
   
-  if (score > 0) {
-    console.log(`Excluding (score: ${score}): "${item.title}"`);
+  // First check if it contains housing-related keywords
+  const housingKeywords = ['housing', 'homeless', 'shelter', 'rent', 'eviction', 'tenant', 'affordable'];
+  const hasHousingTopic = housingKeywords.some(keyword => 
+    new RegExp(`\\b${keyword}\\b`).test(content)
+  );
+  
+  // Check for Bay Area/California location
+  const locationKeywords = ['california', 'bay area', 'san francisco', 'oakland', 'berkeley', 'sf'];
+  const hasRelevantLocation = locationKeywords.some(keyword => 
+    content.includes(keyword)
+  );
+  
+  // Only keep articles about housing AND in the right location
+  if (!hasHousingTopic || !hasRelevantLocation) {
+    console.log(`Excluding (missing housing or location): "${item.title}"`);
     return true;
   }
   

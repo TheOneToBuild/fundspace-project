@@ -56,39 +56,48 @@ const EditableOrganizationHeader = ({
     const typeMap = {
       'nonprofit': { 
         label: '501(c)(3) Nonprofit', 
+        color: 'bg-green-100 text-green-700 border-green-200',
         gradient: 'from-green-500 to-emerald-600'
       },
       'foundation': { 
         label: 'Foundation', 
+        color: 'bg-purple-100 text-purple-700 border-purple-200',
         gradient: 'from-purple-500 to-indigo-600'
       },
       'funder': { 
         label: 'Funder', 
+        color: 'bg-blue-100 text-blue-700 border-blue-200',
         gradient: 'from-blue-500 to-indigo-600'
       },
       'for-profit': { 
         label: 'Company', 
+        color: 'bg-purple-100 text-purple-700 border-purple-200',
         gradient: 'from-purple-500 to-pink-600'
       },
       'forprofit': { 
         label: 'Company', 
+        color: 'bg-purple-100 text-purple-700 border-purple-200',
         gradient: 'from-purple-500 to-pink-600'
       },
       'government': { 
         label: 'Government Agency', 
+        color: 'bg-indigo-100 text-indigo-700 border-indigo-200',
         gradient: 'from-indigo-500 to-blue-600'
       },
       'healthcare': { 
         label: 'Healthcare Organization', 
+        color: 'bg-red-100 text-red-700 border-red-200',
         gradient: 'from-red-500 to-pink-600'
       },
       'education': { 
         label: 'Educational Institution', 
+        color: 'bg-yellow-100 text-yellow-700 border-yellow-200',
         gradient: 'from-yellow-500 to-orange-600'
       }
     };
     return typeMap[normalizedType] || { 
       label: 'Organization', 
+      color: 'bg-slate-100 text-slate-700 border-slate-200',
       gradient: 'from-slate-500 to-slate-600'
     };
   };
@@ -97,14 +106,20 @@ const EditableOrganizationHeader = ({
 
   // Icon mapping for tabs
   const iconMap = {
-    'Globe': '🏠',
-    'Target': '🎯', 
-    'ClipboardList': '📋',
-    'Camera': '📸',
-    'Users': '👥',
-    'DollarSign': '💰',
-    'BarChart3': '📊',
-    'Heart': '❤️'
+    // Legacy icon name mapping (keep for backwards compatibility)
+    Globe: '🌐', Building: '🏢', Users: '👥', Rocket: '🚀', TrendingUp: '📈', 
+    Star: '⭐', DollarSign: '💰', HandHeart: '🤝', BarChart3: '📊', Heart: '❤️', 
+    Award: '🏆', BookOpen: '📚', Microscope: '🔬', Building2: '🏛️', Flag: '🚩', 
+    Briefcase: '💼', Target: '🎯', Camera: '📷',
+    ClipboardList: '📋', // Legacy from this component
+    // Direct emoji mapping (new)
+    '🏠': '🏠',
+    '📋': '📋',
+    '👥': '👥', 
+    '⭐': '⭐',
+    '🎯': '🎯',
+    '📸': '📸',
+    '💰': '💰'
   };
 
   // Handle image uploads and banner position updates
@@ -284,146 +299,159 @@ const EditableOrganizationHeader = ({
       )}
 
       {/* Banner Section */}
-      <BannerEditSection
-        organization={organization}
-        canEdit={canEdit}
-        onSave={handleImageSave}
-        saving={saving}
-        uploading={uploading}
-      />
-
-      <div className="max-w-7xl mx-auto px-8">
-        <div className="flex items-start gap-6 pb-6">
-          {/* Logo - positioned to overlap banner */}
-         <div className="relative -mt-12"> // Instead of -mt-20
-            <LogoEditSection
+      <div className="relative">
+        <div className="h-80 bg-gradient-to-br from-slate-100 via-white to-slate-100 overflow-hidden">
+          {organization.banner_image_url ? (
+            <div className="relative h-full">
+              <img 
+                src={organization.banner_image_url}
+                alt="Banner"
+                className="w-full h-full object-cover"
+                style={{
+                  objectPosition: `${organization.banner_position?.x || 50}% ${organization.banner_position?.y || 50}%`
+                }}
+              />
+              {/* Edit overlay */}
+              <BannerEditSection 
+                organization={organization}
+                onSave={handleImageSave}
+              />
+            </div>
+          ) : (
+            <BannerEditSection 
               organization={organization}
-              canEdit={canEdit}
               onSave={handleImageSave}
-              saving={saving}
-              uploading={uploading}
             />
-          </div>
+          )}
+        </div>
+      </div>
 
-          {/* Organization Info */}
-          <div className="flex-1 pt-4">
-            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-              <div className="flex-1">
-                {/* Organization Type Badge */}
-                <div className="flex items-center gap-3 mb-3">
-                  <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-purple-100 text-purple-700 border border-purple-200">
-                    {typeInfo.label}
-                  </span>
-                  {organization.year_founded && (
-                    <span className="text-sm text-slate-500 flex items-center gap-1">
-                      <Calendar className="w-4 h-4" />
-                      Since {organization.year_founded}
-                    </span>
-                  )}
-                </div>
-
-                {/* Organization Name and Edit Button */}
-                <div className="flex items-center gap-3 mb-2">
-                  <h1 className="text-3xl font-bold text-slate-900">{organization.name}</h1>
-                  {canEdit && (
-                    <button
-                      onClick={() => setIsEditingBasicInfo(true)}
-                      className="flex items-center gap-2 text-blue-600 hover:text-blue-700 px-3 py-1.5 rounded-lg hover:bg-blue-50 transition-colors"
-                    >
-                      <Edit3 className="w-4 h-4" />
-                      Edit Section
-                    </button>
-                  )}
-                </div>
-
-                {/* Location and Website */}
-                <div className="flex flex-wrap items-center gap-4 text-slate-600 mb-4">
-                  {organization.location && (
-                    <div className="flex items-center gap-2">
-                      <MapPin className="w-4 h-4" />
-                      <span>{organization.location}</span>
-                    </div>
-                  )}
-                  {organization.website && (
-                    <a
-                      href={organization.website.startsWith('http') ? organization.website : `https://${organization.website}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-2 text-blue-600 hover:text-blue-700"
-                    >
-                      <ExternalLink className="w-4 h-4" />
-                      Website
-                    </a>
-                  )}
-                </div>
-
-                {/* Followers and Likes */}
-                <div className="flex items-center gap-6 text-slate-600">
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium">{followersCount || 0}</span>
-                    <span>Followers</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium">{bookmarksCount || 0}</span>
-                    <span>Likes</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={onFollow}
-                  className="px-6 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition-colors"
-                >
-                  {isFollowing ? 'Following' : 'Follow'}
-                </button>
-                <button
-                  onClick={onBookmark}
-                  className="p-2 rounded-lg hover:bg-red-50 transition-colors"
-                >
-                  <span className={`text-xl ${isBookmarked ? 'text-red-500' : 'text-gray-400'}`}>
-                    {isBookmarked ? '❤️' : '🤍'}
-                  </span>
-                </button>
+      {/* Main Header Content - Below banner */}
+      <div className="bg-white border-b border-slate-200">
+        <div className="max-w-7xl mx-auto px-8">
+          <div className="flex items-start gap-6 pb-6">
+            {/* Logo - positioned to overlap banner */}
+            <div className="relative -mt-20">
+              <div className="w-40 h-40 rounded-2xl bg-white border-4 border-white shadow-xl overflow-hidden">
+                <LogoEditSection 
+                  organization={organization}
+                  onSave={handleImageSave}
+                />
               </div>
             </div>
-          </div>
-        </div>
-
-        {/* Tabs Navigation - FIXED VERSION */}
-        <div className="border-b border-slate-200">
-          <div className="flex overflow-x-auto">
-            {tabs && tabs.length > 0 ? tabs.map((tab) => {
-              const isActive = activeTab === tab.id;
-              const emoji = iconMap[tab.icon] || '📄';
+            
+            {/* Organization Info */}
+            <div className="flex-1 py-4">
+              {/* Type Badge and Year Founded */}
+              <div className="flex items-center gap-3 mb-2">
+                <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gradient-to-r ${typeInfo.gradient} text-white`}>
+                  <Sparkles className="w-4 h-4 mr-2" />
+                  {typeInfo.label}
+                </span>
+                {organization.year_founded && (
+                  <span className="text-slate-500 font-medium text-sm">
+                    Since {organization.year_founded}
+                  </span>
+                )}
+              </div>
               
-              
-              return (
+              {/* Organization Name and Edit Button */}
+              <div className="flex items-center gap-3 mb-3">
+                <h1 className="text-4xl font-bold text-slate-900">{organization.name}</h1>
                 <button
-                  key={tab.id}
-                  type="button"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    if (typeof setActiveTab === 'function' && tab.id) {
-                      setActiveTab(tab.id);
-                    }
-                  }}
-                  className={`flex items-center gap-2 px-6 py-4 border-b-2 font-medium text-sm whitespace-nowrap transition-colors ${
-                    isActive
-                      ? 'border-blue-500 text-blue-600 bg-blue-50'
-                      : 'border-transparent text-slate-600 hover:text-slate-800 hover:bg-slate-100'
-                  }`}
-                  style={{ pointerEvents: 'auto', cursor: 'pointer' }}
+                  onClick={() => setIsEditingBasicInfo(true)}
+                  className="text-blue-600 hover:text-blue-700 p-2 hover:bg-blue-50 rounded-lg transition-colors"
                 >
-                  <span className="text-base">{emoji}</span>
-                  {tab.label}
+                  <Edit3 className="w-4 h-4" />
                 </button>
-              );
-            }) : (
-              <div className="text-slate-600 px-6 py-4">No tabs available</div>
-            )}
+              </div>
+              
+              {/* Location and Website */}
+              <div className="flex items-center gap-3 mb-4">
+                {organization.location && (
+                  <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium bg-blue-100 text-blue-800 border border-blue-200">
+                    <MapPin className="w-4 h-4" />
+                    {organization.location}
+                  </span>
+                )}
+                {organization.website && (
+                  <a 
+                    href={organization.website} 
+                    target="_blank" 
+                    rel="noopener noreferrer" 
+                    className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium bg-purple-100 text-purple-800 border border-purple-200 hover:bg-purple-200 transition-colors"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                    Website
+                  </a>
+                )}
+              </div>
+              
+              {/* Social Stats */}
+              <div className="flex items-center gap-6 mb-6">
+                <div className="flex items-center gap-2 text-slate-600">
+                  <span className="text-base">👥</span>
+                  <span className="font-semibold text-slate-900">
+                    {new Intl.NumberFormat('en-US').format(followersCount || 0)}
+                  </span>
+                  <span className="text-sm">Followers</span>
+                </div>
+                <div className="flex items-center gap-2 text-slate-600">
+                  <span className="text-base">{bookmarksCount > 0 ? '❤️' : '🤍'}</span>
+                  <span className="font-semibold text-slate-900">
+                    {new Intl.NumberFormat('en-US').format(bookmarksCount || 0)}
+                  </span>
+                  <span className="text-sm">Likes</span>
+                </div>
+              </div>
+            </div>
+            
+            {/* Action Buttons */}
+            <div className="flex items-center gap-3 py-4">
+              <button
+                onClick={onFollow}
+                className={`px-6 py-3 rounded-full font-semibold transition-all duration-300 flex items-center gap-2 ${
+                  isFollowing 
+                    ? 'bg-slate-200 text-slate-800' 
+                    : `bg-gradient-to-r ${typeInfo.gradient} text-white hover:shadow-lg`
+                }`}
+              >
+                {isFollowing ? 'Following' : 'Follow'}
+              </button>
+              <button 
+                onClick={onBookmark}
+                className="p-3 bg-slate-100 text-slate-600 rounded-full hover:bg-slate-200 transition-colors w-12 h-12 flex items-center justify-center"
+              >
+                <span className="text-lg">
+                  {isBookmarked ? '❤️' : '🤍'}
+                </span>
+              </button>
+            </div>
+          </div>
+
+          {/* Tabs - Full width row */}
+          <div className="pb-6">
+            <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide">
+              {tabs.map((tab) => {
+                const isActive = activeTab === tab.id;
+                const emoji = tab.icon || '📄';
+                
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`flex items-center gap-2 px-4 py-2.5 rounded-full font-medium text-sm transition-all duration-200 whitespace-nowrap ${
+                      isActive 
+                        ? `bg-gradient-to-r ${typeInfo.gradient} text-white shadow-md`
+                        : 'text-slate-600 hover:text-slate-800 hover:bg-slate-100'
+                    }`}
+                  >
+                    <span className="text-base">{emoji}</span>
+                    {tab.label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
       </div>

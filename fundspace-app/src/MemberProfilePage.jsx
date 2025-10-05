@@ -23,6 +23,7 @@ export default function MemberProfilePage() {
     const [isFollowing, setIsFollowing] = useState(false);
     const [followingInProgress, setFollowingInProgress] = useState(false);
     const [activeTab, setActiveTab] = useState('activity');
+    const [networkSubTab, setNetworkSubTab] = useState('connections');
 
     useEffect(() => {
         loadMemberData();
@@ -227,7 +228,7 @@ const loadMemberData = async () => {
                         isCurrentUser={isCurrentUser}
                     />
                 );
-            case 'connections':
+            case 'network': // Changed from 'connections'
                 return (
                     <MemberProfileConnections 
                         member={memberData}
@@ -238,6 +239,8 @@ const loadMemberData = async () => {
                         followers={memberData.followers || []}
                         following={memberData.following || []}
                         currentUserProfile={currentUserProfile}
+                        initialSubTab={networkSubTab} // Add this
+                        onSubTabChange={setNetworkSubTab} // Add this
                     />
                 );
             default:
@@ -257,6 +260,7 @@ const loadMemberData = async () => {
                     isCurrentUser={isCurrentUser}
                     activeTab={activeTab}
                     onTabChange={handleTabChange}
+                    onNetworkSubTabChange={setNetworkSubTab} // Add this
                     currentUserId={currentUserProfile?.id}
                     currentUserProfile={currentUserProfile}
                 />

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { User, Users, Heart, UserPlus, UserCheck, UserX, Clock } from 'lucide-react';
 import { 
@@ -17,11 +17,27 @@ const MemberProfileConnections = ({
     isCurrentUser,
     connections,
     followers,
-    following
+    following,
+    initialSubTab = 'connections',
+    onSubTabChange
 }) => {
-    const [activeSubTab, setActiveSubTab] = useState('connections');
+    const [activeSubTab, setActiveSubTab] = useState(() => {
+      const stored = sessionStorage.getItem('networkSubTab');
+      sessionStorage.removeItem('networkSubTab');
+      return stored || initialSubTab;
+    });
+
     const [connectionActions, setConnectionActions] = useState({});
     const [isDataLoading, setIsDataLoading] = useState(true);
+
+    // This effect listens for EXTERNAL changes from the parent (e.g., header stat clicks)
+    useEffect(() => {
+        if (initialSubTab !== activeSubTab) {
+            setActiveSubTab(initialSubTab);
+        }
+        // We only want this to run when the prop from the parent changes.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [initialSubTab]);
 
     useEffect(() => {
         const initializeData = async () => {
@@ -35,7 +51,7 @@ const MemberProfileConnections = ({
         if (!loading) {
             initializeData();
         }
-    }, [member?.id, currentUserId, loading]);
+    }, [member?.id, currentUserId, loading, connections, followers, following]);
 
     const fetchConnectionStatuses = async (allUsers) => {
         const targetUserIds = allUsers
@@ -57,6 +73,12 @@ const MemberProfileConnections = ({
         }
     };
     
+    // This handler manages INTERNAL tab clicks within this component
+    const handleSubTabChange = (newTab) => {
+        setActiveSubTab(newTab);
+        onSubTabChange?.(newTab); // Directly notify the parent
+    };
+
     const refreshParentData = () => {
         // This would ideally call a refresh function passed from MemberProfilePage
     };
@@ -266,8 +288,8 @@ const MemberProfileConnections = ({
 
                 <div className="border-b border-slate-200">
                     <nav className="flex px-6">
-                        <button
-                            onClick={() => setActiveSubTab('connections')}
+                        <button 
+                            onClick={() => handleSubTabChange('connections')}
                             className={`py-4 px-4 text-sm font-medium border-b-2 transition-colors ${
                                 activeSubTab === 'connections'
                                     ? 'border-blue-500 text-blue-600'
@@ -279,8 +301,8 @@ const MemberProfileConnections = ({
                                 <span>Connections ({connections.length})</span>
                             </div>
                         </button>
-                        <button
-                            onClick={() => setActiveSubTab('followers')}
+                        <button 
+                            onClick={() => handleSubTabChange('followers')}
                             className={`py-4 px-4 text-sm font-medium border-b-2 transition-colors ${
                                 activeSubTab === 'followers'
                                     ? 'border-blue-500 text-blue-600'
@@ -292,8 +314,8 @@ const MemberProfileConnections = ({
                                 <span>Followers ({followers.length})</span>
                             </div>
                         </button>
-                        <button
-                            onClick={() => setActiveSubTab('following')}
+                        <button 
+                            onClick={() => handleSubTabChange('following')}
                             className={`py-4 px-4 text-sm font-medium border-b-2 transition-colors ${
                                 activeSubTab === 'following'
                                     ? 'border-blue-500 text-blue-600'
