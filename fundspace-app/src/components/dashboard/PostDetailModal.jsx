@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { X } from 'lucide-react';
-import { supabase } from '../../supabaseClient';
+import { togglePostLike } from '../../utils/rpcClientFunctions';
 import PostBody from '../post/PostBody';
 import PostActions from '../post/PostActions';
 import CommentSection from '../CommentSection';
@@ -107,42 +107,24 @@ const PostDetailModal = ({ post, isOpen, onClose, currentUserProfile, pageData, 
     }, []);
 
     const handleReaction = useCallback(async (reactionType) => {
-        if (!currentUserProfile || !post?.id) return;
+        if (!currentUserProfile?.id || !post?.id) return;
         
         if (onPostLike) {
             const newReaction = selectedReaction === reactionType ? null : reactionType;
             onPostLike(post.id, selectedReaction, newReaction);
             setSelectedReaction(newReaction);
             return;
-        }
+        }        
         
-        try {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) return;
+        const optimisticReaction = selectedReaction === reactionType ? null : reactionType;
+        const originalReaction = selectedReaction;
+        setSelectedReaction(optimisticReaction);
 
-            const existingReaction = selectedReaction ? { reaction_type: selectedReaction } : null;
-            if (selectedReaction === reactionType) {
-                await supabase.from('post_likes').delete().match({ post_id: post.id, user_id: user.id });
-                setSelectedReaction(null);
-                setLikeCount(prev => Math.max(0, prev - 1));
-            } else {
-                await supabase
-                    .from('post_likes')
-                    .upsert({ 
-                        post_id: post.id,
-                        user_id: user.id,
-                        reaction_type: reactionType
-                    });
-                
-                const prevReaction = selectedReaction;
-                setSelectedReaction(reactionType);
-                
-                if (!prevReaction) {
-                    setLikeCount(prev => prev + 1);
-                }
-            }
+        try {
+            await togglePostLike(post.id, currentUserProfile.id, reactionType);
         } catch (error) {
             console.error('Error handling reaction:', error);
+            setSelectedReaction(originalReaction); // Revert on error
         }
     }, [currentUserProfile, post?.id, selectedReaction, onPostLike]);
 

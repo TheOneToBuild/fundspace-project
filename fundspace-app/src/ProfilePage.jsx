@@ -3,8 +3,7 @@ import { supabase } from './supabaseClient';
 import { Outlet, useOutletContext } from 'react-router-dom';
 import PublicPageLayout from './components/PublicPageLayout.jsx';
 import GrantDetailModal from './GrantDetailModal.jsx';
-import { usePageDataLoader } from './hooks/usePageDataLoader.js';
-import { getCompleteProfilePageData, trackRPCUsage, getGrantById } from './utils/rpcClientFunctions';
+import { usePageDataLoader } from './hooks/usePageDataLoader.js';import { getCompleteProfilePageData, trackRPCUsage, getGrantById, toggleSavedGrant, toggleFollowUser } from './utils/rpcClientFunctions';
 
 export default function ProfilePage() {
   const appContext = useOutletContext();
@@ -125,24 +124,13 @@ export default function ProfilePage() {
   const handleFollowUser = useCallback(async (userId, action) => {
     if (!session?.user?.id) return;
     try {
-      if (action === 'follow') {
-        await supabase.from('followers').insert({
-          follower_id: session.user.id,
-          following_id: userId,
-        });
-      } else {
-        await supabase
-          .from('followers')
-          .delete()
-          .eq('follower_id', session.user.id)
-          .eq('following_id', userId);
-      }
+      await toggleFollowUser(session.user.id, userId);
       window.dispatchEvent(
         new CustomEvent('followUpdate', {
           detail: { action, followerId: session.user.id, followingId: userId },
         })
       );
-      clearPageData();
+      invalidateCache('profile');
       fetchPageData(session.user.id);
     } catch (error) {
       console.error('Error updating follow status:', error);
@@ -238,7 +226,7 @@ export default function ProfilePage() {
   const handleSaveGrant = useCallback(
     async (grantId) => {
       if (session && grantId) {
-        await supabase.from('saved_grants').insert({ user_id: session.user.id, grant_id: grantId });
+        await toggleSavedGrant(session.user.id, grantId);
         clearPageData();
         fetchPageData(session.user.id);
       }
@@ -249,7 +237,7 @@ export default function ProfilePage() {
   const handleUnsaveGrant = useCallback(
     async (grantId) => {
       if (session && grantId) {
-        await supabase.from('saved_grants').delete().match({ user_id: session.user.id, grant_id: grantId });
+        await toggleSavedGrant(session.user.id, grantId);
         clearPageData();
         fetchPageData(session.user.id);
       }

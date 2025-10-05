@@ -9,7 +9,7 @@ import EmptyState from './EmptyState';
 import Sidebar from './Sidebar';
 import { useCommunityData } from './useCommunityData';
 import { usePageDataLoader } from '../../hooks/usePageDataLoader';
-import { getDashboardData } from '../../utils/rpcClientFunctions';
+import { getDashboardData, togglePostLike } from '../../utils/rpcClientFunctions';
 import { BAY_AREA_COUNTIES, ORGANIZATION_CHANNELS, getOrgBaseType } from './constants';
 
 export default function CommunityHub() {
@@ -73,27 +73,23 @@ export default function CommunityHub() {
 
   const handlePostLike = useCallback(async (postId, currentReaction, newReaction) => {
     if (!profile?.id) return;
+
+    const reactionType = newReaction === null ? currentReaction : newReaction;
+    const optimisticReaction = newReaction;
+
+    setPostsLikesData(prev => ({
+      ...prev,
+      [postId]: { ...prev[postId], userReaction: optimisticReaction }
+    }));
+
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      if (currentReaction && currentReaction === newReaction) {
-        await supabase.from('post_likes').delete().eq('post_id', postId).eq('user_id', user.id);
-      } else {
-        await supabase.from('post_likes').upsert({
-          post_id: postId,
-          user_id: user.id,
-          reaction_type: newReaction
-        }, { onConflict: 'post_id,user_id' });
-      }
-      setPostsLikesData(prev => ({
-        ...prev,
-        [postId]: {
-          ...prev[postId],
-          userReaction: newReaction === currentReaction ? null : newReaction
-        }
-      }));
+      await togglePostLike(postId, profile.id, reactionType);
     } catch (error) {
       console.error('Error handling post reaction:', error);
+      setPostsLikesData(prev => ({
+        ...prev,
+        [postId]: { ...prev[postId], userReaction: currentReaction }
+      }));
     }
   }, [profile?.id]);
 

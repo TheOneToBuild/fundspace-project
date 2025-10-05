@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, memo, lazy, Suspense, useCallback, useRef } from 'react';
-import { supabase } from '../supabaseClient';
 import { useOutletContext } from 'react-router-dom';
+import { togglePostLike } from '../utils/rpcClientFunctions';
 import { addOrganizationEventListener } from '../utils/organizationEvents';
 import PostHeader from './post/PostHeader';
 import PostBody from './post/PostBody';
@@ -119,62 +119,35 @@ function PostCard({
   }, [likeCount]);
 
   const handleReaction = useCallback(async (reactionType) => {
-    if (!currentUserProfile || !post?.id || disabled || isProcessingReaction) return;
-    
+    if (!currentUserProfile?.id || !post?.id || disabled || isProcessingReaction) return;
+
+    const newReaction = selectedReaction === reactionType ? null : reactionType;
+
     if (onPostLike) {
-      onPostLike(post.id, selectedReaction, selectedReaction === reactionType ? null : reactionType);
-      setSelectedReaction(selectedReaction === reactionType ? null : reactionType);
+      onPostLike(post.id, selectedReaction, newReaction);
+      // The parent component will manage the state update via props.
       return;
     }
-    
-    if (reactionDebounceRef.current) {
-      clearTimeout(reactionDebounceRef.current);
-    }
-    
-    reactionDebounceRef.current = setTimeout(async () => {
-      if (!mountedRef.current) return;
-      
-      setIsProcessingReaction(true);
-      
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
 
-        const existingReaction = selectedReaction ? { reaction_type: selectedReaction } : null;
-        if (selectedReaction === reactionType) {
-          await supabase.from('post_likes').delete().eq('id', existingReaction.id);
-          if (mountedRef.current) {
-            setSelectedReaction(null);
-            setLikeCount(prev => Math.max(0, prev - 1));
-          }
-        } else {
-          await supabase
-            .from('post_likes')
-            .upsert({ 
-              post_id: post.id, 
-              user_id: user.id, 
-              reaction_type: reactionType 
-            }, { onConflict: 'post_id,user_id' });
-          
-          if (mountedRef.current) {
-            setSelectedReaction(reactionType);
-            if (!existingReaction) {
-              setLikeCount(prev => prev + 1);
-            }
-          }
-        }
-        
-      } catch (error) {
-        console.error('Error handling reaction:', error);
-      } finally {
-        if (mountedRef.current) {
-          setTimeout(() => {
-            setIsProcessingReaction(false);
-          }, 500);
-        }
+    // Optimistic update
+    const originalReaction = selectedReaction;
+    setSelectedReaction(newReaction);
+    setIsProcessingReaction(true);
+
+    try {
+      // The `isOrgPost` flag is false here because organization posts are handled
+      // by the `onPostLike` prop passed from `OrganizationProfilePage`.
+      await togglePostLike(post.id, currentUserProfile.id, reactionType, false);
+    } catch (error) {
+      console.error('Error handling reaction:', error);
+      // Revert on error
+      setSelectedReaction(originalReaction);
+    } finally {
+      if (mountedRef.current) {
+        setIsProcessingReaction(false);
       }
-    }, 200);
-  }, [currentUserProfile, post?.id, disabled, selectedReaction, isProcessingReaction, onPostLike]);
+    }
+  }, [currentUserProfile?.id, post?.id, disabled, selectedReaction, isProcessingReaction, onPostLike]);
 
   useEffect(() => {
     if (!isAuthor || !currentUserProfile?.id) return;

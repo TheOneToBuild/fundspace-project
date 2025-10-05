@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
-import { getGrantsWithDetails } from '../utils/rpcClientFunctions';
+import { getGrantsWithDetails, toggleSavedGrant } from '../utils/rpcClientFunctions';
 import { hasPermission, PERMISSIONS } from '../utils/permissions.js';
 import PortalAccessControl from './portal/PortalAccessControl.jsx';
 import PortalBanner from './portal/PortalBanner.jsx';
@@ -121,10 +121,7 @@ const GrantsPortalPage = () => {
         : grant
     ));
     try {
-      await supabase.from('saved_grants').insert({
-        user_id: session.user.id,
-        grant_id: grantId
-      });
+      await toggleSavedGrant(session.user.id, grantId);
       await refreshGrantBookmarkCounts([grantId]);
     } catch (error) {
       console.error('Error saving grant:', error);
@@ -154,10 +151,7 @@ const GrantsPortalPage = () => {
         : grant
     ));
     try {
-      await supabase
-        .from('saved_grants')
-        .delete()
-        .match({ user_id: session.user.id, grant_id: grantId });
+      await toggleSavedGrant(session.user.id, grantId);
       await refreshGrantBookmarkCounts([grantId]);
     } catch (error) {
       console.error('Error unsaving grant:', error);

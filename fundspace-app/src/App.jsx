@@ -51,56 +51,44 @@ import AuthLayout from './components/auth/AuthLayout';
 import ConnectionsPage from './components/ConnectionsPage.jsx';
 import { getProfileById } from './utils/profileHelpers';
 import GrantsPortalPage from './components/GrantsPortalPage.jsx';
+import { getUserProfileComplete, getDashboardData, invalidateCache, getAppInitData, togglePostLike } from './utils/rpcClientFunctions';
 
-import { getUserProfileComplete, getDashboardData, invalidateCache } from './utils/rpcClientFunctions';
-
-if (process.env.NODE_ENV === 'development') {
+if (import.meta.env.DEV) {
+  // RPC Tracking - Development Only
+  window.__rpcStats = { rpc: 0, api: 0 };
+  
   const originalFetch = window.fetch;
   let rpcCallCount = 0;
   let apiCallCount = 0;
-  let recentCalls = [];
   
   window.fetch = function(...args) {
     const url = args[0];
     if (typeof url === 'string' && url.includes('supabase.co/rest/v1/')) {
       const isRPCCall = url.includes('/rpc/');
       const endpoint = url.split('/rest/v1/')[1]?.split('?')[0];
-      const timestamp = new Date().toISOString();
       
       if (isRPCCall) {
         rpcCallCount++;
+        window.__rpcStats.rpc++;
         console.log(`🚀 RPC Call #${rpcCallCount}: ${endpoint}`);
       } else {
         apiCallCount++;
+        window.__rpcStats.api++;
         console.log(`📡 API Call #${apiCallCount}: ${endpoint}`);
-        
-        if (apiCallCount > 10) {
-          console.warn('⚠️ HIGH INDIVIDUAL API USAGE - Consider using RPC functions!');
-        }
       }
-      
-      recentCalls.push({ endpoint, timestamp, url, type: isRPCCall ? 'RPC' : 'API' });
-      if (recentCalls.length > 50) recentCalls.shift();
     }
     return originalFetch.apply(this, args);
   };
   
   setInterval(() => {
-    const totalCalls = rpcCallCount + apiCallCount;
-    if (totalCalls > 0) {
-      const rpcPercentage = ((rpcCallCount / totalCalls) * 100).toFixed(1);
-      console.log(`📊 Last minute: ${rpcCallCount} RPC calls, ${apiCallCount} API calls (${rpcPercentage}% RPC)`);
-      
-      if (rpcPercentage >= 60) {
-        console.log('✅ EXCELLENT: RPC optimization is working!');
-      } else if (rpcPercentage >= 30) {
-        console.log('🟡 PARTIAL: Some components still using individual API calls');
-      } else {
-        console.log('🔴 POOR: Most calls are still individual API calls - check RPC integration');
-      }
+    if (rpcCallCount + apiCallCount > 0) {
+      const total = rpcCallCount + apiCallCount;
+      const rpcPercentage = ((rpcCallCount / total) * 100).toFixed(1);
+      console.log(`📊 Last minute: ${rpcCallCount} RPC, ${apiCallCount} API (${rpcPercentage}% RPC)`);
       
       rpcCallCount = 0;
       apiCallCount = 0;
+      window.__rpcStats = { rpc: 0, api: 0 };
     }
   }, 60000);
 }
@@ -239,27 +227,19 @@ export default function App() {
       setLoading(false);
       return;
     }
-  
+
     try {
-      // Use RPC for profile but handle the response structure correctly
-      const [profileData, notificationsResult] = await Promise.allSettled([
-        getUserProfileComplete(session.user.id),
-        supabase.rpc('get_user_notifications', { p_limit: 50, p_unread_only: false })
-      ]);
-  
-      setProfile(profileData.status === 'fulfilled' ? profileData.value : null);
-      
-      if (notificationsResult.status === 'rejected' || notificationsResult.value.error) {
-        console.error('Notifications error:', notificationsResult.reason || notificationsResult.value.error);
-        setNotifications([]);
-        setUnreadCount(0);
-      } else {
-        setNotifications(notificationsResult.value.data || []);
-        setUnreadCount(notificationsResult.value.data?.filter(n => !n.is_read).length || 0);
-      }
+      // ✅ NEW: Single batched call instead of 2 separate calls
+      const { profile: profileData, notifications: notificationsData } = await getAppInitData(session.user.id);
+
+      setProfile(profileData);
+      setNotifications(notificationsData);
+      setUnreadCount(notificationsData.filter(n => !n.is_read).length);
     } catch (error) {
-      console.error('Critical error in fetchSessionData:', error);
-      setProfile(null); // Ensure profile is null on any critical error
+      console.error('Error fetching app init data:', error);
+      setProfile(null);
+      setNotifications([]);
+      setUnreadCount(0);
     } finally {
       setLoading(false);
     }
@@ -276,7 +256,7 @@ export default function App() {
         
         invalidateCache('profile');
         
-        if (process.env.NODE_ENV === 'development') {
+        if (import.meta.env.DEV) {
           console.log('🚀 Profile refreshed with RPC optimization');
         }
       }

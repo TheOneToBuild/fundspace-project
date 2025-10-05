@@ -3,8 +3,8 @@ import React, { useState, useEffect } from 'react';
 import { useOutletContext, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import { UserPlus, ThumbsUp, MessageSquare, AtSign, Building, Bell, BellOff, Check, X, Filter, Calendar, Clock, Users, UserCheck } from 'lucide-react';
-// Add the missing import at the top
 import { acceptConnectionRequest, declineConnectionRequest, getConnectionStatus } from '../utils/userConnectionsUtils';
+import { getUserNotifications } from '../utils/rpcClientFunctions';
 
 const timeAgo = (date) => {
     const seconds = Math.floor((new Date() - new Date(date)) / 1000);
@@ -368,21 +368,15 @@ export default function NotificationsPage() {
         try {
             setLoading(true);
 
-            const { data, error } = await supabase.rpc('get_user_notifications', {
-                p_limit: 100,
-                p_offset: 0,
-                p_unread_only: filter === 'unread'
-            });
-
-            if (error) {
-                console.error('Error fetching notifications:', error);
-                return;
-            }
+            // Use the new centralized function
+            const data = await getUserNotifications(100, filter === 'unread');
 
             let finalData = data || [];
 
             // Client-side filtering for 'read' and 'connections'
             if (filter === 'read') {
+                // We need to fetch all to filter for read, so we call with unreadOnly=false
+                const allData = await getUserNotifications(100, false);
                 finalData = finalData.filter(n => n.is_read);
             } else if (filter === 'connections') {
                 finalData = finalData.filter(n => 

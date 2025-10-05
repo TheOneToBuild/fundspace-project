@@ -764,6 +764,91 @@ export const getPostsBatch = async (postIds, userId = null) => {
   }
 };
 
+export const togglePostLike = async (postId, userId, reactionType = 'like', isOrgPost = false) => {
+  try {
+    const { data, error } = await supabase.rpc('toggle_post_like', {
+      p_post_id: postId,
+      p_user_id: userId,
+      p_reaction_type: reactionType,
+      p_is_org_post: isOrgPost
+    });
+    if (error) throw error;
+
+    // Invalidate relevant caches
+    invalidateCache('posts');
+    invalidateCache('feed');
+    invalidateCache('profile');
+
+    return data;
+  } catch (error) {
+    console.error('Error toggling post like:', error);
+    throw error;
+  }
+};
+
+export const toggleSavedGrant = async (userId, grantId) => {
+  try {
+    // Check if already saved
+    const { data: existing } = await supabase
+      .from('saved_grants')
+      .select('id')
+      .match({ user_id: userId, grant_id: grantId })
+      .single();
+    
+    if (existing) {
+      await supabase.from('saved_grants').delete().match({ user_id: userId, grant_id: grantId });
+      return { action: 'removed' };
+    } else {
+      await supabase.from('saved_grants').insert({ user_id: userId, grant_id: grantId });
+      return { action: 'added' };
+    }
+  } catch (error) {
+    console.error('Error toggling saved grant:', error);
+    throw error;
+  }
+};
+
+export const toggleFollowUser = async (followerId, followingId) => {
+  try {
+    const { data: existing, error: checkError } = await supabase
+      .from('followers')
+      .select('id')
+      .eq('follower_id', followerId)
+      .eq('following_id', followingId)
+      .single();
+
+    if (checkError && checkError.code !== 'PGRST116') throw checkError;
+
+    if (existing) {
+      // Unfollow
+      await supabase.from('followers').delete().eq('id', existing.id);
+      return { action: 'unfollowed' };
+    } else {
+      // Follow
+      await supabase.from('followers').insert({ follower_id: followerId, following_id: followingId });
+      return { action: 'followed' };
+    }
+  } catch (error) {
+    console.error('Error toggling follow status:', error);
+    throw error;
+  }
+};
+
+export const updateOrganizationCategories = async (organizationId, categoryNames) => {
+  try {
+    const { data, error } = await supabase.rpc('update_organization_categories', {
+      p_organization_id: organizationId,
+      p_category_names: categoryNames
+    });
+    if (error) throw error;
+    invalidateCache('organization');
+    return data;
+  } catch (error) {
+    console.error('Error updating organization categories:', error);
+    throw error;
+  }
+};
+
 export const getOrganizationsBatch = async (orgIds) => {
   if (!orgIds || orgIds.length === 0) return {};
 
@@ -945,6 +1030,52 @@ export const getOrganizationSocialMetrics = async (organizationId, daysBack = 30
       recent_follows: [],
       recent_bookmarks: []
     };
+  }
+};
+
+export const getUserNotifications = async (limit = 50, unreadOnly = false) => {
+  const cacheKey = getCacheKey('notifications', { limit, unreadOnly });
+  const cached = getCachedData(cacheKey);
+  if (cached) return cached;
+  
+  try {
+    const { data, error } = await supabase.rpc('get_user_notifications', {
+      p_limit: limit,
+      p_unread_only: unreadOnly
+    });
+    if (error) throw error;
+    setCachedData(cacheKey, data);
+    return data;
+  } catch (error) {
+    console.error('Error fetching notifications:', error);
+    throw error;
+  }
+};
+
+export const getAppInitData = async (userId) => {
+  if (!userId) return { profile: null, notifications: [] };
+  
+  const cacheKey = getCacheKey('app_init', { userId });
+  const cached = getCachedData(cacheKey);
+  if (cached) return cached;
+  
+  try {
+    const { data, error } = await supabase.rpc('get_app_init_data', {
+      p_user_id: userId
+    });
+    
+    if (error) throw error;
+    
+    const result = {
+      profile: data.profile,
+      notifications: data.notifications || []
+    };
+    
+    setCachedData(cacheKey, result);
+    return result;
+  } catch (error) {
+    console.error('Error fetching app init data:', error);
+    throw error;
   }
 };
 

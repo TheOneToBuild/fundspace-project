@@ -20,7 +20,7 @@ import EditableOrganizationPrograms from '../components/organization-profile/Edi
 import { useOrganizationSocial } from '../hooks/useOrganizationSocial.js';
 import { hasPermission, PERMISSIONS } from '../utils/organizationPermissions.js';
 import { getProfilesBatch } from '../utils/profileHelpers';
-import { getOrganizationData, getOrganizationBySlug } from '../utils/rpcClientFunctions.js';
+import { getOrganizationData, getOrganizationBySlug, togglePostLike } from '../utils/rpcClientFunctions.js';
 
 const ORG_TYPE_CONFIGS = {
   foundation: {
@@ -207,46 +207,24 @@ const OrganizationProfilePage = () => {
   const handlePostLike = useCallback(async (postId, currentReaction, newReaction) => {
     if (!session?.user?.id) return;
 
+    const reactionType = newReaction === null ? currentReaction : newReaction;
+    const optimisticReaction = newReaction;
+
     setPostsLikesData(prev => ({
       ...prev,
-      [postId]: {
-        ...prev[postId],
-        userReaction: newReaction
-      }
+      [postId]: { ...prev[postId], userReaction: optimisticReaction }
     }));
 
     try {
-      if (currentReaction) {
-        if (newReaction === null) {
-          await supabase
-            .from('organization_post_likes')
-            .delete()
-            .eq('organization_post_id', postId)
-            .eq('user_id', session.user.id);
-        } else {
-          await supabase
-            .from('organization_post_likes')
-            .update({ reaction_type: newReaction })
-            .eq('organization_post_id', postId)
-            .eq('user_id', session.user.id);
-        }
-      } else {
-        await supabase
-          .from('organization_post_likes')
-          .insert({
-            organization_post_id: postId,
-            user_id: session.user.id,
-            reaction_type: newReaction
-          });
-      }
+      // The `toggle_post_like` RPC needs to handle organization posts.
+      // We pass `isOrgPost: true` to tell it which table to use.
+      await togglePostLike(postId, session.user.id, reactionType, true);
     } catch (error) {
       console.error('Error updating post reaction:', error);
+      // Revert on error
       setPostsLikesData(prev => ({
         ...prev,
-        [postId]: {
-          ...prev[postId],
-          userReaction: currentReaction
-        }
+        [postId]: { ...prev[postId], userReaction: currentReaction }
       }));
     }
   }, [session]);

@@ -8,7 +8,7 @@ import { supabase } from '../supabaseClient';
 import GlobalSearch from './GlobalSearch.jsx';
 import headerLogoImage from '../assets/fundspace-logo2.png';
 import { isPlatformAdmin } from '../utils/permissions.js';
-import { getUserAllMemberships } from '../utils/rpcClientFunctions.js';
+import { getUserAllMemberships, getUserSocialConnections } from '../utils/rpcClientFunctions.js';
 
 function useRequestDeduplication() {
     const pendingRequests = useRef(new Map());
@@ -57,23 +57,15 @@ export default function DashboardHeader({ profile }) {
         
         return deduplicate(`profile-stats-${profile.id}`, async () => {
             try {
-                const [followersRes, followingRes] = await Promise.allSettled([
-                    supabase.rpc('get_user_followers', { p_user_id: profile.id, p_limit: 9999 }),
-                    supabase.rpc('get_user_following', { p_user_id: profile.id, p_limit: 9999 })
-                ]);
-
-                const followersCount = followersRes.status === 'fulfilled' && followersRes.value.data ? followersRes.value.data.length : 0;
-                if (followersRes.status === 'fulfilled' && followersRes.value.error) console.error('Error fetching followers:', followersRes.value.error);
-                if (followersRes.status === 'rejected') console.error('Error fetching followers:', followersRes.reason);
-                const followingCount = followingRes.status === 'fulfilled' && followingRes.value.data ? followingRes.value.data.length : 0;
-                if (followingRes.status === 'fulfilled' && followingRes.value.error) console.error('Error fetching following:', followingRes.value.error);
-                if (followingRes.status === 'rejected') console.error('Error fetching following:', followingRes.reason);
-                // Use the connections_count from the profile object, which is fetched via RPC in App.jsx
+                const connections = await getUserSocialConnections(profile.id, 'both');
+                const followersCount = connections?.followers?.length || 0;
+                const followingCount = connections?.following?.length || 0;
                 const connectionsCount = profile.connections_count || 0;
+                
                 setStats({
                     followersCount,
                     followingCount,
-                    connectionsCount
+                    connectionsCount,
                 });
             } catch (error) {
                 console.error('Error fetching profile stats:', error);

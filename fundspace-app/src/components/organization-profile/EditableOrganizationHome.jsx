@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { MessageSquare, Plus, Edit3, X } from 'lucide-react';
 import { supabase } from '../../supabaseClient.js';
+import { updateOrganizationCategories } from '../../utils/rpcClientFunctions.js';
 import OrganizationPostsManager from './OrganizationPostsManager.jsx';
 import { hasPermission, PERMISSIONS } from '../../utils/organizationPermissions.js';
 
@@ -90,22 +91,7 @@ const EditableOrganizationHome = ({
       const areasChanged = JSON.stringify(currentFocusAreas.sort()) !== JSON.stringify(newFocusAreas.sort());
       
       if (areasChanged) {
-        await supabase.from('organization_categories').delete().eq('organization_id', organization.id);
-
-        if (newFocusAreas.length > 0) {
-          const categoryPromises = newFocusAreas.map(async (areaName) => {
-            let { data: existingCategory } = await supabase.from('categories').select('id').eq('name', areaName).single();
-            if (!existingCategory) {
-              const { data: newCategory, error: createError } = await supabase.from('categories').insert({ name: areaName }).select('id').single();
-              if (createError) throw createError;
-              existingCategory = newCategory;
-            }
-            return existingCategory.id;
-          });
-          const categoryIds = await Promise.all(categoryPromises);
-          const organizationCategories = categoryIds.map(categoryId => ({ organization_id: organization.id, category_id: categoryId }));
-          await supabase.from('organization_categories').insert(organizationCategories);
-        }
+        await updateOrganizationCategories(organization.id, newFocusAreas);
       }
 
       if (onUpdate) {
