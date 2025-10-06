@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { X } from 'lucide-react';
+import { supabase } from '../../supabaseClient';
 import { togglePostLike } from '../../utils/rpcClientFunctions';
 import PostBody from '../post/PostBody';
 import PostActions from '../post/PostActions';
@@ -81,14 +82,26 @@ const PostDetailModal = ({ post, isOpen, onClose, currentUserProfile, pageData, 
 
     useEffect(() => {
         if (post && isOpen) {
-            // Reset counts when modal opens with fresh post data
+            // Fetch fresh comment count when modal opens
+            const fetchCommentCount = async () => {
+                const tableName = post._isOrganizationPost ? 'organization_post_comments' : 'post_comments';
+                const postField = post._isOrganizationPost ? 'organization_post_id' : 'post_id';
+                
+                const { count } = await supabase
+                    .from(tableName)
+                    .select('*', { count: 'exact', head: true })
+                    .eq(postField, post.id);
+                
+                setCommentCount(count || 0);
+            };
+            
+            fetchCommentCount();
             setLikeCount(likesData?.likes_count || post?.likes_count || 0);
-            setCommentCount(post?.comments_count || 0);
             setSelectedReaction(likesData?.userReaction || null);
             setReactors(likesData?.reactors || []);
             setReactionSummary(likesData?.reaction_summary || post?.reactions?.summary || []);
         }
-    }, [post, isOpen, likesData]);
+    }, [post, isOpen, likesData]); // supabase is stable
 
     useEffect(() => {
         if (likesData?.likes_count !== undefined) setLikeCount(likesData.likes_count);
@@ -141,11 +154,59 @@ const PostDetailModal = ({ post, isOpen, onClose, currentUserProfile, pageData, 
         }, 300);
     }, []);
 
-    const handleOpenReactionsModal = useCallback(() => {
+    const handleOpenReactionsModal = useCallback(async () => {
         if (likeCount > 0) {
+            // Fetch fresh reactor data
+            const likesTable = post._isOrganizationPost 
+                ? 'organization_post_likes' 
+                : 'post_likes';
+            const postField = post._isOrganizationPost 
+                ? 'organization_post_id' 
+                : 'post_id';
+    
+            try {
+                const { data: likesData } = await supabase
+                    .from(likesTable)
+                    .select('user_id, reaction_type')
+                    .eq(postField, post.id);
+    
+                if (likesData && likesData.length > 0) {
+                    const userIds = [...new Set(likesData.map(l => l.user_id))];
+                    
+                    const { data: profilesData } = await supabase
+                        .from('profiles')
+                        .select('id, full_name, avatar_url, organization_name')
+                        .in('id', userIds);
+    
+                    const freshReactors = likesData.map(like => {
+                        const profile = profilesData?.find(p => p.id === like.user_id);
+                        return {
+                            user_id: like.user_id,
+                            reaction_type: like.reaction_type,
+                            full_name: profile?.full_name,
+                            avatar_url: profile?.avatar_url,
+                            organization_name: profile?.organization_name
+                        };
+                    });
+    
+                    const counts = {};
+                    likesData.forEach(like => {
+                        const type = like.reaction_type || 'like';
+                        counts[type] = (counts[type] || 0) + 1;
+                    });
+    
+                    const freshSummary = Object.entries(counts).map(([type, count]) => ({ type, count }));
+    
+                    setReactors(freshReactors);
+                    setReactionSummary(freshSummary);
+                }
+            } catch (error) {
+                console.error('Error fetching reactors:', error);
+            }
+    
             setShowReactionsModal(true);
         }
-    }, [likeCount]);
+    }, [likeCount, post?.id, post?._isOrganizationPost]);
 
     const handleBackdropClick = useCallback((event) => {
         if (event.target === event.currentTarget) {
@@ -309,7 +370,8 @@ const PostDetailModal = ({ post, isOpen, onClose, currentUserProfile, pageData, 
                             <CommentSection
                                 post={postWithMetadata}
                                 currentUserProfile={currentUserProfile}
-                                onCommentCountChange={setCommentCount}
+                                onCommentAdded={() => setCommentCount(prev => prev + 1)}
+                                onCommentDeleted={() => setCommentCount(prev => Math.max(0, prev - 1))}
                                 pageData={pageData}
                             />
                         </div>
@@ -318,9 +380,9 @@ const PostDetailModal = ({ post, isOpen, onClose, currentUserProfile, pageData, 
                         <ReactionsModal 
                             isOpen={showReactionsModal} 
                             onClose={() => setShowReactionsModal(false)} 
-                            reactors={reactors} 
+                            reactions={reactors} 
                             likeCount={likeCount} 
-                            reactionSummary={reactionSummary} 
+                            summary={reactionSummary} 
                         />
                     )}
                 </div>

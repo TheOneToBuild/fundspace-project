@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, memo, lazy, Suspense, useCallback, useRef } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { togglePostLike } from '../utils/rpcClientFunctions';
+import { supabase } from '../supabaseClient';
 import { addOrganizationEventListener } from '../utils/organizationEvents';
 import PostHeader from './post/PostHeader';
 import PostBody from './post/PostBody';
@@ -60,6 +61,7 @@ function PostCard({
   const [showReactorsPreview, setShowReactorsPreview] = useState(false);
   const [isProcessingReaction, setIsProcessingReaction] = useState(false);
   
+  const [firstReactorName, setFirstReactorName] = useState(null);
   const reactorsTimeoutRef = useRef(null);
 
   useEffect(() => {
@@ -67,6 +69,39 @@ function PostCard({
       setSelectedReaction(userReaction);
     }
   }, [userReaction]);
+
+  useEffect(() => {
+    const fetchFirstReactor = async () => {
+      if (likeCount > 0 && (!reactors || reactors.length === 0)) {
+        try {
+          // First get the user_id from post_likes
+          const { data: likeData } = await supabase
+            .from('post_likes')
+            .select('user_id')
+            .eq('post_id', post.id)
+            .limit(1)
+            .single();
+          
+          if (likeData?.user_id) {
+            // Then get the profile
+            const { data: profileData } = await supabase
+              .from('profiles')
+              .select('full_name')
+              .eq('id', likeData.user_id)
+              .single();
+            
+            if (profileData?.full_name) {
+              setFirstReactorName(profileData.full_name);
+            }
+          }
+        } catch (error) {
+          console.error('Error fetching first reactor:', error);
+        }
+      }
+    };
+  
+    fetchFirstReactor();
+  }, [likeCount, post.id, reactors]);
 
   const reactionDebounceRef = useRef(null);
   const mountedRef = useRef(true);
@@ -112,36 +147,76 @@ function PostCard({
 
   const handleOpenReactionsModal = useCallback(async () => {
     if (likeCount > 0) {
-      // The reactors should already be loaded from props.
-      // If not, this will open an empty modal, which is acceptable for now.
+      try {
+        const { data: likesData } = await supabase
+          .from('post_likes')
+          .select('user_id, reaction_type')
+          .eq('post_id', post.id);
+
+        if (likesData && likesData.length > 0) {
+          const userIds = [...new Set(likesData.map(l => l.user_id))];
+          
+          const { data: profilesData } = await supabase
+            .from('profiles')
+            .select('id, full_name, avatar_url, organization_name')
+            .in('id', userIds);
+
+          const freshReactors = likesData.map(like => {
+            const profile = profilesData?.find(p => p.id === like.user_id);
+            return {
+              user_id: like.user_id,
+              reaction_type: like.reaction_type,
+              full_name: profile?.full_name,
+              avatar_url: profile?.avatar_url,
+              organization_name: profile?.organization_name
+            };
+          });
+
+          const counts = {};
+          likesData.forEach(like => {
+            const type = like.reaction_type || 'like';
+            counts[type] = (counts[type] || 0) + 1;
+          });
+
+          const freshSummary = Object.entries(counts).map(([type, count]) => ({ type, count }));
+
+          setReactors(freshReactors);
+          setReactionSummary(freshSummary);
+        }
+      } catch (error) {
+        console.error('Error fetching reactors:', error);
+      }
+
       setShowReactionsModal(true);
     }
-  }, [likeCount]);
+  }, [likeCount, post.id]);
 
   const handleReaction = useCallback(async (reactionType) => {
     if (!currentUserProfile?.id || !post?.id || disabled || isProcessingReaction) return;
 
-    const newReaction = selectedReaction === reactionType ? null : reactionType;
-
     if (onPostLike) {
+      const newReaction = selectedReaction === reactionType ? null : reactionType;
       onPostLike(post.id, selectedReaction, newReaction);
       // The parent component will manage the state update via props.
       return;
     }
 
-    // Optimistic update
-    const originalReaction = selectedReaction;
-    setSelectedReaction(newReaction);
     setIsProcessingReaction(true);
 
     try {
-      // The `isOrgPost` flag is false here because organization posts are handled
-      // by the `onPostLike` prop passed from `OrganizationProfilePage`.
-      await togglePostLike(post.id, currentUserProfile.id, reactionType, false);
+      const result = await togglePostLike(post.id, currentUserProfile.id, reactionType);
+
+      if (result) {
+        // Update state with returned values
+        setSelectedReaction(result.user_reaction || null);
+        setLikeCount(result.total_count || 0);
+        setReactionSummary(result.reaction_summary || []);
+
+        // IMPORTANT: Clear reactors so they get refetched with new data
+        setReactors([]);
+      }
     } catch (error) {
       console.error('Error handling reaction:', error);
-      // Revert on error
-      setSelectedReaction(originalReaction);
     } finally {
       if (mountedRef.current) {
         setIsProcessingReaction(false);
@@ -221,9 +296,44 @@ function PostCard({
     if (reactorsTimeoutRef.current) {
       clearTimeout(reactorsTimeoutRef.current);
     }
-    // Reactors are passed via props, so we just need to show the preview.
+    
+    // If we don't have reactors data yet, fetch it
+    if (likeCount > 0 && (!reactors || reactors.length === 0)) {
+      try {
+        const { data: likesData } = await supabase
+          .from('post_likes')
+          .select('user_id, reaction_type')
+          .eq('post_id', post.id)
+          .limit(5); // Get first 5 for preview
+        
+        if (likesData && likesData.length > 0) {
+          const userIds = likesData.map(l => l.user_id);
+          
+          const { data: profilesData } = await supabase
+            .from('profiles')
+            .select('id, full_name, avatar_url, organization_name')
+            .in('id', userIds);
+          
+          const fetchedReactors = likesData.map(like => {
+            const profile = profilesData?.find(p => p.id === like.user_id);
+            return {
+              user_id: like.user_id,
+              reaction_type: like.reaction_type,
+              full_name: profile?.full_name,
+              avatar_url: profile?.avatar_url,
+              organization_name: profile?.organization_name
+            };
+          });
+          
+          setReactors(fetchedReactors);
+        }
+      } catch (error) {
+        console.error('Error fetching reactors:', error);
+      }
+    }
+    
     setShowReactorsPreview(true);
-  }, []);
+  }, [likeCount, post.id, reactors]);
 
   const handleReactorsLeave = () => {
     reactorsTimeoutRef.current = setTimeout(() => {
@@ -273,8 +383,8 @@ function PostCard({
       <div className="flex items-center justify-between text-sm text-slate-500 my-2 min-h-[20px]">
         <div className="relative" onMouseEnter={handleReactorsEnter} onMouseLeave={handleReactorsLeave}>
           {likeCount > 0 && (
-            <div className="flex items-center cursor-pointer">
-              <div className="flex items-center -space-x-1">
+            <div className="flex items-center cursor-pointer" onClick={handleOpenReactionsModal}>
+              <div className="flex items-center -space-x-1 mr-2">
                 {(reactionSummary || []).sort((a, b) => b.count - a.count).slice(0, 3).map(({ type }) => {
                   const reaction = reactions.find(r => r.type === type);
                   if (!reaction) return null;
@@ -285,11 +395,22 @@ function PostCard({
                   );
                 })}
               </div>
-              <ReactorsText 
-                likeCount={likeCount} 
-                reactors={reactors} 
-                onViewReactions={handleOpenReactionsModal} 
-              />
+              {/* Always show formatted text */}
+              {reactors && reactors.length > 0 ? (
+                <span className="text-sm hover:underline">
+                  {reactors[0].full_name || 'Someone'}
+                  {likeCount > 1 && ` + ${likeCount - 1} other${likeCount - 1 === 1 ? '' : 's'}`}
+                </span>
+              ) : firstReactorName ? (
+                <span className="text-sm hover:underline">
+                  {firstReactorName}
+                  {likeCount > 1 && ` + ${likeCount - 1} other${likeCount - 1 === 1 ? '' : 's'}`}
+                </span>
+              ) : (
+                <span className="text-sm hover:underline">
+                  {likeCount} reaction{likeCount === 1 ? '' : 's'}
+                </span>
+              )}
             </div>
           )}
           {showReactorsPreview && likeCount > 0 && (

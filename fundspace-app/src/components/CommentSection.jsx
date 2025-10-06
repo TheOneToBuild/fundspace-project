@@ -35,7 +35,13 @@ export default function CommentSection({
                 currentUserProfile.id, 
                 isOrganizationPost
             );
-            setComments(allComments[post.id] || []);
+            const commentsForPost = (allComments[post.id] || []).map(comment => ({
+                ...comment,
+                // Standardize to 'profiles' to match what CommentForm and other components expect
+                profiles: comment.profile || comment.profiles,
+                profile: undefined // remove the old property to avoid confusion
+            }));
+            setComments(commentsForPost);
         } catch (error) {
             console.error("Error fetching comments:", error);
         } finally {
@@ -185,7 +191,7 @@ export default function CommentSection({
                     <ReactionsModal
                         isOpen={!!activeReactionsModal}
                         onClose={() => setActiveReactionsModal(null)}
-                        reactions={modalReactors}
+                        reactors={modalReactors}
                         summary={modalReactionSummary}
                         likeCount={modalLikeCount}
                     />

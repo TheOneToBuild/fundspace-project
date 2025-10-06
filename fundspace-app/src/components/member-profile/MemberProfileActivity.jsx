@@ -2,7 +2,7 @@
 import React from 'react';
 import PostCard from '../PostCard';
 
-const MemberProfileActivity = ({ member, posts, loading }) => {
+const MemberProfileActivity = ({ member, posts, loading, currentUserProfile }) => {
     if (loading) {
         return (
             <div className="max-w-7xl mx-auto px-8 py-8">
@@ -22,7 +22,12 @@ const MemberProfileActivity = ({ member, posts, loading }) => {
             {posts && posts.length > 0 ? (
                 <div className="space-y-6">
                     {posts.map(post => (
-                        <PostCard key={post.id} post={post} />
+                        <PostCard
+                          key={post.id}
+                          post={post}
+                          userReaction={post.user_reaction}
+                          currentUserProfile={currentUserProfile}
+                        />
                     ))}
                 </div>
             ) : (

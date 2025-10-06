@@ -45,10 +45,28 @@ const loadMemberData = async () => {
         return;
       }
 
-      // The RPC returns posts, connections, followers, following already
-      // We just need to ensure posts have the profile data attached
+      // Fetch user reactions for all posts if current user is logged in
+      let userReactions = {};
+      if (currentUserProfile?.id && profileData.posts?.length > 0) {
+        const postIds = profileData.posts.map(p => p.id);
+        const { data: reactionsData } = await supabase
+          .from('post_likes')
+          .select('post_id, reaction_type')
+          .in('post_id', postIds)
+          .eq('user_id', currentUserProfile.id);
+        
+        if (reactionsData) {
+          reactionsData.forEach(r => {
+            userReactions[r.post_id] = r.reaction_type;
+          });
+        }
+      }
+
+      // The RPC returns posts, connections, followers, following.
+      // We enrich the posts with the author's profile data and the viewer's reaction.
       const enrichedPosts = (profileData.posts || []).map(post => ({
         ...post,
+        user_reaction: userReactions[post.id] || null,
         profiles: {
           id: profileData.id,
           full_name: profileData.full_name,

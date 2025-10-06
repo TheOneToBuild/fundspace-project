@@ -1,14 +1,13 @@
 // src/components/post/ReactionsModal.jsx
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom'; // 1. Import useNavigate
 import { X } from 'lucide-react';
-import Avatar from '../Avatar';
 import { reactions } from './constants';
+import Avatar from '../Avatar';
 
-export default function ReactionsModal({ isOpen, onClose, reactors, likeCount, reactionSummary }) {
+export default function ReactionsModal({ isOpen, onClose, reactors = [], likeCount = 0, reactionSummary = [] }) {
     const [activeTab, setActiveTab] = useState('all');
-    const [displayCount, setDisplayCount] = useState(6);
-    const navigate = useNavigate(); // 2. Initialize the navigate function
+    const [currentPage, setCurrentPage] = useState(0);
+    const ITEMS_PER_PAGE = 6;
 
     if (!isOpen) return null;
 
@@ -18,79 +17,121 @@ export default function ReactionsModal({ isOpen, onClose, reactors, likeCount, r
     };
 
     const activeReactors = getReactorsByType(activeTab);
-    const displayedReactors = activeReactors.slice(0, displayCount);
-    const hasMore = displayCount < activeReactors.length;
+    const totalPages = Math.ceil(activeReactors.length / ITEMS_PER_PAGE);
+    const startIndex = currentPage * ITEMS_PER_PAGE;
+    const displayedReactors = activeReactors.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
-    const loadMore = () => {
-        setDisplayCount(prev => Math.min(prev + 6, activeReactors.length));
-    };
-
-    // 3. Update the function to use navigate
-    const handleProfileClick = (profileId) => {
-        if (profileId) {
-            onClose(); // Close the modal for a better user experience
-            navigate(`/profile/members/${profileId}`);
-        }
+    const handleTabChange = (type) => {
+        setActiveTab(type);
+        setCurrentPage(0);
     };
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-md max-h-[70vh] overflow-hidden flex flex-col">
+            <div className="bg-white rounded-lg shadow-xl w-full max-w-md overflow-hidden flex flex-col max-h-[80vh]">
                 <div className="flex items-center justify-between p-4 border-b">
                     <h3 className="text-lg font-semibold">Reactions</h3>
                     <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-full">
                         <X size={20} />
                     </button>
                 </div>
-                <div className="flex items-center space-x-1 px-4 py-2 border-b bg-gray-50 overflow-x-auto">
+
+                {/* Tabs */}
+                <div className="flex items-center gap-2 px-4 py-2 border-b overflow-x-auto">
                     <button
-                        onClick={() => { setActiveTab('all'); setDisplayCount(6); }}
-                        className={`px-3 py-1 rounded-full text-sm font-medium whitespace-nowrap ${activeTab === 'all' ? 'bg-blue-100 text-blue-700 border border-blue-200' : 'text-gray-600 hover:bg-gray-100'}`}
+                        onClick={() => handleTabChange('all')}
+                        className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
+                            activeTab === 'all' 
+                                ? 'bg-blue-100 text-blue-700' 
+                                : 'text-gray-600 hover:bg-gray-100'
+                        }`}
                     >
                         All {likeCount}
                     </button>
                     {reactionSummary.map(({ type, count }) => {
                         const reaction = reactions.find(r => r.type === type);
                         if (!reaction) return null;
+                        
                         return (
                             <button
                                 key={type}
-                                onClick={() => { setActiveTab(type); setDisplayCount(6); }}
-                                className={`px-3 py-1 rounded-full text-sm font-medium flex items-center space-x-1 whitespace-nowrap ${activeTab === type ? 'bg-blue-100 text-blue-700 border border-blue-200' : 'text-gray-600 hover:bg-gray-100'}`}
+                                onClick={() => handleTabChange(type)}
+                                className={`px-4 py-2 rounded-full text-sm font-medium flex items-center gap-2 whitespace-nowrap transition-colors ${
+                                    activeTab === type 
+                                        ? 'bg-blue-100 text-blue-700' 
+                                        : 'text-gray-600 hover:bg-gray-100'
+                                }`}
                             >
-                                <div className={`p-0.5 rounded-full ${reaction.color}`}><reaction.Icon size={10} className="text-white" /></div>
-                                <span>{count}</span>
+                                <div className={`p-1 rounded-full ${reaction.color}`}>
+                                    <reaction.Icon size={12} className="text-white" />
+                                </div>
+                                {count}
                             </button>
                         );
                     })}
                 </div>
-                <div className="overflow-y-auto flex-1">
-                    {displayedReactors.map((reactor, index) => (
-                        <div key={index} className="flex items-center space-x-3 p-3 hover:bg-gray-50 cursor-pointer" onClick={() => handleProfileClick(reactor.profile_id || reactor.user_id)}>
-                            <Avatar src={reactor.avatar_url} fullName={reactor.full_name} size="md" />
-                            <div className="flex-1 min-w-0">
-                                <p className="font-medium text-gray-900 truncate">{reactor.full_name}</p>
-                                <p className="text-sm text-gray-500 truncate">{reactor.organization_name || reactor.role || 'No organization'}</p>
-                            </div>
-                            {reactor.reaction_type && (() => {
+
+                {/* Reactors List */}
+                <div className="flex-1 overflow-y-auto p-4">
+                    {displayedReactors.length > 0 ? (
+                        <div className="space-y-3">
+                            {displayedReactors.map((reactor, index) => {
                                 const reaction = reactions.find(r => r.type === reactor.reaction_type);
-                                if (!reaction) return null;
                                 return (
-                                    <div className={`p-1 rounded-full ${reaction.color}`}>
-                                        <reaction.Icon size={12} className="text-white" />
+                                    <div key={index} className="flex items-center justify-between p-2 hover:bg-gray-50 rounded-lg">
+                                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                                            <Avatar 
+                                                src={reactor.avatar_url} 
+                                                fullName={reactor.full_name} 
+                                                size="md" 
+                                            />
+                                            <div className="flex-1 min-w-0">
+                                                <p className="font-medium text-gray-900 truncate">
+                                                    {reactor.full_name || 'Unknown User'}
+                                                </p>
+                                                {reactor.organization_name && (
+                                                    <p className="text-sm text-gray-500 truncate">
+                                                        {reactor.organization_name}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        </div>
+                                        {reaction && (
+                                            <div className={`p-1.5 rounded-full ${reaction.color}`}>
+                                                <reaction.Icon size={14} className="text-white" />
+                                            </div>
+                                        )}
                                     </div>
                                 );
-                            })()}
+                            })}
                         </div>
-                    ))}
-                    {hasMore && (
-                        <div className="p-3 border-t bg-gray-50">
-                            <button onClick={loadMore} className="w-full py-2 text-blue-600 font-medium text-sm">
-                                Show more reactions ({activeReactors.length - displayCount} remaining)
-                            </button>
-                        </div>
+                    ) : (
+                        <p className="text-center text-gray-500 py-8">No reactions yet</p>
                     )}
                 </div>
+
+                {/* Pagination */}
+                {totalPages > 1 && (
+                    <div className="border-t p-4 flex items-center justify-between">
+                        <button
+                            onClick={() => setCurrentPage(prev => Math.max(0, prev - 1))}
+                            disabled={currentPage === 0}
+                            className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            Previous
+                        </button>
+                        <span className="text-sm text-gray-600">
+                            Page {currentPage + 1} of {totalPages}
+                        </span>
+                        <button
+                            onClick={() => setCurrentPage(prev => Math.min(totalPages - 1, prev + 1))}
+                            disabled={currentPage === totalPages - 1}
+                            className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            Next
+                        </button>
+                    </div>
+                )}
             </div>
         </div>
     );

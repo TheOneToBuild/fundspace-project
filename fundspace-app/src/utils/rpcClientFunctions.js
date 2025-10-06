@@ -303,7 +303,7 @@ export const getPostCommentsBatch = async (postIds, userId = null, isOrgPost = f
 
   try {
     const { data, error } = await supabase.rpc('get_post_comments_batch', {
-      p_post_ids: postIds,
+      p_post_ids: postIds, // The RPC function name is correct, the change is in the SQL definition
       p_user_id: userId,
       p_is_org_post: isOrgPost
     });
@@ -769,8 +769,7 @@ export const togglePostLike = async (postId, userId, reactionType = 'like', isOr
     const { data, error } = await supabase.rpc('toggle_post_like', {
       p_post_id: postId,
       p_user_id: userId,
-      p_reaction_type: reactionType,
-      p_is_org_post: isOrgPost
+      p_reaction_type: reactionType
     });
     if (error) throw error;
 
