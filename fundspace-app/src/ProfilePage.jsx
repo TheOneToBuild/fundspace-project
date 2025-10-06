@@ -34,6 +34,8 @@ export default function ProfilePage() {
     totalFollowing: 0,
     activeTab: 'community',
     showCreatePost: false,
+    selectedPost: null,
+    isPostModalOpen: false,
   });
 
   const { pageData, loadProfilePageData, clearPageData } = usePageDataLoader();
@@ -56,6 +58,8 @@ export default function ProfilePage() {
     suggestedConnections,
     followerUsers,
     followingUsers,
+    selectedPost,
+    isPostModalOpen,
   } = appState;
 
   const fetchPageData = useCallback(async (userId) => {
@@ -290,6 +294,57 @@ export default function ProfilePage() {
     }
   }, [session]);
 
+  const handleTrendingPostReaction = useCallback(async (postId, oldReaction, newReaction) => {
+    if (!session?.user?.id) return;
+
+    // Optimistically update the local state
+    setAppState(prev => ({
+      ...prev,
+      trendingGrants: prev.trendingGrants.map(p => 
+        p.id === postId 
+          ? { 
+              ...p, 
+              user_reaction: newReaction,
+              likes_count: newReaction 
+                ? (oldReaction ? p.likes_count : (p.likes_count || 0) + 1)
+                : (p.likes_count || 1) - 1
+            }
+          : p
+      )
+    }));
+  
+    try {
+      await togglePostLike(postId, session.user.id, newReaction || oldReaction);
+    } catch (error) {
+      console.error('Error toggling reaction:', error);
+    }
+  }, [session?.user?.id]);
+
+  const handleTrendingPostClick = useCallback(async (post) => {
+    if (profile?.id) {
+      try {
+        const { data: reactionData } = await supabase
+          .from('post_likes')
+          .select('reaction_type')
+          .eq('post_id', post.id)
+          .eq('user_id', profile.id)
+          .maybeSingle();
+        
+        const enrichedPost = {
+          ...post,
+          user_reaction: reactionData?.reaction_type || null
+        };
+        
+        setAppState(prev => ({ ...prev, selectedPost: enrichedPost, isPostModalOpen: true }));
+      } catch (error) {
+        console.error("Error fetching post reaction for modal:", error);
+        setAppState(prev => ({ ...prev, selectedPost: post, isPostModalOpen: true }));
+      }
+    } else {
+      setAppState(prev => ({ ...prev, selectedPost: post, isPostModalOpen: true }));
+    }
+  }, [session?.user?.id]);
+
   const outletContext = useMemo(
     () => ({
       ...appContext,
@@ -315,7 +370,9 @@ export default function ProfilePage() {
       handleFollowUser,
       handleUnfollowUser,
       socialStats: { totalPosts, totalFollowers, totalFollowing },
+      handleTrendingPostReaction,
       followerUsers,
+      handleTrendingPostClick,
       followingUsers,
     }),
     [
@@ -345,6 +402,8 @@ export default function ProfilePage() {
       totalFollowers,
       totalFollowing,
       followerUsers,
+      handleTrendingPostReaction,
+      handleTrendingPostClick,
       followingUsers,
     ]
   );

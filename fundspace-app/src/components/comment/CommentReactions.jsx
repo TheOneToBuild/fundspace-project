@@ -9,10 +9,11 @@ export default function CommentReactions({
     currentUserProfile, 
     isOrganizationPost, 
     onOpenReactionsModal,
+    userReaction,
     preloadedCommentReactions
 }) {
-    const [selectedReaction, setSelectedReaction] = useState(null);
-    const [reactionSummary, setReactionSummary] = useState([]);
+    const [selectedReaction, setSelectedReaction] = useState(userReaction || null);
+    const [reactionSummary, setReactionSummary] = useState(comment.reaction_summary || []);
     const [totalLikes, setTotalLikes] = useState(comment.likes_count || 0);
     const [showReactionPicker, setShowReactionPicker] = useState(false);
     const [showReactorsPreview, setShowReactorsPreview] = useState(false);
@@ -25,14 +26,16 @@ export default function CommentReactions({
     const commentReactionsTable = isOrganizationPost ? 'organization_post_comment_likes' : 'post_comment_likes';
 
     useEffect(() => {
-        // Data comes preloaded from parent via getPostCommentsWithReactions
-        if (preloadedCommentReactions?.[comment.id]) {
+        if (userReaction !== undefined) {
+            setSelectedReaction(userReaction);
+        } else if (preloadedCommentReactions?.[comment.id]) {
+            // Fallback for older preloading patterns
             const data = preloadedCommentReactions[comment.id];
             setSelectedReaction(data.userReaction || null);
             setReactionSummary(data.summary || []);
             setTotalLikes(data.count || 0);
         }
-    }, [comment.id, preloadedCommentReactions]);
+    }, [comment.id, userReaction, preloadedCommentReactions]);
 
     const handleReaction = async (reactionType) => {
         if (!currentUserProfile?.id || !comment?.id || isLoading) return;

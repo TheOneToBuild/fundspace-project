@@ -5,14 +5,14 @@ import { supabase } from '../../supabaseClient';
 import ImageMosaic from './ImageMosaic';
 import TagDisplay from './TagDisplay';
 
-export default function PostBody({ content, images, tags, onImageClick }) {
+export default function PostBody({ content, images, tags, onImageClick, expanded = false }) {
     const navigate = useNavigate();
     const MAX_CHARS = 300;
     const postBodyRef = useRef(null);
 
-    // Enhanced shouldTruncate logic - don't truncate content with mentions
+    // Enhanced shouldTruncate logic - don't truncate if expanded prop is true or content has mentions
     const containsMentions = content && content.includes('<span') && content.includes('data-type');
-    const shouldTruncate = content && content.length > MAX_CHARS && !content.includes('<img') && !containsMentions;
+    const shouldTruncate = !expanded && content && content.length > MAX_CHARS && !content.includes('<img') && !containsMentions;
 
     // Function to get organization slug from ID (same as CommentCard.jsx)
     const getOrganizationSlug = async (orgType, orgId) => {

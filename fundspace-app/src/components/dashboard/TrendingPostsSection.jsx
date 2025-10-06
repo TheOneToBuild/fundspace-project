@@ -33,12 +33,21 @@ const TrendingPostCard = ({ post, onClick, pageData, postsLikesData, onPostLike 
     const [localComments, setLocalComments] = React.useState(
         post?.comments_count || 0
     );
+    const [localUserReaction, setLocalUserReaction] = React.useState(
+        post.user_reaction || likesData?.userReaction || null
+    );
 
     React.useEffect(() => {
         if (likesData?.likes_count !== undefined) {
             setLocalLikes(likesData.likes_count);
         }
     }, [likesData]);
+
+    React.useEffect(() => {
+        if (post.user_reaction !== undefined) {
+            setLocalUserReaction(post.user_reaction);
+        }
+    }, [post.user_reaction]);
 
     const formatTimeAgo = (dateString) => {
         const now = new Date();
@@ -239,8 +248,11 @@ const TrendingPostCard = ({ post, onClick, pageData, postsLikesData, onPostLike 
                 </div>
                 <div className="flex items-center space-x-4 text-xs text-slate-500">
                     <div className="flex items-center space-x-1">
-                        <Heart size={14} />
-                        <span>{localLikes}</span>
+                        <Heart 
+                            size={14} 
+                            className={localUserReaction ? 'text-red-500 fill-current' : ''}
+                        />
+                        <span>{localLikes}</span> 
                     </div>
                     <div className="flex items-center space-x-1">
                         <MessageCircle size={14} />

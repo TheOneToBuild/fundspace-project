@@ -35,13 +35,37 @@ export default function CommentSection({
                 currentUserProfile.id, 
                 isOrganizationPost
             );
-            const commentsForPost = (allComments[post.id] || []).map(comment => ({
-                ...comment,
-                // Standardize to 'profiles' to match what CommentForm and other components expect
-                profiles: comment.profile || comment.profiles,
-                profile: undefined // remove the old property to avoid confusion
-            }));
-            setComments(commentsForPost);
+            
+            // Fetch user reactions for all comments
+            const commentIds = (allComments[post.id] || []).map(c => c.id);
+            if (commentIds.length > 0) {
+                const reactionsTable = isOrganizationPost ? 
+                    'organization_post_comment_likes' : 
+                    'post_comment_likes';
+                
+                const { data: userReactions } = await supabase
+                    .from(reactionsTable)
+                    .select('comment_id, reaction_type')
+                    .in('comment_id', commentIds)
+                    .eq('user_id', currentUserProfile.id);
+                
+                // Map reactions to comments
+                const reactionsMap = {};
+                (userReactions || []).forEach(r => {
+                    reactionsMap[r.comment_id] = r.reaction_type;
+                });
+                
+                const enrichedComments = (allComments[post.id] || []).map(comment => ({
+                    ...comment,
+                    user_reaction: reactionsMap[comment.id] || null,
+                    profiles: comment.profile || comment.profiles,
+                    profile: undefined
+                }));
+                
+                setComments(enrichedComments);
+            } else {
+                setComments(allComments[post.id] || []);
+            }
         } catch (error) {
             console.error("Error fetching comments:", error);
         } finally {

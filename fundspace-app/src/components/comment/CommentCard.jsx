@@ -333,6 +333,7 @@ export default function CommentCard({
                             currentUserProfile={currentUserProfile}
                             isOrganizationPost={isOrganizationPost}
                             onOpenReactionsModal={onOpenReactionsModal}
+                            userReaction={comment.user_reaction}
                         />
                     </div>
 
