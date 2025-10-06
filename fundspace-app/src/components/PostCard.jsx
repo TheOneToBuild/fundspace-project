@@ -103,6 +103,34 @@ function PostCard({
     fetchFirstReactor();
   }, [likeCount, post.id, reactors]);
 
+  useEffect(() => {
+    const fetchReactionSummary = async () => {
+      if (likeCount > 0 && (!reactionSummary || reactionSummary.length === 0)) {
+        try {
+          const { data: likesData } = await supabase
+            .from('post_likes')
+            .select('reaction_type')
+            .eq('post_id', post.id);
+  
+          if (likesData && likesData.length > 0) {
+            const counts = {};
+            likesData.forEach(like => {
+              const type = like.reaction_type || 'like';
+              counts[type] = (counts[type] || 0) + 1;
+            });
+  
+            const summary = Object.entries(counts).map(([type, count]) => ({ type, count }));
+            setReactionSummary(summary);
+          }
+        } catch (error) {
+          console.error('Error fetching reaction summary:', error);
+        }
+      }
+    };
+  
+    fetchReactionSummary();
+  }, [likeCount, post.id]);
+
   const reactionDebounceRef = useRef(null);
   const mountedRef = useRef(true);
 
@@ -383,19 +411,23 @@ function PostCard({
       <div className="flex items-center justify-between text-sm text-slate-500 my-2 min-h-[20px]">
         <div className="relative" onMouseEnter={handleReactorsEnter} onMouseLeave={handleReactorsLeave}>
           {likeCount > 0 && (
-            <div className="flex items-center cursor-pointer" onClick={handleOpenReactionsModal}>
-              <div className="flex items-center -space-x-1 mr-2">
-                {(reactionSummary || []).sort((a, b) => b.count - a.count).slice(0, 3).map(({ type }) => {
-                  const reaction = reactions.find(r => r.type === type);
-                  if (!reaction) return null;
-                  return (
-                    <div key={type} className={`p-0.5 rounded-full ${reaction.color} border-2 border-white`}>
-                      <reaction.Icon size={12} className="text-white" />
-                    </div>
-                  );
-                })}
-              </div>
-              {/* Always show formatted text */}
+            <div className="flex items-center gap-2 cursor-pointer" onClick={handleOpenReactionsModal}>
+              {/* Reaction icons - always show if we have summary data */}
+              {(reactionSummary || []).length > 0 && (
+                <div className="flex items-center -space-x-1">
+                  {(reactionSummary || []).sort((a, b) => b.count - a.count).slice(0, 3).map(({ type }) => {
+                    const reaction = reactions.find(r => r.type === type);
+                    if (!reaction) return null;
+                    return (
+                      <div key={type} className={`p-0.5 rounded-full ${reaction.color} border-2 border-white`}>
+                        <reaction.Icon size={12} className="text-white" />
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              
+              {/* Reactor text */}
               {reactors && reactors.length > 0 ? (
                 <span className="text-sm hover:underline">
                   {reactors[0].full_name || 'Someone'}

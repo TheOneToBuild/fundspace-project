@@ -183,7 +183,6 @@ const TrendingGrantCard = ({ grant, onClick, onSave, onUnsave, isSaved }) => {
                     {/* FUNDING AMOUNT - Centered */}
                     <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg p-2 border border-green-200 shadow-sm">
                         <div className="flex items-center justify-center gap-1">
-                            <DollarSign size={14} className="text-green-600" />
                             <span className="text-sm font-bold text-green-800">
                                 {formatFunding(grantData.fundingAmount)}
                             </span>

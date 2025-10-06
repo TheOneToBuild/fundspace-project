@@ -247,7 +247,7 @@ const WelcomeBanner = ({ profile, organizationInfo }) => {
                                     </div>
                                     <div className="text-left flex-1">
                                         <h4 className="font-bold text-lg group-hover:opacity-80 text-slate-900">Global Feed</h4>
-                                        <p className="text-sm mt-1 text-slate-600">Share with the entire FundSpace community</p>
+                                        <p className="text-sm mt-1 text-slate-600">Share with the entire Fundspace community</p>
                                     </div>
                                 </div>
                             </button>
@@ -266,7 +266,7 @@ const WelcomeBanner = ({ profile, organizationInfo }) => {
                                         </div>
                                         <div className="text-left flex-1">
                                             <h4 className="font-bold text-lg group-hover:opacity-80 text-purple-900">Hello Community</h4>
-                                            <p className="text-sm mt-1 text-purple-700">Share with your organization community and team members</p>
+                                            <p className="text-sm mt-1 text-purple-700">Share with your community</p>
                                         </div>
                                     </div>
                                 </button>

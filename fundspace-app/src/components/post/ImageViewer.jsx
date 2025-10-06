@@ -10,6 +10,7 @@ import TagDisplay from './TagDisplay';
 import CommentSection from '../CommentSection';
 import ReactorsText from './ReactorsText';
 import PostHeader from './PostHeader';
+import ReactionsModal from './ReactionsModal';
 
 export default function ImageViewer({
     post,
@@ -32,12 +33,30 @@ export default function ImageViewer({
     const navigate = useNavigate();
     const [currentIndex, setCurrentIndex] = useState(initialIndex);
     const [showReactionPanel, setShowReactionPanel] = useState(false);
+    const [showReactionsModal, setShowReactionsModal] = useState(false);
+    const [localReactors, setLocalReactors] = useState(reactors || []);
 
     useEffect(() => { setCurrentIndex(initialIndex); }, [initialIndex]);
     useEffect(() => {
         document.body.style.overflow = isOpen ? 'hidden' : 'unset';
         return () => { document.body.style.overflow = 'unset'; };
     }, [isOpen]);
+
+    useEffect(() => {
+        const handleEscapeKey = (e) => {
+            if (e.key === 'Escape' && isOpen) {
+                onClose();
+            }
+        };
+    
+        if (isOpen) {
+            document.addEventListener('keydown', handleEscapeKey);
+        }
+    
+        return () => {
+            document.removeEventListener('keydown', handleEscapeKey);
+        };
+    }, [isOpen, onClose]);
 
     // Function to get organization slug from ID
     const getOrganizationSlug = async (orgType, orgId) => {
@@ -154,6 +173,42 @@ export default function ImageViewer({
         }
     };
 
+    const handleOpenReactionsModal = async () => {
+        if (likeCount > 0) {
+            try {
+                const { data: likesData } = await supabase
+                    .from('post_likes')
+                    .select('user_id, reaction_type')
+                    .eq('post_id', post.id);
+
+                if (likesData && likesData.length > 0) {
+                    const userIds = [...new Set(likesData.map(l => l.user_id))];
+                    
+                    const { data: profilesData } = await supabase
+                        .from('profiles')
+                        .select('id, full_name, avatar_url, organization_name')
+                        .in('id', userIds);
+
+                    const freshReactors = likesData.map(like => {
+                        const profile = profilesData?.find(p => p.id === like.user_id);
+                        return {
+                            user_id: like.user_id,
+                            reaction_type: like.reaction_type,
+                            full_name: profile?.full_name,
+                            avatar_url: profile?.avatar_url,
+                            organization_name: profile?.organization_name
+                        };
+                    });
+
+                    setLocalReactors(freshReactors);
+                }
+            } catch (error) {
+                console.error('Error fetching reactors:', error);
+            }
+        }
+        setShowReactionsModal(true);
+    };
+
     const nextImage = () => {
         setCurrentIndex(prev => (prev + 1) % images.length);
     };
@@ -167,10 +222,17 @@ export default function ImageViewer({
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
-            <div className="max-w-7xl mx-auto flex bg-white rounded-lg overflow-hidden shadow-2xl" style={{ maxHeight: '90vh', width: '90vw' }}>
+        <div 
+            className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50"
+            onClick={onClose}
+        >
+            <div 
+                className="max-w-7xl mx-auto flex bg-white rounded-lg overflow-hidden shadow-2xl gap-8" 
+                style={{ maxHeight: '90vh', width: '90vw' }}
+                onClick={(e) => e.stopPropagation()}
+            >
                 {showImageSection && images.length > 0 && (
-                    <div className="flex-1 bg-black flex items-center justify-center relative">
+                    <div className="flex-1 flex items-center justify-center relative" style={{ background: '#f5f5f5' }}>
                         <img src={images[currentIndex]} alt={`Image ${currentIndex + 1}`} className="max-w-full max-h-full object-contain" />
                         <button onClick={onClose} className="absolute top-4 right-4 bg-white/80 hover:bg-white text-black rounded-full p-2 z-10 shadow-lg"><X size={20} /></button>
                         {images.length > 1 && <>
@@ -223,31 +285,44 @@ export default function ImageViewer({
                     {post.tags?.length > 0 && <div className="px-6 py-3 border-b"><TagDisplay tags={post.tags} /></div>}
                     <div className="px-6 py-4 border-b">
                         <div className="flex items-center justify-between">
-                             <div className="flex items-center">
+                            <div className="flex items-center">
                                 {likeCount > 0 && (
-                                    <div className="flex items-center -space-x-1 mr-2">
-                                        {(reactionSummary || []).sort((a, b) => b.count - a.count).slice(0, 3).map(({ type }) => {
-                                            const reaction = reactions.find(r => r.type === type);
-                                            if (!reaction) return null;
-                                            return <div key={type} className={`p-0.5 rounded-full ${reaction.color} border-2 border-white`}><reaction.Icon size={12} className="text-white" /></div>;
-                                        })}
+                                    <div className="flex items-center gap-2 cursor-pointer" onClick={handleOpenReactionsModal}>
+                                        {(reactionSummary || []).length > 0 && (
+                                            <div className="flex items-center -space-x-1">
+                                                {(reactionSummary || []).sort((a, b) => b.count - a.count).slice(0, 3).map(({ type }) => {
+                                                    const reaction = reactions.find(r => r.type === type);
+                                                    if (!reaction) return null;
+                                                    return <div key={type} className={`p-0.5 rounded-full ${reaction.color} border-2 border-white`}><reaction.Icon size={12} className="text-white" /></div>;
+                                                })}
+                                            </div>
+                                        )}
+                                        <span className="text-sm hover:underline">
+                                            {localReactors && localReactors.length > 0 ? (
+                                                <>
+                                                    {localReactors[0].full_name || 'Someone'}
+                                                    {likeCount > 1 && ` + ${likeCount - 1} other${likeCount - 1 === 1 ? '' : 's'}`}
+                                                </>
+                                            ) : (
+                                                `${likeCount} reaction${likeCount === 1 ? '' : 's'}`
+                                            )}
+                                        </span>
                                     </div>
                                 )}
-                                <ReactorsText likeCount={likeCount} reactors={reactors} onViewReactions={onViewReactions} />
                             </div>
                             {commentCount > 0 && <span className="text-gray-600 text-sm hover:underline cursor-pointer">{commentCount} {commentCount === 1 ? 'comment' : 'comments'}</span>}
                         </div>
                     </div>
                     <div className="px-6 py-3 border-b flex items-center space-x-1">
                         <div className="relative flex-1">
-                            <button onClick={() => setShowReactionPanel(!showReactionPanel)} className={`w-full flex items-center justify-center space-x-2 py-3 px-4 rounded-lg hover:bg-gray-100 ${currentReaction ? currentReaction.color.replace('bg-', 'text-') : 'text-gray-600'}`}>
+                            <button onClick={() => setShowReactionPanel(!showReactionPanel)} className={`w-full flex items-center justify-center space-x-2 py-3 px-4 rounded-lg hover:bg-gray-100 transition-colors ${currentReaction ? currentReaction.color.replace('bg-', 'text-') : 'text-gray-600'}`}>
                                 {currentReaction ? <currentReaction.Icon size={20} /> : <ThumbsUp size={20} />}
                                 <span className="font-medium text-sm">{currentReaction ? currentReaction.label : 'Like'}</span>
                             </button>
                             {showReactionPanel && (
                                 <div className="absolute bottom-full left-0 mb-2 bg-white rounded-lg shadow-lg border p-2 flex space-x-1 z-10">
                                     {reactions.map(reaction => (
-                                        <button key={reaction.type} onClick={() => { onReaction(reaction.type); setShowReactionPanel(false); }} className={`p-2 rounded-lg hover:bg-gray-100 ${reaction.color}`}>
+                                        <button key={reaction.type} onClick={() => { onReaction(reaction.type); setShowReactionPanel(false); }} className={`p-2 rounded-lg hover:bg-gray-100 transition-colors ${reaction.color}`}>
                                             <reaction.Icon size={24} className="text-white" />
                                         </button>
                                     ))}
@@ -268,6 +343,15 @@ export default function ImageViewer({
                     </div>
                 </div>
             </div>
+            {showReactionsModal && (
+                <ReactionsModal
+                    isOpen={showReactionsModal}
+                    onClose={() => setShowReactionsModal(false)}
+                    reactors={localReactors}
+                    likeCount={likeCount}
+                    reactionSummary={reactionSummary}
+                />
+            )}
         </div>
     );
 }
