@@ -79,7 +79,7 @@ export default function PublicHeader() {
                         links: [
                             { to: "/grants", text: "Find Funding" },
                             { to: "/organizations", text: "Explore Organizations" },
-                            { to: "/submit-grant", text: "Submit Grant" }
+                            { to: "/submit-grant", text: "Submit Grant", requiresAuth: true }
                         ]
                     }
                 ],
@@ -95,59 +95,59 @@ export default function PublicHeader() {
                     {
                         title: "Bay Area Counties",
                         links: [
-                            { to: "/spotlight/san-francisco", text: "San Francisco County" },
-                            { to: "/spotlight/alameda", text: "Alameda County" },
-                            { to: "/spotlight/santa-clara", text: "Santa Clara County" },
-                            { to: "/spotlight/contra-costa", text: "Contra Costa County" },
-                            { to: "/spotlight/marin", text: "Marin County" },
-                            { to: "/spotlight/san-mateo", text: "San Mateo County" },
-                            { to: "/spotlight/solano", text: "Solano County" },
-                            { to: "/spotlight/sonoma", text: "Sonoma County" },
-                            { to: "/spotlight/napa", text: "Napa County" }
+                            { to: "/spotlight/san-francisco", text: "San Francisco County", comingSoon: true },
+                            { to: "/spotlight/alameda", text: "Alameda County", comingSoon: true },
+                            { to: "/spotlight/santa-clara", text: "Santa Clara County", comingSoon: true },
+                            { to: "/spotlight/contra-costa", text: "Contra Costa County", comingSoon: true },
+                            { to: "/spotlight/marin", text: "Marin County", comingSoon: true },
+                            { to: "/spotlight/san-mateo", text: "San Mateo County", available: true },
+                            { to: "/spotlight/solano", text: "Solano County", comingSoon: true },
+                            { to: "/spotlight/sonoma", text: "Sonoma County", comingSoon: true },
+                            { to: "/spotlight/napa", text: "Napa County", comingSoon: true }
                         ]
                     },
                     {
                         title: "Peninsula",
                         links: [
-                            { to: "/spotlight/san-mateo/palo-alto", text: "Palo Alto" },
-                            { to: "/spotlight/san-mateo/redwood-city", text: "Redwood City" },
-                            { to: "/spotlight/san-mateo/menlo-park", text: "Menlo Park" },
-                            { to: "/spotlight/san-mateo/mountain-view", text: "Mountain View" }
+                            { to: "/spotlight/san-mateo/palo-alto", text: "Palo Alto", comingSoon: true },
+                            { to: "/spotlight/san-mateo/redwood-city", text: "Redwood City", comingSoon: true },
+                            { to: "/spotlight/san-mateo/menlo-park", text: "Menlo Park", comingSoon: true },
+                            { to: "/spotlight/san-mateo/mountain-view", text: "Mountain View", comingSoon: true }
                         ]
                     },
                     {
                         title: "South Bay",
                         links: [
-                            { to: "/spotlight/santa-clara/san-jose", text: "San Jose" },
-                            { to: "/spotlight/santa-clara/sunnyvale", text: "Sunnyvale" },
-                            { to: "/spotlight/santa-clara/santa-clara", text: "Santa Clara" },
-                            { to: "/spotlight/santa-clara/cupertino", text: "Cupertino" }
+                            { to: "/spotlight/santa-clara/san-jose", text: "San Jose", comingSoon: true },
+                            { to: "/spotlight/santa-clara/sunnyvale", text: "Sunnyvale", comingSoon: true },
+                            { to: "/spotlight/santa-clara/santa-clara", text: "Santa Clara", comingSoon: true },
+                            { to: "/spotlight/santa-clara/cupertino", text: "Cupertino", comingSoon: true }
                         ]
                     },
                     {
                         title: "East Bay",
                         links: [
-                            { to: "/spotlight/alameda/oakland", text: "Oakland" },
-                            { to: "/spotlight/alameda/berkeley", text: "Berkeley" },
-                            { to: "/spotlight/alameda/fremont", text: "Fremont" },
-                            { to: "/spotlight/contra-costa/concord", text: "Concord" }
+                            { to: "/spotlight/alameda/oakland", text: "Oakland", comingSoon: true },
+                            { to: "/spotlight/alameda/berkeley", text: "Berkeley", comingSoon: true },
+                            { to: "/spotlight/alameda/fremont", text: "Fremont", comingSoon: true },
+                            { to: "/spotlight/contra-costa/concord", text: "Concord", comingSoon: true }
                         ]
                     },
                     {
                         title: "North Bay",
                         links: [
-                            { to: "/spotlight/marin/san-rafael", text: "San Rafael" },
-                            { to: "/spotlight/sonoma/santa-rosa", text: "Santa Rosa" },
-                            { to: "/spotlight/napa/napa", text: "Napa" },
-                            { to: "/spotlight/solano/vallejo", text: "Vallejo" }
+                            { to: "/spotlight/marin/san-rafael", text: "San Rafael", comingSoon: true },
+                            { to: "/spotlight/sonoma/santa-rosa", text: "Santa Rosa", comingSoon: true },
+                            { to: "/spotlight/napa/napa", text: "Napa", comingSoon: true },
+                            { to: "/spotlight/solano/vallejo", text: "Vallejo", comingSoon: true }
                         ]
                     },
                     {
                         title: "Community",
                         links: [
-                            { to: "/spotlight", text: "All Spotlights" },
-                            { to: "/spotlight/submit", text: "Submit Story" },
-                            { to: "/spotlight/featured", text: "Featured Stories" }
+                            { to: "/spotlight", text: "All Spotlights", comingSoon: true },
+                            { to: "/spotlight/submit", text: "Submit Story", comingSoon: true },
+                            { to: "/spotlight/featured", text: "Featured Stories", comingSoon: true }
                         ]
                     }
                 ],
@@ -353,11 +353,34 @@ export default function PublicHeader() {
                                                 {section.links.map((dropdownLink, linkIndex) => (
                                                     <li key={linkIndex}>
                                                         <Link 
-                                                            to={dropdownLink.to} 
-                                                            className="text-slate-600 hover:text-blue-600 transition-colors block py-1 text-base leading-snug whitespace-nowrap"
-                                                            onClick={() => setActiveDropdown(null)}
+                                                            to={dropdownLink.comingSoon ? "#" : dropdownLink.to}
+                                                            className={`flex items-center gap-2 py-1 text-base leading-snug whitespace-nowrap transition-colors ${
+                                                                dropdownLink.comingSoon 
+                                                                    ? 'text-slate-400 cursor-not-allowed pointer-events-none' 
+                                                                    : 'text-slate-600 hover:text-blue-600'
+                                                            }`}
+                                                            onClick={(e) => {
+                                                                if (dropdownLink.comingSoon) {
+                                                                    e.preventDefault();
+                                                                } else if (dropdownLink.requiresAuth && (!session || !profile)) {
+                                                                    e.preventDefault();
+                                                                    window.location.href = '/login';
+                                                                } else {
+                                                                    setActiveDropdown(null);
+                                                                }
+                                                            }}
                                                         >
-                                                            {dropdownLink.text}
+                                                            <span>{dropdownLink.text}</span>
+                                                            {dropdownLink.comingSoon && (
+                                                                <span className="px-2 py-0.5 text-xs font-medium bg-yellow-100 text-yellow-800 rounded-full border border-yellow-200">
+                                                                    SOON
+                                                                </span>
+                                                            )}
+                                                            {dropdownLink.available && (
+                                                                <span className="px-2 py-0.5 text-xs font-semibold bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-full">
+                                                                    LIVE
+                                                                </span>
+                                                            )}
                                                         </Link>
                                                     </li>
                                                 ))}

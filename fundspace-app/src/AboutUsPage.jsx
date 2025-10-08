@@ -5,10 +5,10 @@ import AnimatedCounter from './components/AnimatedCounter.jsx';
 import { LayoutContext } from './App.jsx';
 
 const ADVISORY = [
-  { name: 'Advisory Member', title: 'Chief Program & Advancement Officer, Silicon Valley Social Venture Fund', imageUrl: 'https://media.licdn.com/dms/image/v2/D5603AQFJnKCpiXgEvA/profile-displayphoto-shrink_800_800/profile-displayphoto-shrink_800_800/0/1714823893508?e=1759968000&v=beta&t=alffzwY7ieN0BbxXshwwOcN_KczfJGL59CjCIGoW5Xk', linkedinUrl: 'https://www.linkedin.com/in/linda-prieto/' },
-  { name: 'Advisory Member', title: 'Director of Community Partnerships, Silicon Valley Community Foundation', imageUrl: 'https://www.hfsv.org/wp-content/uploads/2023/11/mauricio-palma-2023.jpg', linkedinUrl: 'https://www.linkedin.com/in/mauricio-palma-b2ba587/' },
-  { name: 'Advisory Member', title: 'Director of Contracts & Compliance, San Francisco International Airport', imageUrl: 'https://media.licdn.com/dms/image/v2/C5603AQFAMGYFJIyhzA/profile-displayphoto-shrink_800_800/profile-displayphoto-shrink_800_800/0/1600903357926?e=1759968000&v=beta&t=MLY11lUsP_16_m1_rt7RZXUaMGWISzuVx5BUGofPKpQ', linkedinUrl: 'https://www.linkedin.com/in/yenpang/' },
-  { name: 'Advisory Member', title: 'To be announced', imageUrl: 'https://triadessay.com/wp-content/uploads/2025/01/2025010118415912.png', linkedinUrl: null },
+  { name: 'Linda Prieto', title: 'Chief Program & Advancement Officer, Silicon Valley Social Venture Fund', imageUrl: 'https://media.licdn.com/dms/image/v2/D5603AQFJnKCpiXgEvA/profile-displayphoto-shrink_800_800/profile-displayphoto-shrink_800_800/0/1714823893508?e=1759968000&v=beta&t=alffzwY7ieN0BbxXshwwOcN_KczfJGL59CjCIGoW5Xk', linkedinUrl: 'https://www.linkedin.com/in/linda-prieto/' },
+  { name: 'Mauricio Palma', title: 'Director of Community Partnerships, Silicon Valley Community Foundation', imageUrl: 'https://www.hfsv.org/wp-content/uploads/2023/11/mauricio-palma-2023.jpg', linkedinUrl: 'https://www.linkedin.com/in/mauricio-palma-b2ba587/' },
+  { name: 'Yen Pang', title: 'Director of Contracts & Compliance, San Francisco International Airport', imageUrl: 'https://media.licdn.com/dms/image/v2/C5603AQFAMGYFJIyhzA/profile-displayphoto-shrink_800_800/profile-displayphoto-shrink_800_800/0/1600903357926?e=1759968000&v=beta&t=MLY11lUsP_16_m1_rt7RZXUaMGWISzuVx5BUGofPKpQ', linkedinUrl: 'https://www.linkedin.com/in/yenpang/' },
+  { name: 'Amourence Lee', title: 'Program Officer Policy & Innovation, San Francisco Foundation', imageUrl: 'https://media.licdn.com/dms/image/v2/C5603AQEWoE5dw6oN-w/profile-displayphoto-shrink_200_200/profile-displayphoto-shrink_200_200/0/1588619359657?e=1762992000&v=beta&t=td0jZu9txPu6nuHgyDmpyUqa_qur0svDnMmr_aXI1EM', linkedinUrl: 'https://www.linkedin.com/in/amourence-lee' },
   { name: 'Advisory Member', title: 'To be announced', imageUrl: 'https://avatar.iran.liara.run/public/7', linkedinUrl: null },
   { name: 'Advisory Member', title: 'To be announced', imageUrl: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTePvPIcfgyTA_2uby6QSsAG7PDe0Ai1Pv9x6cpYZYRGyxKSufwKmkibEpGZDw1fw5JUSs&usqp=CAU', linkedinUrl: null }
 ];
@@ -145,8 +145,37 @@ const AboutUsPage = () => {
             <h2 className="text-4xl font-black leading-tight tracking-tight text-slate-900">Rooted Locally. Architected To Scale.</h2>
             <p className="text-lg text-slate-700 leading-relaxed">We live here. The Bay Area gives us dense diversity in focus areas, org sizes, and capital sources—perfect for iterating equitable matching systems. Regional grounding lets us avoid abstract platform bloat & ship pragmatic tools.</p>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
-              {['Alameda', 'Contra Costa', 'Marin', 'Napa', 'San Francisco', 'San Mateo', 'Santa Clara', 'Solano', 'Sonoma'].map(c => (
-                <span key={c} className="px-3 py-2 rounded-xl bg-gradient-to-br from-slate-50 to-white border border-slate-200 shadow-sm text-slate-700 font-medium text-center">{c}</span>
+              {[
+                { name: 'Alameda', comingSoon: true },
+                { name: 'Contra Costa', comingSoon: true },
+                { name: 'Marin', comingSoon: true },
+                { name: 'Napa', comingSoon: true },
+                { name: 'San Francisco', comingSoon: true },
+                { name: 'San Mateo', comingSoon: false },
+                { name: 'Santa Clara', comingSoon: true },
+                { name: 'Solano', comingSoon: true },
+                { name: 'Sonoma', comingSoon: true }
+              ].map(county => (
+                <span 
+                  key={county.name} 
+                  className={`px-3 py-2 rounded-xl border shadow-sm font-medium text-center flex items-center justify-center gap-2 ${
+                    county.comingSoon 
+                      ? 'bg-slate-50 border-slate-200 text-slate-400' 
+                      : 'bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200 text-slate-700'
+                  }`}
+                >
+                  <span>{county.name}</span>
+                  {county.comingSoon && (
+                    <span className="px-1.5 py-0.5 text-[10px] font-semibold bg-yellow-100 text-yellow-800 rounded-full border border-yellow-200">
+                      SOON
+                    </span>
+                  )}
+                  {!county.comingSoon && (
+                    <span className="px-1.5 py-0.5 text-[10px] font-semibold bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-full">
+                      LIVE
+                    </span>
+                  )}
+                </span>
               ))}
             </div>
             <p className="text-sky-600 font-semibold">We look forward to expanding in other regions once we have time to learn and adapt our model.</p>
@@ -211,6 +240,11 @@ const AboutUsPage = () => {
               </div>
             </motion.div>
           ))}
+        </div>
+        <div className="mt-24 max-w-3xl mx-auto px-6">
+          <p className="text-sm text-center text-slate-500 italic bg-slate-50 border border-slate-200 rounded-xl px-6 py-4">
+            All advisory members participate in their personal capacity and do not represent their affiliated organizations. Views and guidance shared are their own.
+          </p>
         </div>
       </Section>
       <Section className="bg-gradient-to-br from-blue-50 via-indigo-50 to-violet-50 py-32 md:py-44 overflow-hidden">

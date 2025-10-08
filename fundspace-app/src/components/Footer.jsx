@@ -1,19 +1,50 @@
-// src/components/Footer.jsx - Updated with more top spacing
-import React, { useState } from 'react';
+// src/components/Footer.jsx
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Facebook, Twitter, Linkedin, Instagram, Youtube } from 'lucide-react';
+import { supabase } from '../supabaseClient';
+import { getProfileById } from '../utils/profileHelpers.js';
 import footerLogoImage from '../assets/fundspace-logo.png';
 
 export default function Footer() {
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [session, setSession] = useState(null);
+  const [profile, setProfile] = useState(null);
+
+  // Fetch session/profile on mount
+  useEffect(() => {
+    const fetchProfileForSession = async (currentSession) => {
+      setSession(currentSession);
+      if (currentSession?.user) {
+        const profileData = await getProfileById(currentSession.user.id);
+        setProfile(profileData);
+      } else {
+        setProfile(null);
+      }
+    };
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      fetchProfileForSession(session);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      fetchProfileForSession(newSession);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   const handleSubmitGrantClick = async (e) => {
     e.preventDefault();
+    
+    if (!session || !profile) {
+      window.location.href = '/login';
+      return;
+    }
+    
     setIsSubmitting(true);
-    
     await new Promise(resolve => setTimeout(resolve, 500));
-    
     navigate('/submit-grant');
     setIsSubmitting(false);
   };
@@ -33,20 +64,19 @@ export default function Footer() {
   ];
 
   const spotlightLinks = [
-    { to: "/spotlight", text: "All Spotlights" },
-    { to: "/spotlight/san-francisco", text: "San Francisco" },
-    { to: "/spotlight/alameda", text: "Alameda" },
-    { to: "/spotlight/contra-costa", text: "Contra Costa" },
-    { to: "/spotlight/marin", text: "Marin" },
-    { to: "/spotlight/napa", text: "Napa" },
-    { to: "/spotlight/san-mateo", text: "San Mateo" },
-    { to: "/spotlight/santa-clara", text: "Santa Clara" },
-    { to: "/spotlight/solano", text: "Solano" },
-    { to: "/spotlight/sonoma", text: "Sonoma" },
+    { to: "/spotlight", text: "All Spotlights", comingSoon: true },
+    { to: "/spotlight/san-francisco", text: "San Francisco County", comingSoon: true },
+    { to: "/spotlight/alameda", text: "Alameda County", comingSoon: true },
+    { to: "/spotlight/contra-costa", text: "Contra Costa County", comingSoon: true },
+    { to: "/spotlight/marin", text: "Marin County", comingSoon: true },
+    { to: "/spotlight/napa", text: "Napa County", comingSoon: true },
+    { to: "/spotlight/san-mateo", text: "San Mateo County" },
+    { to: "/spotlight/santa-clara", text: "Santa Clara County", comingSoon: true },
+    { to: "/spotlight/solano", text: "Solano County", comingSoon: true },
+    { to: "/spotlight/sonoma", text: "Sonoma County", comingSoon: true },
   ];
 
   return (
-    // UPDATED: Increased top margin to mt-32 for double the spacing
     <footer className="bg-transparent py-8 mt-32">
       <div className="container mx-auto px-6">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
@@ -73,9 +103,35 @@ export default function Footer() {
           <div>
             <h4 className="text-sm font-bold text-slate-800 mb-3 tracking-wider uppercase">Spotlight</h4>
             <ul className="space-y-2 text-base">
-                {spotlightLinks.map(link => (
-                  <li key={link.to}><Link to={link.to} className="text-slate-600 hover:text-rose-600 transition-colors">{link.text}</Link></li>
-                ))}
+              {spotlightLinks.map(link => (
+                <li key={link.to} className="flex items-center gap-2">
+                  <Link 
+                    to={link.comingSoon ? "#" : link.to}
+                    className={`transition-colors ${
+                      link.comingSoon 
+                        ? 'text-slate-400 cursor-not-allowed pointer-events-none' 
+                        : 'text-slate-600 hover:text-rose-600'
+                    }`}
+                    onClick={(e) => {
+                      if (link.comingSoon) {
+                        e.preventDefault();
+                      }
+                    }}
+                  >
+                    {link.text}
+                  </Link>
+                  {link.comingSoon && (
+                    <span className="px-2 py-0.5 text-xs font-medium bg-yellow-100 text-yellow-800 rounded-full border border-yellow-200">
+                      SOON
+                    </span>
+                  )}
+                  {!link.comingSoon && link.to === "/spotlight/san-mateo" && (
+                    <span className="px-2 py-0.5 text-xs font-semibold bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-full">
+                      LIVE
+                    </span>
+                  )}
+                </li>
+              ))}
             </ul>
           </div>
             <div>
