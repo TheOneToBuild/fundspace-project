@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useCallback, useContext } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Search, MapPin, LayoutGrid, List, SlidersHorizontal, Building, Heart, Shield, GraduationCap, Stethoscope, Church, XCircle, ChevronDown, TrendingUp, Sparkles, Star, Target } from './components/Icons.jsx';
+import { Search, MapPin, LayoutGrid, List, SlidersHorizontal, Building, Heart, Shield, GraduationCap, Stethoscope, Church, XCircle, ChevronDown, TrendingUp, Sparkles, Star, Target, Users, Eye } from './components/Icons.jsx';
 import FilterBar from './components/FilterBar.jsx';
 import Pagination from './components/Pagination.jsx';
 import OrganizationCard from './components/OrganizationCard.jsx';
@@ -46,6 +46,12 @@ const ORG_TYPE_CONFIG = {
     description: 'Healthcare organizations and medical institutions'
   },
   forprofit: {
+    label: 'For-Profit',
+    icon: <Building size={16} />,
+    color: 'orange',
+    description: 'For-profit organizations with social impact'
+  },
+  'for-profit': {
     label: 'For-Profit',
     icon: <Building size={16} />,
     color: 'orange',
@@ -127,6 +133,19 @@ const OrganizationListItem = ({ organization }) => {
                       +{organization.focus_areas.length - 2}
                   </span>
               )}
+            </div>
+          )}
+          {(organization.followers_count > 0 || organization.bookmarks_count > 0) && (
+            <div className="flex items-center gap-1.5">
+                <Users size={14} className="text-slate-500" />
+                <span className="text-xs font-medium text-slate-600">
+                    {organization.followers_count || 0} followers
+                </span>
+                <span className="text-slate-300">·</span>
+                <Heart size={14} className="text-slate-500" />
+                 <span className="text-xs font-medium text-slate-600">
+                    {organization.bookmarks_count || 0} likes
+                </span>
             </div>
           )}
         </div>

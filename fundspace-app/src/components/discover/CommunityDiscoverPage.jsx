@@ -10,7 +10,7 @@ export default function CommunityDiscoverPage() {
     const [viewType, setViewType] = useState('counties'); // 'counties' or 'cities'
     const [selectedLocation, setSelectedLocation] = useState('bay-area'); // Default to Bay Area wide
     const [searchQuery, setSearchQuery] = useState('');
-    const [activeTab, setActiveTab] = useState('overview'); // 'overview', 'organizations', 'grants', 'posts'
+    const [activeTab, setActiveTab] = useState('overview'); // Changed from 'organizations' to 'overview'
     
     const { locationData, loading } = useLocationData(selectedLocation, viewType);
 

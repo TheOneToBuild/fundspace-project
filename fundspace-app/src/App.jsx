@@ -9,6 +9,7 @@ import OmegaAdminUsers from './components/omega-admin/OmegaAdminUsers.jsx';
 import OmegaAdminGrants from './components/omega-admin/OmegaAdminGrants.jsx';
 import GrantsPageContent from './GrantsPageContent.jsx';
 import CommunityDiscoverPage from './components/discover/CommunityDiscoverPage.jsx';
+import ExplorePage from './pages/ExplorePage.jsx';
 import ExploreOrganizations from './ExploreOrganizations.jsx';
 import SpotlightLandingPage from './SpotlightLandingPage.jsx';
 import CountySpotlightPage from './CountySpotlightPage.jsx';
@@ -372,6 +373,7 @@ export default function App() {
           <Route path="/" element={<AppLayout />}>
             <Route index element={<AuthRedirect><HomePage /></AuthRedirect>} />
             <Route path="grants" element={<GrantsPageContent />} />
+            <Route path="explore" element={<ExplorePage />} />
             <Route path="organizations" element={<ExploreOrganizations />} />
             <Route path="spotlight" element={<SpotlightLandingPage />} />
             <Route path="spotlight/:countySlug" element={<CountySpotlightPage />} />

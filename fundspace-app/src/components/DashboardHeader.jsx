@@ -246,6 +246,11 @@ export default function DashboardHeader({ profile }) {
             to: '/profile/my-organization',
             icon: <Building size={16} />,
         },
+        {
+            label: 'Explore',
+            to: '/explore',
+            icon: <MapPin size={16} />
+        },
         ...(isOmegaAdmin ? [omegaAdminItem] : [])
     ];
 

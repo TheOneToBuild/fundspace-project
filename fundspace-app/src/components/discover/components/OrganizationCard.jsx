@@ -68,16 +68,16 @@ export default function OrganizationCard({ organization }) {
                             <Users className="w-4 h-4 text-blue-600" />
                         </div>
                         <span className="font-medium">
-                            {organization.organization_follows?.[0]?.count || 0} followers
+                            {organization.followers_count || 0} followers
                         </span>
                     </div>
                     
                     <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
-                            <MessageSquare className="w-4 h-4 text-green-600" />
+                        <div className="w-8 h-8 bg-pink-100 rounded-lg flex items-center justify-center">
+                            <Heart className="w-4 h-4 text-pink-600" />
                         </div>
                         <span className="font-medium">
-                            {organization.organization_posts?.[0]?.count || 0} posts
+                            {organization.bookmarks_count || 0} likes
                         </span>
                     </div>
                 </div>

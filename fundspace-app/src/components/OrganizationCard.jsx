@@ -39,6 +39,12 @@ const ORG_TYPE_CONFIG = {
     color: 'orange',
     description: 'For-profit organizations with social impact'
   },
+  'for-profit': {
+    label: 'For-Profit',
+    icon: <Building size={16} />,
+    color: 'orange',
+    description: 'For-profit organizations with social impact'
+  },
   religious: {
     label: 'Religious',
     icon: <Church size={16} />,
@@ -48,30 +54,80 @@ const ORG_TYPE_CONFIG = {
 };
 
 const getEnhancedPillClasses = (focusArea) => {
-  const areaMap = {
-    'Arts': 'bg-gradient-to-r from-fuchsia-100 to-purple-100 text-fuchsia-700 border-fuchsia-200',
-    'Culture': 'bg-gradient-to-r from-rose-100 to-pink-100 text-rose-700 border-rose-200',
-    'Education': 'bg-gradient-to-r from-sky-100 to-blue-100 text-sky-700 border-sky-200',
-    'Health': 'bg-gradient-to-r from-emerald-100 to-teal-100 text-emerald-700 border-emerald-200',
-    'Healthcare': 'bg-gradient-to-r from-green-100 to-emerald-100 text-green-700 border-green-200',
-    'Environment': 'bg-gradient-to-r from-lime-100 to-green-100 text-lime-700 border-lime-200',
-    'Housing': 'bg-gradient-to-r from-amber-100 to-orange-100 text-amber-700 border-amber-200',
-    'Technology': 'bg-gradient-to-r from-cyan-100 to-teal-100 text-cyan-700 border-cyan-200',
-    'Innovation': 'bg-gradient-to-r from-indigo-100 to-violet-100 text-indigo-700 border-indigo-200',
-    'Community': 'bg-gradient-to-r from-pink-100 to-rose-100 text-pink-700 border-pink-200',
-    'Community Development': 'bg-gradient-to-r from-red-100 to-rose-100 text-red-700 border-red-200',
-    'Social Impact': 'bg-gradient-to-r from-violet-100 to-purple-100 text-violet-700 border-violet-200',
-    'Research': 'bg-gradient-to-r from-gray-100 to-slate-100 text-gray-700 border-gray-200',
-    'Medical Research': 'bg-gradient-to-r from-blue-100 to-indigo-100 text-blue-700 border-blue-200',
-    'Mental Health': 'bg-gradient-to-r from-purple-100 to-indigo-100 text-purple-700 border-purple-200',
-    'Health Equity': 'bg-gradient-to-r from-teal-100 to-green-100 text-teal-700 border-teal-200',
-    'Chronic Disease Prevention': 'bg-gradient-to-r from-orange-100 to-red-100 text-orange-700 border-orange-200',
-    'Pediatric Health': 'bg-gradient-to-r from-yellow-100 to-amber-100 text-yellow-700 border-yellow-200',
-    'Child Health Research': 'bg-gradient-to-r from-lime-100 to-yellow-100 text-lime-700 border-lime-200',
-    'Pediatric Education': 'bg-gradient-to-r from-emerald-100 to-cyan-100 text-emerald-700 border-emerald-200'
+  if (!focusArea) return 'bg-gradient-to-r from-slate-100 to-zinc-100 text-slate-700 border-slate-200';
+  
+  // Color palettes for gradients
+  const colorPalettes = [
+    'bg-gradient-to-r from-fuchsia-100 to-purple-100 text-fuchsia-700 border-fuchsia-200',
+    'bg-gradient-to-r from-rose-100 to-pink-100 text-rose-700 border-rose-200',
+    'bg-gradient-to-r from-sky-100 to-blue-100 text-sky-700 border-sky-200',
+    'bg-gradient-to-r from-emerald-100 to-teal-100 text-emerald-700 border-emerald-200',
+    'bg-gradient-to-r from-green-100 to-emerald-100 text-green-700 border-green-200',
+    'bg-gradient-to-r from-lime-100 to-green-100 text-lime-700 border-lime-200',
+    'bg-gradient-to-r from-amber-100 to-orange-100 text-amber-700 border-amber-200',
+    'bg-gradient-to-r from-cyan-100 to-teal-100 text-cyan-700 border-cyan-200',
+    'bg-gradient-to-r from-indigo-100 to-violet-100 text-indigo-700 border-indigo-200',
+    'bg-gradient-to-r from-pink-100 to-rose-100 text-pink-700 border-pink-200',
+    'bg-gradient-to-r from-red-100 to-rose-100 text-red-700 border-red-200',
+    'bg-gradient-to-r from-violet-100 to-purple-100 text-violet-700 border-violet-200',
+    'bg-gradient-to-r from-blue-100 to-indigo-100 text-blue-700 border-blue-200',
+    'bg-gradient-to-r from-purple-100 to-indigo-100 text-purple-700 border-purple-200',
+    'bg-gradient-to-r from-teal-100 to-green-100 text-teal-700 border-teal-200',
+    'bg-gradient-to-r from-orange-100 to-red-100 text-orange-700 border-orange-200',
+    'bg-gradient-to-r from-yellow-100 to-amber-100 text-yellow-700 border-yellow-200',
+    'bg-gradient-to-r from-emerald-100 to-cyan-100 text-emerald-700 border-emerald-200',
+  ];
+  
+  // Simple hash function to consistently map focus area to a color
+  const hashString = (str) => {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      const char = str.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32bit integer
+    }
+    return Math.abs(hash);
   };
   
-  return areaMap[focusArea] || 'bg-gradient-to-r from-slate-100 to-zinc-100 text-slate-700 border-slate-200';
+  const colorIndex = hashString(focusArea) % colorPalettes.length;
+  return colorPalettes[colorIndex];
+};
+
+const getStaffRange = (count) => {
+  if (!count) return null;
+  const num = parseInt(count);
+  if (isNaN(num)) return count;
+  
+  if (num === 1) return '1 employee';
+  if (num < 10) return '1-10 employees';
+  if (num < 50) return '10-50 employees';
+  if (num < 100) return '50-100 employees';
+  if (num < 500) return '100-500 employees';
+  if (num < 1000) return '500-1,000 employees';
+  return '1,000+ employees';
+};
+
+const getBudgetRange = (amount) => {
+  if (!amount) return null;
+  
+  // If it's already a string range, return it
+  if (typeof amount === 'string' && amount.includes('-')) return amount;
+  
+  // Convert number to string and remove non-numeric characters
+  const numStr = String(amount).replace(/[^0-9]/g, '');
+  const num = parseInt(numStr);
+  
+  if (isNaN(num)) return amount; // Return original if can't parse
+  
+  // Define ranges
+  if (num < 100000) return 'Under $100K';
+  if (num < 500000) return '$100K - $500K';
+  if (num < 1000000) return '$500K - $1M';
+  if (num < 5000000) return '$1M - $5M';
+  if (num < 10000000) return '$5M - $10M';
+  if (num < 50000000) return '$10M - $50M';
+  if (num < 100000000) return '$50M - $100M';
+  return 'Over $100M';
 };
 
 const OrganizationCard = ({ organization, handleFilterChange, linkTo, buttonText = "View Profile" }) => {
@@ -212,19 +268,17 @@ const OrganizationCard = ({ organization, handleFilterChange, linkTo, buttonText
               </span>
             )}
 
-            {(organization.followers_count || organization.followersCount) && (
-              <span className="text-xs font-medium px-2 py-1 rounded-full bg-blue-50 text-blue-600 border border-blue-200 inline-flex items-center gap-1">
-                <Eye size={12} />
-                {organization.followers_count || organization.followersCount} followers
-              </span>
-            )}
+            {/* Show followers count */}
+            <span className="text-xs font-medium px-2 py-1 rounded-full bg-blue-50 text-blue-600 border border-blue-200 inline-flex items-center gap-1">
+              <Eye size={12} />
+              {organization.followers_count || 0} followers
+            </span>
 
-            {(organization.likes_count || organization.likesCount) && (
-              <span className="text-xs font-medium px-2 py-1 rounded-full bg-pink-50 text-pink-600 border border-pink-200 inline-flex items-center gap-1">
-                <Heart size={12} />
-                {organization.likes_count || organization.likesCount} likes
-              </span>
-            )}
+            {/* Show bookmarks count (likes) */}
+            <span className="text-xs font-medium px-2 py-1 rounded-full bg-pink-50 text-pink-600 border border-pink-200 inline-flex items-center gap-1">
+              <Heart size={12} />
+              {organization.bookmarks_count || 0} likes
+            </span>
           </div>
         </div>
 
@@ -234,61 +288,87 @@ const OrganizationCard = ({ organization, handleFilterChange, linkTo, buttonText
           </p>
         </div>
 
-        <div className="grid grid-cols-1 gap-3 mb-6">
-          <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-4 rounded-xl border border-blue-100 group-hover:shadow-lg transition-shadow duration-300 h-20">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="p-1 bg-blue-100 rounded-lg">
-                <MapPin size={14} className="text-blue-600" />
+        {/* HQ, Areas Served, Team Size, and Budget - Two rows */}
+        <div className="mb-4 space-y-3">
+          {/* First Row: HQ and Areas Served */}
+          <div className="grid grid-cols-2 gap-3">
+            {/* HQ (Headquarters) */}
+            <div>
+              <div className="flex items-center gap-1 mb-2">
+                <MapPin size={12} className="text-blue-600" />
+                <span className="text-xs font-semibold text-blue-700 uppercase tracking-wide">Headquarters</span>
               </div>
-              <span className="text-xs font-semibold text-blue-700 uppercase tracking-wide">Location</span>
+              {organization.location ? (
+                <span className="inline-flex items-center text-xs font-semibold px-2 py-1 rounded-full bg-gradient-to-r from-blue-100 to-indigo-100 text-blue-700 border border-blue-200 line-clamp-1">
+                  {organization.location}
+                </span>
+              ) : (
+                <span className="inline-flex items-center text-xs font-medium px-2 py-1 rounded-full bg-slate-50 text-slate-500 border border-slate-200 italic">
+                  Unknown
+                </span>
+              )}
             </div>
-            <div className="text-sm font-bold text-blue-800 line-clamp-1">
-              {organization.location || 'Not specified'}
+
+            {/* Areas Served */}
+            <div>
+              <div className="flex items-center gap-1 mb-2">
+                <MapPin size={12} className="text-indigo-600" />
+                <span className="text-xs font-semibold text-indigo-700 uppercase tracking-wide">Areas Served</span>
+              </div>
+              {organization.areas_served ? (
+                <span className="inline-flex items-center text-xs font-semibold px-2 py-1 rounded-full bg-gradient-to-r from-indigo-100 to-purple-100 text-indigo-700 border border-indigo-200 line-clamp-1">
+                  {organization.areas_served}
+                </span>
+              ) : (
+                <span className="inline-flex items-center text-xs font-medium px-2 py-1 rounded-full bg-slate-50 text-slate-500 border border-slate-200 italic">
+                  Unknown
+                </span>
+              )}
             </div>
           </div>
-          
-          {normalizedType === 'foundation' && organization.total_funding_annually && (
-            <div className="bg-gradient-to-br from-green-50 to-emerald-50 p-4 rounded-xl border border-green-100 group-hover:shadow-lg transition-shadow duration-300 h-20">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="p-1 bg-green-100 rounded-lg">
-                  <DollarSign size={14} className="text-green-600" />
-                </div>
-                <span className="text-xs font-semibold text-green-700 uppercase tracking-wide">Annual Giving</span>
-              </div>
-              <div className="text-sm font-bold text-green-800 line-clamp-1">
-                {organization.total_funding_annually}
-              </div>
-            </div>
-          )}
-          
-          {normalizedType === 'nonprofit' && organization.budget && (
-            <div className="bg-gradient-to-br from-green-50 to-emerald-50 p-4 rounded-xl border border-green-100 group-hover:shadow-lg transition-shadow duration-300 h-20">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="p-1 bg-green-100 rounded-lg">
-                  <DollarSign size={14} className="text-green-600" />
-                </div>
-                <span className="text-xs font-semibold text-green-700 uppercase tracking-wide">Annual Budget</span>
-              </div>
-              <div className="text-sm font-bold text-green-800 line-clamp-1">
-                {organization.budget}
-              </div>
-            </div>
-          )}
-          
-          {(organization.staff_count || organization.staffCount) && (
-            <div className="bg-gradient-to-br from-purple-50 to-pink-50 p-4 rounded-xl border border-purple-100 group-hover:shadow-lg transition-shadow duration-300 h-20">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="p-1 bg-purple-100 rounded-lg">
-                  <Users size={14} className="text-purple-600" />
-                </div>
-                <span className="text-xs font-semibold text-purple-700 uppercase tracking-wide">Staff Count</span>
-              </div>
-              <div className="text-sm font-bold text-purple-800 line-clamp-1">
-                {organization.staff_count || organization.staffCount}
-              </div>
-            </div>
-          )}
 
+          {/* Second Row: Team Size and Budget */}
+          <div className="grid grid-cols-2 gap-3">
+            {/* Team Size */}
+            <div>
+              <div className="flex items-center gap-1 mb-2">
+                <Users size={12} className="text-purple-600" />
+                <span className="text-xs font-semibold text-purple-700 uppercase tracking-wide">Team Size</span>
+              </div>
+              {(organization.staff_count || organization.staffCount) ? (
+                <span className="inline-flex items-center text-xs font-semibold px-2 py-1 rounded-full bg-gradient-to-r from-purple-100 to-pink-100 text-purple-700 border border-purple-200 line-clamp-1">
+                  {organization.staff_count || organization.staffCount}
+                </span>
+              ) : (
+                <span className="inline-flex items-center text-xs font-medium px-2 py-1 rounded-full bg-slate-50 text-slate-500 border border-slate-200 italic">
+                  Unknown
+                </span>
+              )}
+            </div>
+
+            {/* Annual Budget/Giving */}
+            <div>
+              <div className="flex items-center gap-1 mb-2">
+                <DollarSign size={12} className="text-green-600" />
+                <span className="text-xs font-semibold text-green-700 uppercase tracking-wide whitespace-nowrap">
+                  {normalizedType === 'foundation' ? 'Annual Giving' : 'Budget'}
+                </span>
+              </div>
+              {((normalizedType === 'foundation' && organization.total_funding_annually) ||
+                (normalizedType === 'nonprofit' && organization.budget)) ? (
+                <span className="inline-flex items-center text-xs font-semibold px-2 py-1 rounded-full bg-gradient-to-r from-green-100 to-emerald-100 text-green-700 border border-green-200 line-clamp-1">
+                  {getBudgetRange(organization.total_funding_annually || organization.budget)}
+                </span>
+              ) : (
+                <span className="inline-flex items-center text-xs font-medium px-2 py-1 rounded-full bg-slate-50 text-slate-500 border border-slate-200 italic">
+                  Unknown
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+        
+        <div className="grid grid-cols-1 gap-3 mb-6">
           {organization.notable_grant && (
             <div className="bg-gradient-to-br from-amber-50 to-yellow-50 p-4 rounded-xl border border-amber-100 group-hover:shadow-lg transition-shadow duration-300 h-20">
               <div className="flex items-center gap-2 mb-2">
@@ -318,13 +398,15 @@ const OrganizationCard = ({ organization, handleFilterChange, linkTo, buttonText
           )}
         </div>
 
-        {((organization.focus_areas && organization.focus_areas.length > 0) || 
-          (organization.focusAreas && organization.focusAreas.length > 0)) && (
-          <div className="mb-6">
-            <div className="flex items-center gap-2 mb-2">
-              <Target size={14} className="text-purple-500" />
-              <span className="text-xs font-semibold text-purple-700 uppercase tracking-wide">Focus Areas</span>
-            </div>
+        {/* Focus Areas Section - Always show */}
+        <div className="mb-6">
+          <div className="flex items-center gap-2 mb-2">
+            <Target size={14} className="text-purple-500" />
+            <span className="text-xs font-semibold text-purple-700 uppercase tracking-wide">Focus Areas</span>
+          </div>
+          
+          {((organization.focus_areas && organization.focus_areas.length > 0) || 
+            (organization.focusAreas && organization.focusAreas.length > 0)) ? (
             <div className="flex flex-wrap gap-2">
               {(organization.focus_areas || organization.focusAreas || []).slice(0, 3).map((area, index) => (
                 <button 
@@ -346,8 +428,14 @@ const OrganizationCard = ({ organization, handleFilterChange, linkTo, buttonText
                 </span>
               )}
             </div>
-          </div>
-        )}
+          ) : (
+            <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-lg border border-slate-200">
+              <span className="text-xs text-slate-500 italic">
+                No focus areas listed yet
+              </span>
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="px-6 pb-6 relative z-0 mt-auto">

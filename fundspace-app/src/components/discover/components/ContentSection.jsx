@@ -8,6 +8,7 @@ import DashboardBanner from './DashboardBanner.jsx';
 import OrganizationCard from './OrganizationCard.jsx';
 import GrantCard from './GrantCard.jsx';
 import PostCard from './PostCard.jsx';
+import TabNavigation from './TabNavigation.jsx';
 
 const AnimationStyles = () => {
     React.useEffect(() => {
@@ -203,8 +204,8 @@ const TabContent = ({ activeTab, locationData, isVisible, dashboardStats }) => {
             <div className="space-y-8">
                 {locationData?.demographics && (
                     <DemographicsSection 
-                        demographics={locationData.demographics} 
-                        isVisible={isVisible} 
+                        demographics={locationData.demographics}
+                        isVisible={isVisible} // Changed
                     />
                 )}
                 <StatsCards 
@@ -312,38 +313,42 @@ export default function ContentSection({
     loading, 
     activeTab, 
     setActiveTab 
-}) {
-    const [isVisible, setIsVisible] = useState(false);
+}) {const [isDashboardVisible, setIsDashboardVisible] = useState(false);
+const [isContentVisible, setIsContentVisible] = useState(false);
     const [previousLocation, setPreviousLocation] = useState(selectedLocation);
     const [previousTab, setPreviousTab] = useState(activeTab);
     
     const dashboardStats = useDashboardStats(selectedLocation);
 
+    // Dashboard visibility - only changes with location
     useEffect(() => {
         if (selectedLocation !== previousLocation) {
-            setIsVisible(false);
+            setIsDashboardVisible(false);
             const timer = setTimeout(() => {
-                setIsVisible(true);
+                setIsDashboardVisible(true);
                 setPreviousLocation(selectedLocation);
             }, 150);
             
             return () => clearTimeout(timer);
-        } else if (!loading && locationData && !isVisible) {
-            setIsVisible(true);
+        } else if (!loading && locationData && !isDashboardVisible) {
+            setIsDashboardVisible(true);
         }
-    }, [selectedLocation, previousLocation, loading, locationData, isVisible]);
+    }, [selectedLocation, previousLocation, loading, locationData, isDashboardVisible]);
 
+    // Content visibility - changes with tabs
     useEffect(() => {
         if (activeTab !== previousTab) {
-            setIsVisible(false);
+            setIsContentVisible(false);
             const timer = setTimeout(() => {
-                setIsVisible(true);
+                setIsContentVisible(true);
                 setPreviousTab(activeTab);
             }, 100);
             
             return () => clearTimeout(timer);
+        } else if (!isContentVisible) {
+            setIsContentVisible(true);
         }
-    }, [activeTab, previousTab]);
+    }, [activeTab, previousTab, isContentVisible]);
 
     if (!selectedLocation) {
         return (
@@ -370,20 +375,24 @@ export default function ContentSection({
             <DashboardBanner 
                 selectedLocation={selectedLocation}
                 locationName={locationName}
-                activeTab={activeTab}
-                setActiveTab={setActiveTab}
                 viewType={viewType}
                 setViewType={setViewType}
                 setSelectedLocation={setSelectedLocation}
                 searchQuery={searchQuery}
                 setSearchQuery={setSearchQuery}
-                isVisible={isVisible}
+                isVisible={isDashboardVisible}  // Use isDashboardVisible instead of isVisible
+            />
+
+            <TabNavigation 
+                activeTab={activeTab}
+                setActiveTab={setActiveTab}
+                stats={dashboardStats}
             />
 
             <TabContent 
                 activeTab={activeTab} 
                 locationData={locationData} 
-                isVisible={isVisible} 
+                isVisible={isContentVisible}  // Use isContentVisible instead of isVisible
                 dashboardStats={dashboardStats}
             />
         </>
