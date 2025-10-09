@@ -122,7 +122,6 @@ const getLocationPillClasses = (locationName) => {
     'Fremont': 'bg-gradient-to-r from-orange-100 to-red-100 text-orange-700 border-orange-200',
     'Hayward': 'bg-gradient-to-r from-yellow-100 to-orange-100 text-yellow-700 border-yellow-200',
     'Sunnyvale': 'bg-gradient-to-r from-cyan-100 to-teal-100 text-cyan-700 border-cyan-200',
-    'Santa Clara': 'bg-gradient-to-r from-emerald-100 to-green-100 text-emerald-700 border-emerald-200',
     'Mountain View': 'bg-gradient-to-r from-teal-100 to-emerald-100 text-teal-700 border-teal-200',
     'Palo Alto': 'bg-gradient-to-r from-lime-100 to-green-100 text-lime-700 border-lime-200',
     'Redwood City': 'bg-gradient-to-r from-green-100 to-lime-100 text-green-700 border-green-200',

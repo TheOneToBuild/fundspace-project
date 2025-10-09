@@ -1,5 +1,5 @@
 import { alamedaCounty } from './alamedaCounty.js';
-import { contraCostaCounty } from './contracostaCounty.js';
+import { contraCostaCounty } from './contraCostaCounty.js';
 import { marinCounty } from './marinCounty.js';
 import { napaCounty } from './napaCounty.js';
 import { sanFranciscoCounty } from './sanfranciscoCounty.js';
