@@ -2,7 +2,7 @@ import { alamedaCounty } from './alamedaCounty.js';
 import { contraCostaCounty } from './contraCostaCounty.js';
 import { marinCounty } from './marinCounty.js';
 import { napaCounty } from './napaCounty.js';
-import { sanFranciscoCounty } from './sanfranciscoCounty.js';
+import { sanFranciscoCounty } from './sanFranciscoCounty.js';
 import { sanMateoCounty } from './sanmateoCounty.js';
 import { santaClaraCounty } from './santaclaraCounty.js';
 import { solanoCounty } from './solanoCounty.js';
