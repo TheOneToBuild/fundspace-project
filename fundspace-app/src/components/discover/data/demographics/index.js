@@ -3,8 +3,8 @@ import { contraCostaCounty } from './contraCostaCounty.js';
 import { marinCounty } from './marinCounty.js';
 import { napaCounty } from './napaCounty.js';
 import { sanFranciscoCounty } from './sanFranciscoCounty.js';
-import { sanMateoCounty } from './sanmateoCounty.js';
-import { santaClaraCounty } from './santaclaraCounty.js';
+import { sanMateoCounty } from './sanMateoCounty.js';
+import { santaClaraCounty } from './santaClaraCounty.js';
 import { solanoCounty } from './solanoCounty.js';
 import { sonomaCounty } from './sonomaCounty.js';
 
