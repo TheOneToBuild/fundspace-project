@@ -304,105 +304,111 @@ const FilterBar = ({
       {isOrganizationsPage && (
         <>
           <div className="flex gap-3">
-            <div className="min-w-[140px]">
-              <Select
-                id="org-type-filter"
-                isMulti={false}
-                options={[{ value: '', label: 'All Types' }, ...(availableTypes?.map(type => {
-                  const config = orgTypeConfig?.[type];
-                  return { value: type, label: config?.label || type };
-                }) || [])]}
-                value={(() => {
-                  const val = typeFilter?.[0] || '';
-                  return [{ value: val, label: (orgTypeConfig?.[val]?.label || val) || 'All Types' }];
-                })()}
-                onChange={opt => setTypeFilter(opt && opt.value ? [opt.value] : [])}
-                placeholder="Organization Type"
-                classNamePrefix="filter-pill"
-                styles={{
-                  ...customSelectStyles,
-                  control: (base, state) => ({
-                    ...base,
-                    borderRadius: '9999px',
-                    minHeight: '44px',
-                    maxHeight: '44px',
-                    paddingLeft: '20px',
-                    paddingRight: '20px',
-                    fontWeight: 500,
-                    fontSize: '15px',
-                    boxShadow: 'none',
-                    borderColor: state.isFocused ? '#3b82f6' : '#e5e7eb',
-                    background: '#fff',
-                    cursor: 'pointer',
-                  }),
-                  placeholder: (base) => ({ ...base, color: '#64748b', fontWeight: 500 }),
-                }}
-                isClearable
-                menuIsOpen={undefined}
-              />
-            </div>
-            <div className="min-w-[140px]">
-              <Select
-                id="org-focus-area-filter"
-                isMulti
-                options={focusAreaOptions}
-                value={getSelectedValues(focusAreaFilter, focusAreaOptions)}
-                onChange={handleMultiSelectChange(setFocusAreaFilter)}
-                placeholder="Focus Areas"
-                classNamePrefix="filter-pill"
-                styles={{
-                  ...customSelectStyles,
-                  control: (base, state) => ({
-                    ...base,
-                    borderRadius: '9999px',
-                    minHeight: '44px',
-                    maxHeight: '44px',
-                    paddingLeft: '20px',
-                    paddingRight: '20px',
-                    fontWeight: 500,
-                    fontSize: '15px',
-                    boxShadow: 'none',
-                    borderColor: state.isFocused ? '#3b82f6' : '#e5e7eb',
-                    background: '#fff',
-                    cursor: 'pointer',
-                  }),
-                  placeholder: (base) => ({ ...base, color: '#64748b', fontWeight: 500 }),
-                }}
-                isClearable
-                menuIsOpen={undefined}
-              />
-            </div>
-            <div className="min-w-[140px]">
-              <Select
-                id="org-location-filter"
-                isMulti
-                options={locationOptions}
-                value={getSelectedValues(locationFilter, locationOptions)}
-                onChange={handleMultiSelectChange(setLocationFilter)}
-                placeholder="Locations"
-                classNamePrefix="filter-pill"
-                styles={{
-                  ...customSelectStyles,
-                  control: (base, state) => ({
-                    ...base,
-                    borderRadius: '9999px',
-                    minHeight: '44px',
-                    maxHeight: '44px',
-                    paddingLeft: '20px',
-                    paddingRight: '20px',
-                    fontWeight: 500,
-                    fontSize: '15px',
-                    boxShadow: 'none',
-                    borderColor: state.isFocused ? '#3b82f6' : '#e5e7eb',
-                    background: '#fff',
-                    cursor: 'pointer',
-                  }),
-                  placeholder: (base) => ({ ...base, color: '#64748b', fontWeight: 500 }),
-                }}
-                isClearable
-                menuIsOpen={undefined}
-              />
-            </div>
+            {setTypeFilter && (
+              <div className="min-w-[140px]">
+                <Select
+                  id="org-type-filter"
+                  isMulti={false}
+                  options={[{ value: '', label: 'All Types' }, ...(availableTypes?.map(type => {
+                    const config = orgTypeConfig?.[type];
+                    return { value: type, label: config?.label || type };
+                  }) || [])]}
+                  value={(() => {
+                    const val = typeFilter?.[0] || '';
+                    return [{ value: val, label: (orgTypeConfig?.[val]?.label || val) || 'All Types' }];
+                  })()}
+                  onChange={opt => setTypeFilter(opt && opt.value ? [opt.value] : [])}
+                  placeholder="Organization Type"
+                  classNamePrefix="filter-pill"
+                  styles={{
+                    ...customSelectStyles,
+                    control: (base, state) => ({
+                      ...base,
+                      borderRadius: '9999px',
+                      minHeight: '44px',
+                      maxHeight: '44px',
+                      paddingLeft: '20px',
+                      paddingRight: '20px',
+                      fontWeight: 500,
+                      fontSize: '15px',
+                      boxShadow: 'none',
+                      borderColor: state.isFocused ? '#3b82f6' : '#e5e7eb',
+                      background: '#fff',
+                      cursor: 'pointer',
+                    }),
+                    placeholder: (base) => ({ ...base, color: '#64748b', fontWeight: 500 }),
+                  }}
+                  isClearable
+                  menuIsOpen={undefined}
+                />
+              </div>
+            )}
+            {setFocusAreaFilter && (
+              <div className="min-w-[140px]">
+                <Select
+                  id="org-focus-area-filter"
+                  isMulti
+                  options={focusAreaOptions}
+                  value={getSelectedValues(focusAreaFilter, focusAreaOptions)}
+                  onChange={handleMultiSelectChange(setFocusAreaFilter)}
+                  placeholder="Focus Areas"
+                  classNamePrefix="filter-pill"
+                  styles={{
+                    ...customSelectStyles,
+                    control: (base, state) => ({
+                      ...base,
+                      borderRadius: '9999px',
+                      minHeight: '44px',
+                      maxHeight: '44px',
+                      paddingLeft: '20px',
+                      paddingRight: '20px',
+                      fontWeight: 500,
+                      fontSize: '15px',
+                      boxShadow: 'none',
+                      borderColor: state.isFocused ? '#3b82f6' : '#e5e7eb',
+                      background: '#fff',
+                      cursor: 'pointer',
+                    }),
+                    placeholder: (base) => ({ ...base, color: '#64748b', fontWeight: 500 }),
+                  }}
+                  isClearable
+                  menuIsOpen={undefined}
+                />
+              </div>
+            )}
+            {setLocationFilter && (
+              <div className="min-w-[140px]">
+                <Select
+                  id="org-location-filter"
+                  isMulti
+                  options={locationOptions}
+                  value={getSelectedValues(locationFilter, locationOptions)}
+                  onChange={handleMultiSelectChange(setLocationFilter)}
+                  placeholder="Locations"
+                  classNamePrefix="filter-pill"
+                  styles={{
+                    ...customSelectStyles,
+                    control: (base, state) => ({
+                      ...base,
+                      borderRadius: '9999px',
+                      minHeight: '44px',
+                      maxHeight: '44px',
+                      paddingLeft: '20px',
+                      paddingRight: '20px',
+                      fontWeight: 500,
+                      fontSize: '15px',
+                      boxShadow: 'none',
+                      borderColor: state.isFocused ? '#3b82f6' : '#e5e7eb',
+                      background: '#fff',
+                      cursor: 'pointer',
+                    }),
+                    placeholder: (base) => ({ ...base, color: '#64748b', fontWeight: 500 }),
+                  }}
+                  isClearable
+                  menuIsOpen={undefined}
+                />
+              </div>
+            )}
           </div>
         </>
       )}

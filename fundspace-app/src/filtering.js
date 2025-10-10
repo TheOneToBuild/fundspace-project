@@ -253,86 +253,57 @@ const parseBudgetString = (budgetStr) => {
 };
 
 // Organization filtering function
-export const filterOrganizations = (organizations, filterConfig) => {
-  return organizations.filter(org => {
-    // Search term filter
-    if (filterConfig.searchTerm) {
-      const searchLower = filterConfig.searchTerm.toLowerCase();
-      const matchesSearch = 
-        org.name?.toLowerCase().includes(searchLower) ||
-        org.description?.toLowerCase().includes(searchLower) ||
-        org.focus_areas?.some(area => area.toLowerCase().includes(searchLower));
-      
-      if (!matchesSearch) return false;
-    }
+export const filterOrganizations = (orgs, filters) => {
+  const { 
+    searchTerm, 
+    locationSearchTerm,  // Add this
+    typeSearchTerm,
+    focusAreaSearchTerm,
+    locationFilter, 
+    focusAreaFilter, 
+    typeFilter, 
+    taxonomyFilter 
+  } = filters;
 
-    // Location filter
-    if (filterConfig.locationFilter && filterConfig.locationFilter.length > 0) {
-      if (!org.location || !filterConfig.locationFilter.some(loc => 
-        org.location.toLowerCase().includes(loc.toLowerCase())
-      )) {
-        return false;
-      }
-    }
+  return orgs.filter(org => {
+    // Existing search term logic
+    const term = (typeof searchTerm === 'string' ? searchTerm.trim() : '').toLowerCase();
+    const matchesSearch = !term ||
+      (org.name || '').toLowerCase().includes(term) ||
+      (org.description || '').toLowerCase().includes(term) ||
+      (org.focus_areas && org.focus_areas.some(area => area.toLowerCase().includes(term)));
 
-    // Focus area filter
-    if (filterConfig.focusAreaFilter && filterConfig.focusAreaFilter.length > 0) {
-      if (!org.focus_areas || !filterConfig.focusAreaFilter.some(area =>
-        org.focus_areas.includes(area)
-      )) {
-        return false;
-      }
-    }
+    // Location text search - NEW
+    const locationTerm = (typeof locationSearchTerm === 'string' ? locationSearchTerm.trim() : '').toLowerCase();
+    const matchesLocationSearch = !locationTerm ||
+      (org.location || '').toLowerCase().includes(locationTerm) ||
+      (org.city || '').toLowerCase().includes(locationTerm) ||
+      (org.state || '').toLowerCase().includes(locationTerm);
 
-    // Organization type filter
-    if (filterConfig.typeFilter && filterConfig.typeFilter.length > 0) {
-      if (!filterConfig.typeFilter.includes(org.type)) {
-        return false;
-      }
-    }
+    // Focus Area text search
+    const focusTerm = (typeof focusAreaSearchTerm === 'string' ? focusAreaSearchTerm.trim() : '').toLowerCase();
+    const matchesFocusSearch = !focusTerm ||
+      (org.focus_areas && org.focus_areas.some(area => area.toLowerCase().includes(focusTerm)));
 
-    // Taxonomy filter (if you want to filter by specific taxonomies)
-    if (filterConfig.taxonomyFilter && filterConfig.taxonomyFilter.length > 0) {
-      if (!filterConfig.taxonomyFilter.includes(org.taxonomy_code)) {
-        return false;
-      }
-    }
+    // Type text search
+    const typeTerm = (typeof typeSearchTerm === 'string' ? typeSearchTerm.trim() : '').toLowerCase();
+    const matchesTypeSearch = !typeTerm ||
+      (org.type || '').toLowerCase().includes(typeTerm);
 
-    // Budget filter for nonprofits
-    if (filterConfig.minBudget || filterConfig.maxBudget) {
-      if (org.type === 'nonprofit' && org.budget) {
-        const budgetValue = parseBudgetString(org.budget);
-        if (filterConfig.minBudget && budgetValue < parseFloat(filterConfig.minBudget)) {
-          return false;
-        }
-        if (filterConfig.maxBudget && budgetValue > parseFloat(filterConfig.maxBudget)) {
-          return false;
-        }
-      }
-    }
+    // Existing location filter (from dropdown)
+    const matchesLocation = locationFilter.length === 0 ||
+      locationFilter.some(loc => (org.location || '').toLowerCase().includes(loc.toLowerCase()));
 
-    // Annual giving filter for foundations
-    if (filterConfig.annualGivingFilter) {
-      if (org.type === 'foundation' && org.total_funding_annually) {
-        const givingValue = parseBudgetString(org.total_funding_annually);
-        const ranges = {
-          '0-500000': [0, 500000],
-          '500000-1000000': [500000, 1000000],
-          '1000000-5000000': [1000000, 5000000],
-          '5000000-10000000': [5000000, 10000000],
-          '10000000-50000000': [10000000, 50000000],
-          '50000000-100000000': [50000000, 100000000],
-          '100000000-999999999': [100000000, 999999999]
-        };
-        
-        const range = ranges[filterConfig.annualGivingFilter];
-        if (range && (givingValue < range[0] || givingValue > range[1])) {
-          return false;
-        }
-      }
-    }
+    // Existing filters...
+    const matchesFocusArea = focusAreaFilter.length === 0 ||
+      (org.focus_areas && focusAreaFilter.some(filter => 
+        org.focus_areas.some(area => area.toLowerCase() === filter.toLowerCase())
+      ));
 
-    return true;
+    const matchesType = typeFilter.length === 0 ||
+      typeFilter.some(type => (org.type || '').toLowerCase() === type.toLowerCase());
+
+    return matchesSearch && matchesLocationSearch && matchesFocusSearch && matchesTypeSearch && matchesLocation && matchesFocusArea && matchesType;
   });
 };
 

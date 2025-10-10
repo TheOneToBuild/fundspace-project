@@ -10,7 +10,8 @@ const EnhancedSearchInput = ({
   funders = [],
   placeholder = "Search funders, focus areas, locations...",
   className = "",
-  showRecentSearches = true
+  showRecentSearches = true,
+  hideIcon = false
 }) => {
   const [inputValue, setInputValue] = useState(searchTerm || '');
   const [isFocused, setIsFocused] = useState(false);
@@ -111,9 +112,11 @@ const EnhancedSearchInput = ({
   return (
     <div className={`relative ${className}`}>
       <div className="relative">
-        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-          <Search size={20} className="text-slate-400" />
-        </div>
+        {!hideIcon && (
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <Search size={20} className="text-slate-400" />
+          </div>
+        )}
         <input
           ref={inputRef} 
           type="text" 
@@ -123,7 +126,7 @@ const EnhancedSearchInput = ({
           onBlur={handleInputBlur} 
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
-          className="block w-full pl-10 pr-10 py-3 bg-transparent border-none outline-none shadow-none rounded-none placeholder-slate-400 focus:ring-0 focus:border-none focus:outline-none transition-all duration-200"
+          className={`block w-full ${hideIcon ? 'pl-0' : 'pl-10'} pr-10 py-3 bg-transparent border-none outline-none shadow-none rounded-none placeholder-slate-400 focus:ring-0 focus:border-none focus:outline-none transition-all duration-200`}
           style={{ boxShadow: 'none', border: 'none', background: 'transparent', borderRadius: 0 }}
           autoComplete="off"
         />

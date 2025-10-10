@@ -182,6 +182,7 @@ const ExploreOrganizations = ({ isProfileView = false }) => {
   const [error, setError] = useState('');
   const [filterConfig, setFilterConfig] = useState({ 
     searchTerm: '', 
+    locationSearchTerm: '', // Add for consistency, though not used in this component's own UI
     locationFilter: [],
     focusAreaFilter: [], 
     typeFilter: [],
@@ -260,6 +261,7 @@ const ExploreOrganizations = ({ isProfileView = false }) => {
   const handleClearFilters = useCallback(() => {
     setFilterConfig({ 
       searchTerm: '', 
+      locationSearchTerm: '',
       locationFilter: [], 
       focusAreaFilter: [], 
       typeFilter: [],
@@ -285,6 +287,7 @@ const ExploreOrganizations = ({ isProfileView = false }) => {
   const activeFilters = useMemo(() => {
     const filters = [];
     if (filterConfig.searchTerm) filters.push({ key: 'searchTerm', label: `Search: "${filterConfig.searchTerm}"` });
+    if (filterConfig.locationSearchTerm) filters.push({ key: 'locationSearchTerm', label: `Location: "${filterConfig.locationSearchTerm}"` });
     filterConfig.locationFilter.forEach(loc => filters.push({ key: 'locationFilter', value: loc, label: `Location: ${loc}` }));
     filterConfig.focusAreaFilter.forEach(area => filters.push({ key: 'focusAreaFilter', value: area, label: `Focus: ${area}` }));
     filterConfig.typeFilter.forEach(type => {
@@ -339,7 +342,7 @@ const ExploreOrganizations = ({ isProfileView = false }) => {
 
 
   return (
-    <div className={isProfileView ? "" : "container mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12 bg-[#faf7f5]"}>
+    <div className="w-full px-4 sm:px-6 lg:px-8 py-8 md:py-12 bg-[#faf7f5]">
       {/* Search bar and filter section, matching GrantsPageContent */}
       {!isProfileView && (
         <section className="mb-12 flex flex-col items-center w-full pt-14 sm:pt-20">
@@ -475,7 +478,7 @@ const ExploreOrganizations = ({ isProfileView = false }) => {
         ) : currentOrganizations.length > 0 ? (
           <>
             {viewMode === 'grid' ? (
-              <div className={`grid grid-cols-1 md:grid-cols-2 ${isProfileView ? 'lg:grid-cols-2' : 'lg:grid-cols-3'} gap-8`}>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                 {currentOrganizations.map((organization) => (
                   <OrganizationCard 
                     key={organization.id} 
