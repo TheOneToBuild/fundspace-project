@@ -149,50 +149,148 @@ export const sendConnectionRequest = async (requesterId, recipientId) => {
   }
 };
 
-export const acceptConnectionRequest = async (currentUserId, requesterId) => {
-  try {
-    const { data, error } = await supabase
-      .from('user_connections')
-      .update({
-        status: 'accepted',
-        updated_at: new Date().toISOString()
-      })
-      .eq('requester_id', requesterId)
-      .eq('recipient_id', currentUserId)
-      .eq('status', 'pending')
-      .select('id')
-      .single();
+export const acceptConnectionRequest = async (currentUserId, requesterId, connectionId = null) => {
+    try {
+        let connection;
 
-    if (error) {
-      return { success: false, error: error.message };
+        // If we have a connectionId from the notification, use it directly
+        if (connectionId) {
+            const { data, error } = await supabase
+                .from('user_connections')
+                .select('id, status, requester_id, recipient_id')
+                .eq('id', connectionId)
+                .maybeSingle();
+
+            if (error && error.code !== 'PGRST116') {
+                console.error('Connection lookup error:', error);
+            }
+            connection = data;
+        }
+
+        // If no connectionId or not found, search for it
+        if (!connection) {
+            const { data, error: findError } = await supabase
+                .from('user_connections')
+                .select('id, status, requester_id, recipient_id')
+                .eq('requester_id', requesterId)
+                .eq('recipient_id', currentUserId)
+                .maybeSingle();
+
+            if (findError && findError.code !== 'PGRST116') {
+                console.error('Error finding connection:', findError);
+                return { success: false, error: 'Failed to find connection request' };
+            }
+
+            connection = data;
+        }
+
+        // Check if connection exists
+        if (!connection) {
+            return { success: false, error: 'Connection request not found or already processed' };
+        }
+
+        // Check if already accepted - THIS IS THE KEY FIX
+        if (connection.status === 'accepted') {
+            console.log('Connection already accepted');
+            return { 
+                success: true, 
+                alreadyAccepted: true,  // Add this flag
+                data: connection 
+            };
+        }
+
+        // Check if not pending
+        if (connection.status !== 'pending') {
+            console.warn('Connection is not in pending state:', connection.status);
+            return { success: false, error: `Connection is ${connection.status}, cannot accept` };
+        }
+
+        // Update the connection to accepted
+        const { data: updatedData, error: updateError } = await supabase
+            .from('user_connections')
+            .update({
+                status: 'accepted',
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', connection.id)
+            .select()
+            .single();
+
+        if (updateError) {
+            console.error('Error updating connection:', updateError);
+            return { success: false, error: updateError.message };
+        }
+
+        // Create notification for the requester
+        await createConnectionNotification(requesterId, currentUserId, 'connection_accepted', connection.id);
+
+        return { success: true, data: updatedData };
+    } catch (error) {
+        console.error('Exception in acceptConnectionRequest:', error);
+        return { success: false, error: error.message };
     }
-
-    await createConnectionNotification(currentUserId, requesterId, 'connection_accepted', data.id);
-    return { success: true };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
 };
 
-export const declineConnectionRequest = async (currentUserId, requesterId) => {
-  try {
-    const { error } = await supabase
-      .from('user_connections')
-      .update({
-        status: 'declined',
-        updated_at: new Date().toISOString()
-      })
-      .eq('requester_id', requesterId)
-      .eq('recipient_id', currentUserId)
-      .eq('status', 'pending');
+export const declineConnectionRequest = async (currentUserId, requesterId, connectionId = null) => {
+    try {
+        let connection;
 
-    if (error) {
-      return { success: false, error: error.message };
+        // If we have a connectionId, use it directly
+        if (connectionId) {
+            const { data, error } = await supabase
+                .from('user_connections')
+                .select('id, status')
+                .eq('id', connectionId)
+                .single();
+
+            if (error) {
+                console.error('Connection not found by ID:', error);
+                connection = null;
+            } else {
+                connection = data;
+            }
+        }
+
+        // If no connectionId or not found, search for it
+        if (!connection) {
+            const { data, error: findError } = await supabase
+                .from('user_connections')
+                .select('id, status')
+                .eq('requester_id', requesterId)
+                .eq('recipient_id', currentUserId)
+                .maybeSingle();
+
+            if (findError) {
+                console.error('Error finding connection:', findError);
+                return { success: false, error: 'Failed to find connection request' };
+            }
+
+            connection = data;
+        }
+
+        if (!connection) {
+            return { success: false, error: 'Connection request not found' };
+        }
+
+        // Update it to declined
+        const { error } = await supabase
+            .from('user_connections')
+            .update({
+                status: 'declined',
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', connection.id);
+
+        if (error) {
+            console.error('Error declining connection:', error);
+            return { success: false, error: error.message };
+        }
+
+        return { success: true };
+    } catch (error) {
+        console.error('Exception in declineConnectionRequest:', error);
+        return { success: false, error: error.message };
     }
-    return { success: true };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
 };
 
 export const removeConnection = async (currentUserId, otherUserId) => {

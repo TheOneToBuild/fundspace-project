@@ -456,10 +456,6 @@ export default function NotificationsPage() {
     };
 
     const handleClearAll = async () => {
-        if (!window.confirm('Are you sure you want to delete all notifications? This action cannot be undone.')) {
-            return;
-        }
-
         try {
             const { error } = await supabase
                 .from('notifications')

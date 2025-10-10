@@ -4,7 +4,7 @@ import { useOutletContext, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import { UserPlus, ThumbsUp, MessageSquare, AtSign, Building, Bell, BellOff, Check, X, Filter, Calendar, Clock, Users, UserCheck } from 'lucide-react';
 import { acceptConnectionRequest, declineConnectionRequest, getConnectionStatus } from '../utils/userConnectionsUtils';
-import { getUserNotifications } from '../utils/rpcClientFunctions';
+import { getUserNotifications, invalidateCache } from '../utils/rpcClientFunctions';
 
 const timeAgo = (date) => {
     const seconds = Math.floor((new Date() - new Date(date)) / 1000);
@@ -137,13 +137,27 @@ const NotificationItem = ({ notification, onViewPost, onMarkAsRead, onDelete, cu
         setActionLoading(true);
         
         try {
-            const result = await acceptConnectionRequest(currentUserId, actor.id);
-            if (result.success) {
+            const result = await acceptConnectionRequest(
+                currentUserId, 
+                actor.id, 
+                connection_id
+            );
+            
+            // Handle success OR already accepted
+            if (result.success || result.alreadyAccepted) {
                 setLocalConnectionStatus('accepted');
                 await onMarkAsRead(notification.id);
                 if (onRefresh) onRefresh();
             } else {
                 console.error('Failed to accept connection:', result.error);
+                
+                // If already processed, just update UI
+                if (result.error.includes('not found') || 
+                    result.error.includes('already processed') ||
+                    result.error.includes('already accepted')) {
+                    setLocalConnectionStatus('accepted');
+                    await onMarkAsRead(notification.id);
+                }
             }
         } catch (error) {
             console.error('Error accepting connection:', error);
@@ -157,12 +171,21 @@ const NotificationItem = ({ notification, onViewPost, onMarkAsRead, onDelete, cu
         setActionLoading(true);
         
         try {
-            const result = await declineConnectionRequest(currentUserId, actor.id);
+            const result = await declineConnectionRequest(
+                currentUserId, 
+                actor.id,
+                connection_id
+            );
+            
             if (result.success) {
                 await onDelete(notification.id);
                 if (onRefresh) onRefresh();
             } else {
                 console.error('Failed to decline connection:', result.error);
+                // If connection not found, just delete the notification
+                if (result.error.includes('not found')) {
+                    await onDelete(notification.id);
+                }
             }
         } catch (error) {
             console.error('Error declining connection:', error);
@@ -368,16 +391,16 @@ export default function NotificationsPage() {
         try {
             setLoading(true);
 
-            // Use the new centralized function
-            const data = await getUserNotifications(100, filter === 'unread');
+            // Always get fresh data by skipping cache
+            const data = await getUserNotifications(100, filter === 'unread', true); // Added skipCache=true
 
+            // Use the new centralized function
             let finalData = data || [];
 
             // Client-side filtering for 'read' and 'connections'
             if (filter === 'read') {
-                // We need to fetch all to filter for read, so we call with unreadOnly=false
-                const allData = await getUserNotifications(100, false);
-                finalData = finalData.filter(n => n.is_read);
+                const allData = await getUserNotifications(100, false, true);
+                finalData = allData.filter(n => n.is_read);
             } else if (filter === 'connections') {
                 finalData = finalData.filter(n => 
                     ['connection_request', 'connection_accepted', 'connection_declined'].includes(n.type)
@@ -386,8 +409,6 @@ export default function NotificationsPage() {
 
             // Client-side sorting
             if (sortBy === 'oldest') {
-                // The RPC likely returns newest first, so we reverse for oldest.
-                // If the default RPC order changes, this might need adjustment.
                 finalData.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
             } else {
                 finalData.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
@@ -396,6 +417,7 @@ export default function NotificationsPage() {
             setNotifications(finalData);
         } catch (error) {
             console.error('Error in fetchNotifications:', error);
+            setNotifications([]);
         } finally {
             setLoading(false);
         }
@@ -454,39 +476,47 @@ export default function NotificationsPage() {
                 .from('notifications')
                 .delete()
                 .eq('id', notificationId);
-
+    
             if (error) {
                 console.error('Error deleting notification:', error);
                 return;
             }
-
+    
+            // Update local state
             setNotifications(current =>
                 current.filter(notification => notification.id !== notificationId)
             );
+    
+            // Invalidate cache
+            invalidateCache('notifications');
         } catch (error) {
             console.error('Error in handleDelete:', error);
         }
     };
 
     const handleClearAll = async () => {
-        if (!window.confirm('Are you sure you want to delete all notifications? This action cannot be undone.')) {
-            return;
-        }
-
         try {
-            const { error } = await supabase
+            // Delete from database FIRST
+            const { error, data } = await supabase
                 .from('notifications')
                 .delete()
-                .eq('user_id', session.user.id);
-
+                .eq('user_id', session.user.id)
+                .select();
+    
             if (error) {
-                console.error('Error clearing all notifications:', error);
+                console.error('❌ Error clearing notifications:', error);
                 return;
             }
-
+    
+            // Clear local state immediately
             setNotifications([]);
+
+            // Invalidate ALL notification-related caches
+            invalidateCache('notifications');
+            invalidateCache('app_init');
+            
         } catch (error) {
-            console.error('Error in handleClearAll:', error);
+            console.error('💥 Error in handleClearAll:', error);
         }
     };
 

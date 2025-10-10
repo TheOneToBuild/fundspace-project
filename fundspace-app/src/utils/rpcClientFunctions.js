@@ -1032,18 +1032,31 @@ export const getOrganizationSocialMetrics = async (organizationId, daysBack = 30
   }
 };
 
-export const getUserNotifications = async (limit = 50, unreadOnly = false) => {
+export const getUserNotifications = async (limit = 50, unreadOnly = false, skipCache = false) => {
   const cacheKey = getCacheKey('notifications', { limit, unreadOnly });
-  const cached = getCachedData(cacheKey);
-  if (cached) return cached;
   
+  // If skipCache is true, delete the cache first
+  if (skipCache) {
+    cache.delete(cacheKey);
+  } else {
+    const cached = getCachedData(cacheKey);
+    if (cached) {
+      return cached;
+    }
+  }
+
   try {
     const { data, error } = await supabase.rpc('get_user_notifications', {
       p_limit: limit,
       p_unread_only: unreadOnly
     });
     if (error) throw error;
-    setCachedData(cacheKey, data);
+    
+    // Only cache if not skipping cache
+    if (!skipCache) {
+      setCachedData(cacheKey, data);
+    }
+    
     return data;
   } catch (error) {
     console.error('Error fetching notifications:', error);
