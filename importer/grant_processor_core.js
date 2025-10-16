@@ -11,7 +11,7 @@ const pdf = require('pdf-parse');
 // --- CLIENTS & CONFIG ---
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash-8b' });
+const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash-8b-latest' });
 
 
 const CONFIG = {
