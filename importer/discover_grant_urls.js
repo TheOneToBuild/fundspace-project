@@ -27,7 +27,7 @@ const CONFIG = {
 // --- CLIENTS ---
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash-latest' });
+const model = genAI.getGenerativeModel({ model: 'models/gemini-1.5-flash' });
 
 // =================================================================
 // HELPER FUNCTIONS
