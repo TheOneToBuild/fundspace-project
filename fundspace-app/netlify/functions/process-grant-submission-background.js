@@ -1,20 +1,35 @@
 // netlify/functions/process-grant-submission-background.js
 
 import { createClient } from '@supabase/supabase-js';
-import { GoogleGenerativeAI } from '@google/generative-ai';
 
 // Use service role key to bypass RLS policies
 const supabase = createClient(
     process.env.SUPABASE_URL, 
     process.env.SUPABASE_SERVICE_ROLE_KEY
 );
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ 
-    model: 'models/gemini-1.5-flash',
-    generationConfig: {
-        temperature: 0.7,
+
+// Direct Gemini API call function (bypasses SDK)
+async function callGeminiAPI(prompt) {
+    const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
+        {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                contents: [{ parts: [{ text: prompt }] }],
+                generationConfig: { temperature: 0.7 }
+            })
+        }
+    );
+    
+    if (!response.ok) {
+        const error = await response.text();
+        throw new Error(`Gemini API error: ${response.status} - ${error}`);
     }
-});
+    
+    const data = await response.json();
+    return data.candidates[0].content.parts[0].text;
+}
 
 // Database helper functions
 function generateSlug(organizationName, grantTitle) {
@@ -871,8 +886,7 @@ Look for About Us, Mission, Contact, Staff, History sections in both HTML and PD
 Content from ${pagesToScrape.length} pages: ${combinedContent.substring(0, 150000)}
         `;
 
-        const result = await model.generateContent(prompt);
-        const response_text = result.response.text();
+        const response_text = await callGeminiAPI(prompt);
         console.log(`✅ AI response received: ${response_text.length} characters`);
         
         // Parse JSON from AI response for both grants and organization
@@ -968,4 +982,4 @@ Content from ${pagesToScrape.length} pages: ${combinedContent.substring(0, 15000
             body: JSON.stringify({ error: error.message }),
         };
     }
-};
+}
