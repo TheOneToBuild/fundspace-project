@@ -1,35 +1,14 @@
 // netlify/functions/process-grant-submission-background.js
 
 import { createClient } from '@supabase/supabase-js';
+import { OllamaClient } from './ollama-client.js';
 
 // Use service role key to bypass RLS policies
 const supabase = createClient(
     process.env.SUPABASE_URL, 
     process.env.SUPABASE_SERVICE_ROLE_KEY
 );
-
-// Direct Gemini API call function (bypasses SDK)
-async function callGeminiAPI(prompt) {
-    const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash-001:generateContent?key=${process.env.GEMINI_API_KEY}`,
-        {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                contents: [{ parts: [{ text: prompt }] }],
-                generationConfig: { temperature: 0.7 }
-            })
-        }
-    );
-    
-    if (!response.ok) {
-        const error = await response.text();
-        throw new Error(`Gemini API error: ${response.status} - ${error}`);
-    }
-    
-    const data = await response.json();
-    return data.candidates[0].content.parts[0].text;
-}
+const ollamaClient = new OllamaClient();
 
 // Database helper functions
 function generateSlug(organizationName, grantTitle) {
@@ -794,118 +773,14 @@ export const handler = async function(event, context) {
         }
 
         // Enhanced AI analysis with comprehensive prompt and examples
-        console.log(`🤖 Sending to AI for comprehensive grant and organization analysis...`);
-        const prompt = `
-Analyze the following content for BOTH active grant opportunities AND detailed organization information.
+        console.log(`🤖 Sending to Ollama for grant extraction...`);
 
-### PART 1: GRANT EXTRACTION
-Extract ACTIVE grants with confirmed funding amounts and future deadlines:
-- Include grants with specific funding amounts (e.g., "$50,000", "$10K-$25K", "$4.4 million").
-- Exclude grants with $0, "varies", "TBD", or past deadlines.
-- Exclude invitation-only grants unless funding >$5,000.
-- If funding says "over $X million" or "awarded $X million", use the X amount as max funding.
-
-### PART 2: ORGANIZATION EXTRACTION
-Extract comprehensive organization details:
-{
-    "name": "Organization name",
-    "type": "foundation/nonprofit/government/corporate",
-    "description": "Detailed mission/purpose (200+ characters)",
-    "website": "Official website URL",
-    "location": "City, State or full address",
-    "focus_areas": ["Education", "Health", "Environment"],
-    "annual_budget": "Budget information if found",
-    "year_founded": "Year established if mentioned",
-    "staff_count": "Number of employees if found",
-    "geographic_scope": ["Counties/regions served"],
-    "contact_info": {
-        "email": "Contact email",
-        "phone": "Phone number",
-        "address": "Physical address"
-    }
-}
-
-### EXAMPLES
-Grant Example:
-{
-    "funder_name": "ABC Foundation",
-    "title": "Community Development Grant",
-    "description": "Funding for community projects focused on education and health.",
-    "deadline": "2025-12-31",
-    "funding_amount_text": "$50,000",
-    "eligibility_criteria": "Nonprofits with 501(c)(3) status",
-    "application_url": "https://example.com/apply",
-    "grant_type": "Project",
-    "categories": ["Education", "Health"],
-    "eligible_organization_types": ["nonprofit", "501c3"]
-}
-
-Organization Example:
-{
-    "name": "ABC Foundation",
-    "type": "foundation",
-    "description": "A nonprofit organization focused on community development.",
-    "website": "https://abcfoundation.org",
-    "location": "San Francisco, CA",
-    "focus_areas": ["Education", "Health"],
-    "annual_budget": "$10 million",
-    "year_founded": "1995",
-    "staff_count": "50",
-    "geographic_scope": ["California", "Nevada"],
-    "contact_info": {
-        "email": "info@abcfoundation.org",
-        "phone": "123-456-7890",
-        "address": "123 Main St, San Francisco, CA"
-    }
-}
-
-Return JSON with TWO sections:
-{
-    "grants": [
-        {
-            "funder_name": "Organization name",
-            "title": "Grant name",
-            "description": "Detailed description (100+ chars)",
-            "deadline": "YYYY-MM-DD or null if rolling",
-            "funding_amount_text": "Exact dollar amounts",
-            "eligibility_criteria": "Specific requirements",
-            "application_url": "Direct application link",
-            "grant_type": "Operating/Project/etc",
-            "categories": ["Focus areas"],
-            "eligible_organization_types": ["nonprofit", "501c3", etc.]
-        }
-    ],
-    "organization": {
-        /* Organization details as specified above */
-    }
-}
-
-CRITICAL: Extract ALL available organization information from across ALL pages.
-Look for About Us, Mission, Contact, Staff, History sections in both HTML and PDF content.
-
-Content from ${pagesToScrape.length} pages: ${combinedContent.substring(0, 150000)}
-        `;
-
-        const response_text = await callGeminiAPI(prompt);
-        console.log(`✅ AI response received: ${response_text.length} characters`);
+        // Use Ollama for grant extraction
+        const grants = await ollamaClient.extractGrants(combinedContent, url);
+        console.log(`✅ Ollama extracted ${grants.length} grants`);
         
-        // Parse JSON from AI response for both grants and organization
-        let grants = [];
-        let organizationData = null;
-        try {
-            const jsonMatch = response_text.match(/\{[\s\S]*\}/);
-            if (jsonMatch) {
-                const aiResponse = JSON.parse(jsonMatch[0]);
-                grants = aiResponse.grants || [];
-                organizationData = aiResponse.organization || null;
-                console.log(`✅ Parsed ${grants.length} grants and organization data from AI response`);
-            } else {
-                console.log(`⚠️ No JSON object found in AI response`);
-            }
-        } catch (e) {
-            console.log(`⚠️ Could not parse AI response as JSON: ${e.message}`);
-            console.log(`Raw AI response: ${response_text}`);
-        }
+        // For now, we'll skip organization extraction (Phase 2 feature)
+        const organizationData = null;
 
         // Save grants to database and update organization
         let savedCount = 0;
@@ -982,4 +857,4 @@ Content from ${pagesToScrape.length} pages: ${combinedContent.substring(0, 15000
             body: JSON.stringify({ error: error.message }),
         };
     }
-}
+};
