@@ -4,7 +4,7 @@ import axios from 'axios';
 class OllamaClient {
   constructor() {
     this.baseUrl = process.env.OLLAMA_URL || 'http://localhost:11434';
-    this.textModel = 'llama3.1:8b';
+    this.textModel = 'llama3:8b-instruct-q4_0';
     this.embeddingModel = 'nomic-embed-text:latest';
     
     this.client = axios.create({
