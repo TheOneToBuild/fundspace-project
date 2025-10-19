@@ -49,38 +49,38 @@ class OllamaClient {
   }
 
   createGrantExtractionPrompt(content, sourceUrl) {
-    return `Extract grant opportunities from this content and return ONLY a JSON array.
+    return `You are a grant extraction specialist. Extract grant opportunities and return a complete, valid JSON array.
 
 Source: ${sourceUrl}
 
-RULES:
-1. Return ONLY valid JSON array format - no explanations
-2. Extract ALL distinct grant opportunities mentioned
-3. Focus on active/open grants with future deadlines
-4. If funding amount is unclear, use null
+CRITICAL: Return ONLY a complete JSON array with no additional text, explanations, or markdown.
 
-Required JSON structure:
+Extract all grants with this exact structure:
 [
   {
     "title": "Grant program name",
-    "funder_name": "Organization providing grant", 
-    "description": "What the grant funds",
-    "deadline": "YYYY-MM-DD format or null",
-    "funding_amount_min": number or null,
-    "funding_amount_max": number or null,
-    "funding_amount_text": "Original text like '$10K-$50K'",
+    "funder_name": "Organization name", 
+    "description": "Brief description",
+    "deadline": "YYYY-MM-DD or null",
+    "funding_amount_min": 10000,
+    "funding_amount_max": 50000,
+    "funding_amount_text": "$10K-$50K",
     "eligibility_criteria": "Who can apply",
-    "application_url": "Direct application link or null",
-    "grant_type": "Type of grant or null",
-    "categories": ["focus area 1", "focus area 2"],
-    "status": "Open/Closed/Rolling"
+    "application_url": null,
+    "grant_type": null,
+    "categories": ["category1"],
+    "status": "Open"
   }
 ]
 
-Content to analyze:
-${content.substring(0, 3000)}
+RULES:
+1. Return ONLY valid, complete JSON array
+2. No explanations, no markdown, no extra text
+3. Ensure all JSON brackets and quotes are properly closed
+4. If no grants found, return: []
 
-JSON array:`;
+Content:
+${content.substring(0, 3000)}`;
   }
 
   parseGrantsFromResponse(rawResponse) {
