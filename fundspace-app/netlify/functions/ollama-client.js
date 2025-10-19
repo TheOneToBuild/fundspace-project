@@ -4,7 +4,7 @@ import axios from 'axios';
 class OllamaClient {
   constructor() {
     this.baseUrl = process.env.OLLAMA_URL || 'http://localhost:11434';
-    this.textModel = 'llama3:latest';
+    this.textModel = 'llama3.1:8b';
     this.embeddingModel = 'nomic-embed-text:latest';
     
     this.client = axios.create({
@@ -85,21 +85,34 @@ JSON array:`;
 
   parseGrantsFromResponse(rawResponse) {
     try {
-      // Look for JSON array in the response
-      const jsonMatch = rawResponse.match(/\[[\s\S]*\]/);
+      // First try to find JSON array directly
+      let jsonMatch = rawResponse.match(/\[[\s\S]*?\]/);
+      
+      // If no direct array, look for JSON inside markdown code blocks
       if (!jsonMatch) {
-        console.log('❌ No JSON array found in response');
+        const codeBlockMatch = rawResponse.match(/```json\s*([\s\S]*?)\s*```/);
+        if (codeBlockMatch) {
+          jsonMatch = [codeBlockMatch[1]];
+        }
+      }
+      
+      // If still no match, look for any JSON object/array
+      if (!jsonMatch) {
+        jsonMatch = rawResponse.match(/[\[\{][\s\S]*?[\]\}]/);
+      }
+      
+      if (!jsonMatch) {
+        console.log('❌ No JSON found in response');
+        console.log('Raw response:', rawResponse.substring(0, 500));
         return [];
       }
 
       const jsonString = jsonMatch[0];
-      const grants = JSON.parse(jsonString);
+      const parsed = JSON.parse(jsonString);
       
-      if (!Array.isArray(grants)) {
-        console.log('❌ Response is not an array');
-        return [];
-      }
-
+      // If it's an object, wrap it in an array
+      const grants = Array.isArray(parsed) ? parsed : [parsed];
+      
       return grants;
       
     } catch (error) {
