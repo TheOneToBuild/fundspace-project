@@ -9,7 +9,7 @@ class OllamaClient {
     
     this.client = axios.create({
       baseURL: this.baseUrl,
-      timeout: 120000, // 2 minutes timeout for large content
+      timeout: 300000, // Increase to 5 minutes
       headers: {
         'Content-Type': 'application/json'
       }
@@ -78,7 +78,7 @@ Required JSON structure:
 ]
 
 Content to analyze:
-${content.substring(0, 6000)}
+${content.substring(0, 3000)}
 
 JSON array:`;
   }
