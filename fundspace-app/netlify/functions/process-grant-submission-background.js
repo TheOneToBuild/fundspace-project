@@ -776,14 +776,67 @@ export const handler = async function(event, context) {
         }
 
         // Enhanced AI analysis with comprehensive prompt and examples
-        console.log(`🤖 Sending to AI for grant extraction...`);
+        console.log(`🤖 Sending to AI for comprehensive grant and organization analysis...`);
+        const prompt = `
+Analyze the following content for BOTH active grant opportunities AND detailed organization information.
 
-        // Use Ollama for grant extraction
-        const grants = await aiClient.extractGrants(combinedContent, url);
-        console.log(`✅ AI client extracted ${grants.length} grants`);
-        
-        // For now, we'll skip organization extraction (Phase 2 feature)
-        const organizationData = null;
+### PART 1: GRANT EXTRACTION
+Extract ACTIVE grants with confirmed funding amounts and future deadlines:
+- Include grants with specific funding amounts (e.g., "$50,000", "$10K-$25K", "$4.4 million").
+- Exclude grants with $0, "varies", "TBD", or past deadlines.
+- Exclude invitation-only grants unless funding >$5,000.
+- If funding says "over $X million" or "awarded $X million", use the X amount as max funding.
+
+### PART 2: ORGANIZATION EXTRACTION
+Extract comprehensive organization details.
+
+Return JSON with TWO sections:
+{
+    "grants": [
+        {
+            "funder_name": "Organization name",
+            "title": "Grant name",
+            "description": "Detailed description (100+ chars)",
+            "deadline": "YYYY-MM-DD or null if rolling",
+            "funding_amount_text": "Exact dollar amounts",
+            "eligibility_criteria": "Specific requirements",
+            "application_url": "Direct application link",
+            "grant_type": "Operating/Project/etc",
+            "categories": ["Focus areas"],
+            "eligible_organization_types": ["nonprofit", "501c3", etc.]
+        }
+    ],
+    "organization": {
+        "name": "Organization name", "type": "foundation/nonprofit/government/corporate", "description": "Detailed mission/purpose (200+ characters)", "website": "Official website URL", "location": "City, State or full address", "focus_areas": ["Education", "Health", "Environment"], "annual_budget": "Budget information if found", "year_founded": "Year established if mentioned", "staff_count": "Number of employees if found", "geographic_scope": ["Counties/regions served"], "contact_info": { "email": "Contact email", "phone": "Phone number", "address": "Physical address" }
+    }
+}
+
+CRITICAL: Extract ALL available organization information from across ALL pages. Look for About Us, Mission, Contact, Staff, History sections in both HTML and PDF content.
+
+Content from ${pagesToScrape.length} pages: ${combinedContent.substring(0, 150000)}
+        `;
+
+        const model = aiClient.getModel();
+        const result = await model.generateContent(prompt);
+        const response_text = result.response.text();
+        console.log(`✅ AI response received: ${response_text.length} characters`);
+
+        let grants = [];
+        let organizationData = null;
+        try {
+            const jsonMatch = response_text.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+                const aiResponse = JSON.parse(jsonMatch[0]);
+                grants = aiResponse.grants || [];
+                organizationData = aiResponse.organization || null;
+                console.log(`✅ Parsed ${grants.length} grants and organization data from AI response`);
+            } else {
+                console.log(`⚠️ No JSON object found in AI response`);
+            }
+        } catch (e) {
+            console.log(`⚠️ Could not parse AI response as JSON: ${e.message}`);
+            console.log(`Raw AI response: ${response_text}`);
+        }
 
         // Save grants to database and update organization
         let savedCount = 0;
