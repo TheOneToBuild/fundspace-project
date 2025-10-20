@@ -6,7 +6,7 @@ class GeminiClient {
     this.genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
     // Try with explicit configuration
     this.model = this.genAI.getGenerativeModel({ 
-      model: 'gemini-pro',
+      model: 'gemini-1.5-pro-latest', // ✨ FIX: Use a current model name
       generationConfig: {
         temperature: 0.1,
       }

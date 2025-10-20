@@ -747,9 +747,12 @@ export const handler = async function(event, context) {
         return { statusCode: 401, body: 'Unauthorized' };
     }
 
+    let submissionId; // ✨ FIX 1: Declare submissionId here
+
     try {
         const payload = JSON.parse(event.body);
-        const { url, submissionId } = payload;
+        const { url } = payload;
+        submissionId = payload.submissionId; // ✨ FIX 2: Assign value here
 
         if (!url || !submissionId) {
             throw new Error("Missing url or submissionId in payload.");
@@ -843,13 +846,16 @@ export const handler = async function(event, context) {
         console.error(`💥 Error processing submission:`, error.message);
         
         // Update submission status to failed
-        try {
-            await supabase
-                .from('grant_submissions')
-                .update({ status: 'failed', error_message: error.message })
-                .eq('id', submissionId);
-        } catch (updateError) {
-            console.error(`💥 Failed to update submission status:`, updateError.message);
+        // ✨ FIX 3: Now submissionId is accessible here
+        if (submissionId) {
+            try {
+                await supabase
+                    .from('grant_submissions')
+                    .update({ status: 'failed', error_message: error.message })
+                    .eq('id', submissionId);
+            } catch (updateError) {
+                console.error(`💥 Failed to update submission status:`, updateError.message);
+            }
         }
         
         return {
