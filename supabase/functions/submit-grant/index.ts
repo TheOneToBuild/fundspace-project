@@ -94,13 +94,20 @@ serve(async (req) => {
     }
     
     // 5. Insert new submission record
+    console.log('User authenticated:', user.id);
+    console.log('About to insert:', { url, normalized_url: normalizedUrl, notes, user_id: user.id, status: 'pending_review' });
+
     const { data: submission, error: insertError } = await serviceSupabaseClient
       .from('grant_submissions')
       .insert({ url, normalized_url: normalizedUrl, notes, user_id: user.id, status: 'pending_review' })
-      .select('id')
+      .select('id, user_id, normalized_url') // Select user_id to verify it was inserted
       .single();
 
-    if (insertError) throw insertError;
+    console.log('Insertion result:', submission);
+    if (insertError) {
+      console.error('Insert error:', insertError);
+      throw insertError;
+    }
 
     // IMPORTANT: Trigger the backend worker
     // This URL is a placeholder for where you host your worker script.

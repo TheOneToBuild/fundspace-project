@@ -10,6 +10,22 @@ const supabase = createClient(
 );
 const aiClient = new GeminiClient();
 
+// Helper function to normalize URLs
+function normalizeUrl(url) {
+    try {
+      const parsed = new URL(url);
+      // Remove common tracking parameters
+      ['utm_source', 'utm_medium', 'utm_campaign', 'ref', 'fbclid'].forEach(param => {
+        parsed.searchParams.delete(param);
+      });
+      // Remove trailing slash from pathname and remove fragments
+      return parsed.origin + parsed.pathname.replace(/\/$/, '') + parsed.search;
+    } catch {
+      // Fallback for invalid URLs
+      return url.toLowerCase().trim();
+    }
+  }
+
 // Database helper functions
 function generateSlug(organizationName, grantTitle) {
     if (!organizationName || !grantTitle) return null;
@@ -782,6 +798,28 @@ export const handler = async function(event, context) {
         }
 
         console.log(`🚀 Starting enhanced processing for submission ${submissionId}: ${url}`);
+
+        // NEW: Check for duplicates at processor level
+        const normalizedUrl = normalizeUrl(url); // You already have this function
+        const { data: existingProcessed, error: duplicateCheckError } = await supabase
+            .from('grant_submissions')
+            .select('id, status')
+            .neq('id', submissionId) // Exclude current submission
+            .eq('normalized_url', normalizedUrl)
+            .in('status', ['completed', 'processing']) // Check against processed or in-flight
+            .limit(1)
+            .maybeSingle();
+
+        if (duplicateCheckError) throw duplicateCheckError;
+
+        if (existingProcessed) {
+            console.log('🔄 Duplicate URL detected in processor, skipping AI processing');
+            await supabase
+                .from('grant_submissions')
+                .update({ status: 'failed', error_message: 'Duplicate URL already processed or in-progress.' })
+                .eq('id', submissionId);
+            return { statusCode: 409, body: 'Already processed' };
+        }
 
         // Update status to processing
         await supabase.from('grant_submissions').update({ status: 'processing' }).eq('id', submissionId);
