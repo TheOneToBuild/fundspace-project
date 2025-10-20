@@ -58,6 +58,10 @@ const NotificationIcon = ({ type, actor }) => {
     // Default icons for other notification types
     const iconClass = "w-10 h-10 rounded-full flex items-center justify-center";
     switch (type) {
+        case 'submission_completed':
+            return <div className={`${iconClass} bg-green-100`}><Check className="w-5 h-5 text-green-500" /></div>;
+        case 'submission_failed':
+            return <div className={`${iconClass} bg-red-100`}><X className="w-5 h-5 text-red-500" /></div>;
         case 'new_follower':
             return <div className={`${iconClass} bg-blue-100`}><UserPlus className="w-5 h-5 text-blue-500" /></div>;
         case 'connection_request':
@@ -89,7 +93,8 @@ const NotificationItem = ({ notification, onViewPost, onMarkAsRead, onDelete, cu
         post_id, 
         organization_post_id,
         is_read,
-        connection_id
+        connection_id,
+        data: notificationData
     } = notification;
 
     // Check connection status for connection notifications
@@ -110,6 +115,12 @@ const NotificationItem = ({ notification, onViewPost, onMarkAsRead, onDelete, cu
 
     const notificationText = () => {
         switch (type) {
+            case 'submission_completed': {
+                const successData = notificationData || {};
+                return <>Your grant submission was <strong className="font-semibold text-green-600">successfully processed</strong>! Found {successData.grants_found || 0} grant(s) and earned {successData.points_earned || 0} points.</>;
+            }
+            case 'submission_failed':
+                return <>Your grant submission <strong className="font-semibold text-red-600">could not be processed</strong>. No qualifying grants were found.</>;
             case 'new_follower':
                 return <><strong className="font-semibold text-slate-900">{actor.full_name}</strong> started following you.</>;
             case 'connection_request':
@@ -249,18 +260,23 @@ const NotificationItem = ({ notification, onViewPost, onMarkAsRead, onDelete, cu
             onMarkAsRead(notification.id);
         }
         
+        if (type === 'submission_completed' || type === 'submission_failed') {
+            navigate('/profile/submissions');
+            return; // Add return to prevent fallback navigation
+        }
+        
         if (type === 'new_follower' || type === 'connection_request' || type === 'connection_accepted') {
-            navigate(`/profile/members/${actor.id}`);
+            if (actor?.id) navigate(`/profile/members/${actor.id}`);
         } else if (organization_post_id) {
             getOrganizationDetailsAndNavigate(organization_post_id);
         } else if (post_id) {
             navigate('/profile');
             setTimeout(() => {
-                if (onViewPost) {
-                    onViewPost(post_id);
-                }
+                onViewPost?.(post_id);
             }, 100);
-        } else {
+        } else if (actor?.id) {
+            // Fallback for other notifications with an actor but no specific content link
+            // This avoids navigating for submission notifications which are handled above
             navigate(`/profile/members/${actor.id}`);
         }
     };
@@ -368,6 +384,18 @@ const NotificationItem = ({ notification, onViewPost, onMarkAsRead, onDelete, cu
                             View Profile
                         </button>
                     )}
+
+                    {(type === 'submission_completed' || type === 'submission_failed') && (
+                        <button 
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                navigate('/profile/submissions');
+                            }}
+                            className="text-xs bg-blue-100 text-blue-700 px-3 py-1.5 rounded-full hover:bg-blue-200 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                            View Submissions
+                        </button>
+                    )}
                 </div>
             </div>
         </div>
@@ -404,6 +432,10 @@ export default function NotificationsPage() {
             } else if (filter === 'connections') {
                 finalData = finalData.filter(n => 
                     ['connection_request', 'connection_accepted', 'connection_declined'].includes(n.type)
+                );
+            } else if (filter === 'submissions') {
+                finalData = finalData.filter(n => 
+                    ['submission_completed', 'submission_failed'].includes(n.type)
                 );
             }
 
@@ -523,6 +555,9 @@ export default function NotificationsPage() {
     const filteredNotifications = notifications;
     const unreadCount = notifications.filter(n => !n.is_read).length;
     const connectionRequestsCount = notifications.filter(n => n.type === 'connection_request' && !n.is_read).length;
+    const submissionNotificationsCount = notifications.filter(n => 
+        ['submission_completed', 'submission_failed'].includes(n.type) && !n.is_read
+    ).length;
 
     if (loading) {
         return (
@@ -567,6 +602,11 @@ export default function NotificationsPage() {
                                                 • {connectionRequestsCount} connection request{connectionRequestsCount === 1 ? '' : 's'}
                                             </span>
                                         )}
+                                        {submissionNotificationsCount > 0 && (
+                                            <span className="ml-2 text-blue-600 font-medium">
+                                                • {submissionNotificationsCount} submission update{submissionNotificationsCount === 1 ? '' : 's'}
+                                            </span>
+                                        )}
                                     </>
                                 ) : (
                                     'All caught up!'
@@ -609,6 +649,7 @@ export default function NotificationsPage() {
                             <option value="unread">Unread</option>
                             <option value="read">Read</option>
                             <option value="connections">Connections</option>
+                            <option value="submissions">Grant Submissions</option>
                         </select>
                     </div>
                     
@@ -642,6 +683,8 @@ export default function NotificationsPage() {
                                 ? "You don't have any read notifications."
                                 : filter === 'connections'
                                 ? "You don't have any connection notifications."
+                                : filter === 'submissions' 
+                                ? "You don't have any grant submission notifications."
                                 : "You don't have any notifications yet. When people interact with your posts, follow you, or send connection requests, you'll see them here."
                             }
                         </p>

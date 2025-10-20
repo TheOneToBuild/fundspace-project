@@ -4,6 +4,21 @@ import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
 
+function normalizeUrl(url: string): string {
+  try {
+    const parsed = new URL(url);
+    // Remove common tracking parameters
+    ['utm_source', 'utm_medium', 'utm_campaign', 'ref', 'fbclid'].forEach(param => {
+      parsed.searchParams.delete(param);
+    });
+    // Remove trailing slash from pathname and remove fragments
+    return parsed.origin + parsed.pathname.replace(/\/$/, '') + parsed.search;
+  } catch {
+    // Fallback for invalid URLs, though we validate before this
+    return url.toLowerCase().trim();
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -11,21 +26,77 @@ serve(async (req) => {
 
   try {
     const { url, notes } = await req.json();
-
-    if (!url || !new URL(url)) {
+    
+    // 1. Validate URL
+    if (!url) {
       throw new Error("A valid URL is required.");
     }
+    try {
+      new URL(url);
+    } catch (_) {
+      throw new Error("The provided URL is not valid.");
+    }
     
-    // Use the Service Role Key to bypass RLS for this internal operation
-    const supabaseClient = createClient(
+    // 2. Create a Supabase client with the user's auth context to get user ID
+    const userSupabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
     );
-    
-    // Insert a new record to track the submission, starting in 'processing' state
-    const { data: submission, error: insertError } = await supabaseClient
+
+    const { data: { user } } = await userSupabaseClient.auth.getUser();
+    if (!user) {
+      return new Response(JSON.stringify({ error: 'Unauthorized: You must be logged in to submit a grant.' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 401,
+      });
+    }
+
+    // Use the Service Role Key for admin-level queries
+    const serviceSupabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+    );
+
+    // 3. Check for daily submission limit (rate limiting)
+    const { count, error: countError } = await serviceSupabaseClient
       .from('grant_submissions')
-      .insert({ url, notes, status: 'processing' })
+      .select('id', { count: 'exact', head: true }) // head: true makes it faster
+      .eq('user_id', user.id)
+      .gte('created_at', new Date().toISOString().split('T')[0] + 'T00:00:00Z'); // Today in UTC
+
+    if (countError) throw countError;
+
+    if (count && count >= 10) {
+      return new Response(JSON.stringify({ error: 'Daily submission limit reached (10 per day).' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 429, // Too Many Requests
+      });
+    }
+
+    // 4. Normalize URL and check for recent duplicates
+    const normalizedUrl = normalizeUrl(url);
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    const { data: existingSubmission, error: duplicateCheckError } = await serviceSupabaseClient
+      .from('grant_submissions')
+      .select('id, status, created_at')
+      .eq('normalized_url', normalizedUrl)
+      .gte('created_at', thirtyDaysAgo)
+      .maybeSingle(); // Use maybeSingle to avoid error if no row is found
+
+    if (duplicateCheckError) throw duplicateCheckError;
+
+    if (existingSubmission) {
+      return new Response(JSON.stringify({ error: 'This URL was already submitted recently.', existing: existingSubmission }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 409, // 409 Conflict
+      });
+    }
+    
+    // 5. Insert new submission record
+    const { data: submission, error: insertError } = await serviceSupabaseClient
+      .from('grant_submissions')
+      .insert({ url, normalized_url: normalizedUrl, notes, user_id: user.id, status: 'pending_review' })
       .select('id')
       .single();
 
@@ -39,7 +110,7 @@ serve(async (req) => {
 
     if (!WORKER_URL) {
         console.error("GRANT_PROCESSOR_WORKER_URL is not set. Cannot trigger worker.");
-        // Optionally, you could leave the status as 'pending_review' here.
+        // The status is already 'pending_review', so it can be manually processed later.
     } else {
          // We use `fetch` but don't wait for the response to keep this function fast.
         fetch(WORKER_URL, {
@@ -58,7 +129,7 @@ serve(async (req) => {
     // Immediately respond to the user
     return new Response(JSON.stringify({ 
         submissionId: submission.id, 
-        message: "Submission received and is now being processed. Thank you for supporting the community!" 
+        message: "Submission received and is pending review. Thank you for supporting the community!" 
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 202, // 202 Accepted

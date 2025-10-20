@@ -740,6 +740,29 @@ async function saveGrantsToSupabase(grants, primaryUrl, organizationId) {
     return savedCount;
 }
 
+// Send notification to user about submission status
+async function sendSubmissionNotification(submissionId, type, title, message, data = {}) {
+    const { data: submission } = await supabase
+      .from('grant_submissions')
+      .select('user_id')
+      .eq('id', submissionId)
+      .single();
+  
+    if (submission?.user_id) {
+      await supabase
+        .from('notifications')
+        .insert({
+          user_id: submission.user_id,
+          actor_id: submission.user_id, // Self-notification
+          type,
+          submission_id: submissionId,
+          is_read: false,
+          data: { title, message, ...data }
+        });
+      console.log(`🔔 Sent '${type}' notification to user ${submission.user_id}`);
+    }
+  }
+
 export const handler = async function(event, context) {
     const authHeader = event.headers.authorization || '';
     const token = authHeader.split(' ')[1];
@@ -864,23 +887,47 @@ Content from ${pagesToScrape.length} pages: ${combinedContent.substring(0, 15000
             console.log(`✅ Database operation complete: ${savedCount} grants saved, organization updated`);
         }
 
-        // Update final status
-        const finalMessage = savedCount > 0 
-            ? `Enhanced processing complete. Found and saved ${savedCount} qualifying grant(s) from ${pagesToScrape.length} pages.`
-            : grants.length > 0 
-                ? 'Grants found but did not meet funding/eligibility criteria.' 
-                : 'No grant opportunities found after comprehensive analysis.';
+        // Update final status with points and notifications
+        if (savedCount > 0) {
+            const points = savedCount * 10;
+            
+            await supabase
+                .from('grant_submissions')
+                .update({ 
+                    status: 'completed', 
+                    contribution_points: points,
+                    error_message: `Found and saved ${savedCount} qualifying grant(s) from ${pagesToScrape.length} pages.`
+                })
+                .eq('id', submissionId);
 
-        const finalStatus = savedCount > 0 ? 'success' : 'failed';
+            await sendSubmissionNotification(
+              submissionId, 
+              'submission_completed',
+              'Grant Submission Processed!',
+              `Your submission found ${savedCount} grant(s) and earned ${points} points!`,
+              { grants_found: savedCount, points_earned: points, submission_url: url }
+            );
+        } else {
+            await supabase
+                .from('grant_submissions')
+                .update({ 
+                    status: 'failed',
+                    error_message: grants.length > 0 
+                        ? 'Grants found but did not meet funding/eligibility criteria.' 
+                        : 'No grant opportunities found after comprehensive analysis.'
+                })
+                .eq('id', submissionId);
 
-        await supabase
-            .from('grant_submissions')
-            .update({ 
-                status: finalStatus === 'success' ? 'completed' : 'failed', 
-                error_message: finalMessage 
-            })
-            .eq('id', submissionId);
-
+            await sendSubmissionNotification(
+                submissionId,
+                'submission_failed',
+                'Grant Submission Failed',
+                'We were unable to find any qualifying grants from your submission.',
+                { submission_url: url }
+            );
+        }
+        
+        const finalStatus = savedCount > 0 ? 'completed' : 'failed';
         console.log(`🎉 Enhanced processing complete! Status: ${finalStatus === 'success' ? 'completed' : 'failed'}`);
         console.log(`📊 Final results: Found ${grants.length} grants, saved ${savedCount} qualifying grants`);
 
@@ -891,7 +938,7 @@ Content from ${pagesToScrape.length} pages: ${combinedContent.substring(0, 15000
                 grantsFound: grants.length,
                 grantsSaved: savedCount,
                 pagesAnalyzed: successfulPages,
-                status: finalStatus
+                status: finalStatus === 'completed' ? 'success' : 'failed'
             }),
         };
 
