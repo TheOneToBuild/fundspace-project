@@ -1,14 +1,14 @@
 // netlify/functions/process-grant-submission-background.js
 
 import { createClient } from '@supabase/supabase-js';
-import { OllamaClient } from './ollama-client.js';
+import { GeminiClient } from './gemini-client.js';
 
 // Use service role key to bypass RLS policies
 const supabase = createClient(
     process.env.SUPABASE_URL, 
     process.env.SUPABASE_SERVICE_ROLE_KEY
 );
-const ollamaClient = new OllamaClient();
+const aiClient = new GeminiClient();
 
 // Database helper functions
 function generateSlug(organizationName, grantTitle) {
@@ -773,11 +773,11 @@ export const handler = async function(event, context) {
         }
 
         // Enhanced AI analysis with comprehensive prompt and examples
-        console.log(`🤖 Sending to Ollama for grant extraction...`);
+        console.log(`🤖 Sending to AI for grant extraction...`);
 
         // Use Ollama for grant extraction
-        const grants = await ollamaClient.extractGrants(combinedContent, url);
-        console.log(`✅ Ollama extracted ${grants.length} grants`);
+        const grants = await aiClient.extractGrants(combinedContent, url);
+        console.log(`✅ AI client extracted ${grants.length} grants`);
         
         // For now, we'll skip organization extraction (Phase 2 feature)
         const organizationData = null;

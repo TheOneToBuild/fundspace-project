@@ -1,61 +1,41 @@
-// fundspace-app/netlify/functions/ollama-client.js
-import axios from 'axios';
+// fundspace-app/netlify/functions/gemini-client.js
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
-class OllamaClient {
+class GeminiClient {
   constructor() {
-    this.baseUrl = process.env.OLLAMA_URL || 'http://localhost:11434';
-    this.textModel = 'llama3:8b-instruct-q4_0';
-    this.embeddingModel = 'nomic-embed-text:latest';
-    
-    this.client = axios.create({
-      baseURL: this.baseUrl,
-      timeout: 300000, // Increase to 5 minutes
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    });
+    this.genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    this.model = this.genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
   }
 
   async extractGrants(content, sourceUrl) {
     const prompt = this.createGrantExtractionPrompt(content, sourceUrl);
     
     try {
-      console.log(`🤖 Sending ${content.length} characters to Ollama...`);
+      console.log(`🤖 Sending ${content.length} characters to Gemini...`);
       
-      const response = await this.client.post('/api/generate', {
-        model: this.textModel,
-        prompt: prompt,
-        stream: false,
-        options: {
-          temperature: 0.1, // Low temperature for consistent extraction
-          top_k: 10,
-          top_p: 0.3
-        }
-      });
+      const result = await this.model.generateContent(prompt);
+      const response = await result.response;
+      const rawResponse = response.text();
+      
+      console.log(`📝 Gemini response received (${rawResponse.length} chars)`);
 
-      const rawResponse = response.data.response;
-      console.log(`📝 Ollama response received (${rawResponse.length} chars)`);
-
-      // Extract JSON from response
       const grants = this.parseGrantsFromResponse(rawResponse);
       console.log(`✅ Extracted ${grants.length} grants`);
       
       return this.validateAndCleanGrants(grants);
       
     } catch (error) {
-      console.error('❌ Ollama extraction error:', error.message);
+      console.error('❌ Gemini extraction error:', error.message);
       throw new Error(`Grant extraction failed: ${error.message}`);
     }
   }
 
   createGrantExtractionPrompt(content, sourceUrl) {
-    return `You are a grant extraction specialist. Extract grant opportunities and return a complete, valid JSON array.
+    return `Extract grant opportunities and return a valid JSON array.
 
 Source: ${sourceUrl}
 
-CRITICAL: Return ONLY a complete JSON array with no additional text, explanations, or markdown.
-
-Extract all grants with this exact structure:
+Return ONLY a JSON array with this structure:
 [
   {
     "title": "Grant program name",
@@ -73,14 +53,10 @@ Extract all grants with this exact structure:
   }
 ]
 
-RULES:
-1. Return ONLY valid, complete JSON array
-2. No explanations, no markdown, no extra text
-3. Ensure all JSON brackets and quotes are properly closed
-4. If no grants found, return: []
+Rules: Return only valid JSON. If no grants, return [].
 
 Content:
-${content.substring(0, 3000)}`;
+${content.substring(0, 6000)}`;
   }
 
   parseGrantsFromResponse(rawResponse) {
@@ -170,26 +146,6 @@ ${content.substring(0, 3000)}`;
     
     return { min: null, max: null };
   }
-
-  // Health check method
-  async healthCheck() {
-    try {
-      const response = await this.client.get('/api/tags');
-      const models = response.data.models || [];
-      
-      return {
-        status: 'healthy',
-        models: models.map(m => m.name),
-        textModelAvailable: models.some(m => m.name === this.textModel),
-        embeddingModelAvailable: models.some(m => m.name === this.embeddingModel)
-      };
-    } catch (error) {
-      return {
-        status: 'unhealthy',
-        error: error.message
-      };
-    }
-  }
 }
 
-export { OllamaClient };
+export { GeminiClient };
