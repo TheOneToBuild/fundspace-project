@@ -4,7 +4,13 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 class GeminiClient {
   constructor() {
     this.genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    this.model = this.genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    // Try with explicit configuration
+    this.model = this.genAI.getGenerativeModel({ 
+      model: 'gemini-pro',
+      generationConfig: {
+        temperature: 0.1,
+      }
+    });
   }
 
   async extractGrants(content, sourceUrl) {
