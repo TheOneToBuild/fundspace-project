@@ -389,11 +389,18 @@ const NotificationItem = ({ notification, onViewPost, onMarkAsRead, onDelete, cu
                         <button 
                             onClick={(e) => {
                                 e.stopPropagation();
-                                navigate('/profile/submissions');
+                                const grantSlugs = notificationData?.grant_slugs;
+                                if (type === 'submission_completed' && grantSlugs && grantSlugs.length > 0) {
+                                    // Navigate to grants page and open first grant detail modal
+                                    navigate(`/grants?open_grant_slug=${grantSlugs[0]}`);
+                                } else {
+                                    // Fallback to submissions page
+                                    navigate('/profile/submissions');
+                                }
                             }}
                             className="text-xs bg-blue-100 text-blue-700 px-3 py-1.5 rounded-full hover:bg-blue-200 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
                         >
-                            View Submissions
+                            {type === 'submission_completed' && notificationData?.grants_saved > 0 ? `View Grant${notificationData.grants_saved > 1 ? 's' : ''}` : 'View Submissions'}
                         </button>
                     )}
                 </div>

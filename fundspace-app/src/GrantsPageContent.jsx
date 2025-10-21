@@ -275,14 +275,22 @@ const GrantsPageContent = ({ isProfileView = false }) => {
   }, [searchParams, setSearchParams]);
 
   useEffect(() => {
-    const grantIdToOpen = searchParams.get('open_grant');
-    if (grantIdToOpen && grants.length > 0 && !selectedGrant) {
-      const grantToOpen = grants.find(g => g.id.toString() === grantIdToOpen);
-      if (grantToOpen) {
-        openDetail(grantToOpen);
-      }
+    if (grants.length === 0 || isDetailModalOpen) return;
+
+    const grantId = searchParams.get('open_grant');
+    const grantSlug = searchParams.get('open_grant_slug');
+
+    let grantToOpen = null;
+    if (grantId) {
+      grantToOpen = grants.find(g => g.id.toString() === grantId);
+    } else if (grantSlug) {
+      grantToOpen = grants.find(g => g.slug === grantSlug);
     }
-  }, [searchParams, grants, openDetail, selectedGrant]);
+
+    if (grantToOpen) {
+      openDetail(grantToOpen);
+    }
+  }, [searchParams, grants, openDetail, isDetailModalOpen]);
 
   const handleSaveGrant = async (grantId) => {
     if (!session) return;

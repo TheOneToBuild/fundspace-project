@@ -671,6 +671,7 @@ async function saveGrantsToSupabase(grants, primaryUrl, organizationId) {
 
     let savedCount = 0;
     let skippedCount = 0;
+    const savedGrantDetails = [];
 
     for (const grant of grants) {
         try {
@@ -699,6 +700,7 @@ async function saveGrantsToSupabase(grants, primaryUrl, organizationId) {
             const fundingAmount = parseFundingAmount(grant.funding_amount_text);
             const eligibilityTypes = extractEligibilityTypes(grant.description, grant.eligibility_criteria);
             const grantLocations = extractLocationInfo(grant.description, grant.eligibility_criteria, grant.title);
+            const grantSlug = generateSlug(grant.funder_name, grant.title);
 
             const { data: grantResult, error } = await supabase
                 .from('grants')
@@ -714,7 +716,7 @@ async function saveGrantsToSupabase(grants, primaryUrl, organizationId) {
                     eligibility_criteria: grant.eligibility_criteria,
                     grant_type: grant.grant_type,
                     eligible_organization_types: eligibilityTypes,
-                    slug: generateSlug(grant.funder_name, grant.title),
+                    slug: grantSlug,
                     date_added: new Date().toISOString().split('T')[0],
                     last_updated: new Date().toISOString()
                 })
@@ -726,6 +728,9 @@ async function saveGrantsToSupabase(grants, primaryUrl, organizationId) {
             console.log(`✅ Grant saved: "${grant.title}" (ID: ${grantResult.id})`);
             console.log(`📋 Eligibility: ${eligibilityTypes.join(', ')}`);
             savedCount++;
+            if (grantSlug) {
+                savedGrantDetails.push({ slug: grantSlug });
+            }
 
             // Link grant to locations
             await linkGrantToLocations(grantResult.id, grantLocations);
@@ -753,7 +758,7 @@ async function saveGrantsToSupabase(grants, primaryUrl, organizationId) {
     }
     
     console.log(`💾 Grant processing summary: ${savedCount} saved, ${skippedCount} skipped`);
-    return savedCount;
+    return { savedCount, savedGrantDetails };
 }
 
 // Send notification to user about submission status
@@ -915,7 +920,7 @@ Content from ${pagesToScrape.length} pages: ${combinedContent.substring(0, 15000
         }
 
         // Save grants to database and update organization
-        let savedCount = 0;
+        let savedCount = 0, grantSlugs = [];
         if (grants.length > 0 || organizationData) {
             console.log(`💾 Processing ${grants.length} grants and organization data...`);
             
@@ -934,7 +939,9 @@ Content from ${pagesToScrape.length} pages: ${combinedContent.substring(0, 15000
             }
             
             if (organizationId && grants.length > 0) {
-                savedCount = await saveGrantsToSupabase(grants, url, organizationId);
+                const { savedCount: count, savedGrantDetails } = await saveGrantsToSupabase(grants, url, organizationId);
+                savedCount = count;
+                grantSlugs = savedGrantDetails.map(g => g.slug);
             }
             
             console.log(`✅ Database operation complete: ${savedCount} grants saved, organization updated`);
@@ -942,23 +949,24 @@ Content from ${pagesToScrape.length} pages: ${combinedContent.substring(0, 15000
 
         // Update final status with points and notifications
         if (savedCount > 0) {
-            const points = savedCount * 10;
+            const points = savedCount; // 1 point per grant
+            const errorMessage = `Found and saved ${savedCount} qualifying grant(s) from ${pagesToScrape.length} pages.`;
             
             await supabase
                 .from('grant_submissions')
                 .update({ 
                     status: 'completed', 
                     contribution_points: points,
-                    error_message: `Found and saved ${savedCount} qualifying grant(s) from ${pagesToScrape.length} pages.`
+                    error_message: errorMessage
                 })
                 .eq('id', submissionId);
 
             await sendSubmissionNotification(
               submissionId, 
               'submission_completed',
-              'Grant Submission Processed!',
-              `Your submission found ${savedCount} grant(s) and earned ${points} points!`,
-              { grants_found: savedCount, points_earned: points, submission_url: url }
+              'Thank You for Your Contribution!',
+              `Thank you for helping grow our database! We found ${grants.length} grant(s) and added ${savedCount} to our platform. You earned ${points} point(s).`,
+              { grants_found: grants.length, grants_saved: savedCount, points_earned: points, submission_url: url, grant_slugs: grantSlugs }
             );
         } else {
             await supabase
