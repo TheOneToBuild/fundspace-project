@@ -264,12 +264,17 @@ const NotificationItem = ({ notification, onViewPost, onMarkAsRead, onDelete, cu
             onMarkAsRead(notification.id);
         }
         
+        // For failed submissions, do nothing - just mark as read
+        if (type === 'submission_failed') {
+            return;
+        }
+
         if (type === 'submission_completed' || type === 'submission_failed') {
             const grantSlugs = notificationData?.grant_slugs;
             if (type === 'submission_completed' && grantSlugs && grantSlugs.length > 0) {
                 navigate(`/grants?open_grant_slug=${grantSlugs[0]}`);
             } else {
-                // Fallback to general grants page for failed submissions or successful ones without slugs
+                // Fallback to general grants page for successful submissions without slugs
                 navigate('/grants');
             }
             return;
