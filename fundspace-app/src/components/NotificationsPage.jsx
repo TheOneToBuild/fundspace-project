@@ -116,7 +116,12 @@ const NotificationItem = ({ notification, onViewPost, onMarkAsRead, onDelete, cu
     const notificationText = () => {
         switch (type) {
             case 'submission_completed': {
-                return <>{notificationData?.message || 'Your grant submission was successfully processed!'}</>;
+                // Use the detailed message from the notification data if available
+                if (notificationData?.message) {
+                    return <>{notificationData.message}</>;
+                }
+                // Fallback to a more generic but still informative message
+                return <>Your grant submission was <strong className="font-semibold text-green-600">successfully processed</strong>! Found {notificationData?.grants_found || 0} grant(s) and earned {notificationData?.points_earned || 0} points.</>;
             }
             case 'submission_failed':
                 return <>Your grant submission <strong className="font-semibold text-red-600">could not be processed</strong>. No qualifying grants were found.</>;
@@ -391,22 +396,43 @@ const NotificationItem = ({ notification, onViewPost, onMarkAsRead, onDelete, cu
                     )}
 
                     {(type === 'submission_completed' || type === 'submission_failed') && (
-                        <button 
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                const grantSlugs = notificationData?.grant_slugs;
-                                if (type === 'submission_completed' && grantSlugs && grantSlugs.length > 0) {
-                                    // Navigate to grants page and open first grant detail modal
-                                    navigate(`/grants?open_grant_slug=${grantSlugs[0]}`);
-                                } else {
-                                    // Fallback to general grants page instead of non-existent submissions page
-                                    navigate('/grants');
-                                }
-                            }}
-                            className="text-xs bg-blue-100 text-blue-700 px-3 py-1.5 rounded-full hover:bg-blue-200 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        >
-                            {type === 'submission_completed' && notificationData?.grants_saved > 0 ? `View Grant${notificationData.grants_saved > 1 ? 's' : ''}` : 'View Grants'}
-                        </button>
+                        <>
+                            {/* Only show "View Grants" button for successful submissions with saved grants */}
+                            {type === 'submission_completed' && notificationData?.grants_saved > 0 && (
+                                <button 
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        const grantSlugs = notificationData?.grant_slugs;
+                                        if (grantSlugs && grantSlugs.length > 0) {
+                                            // Navigate to grants page and open first grant detail modal
+                                            navigate(`/grants?open_grant_slug=${grantSlugs[0]}`);
+                                        } else {
+                                            // Fallback to general grants page
+                                            navigate('/grants');
+                                        }
+                                    }}
+                                    className="text-xs bg-blue-100 text-blue-700 px-3 py-1.5 rounded-full hover:bg-blue-200 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                >
+                                    {notificationData.grants_saved > 1 ? 'View Grants' : 'View Grant'}
+                                </button>
+                            )}
+                            
+                            {/* For successful submissions without saved grants, show "Browse Grants" */}
+                            {type === 'submission_completed' && (!notificationData?.grants_saved || notificationData.grants_saved === 0) && (
+                                <button 
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        navigate('/grants');
+                                    }}
+                                    className="text-xs bg-gray-100 text-gray-700 px-3 py-1.5 rounded-full hover:bg-gray-200 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500"
+                                >
+                                    Browse Grants
+                                </button>
+                            )}
+                            
+                            {/* For failed submissions, no button at all */}
+                            {/* type === 'submission_failed' shows no buttons */}
+                        </>
                     )}
                 </div>
             </div>
