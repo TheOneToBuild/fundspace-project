@@ -116,8 +116,7 @@ const NotificationItem = ({ notification, onViewPost, onMarkAsRead, onDelete, cu
     const notificationText = () => {
         switch (type) {
             case 'submission_completed': {
-                const successData = notificationData || {};
-                return <>Your grant submission was <strong className="font-semibold text-green-600">successfully processed</strong>! Found {successData.grants_found || 0} grant(s) and earned {successData.points_earned || 0} points.</>;
+                return <>{notificationData?.message || 'Your grant submission was successfully processed!'}</>;
             }
             case 'submission_failed':
                 return <>Your grant submission <strong className="font-semibold text-red-600">could not be processed</strong>. No qualifying grants were found.</>;
@@ -261,8 +260,14 @@ const NotificationItem = ({ notification, onViewPost, onMarkAsRead, onDelete, cu
         }
         
         if (type === 'submission_completed' || type === 'submission_failed') {
-            navigate('/profile/submissions');
-            return; // Add return to prevent fallback navigation
+            const grantSlugs = notificationData?.grant_slugs;
+            if (type === 'submission_completed' && grantSlugs && grantSlugs.length > 0) {
+                navigate(`/grants?open_grant_slug=${grantSlugs[0]}`);
+            } else {
+                // Fallback to general grants page for failed submissions or successful ones without slugs
+                navigate('/grants');
+            }
+            return;
         }
         
         if (type === 'new_follower' || type === 'connection_request' || type === 'connection_accepted') {
@@ -394,13 +399,13 @@ const NotificationItem = ({ notification, onViewPost, onMarkAsRead, onDelete, cu
                                     // Navigate to grants page and open first grant detail modal
                                     navigate(`/grants?open_grant_slug=${grantSlugs[0]}`);
                                 } else {
-                                    // Fallback to submissions page
-                                    navigate('/profile/submissions');
+                                    // Fallback to general grants page instead of non-existent submissions page
+                                    navigate('/grants');
                                 }
                             }}
                             className="text-xs bg-blue-100 text-blue-700 px-3 py-1.5 rounded-full hover:bg-blue-200 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
                         >
-                            {type === 'submission_completed' && notificationData?.grants_saved > 0 ? `View Grant${notificationData.grants_saved > 1 ? 's' : ''}` : 'View Submissions'}
+                            {type === 'submission_completed' && notificationData?.grants_saved > 0 ? `View Grant${notificationData.grants_saved > 1 ? 's' : ''}` : 'View Grants'}
                         </button>
                     )}
                 </div>
