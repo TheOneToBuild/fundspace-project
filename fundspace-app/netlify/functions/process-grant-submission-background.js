@@ -758,24 +758,39 @@ async function saveGrantsToSupabase(grants, primaryUrl, organizationId) {
 
 // Send notification to user about submission status
 async function sendSubmissionNotification(submissionId, type, title, message, data = {}) {
-    const { data: submission } = await supabase
-      .from('grant_submissions')
-      .select('user_id')
-      .eq('id', submissionId)
-      .single();
+    try {
+        const { data: submission } = await supabase
+            .from('grant_submissions')
+            .select('user_id')
+            .eq('id', submissionId)
+            .single();
   
-    if (submission?.user_id) {
-      await supabase
-        .from('notifications')
-        .insert({
-          user_id: submission.user_id,
-          actor_id: submission.user_id, // Self-notification
-          type,
-          submission_id: submissionId,
-          is_read: false,
-          data: { title, message, ...data }
-        });
-      console.log(`🔔 Sent '${type}' notification to user ${submission.user_id}`);
+        if (submission?.user_id) {
+            // The user_id from grant_submissions references auth.users(id)
+            // But notifications.user_id references profiles(id)
+            // These should be the same UUID, but we need to use the profile reference
+            
+            const { data: notificationResult, error } = await supabase
+                .from('notifications')
+                .insert({
+                    user_id: submission.user_id, // This should work if the UUIDs match
+                    actor_id: submission.user_id, // Same here
+                    type,
+                    submission_id: submissionId,
+                    is_read: false,
+                    data: { title, message, ...data }
+                })
+                .select();
+            
+            if (error) {
+                console.error(`❌ Error creating notification:`, error);
+                throw error;
+            }
+            
+            console.log(`🔔 Successfully created notification:`, notificationResult);
+        }
+    } catch (error) {
+        console.error(`💥 Error in sendSubmissionNotification:`, error);
     }
   }
 
