@@ -956,7 +956,7 @@ Content from ${pagesToScrape.length} pages: ${combinedContent.substring(0, 15000
                 .from('grant_submissions')
                 .update({ 
                     status: 'completed',
-                    contribution_points: points, // This was already here, but let's ensure it's correct.
+                    contribution_points: points,
                     error_message: errorMessage
                 })
                 .eq('id', submissionId);

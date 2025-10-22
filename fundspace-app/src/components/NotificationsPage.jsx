@@ -116,15 +116,38 @@ const NotificationItem = ({ notification, onViewPost, onMarkAsRead, onDelete, cu
     const notificationText = () => {
         switch (type) {
             case 'submission_completed': {
-                // Use the detailed message from the notification data if available
-                if (notificationData?.message) {
-                    return <>{notificationData.message}</>;
+                // Now that the RPC function includes the data field, we can access it directly
+                const message = notification.data?.message;
+                const title = notification.data?.title;
+                const grantsFound = notification.data?.grants_found;
+                const grantsSaved = notification.data?.grants_saved;
+                const pointsEarned = notification.data?.points_earned;
+                
+                if (message) {
+                    return <>{message}</>;
                 }
-                // Fallback to a more generic but still informative message
-                return <>Your grant submission was <strong className="font-semibold text-green-600">successfully processed</strong>! Found {notificationData?.grants_found || 0} grant(s) and earned {notificationData?.points_earned || 0} points.</>;
+                
+                // Fallback message construction
+                if (title) {
+                    return <>{title} {grantsFound ? `Found ${grantsFound} grant(s).` : ''} {pointsEarned ? `Earned ${pointsEarned} points.` : ''}</>;
+                }
+                
+                return <>Your grant submission was successfully processed!</>;
             }
-            case 'submission_failed':
-                return <>Your grant submission <strong className="font-semibold text-red-600">could not be processed</strong>. No qualifying grants were found.</>;
+            case 'submission_failed': {
+                const message = notification.data?.message;
+                const title = notification.data?.title;
+                
+                if (message) {
+                    return <>{message}</>;
+                }
+                
+                if (title) {
+                    return <>{title}</>;
+                }
+                
+                return <>Your grant submission could not be processed. No qualifying grants were found.</>;
+            }
             case 'new_follower':
                 return <><strong className="font-semibold text-slate-900">{actor.full_name}</strong> started following you.</>;
             case 'connection_request':
@@ -464,6 +487,10 @@ export default function NotificationsPage() {
 
             // Always get fresh data by skipping cache
             const data = await getUserNotifications(100, filter === 'unread', true); // Added skipCache=true
+
+            // DEBUG: Check raw notification structure
+            console.log('Raw notifications from getUserNotifications:', data);
+            
 
             // Use the new centralized function
             let finalData = data || [];
