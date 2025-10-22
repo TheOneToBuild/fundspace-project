@@ -952,7 +952,8 @@ Content from ${pagesToScrape.length} pages: ${combinedContent.substring(0, 15000
             const points = savedCount; // 1 point per grant
             const errorMessage = `Found and saved ${savedCount} qualifying grant(s) from ${pagesToScrape.length} pages.`;
             
-            await supabase
+            // FIX: Update the submission record properly
+            const { error: updateError } = await supabase
                 .from('grant_submissions')
                 .update({ 
                     status: 'completed',
@@ -960,6 +961,12 @@ Content from ${pagesToScrape.length} pages: ${combinedContent.substring(0, 15000
                     error_message: errorMessage
                 })
                 .eq('id', submissionId);
+
+            if (updateError) {
+                console.error('❌ Error updating submission status:', updateError);
+            } else {
+                console.log(`✅ Updated submission ${submissionId} - Status: completed, Points: ${points}`);
+            }
 
             await sendSubmissionNotification(
               submissionId, 
@@ -969,7 +976,8 @@ Content from ${pagesToScrape.length} pages: ${combinedContent.substring(0, 15000
               { grants_found: grants.length, grants_saved: savedCount, points_earned: points, submission_url: url, grant_slugs: grantSlugs }
             );
         } else {
-            await supabase
+            // FIX: Update failed submissions properly
+            const { error: updateError } = await supabase
                 .from('grant_submissions')
                 .update({ 
                     status: 'failed',
@@ -978,6 +986,12 @@ Content from ${pagesToScrape.length} pages: ${combinedContent.substring(0, 15000
                         : 'No grant opportunities found after comprehensive analysis.'
                 })
                 .eq('id', submissionId);
+
+            if (updateError) {
+                console.error('❌ Error updating failed submission status:', updateError);
+            } else {
+                console.log(`✅ Updated submission ${submissionId} - Status: failed`);
+            }
 
             await sendSubmissionNotification(
                 submissionId,
@@ -988,8 +1002,8 @@ Content from ${pagesToScrape.length} pages: ${combinedContent.substring(0, 15000
             );
         }
         
-        const finalStatus = savedCount > 0 ? 'completed' : 'failed';
-        console.log(`🎉 Enhanced processing complete! Status: ${finalStatus === 'success' ? 'completed' : 'failed'}`);
+        const finalStatus = savedCount > 0 ? 'completed' : 'failed'; // This line correctly determines finalStatus
+        console.log(`🎉 Enhanced processing complete! Status: ${finalStatus}`);
         console.log(`📊 Final results: Found ${grants.length} grants, saved ${savedCount} qualifying grants`);
 
         return {
@@ -999,7 +1013,7 @@ Content from ${pagesToScrape.length} pages: ${combinedContent.substring(0, 15000
                 grantsFound: grants.length,
                 grantsSaved: savedCount,
                 pagesAnalyzed: successfulPages,
-                status: finalStatus === 'completed' ? 'success' : 'failed'
+                status: savedCount > 0 ? 'success' : 'failed'
             }),
         };
 

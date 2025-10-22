@@ -488,10 +488,6 @@ export default function NotificationsPage() {
             // Always get fresh data by skipping cache
             const data = await getUserNotifications(100, filter === 'unread', true); // Added skipCache=true
 
-            // DEBUG: Check raw notification structure
-            console.log('Raw notifications from getUserNotifications:', data);
-            
-
             // Use the new centralized function
             let finalData = data || [];
 

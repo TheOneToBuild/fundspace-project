@@ -74,23 +74,61 @@ serve(async (req) => {
       });
     }
 
-    // 4. Normalize URL and check for recent duplicates
+    // 4. Check for existing submissions with improved logic
     const normalizedUrl = normalizeUrl(url);
-    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-    const { data: existingSubmission, error: duplicateCheckError } = await serviceSupabaseClient
+    const { data: existingSubmissions, error: existingError } = await serviceSupabaseClient
       .from('grant_submissions')
-      .select('id, status, created_at')
+      .select('id, status, created_at, contribution_points')
       .eq('normalized_url', normalizedUrl)
-      .gte('created_at', thirtyDaysAgo)
-      .maybeSingle(); // Use maybeSingle to avoid error if no row is found
+      .order('created_at', { ascending: false })
+      .limit(5); // Get recent submissions
 
-    if (duplicateCheckError) throw duplicateCheckError;
-
-    if (existingSubmission) {
-      return new Response(JSON.stringify({ error: 'This URL was already submitted recently.', existing: existingSubmission }), {
+    if (existingError) {
+      return new Response(JSON.stringify({ error: 'Database error checking submissions' }), {
+        status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 409, // 409 Conflict
       });
+    }
+
+    if (existingSubmissions && existingSubmissions.length > 0) {
+      const mostRecentSubmission = existingSubmissions[0];
+      const sixMonthsAgo = new Date();
+      sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+      const mostRecentDate = new Date(mostRecentSubmission.created_at);
+      
+      // Allow resubmission if:
+      // 1. Most recent submission was more than 6 months ago, OR
+      // 2. Most recent submission failed (status = 'failed'), OR
+      // 3. Most recent submission is still processing (in case of stuck processing)
+      const canResubmit = 
+        mostRecentDate < sixMonthsAgo || 
+        mostRecentSubmission.status === 'failed' ||
+        mostRecentSubmission.status === 'processing';
+      
+      if (!canResubmit) {
+        // Check if there's a successful submission
+        const successfulSubmission = existingSubmissions.find(sub => sub.status === 'completed');
+        
+        if (successfulSubmission) {
+          const successDate = new Date(successfulSubmission.created_at);
+          const daysSinceSuccess = Math.floor((Date.now() - successDate.getTime()) / (1000 * 60 * 60 * 24));
+          
+          return new Response(JSON.stringify({ 
+            error: `This URL was successfully processed ${daysSinceSuccess} days ago and earned ${successfulSubmission.contribution_points || 0} points. You can resubmit URLs after 6 months or if they previously failed.`,
+            canRetryAfter: new Date(successDate.getTime() + (6 * 30 * 24 * 60 * 60 * 1000)).toISOString() // 6 months from success
+          }), {
+            status: 409,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+      }
+      
+      // If we reach here, resubmission is allowed
+      console.log(`📝 Allowing resubmission for ${normalizedUrl}. Reason: ${
+        mostRecentDate < sixMonthsAgo ? 'More than 6 months old' :
+        mostRecentSubmission.status === 'failed' ? 'Previous submission failed' :
+        'Previous submission stuck in processing'
+      }`);
     }
     
     // 5. Insert new submission record
@@ -119,18 +157,21 @@ serve(async (req) => {
         console.error("GRANT_PROCESSOR_WORKER_URL is not set. Cannot trigger worker.");
         // The status is already 'pending_review', so it can be manually processed later.
     } else {
-         // We use `fetch` but don't wait for the response to keep this function fast.
-        fetch(WORKER_URL, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${WORKER_SECRET}` // For security
-            },
-            body: JSON.stringify({
-                url: url,
-                submissionId: submission.id
-            }),
-        });
+        // Small delay to prevent rapid-fire submissions
+        setTimeout(() => {
+            // We use `fetch` but don't wait for the response to keep this function fast.
+            fetch(WORKER_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${WORKER_SECRET}` // For security
+                },
+                body: JSON.stringify({
+                    url: url,
+                    submissionId: submission.id
+                }),
+            }).catch(err => console.error('Worker trigger failed:', err));
+        }, 100);
     }
 
     // Immediately respond to the user
