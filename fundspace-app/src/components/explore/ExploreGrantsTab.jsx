@@ -1,18 +1,26 @@
 // fundspace-app/src/components/explore/ExploreGrantsTab.jsx
-import React from 'react';
-import { Search } from 'lucide-react';
+import React, { useMemo } from 'react';
+import GrantsPageContent from '../../GrantsPageContent';
 
 const ExploreGrantsTab = ({ searchParams }) => {
+  // Create stable filter object to prevent unnecessary re-renders
+  const filterProps = useMemo(() => ({
+    searchTerm: searchParams?.searchTerm || '',
+    locationFilter: searchParams?.locationFilter || [],
+    categoryFilter: searchParams?.categoryFilter || [],
+    grantStatusFilter: searchParams?.grantStatusFilter || '',
+    grantTypeFilter: searchParams?.grantTypeFilter || '',
+    sortCriteria: searchParams?.sortCriteria || 'dueDate_asc'
+  }), [searchParams]);
+
   return (
-    <div className="text-center py-20">
-      <div className="text-gray-400 mb-4">
-        <Search className="w-16 h-16 mx-auto" />
-      </div>
-      <h3 className="text-xl font-semibold text-gray-900 mb-2">Available Grants</h3>
-      <p className="text-gray-600 mb-4">Content for available grants will appear here</p>
-      {searchParams?.searchQuery && (
-        <p className="text-sm text-gray-500">Search: {searchParams.searchQuery}</p>
-      )}
+    <div>
+      <GrantsPageContent 
+        isProfileView={true} 
+        isExploreTab={true}
+        hideFilterBar={true}
+        initialFilters={filterProps}
+      />
     </div>
   );
 };

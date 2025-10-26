@@ -230,7 +230,7 @@ const GrantDetailModal = ({ grant, isOpen, onClose, session, isSaved, onSave, on
                 </p>
               </div>
 
-              {grantData.categories && grantData.categories.length > 0 && (
+              {grantData.categories && Array.isArray(grantData.categories) && grantData.categories.length > 0 && (
                 <div>
                   <h3 className="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
                     <Target size={20} className="text-slate-600" />
@@ -238,7 +238,9 @@ const GrantDetailModal = ({ grant, isOpen, onClose, session, isSaved, onSave, on
                   </h3>
                   <div className="flex flex-wrap gap-3">
                     {grantData.categories.map((category, index) => {
-                      const categoryName = category.name || category;
+                      // Handle both string and object formats
+                      const categoryName = typeof category === 'string' ? category : (category?.name || 'Unknown');
+                      if (!categoryName || categoryName === 'Unknown') return null;
                       return (
                         <span 
                           key={category.id || index} 

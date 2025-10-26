@@ -52,18 +52,22 @@ export const filterGrants = (grant, filters) => {
 
 // NEW: Enhanced grant filtering with taxonomy support
 export const filterGrantsWithTaxonomy = (grant, filters) => {
-  const { 
-    searchTerm, 
-    locationFilter, 
-    categoryFilter, // Legacy category support
-    taxonomyFilter = [], // New taxonomy filter
-    grantTypeFilter, 
+  // Add null check at the start
+  if (!grant || !grant.title) {
+    return false;
+  }
+
+  const {
+    searchTerm,
+    locationFilter = [],
+    categoryFilter = [],
+    grantTypeFilter,
     grantStatusFilter,
     minFunding,
-    maxFunding,
-    eligibleOrganizationTypes = [] // Filter by what org types are eligible
+    maxFunding
   } = filters;
 
+  // Search term matching
   const term = (searchTerm || '').toLowerCase();
   const matchesSearch =
     !term ||
@@ -71,68 +75,72 @@ export const filterGrantsWithTaxonomy = (grant, filters) => {
     (grant.description || '').toLowerCase().includes(term) ||
     (grant.foundationName || '').toLowerCase().includes(term);
 
-  // Location filtering (unchanged)
-  const locFilterArray = Array.isArray(locationFilter) ? locationFilter.map(l => l.toLowerCase()) : [];
-  const grantLocs = Array.isArray(grant.locations) ? grant.locations.map(l => (l.name || '').toLowerCase()) : [];
-  const matchesLocation =
-    locFilterArray.length === 0 ||
-    locFilterArray.some(filterLoc => grantLocs.includes(filterLoc));
+  // Location matching (improved)
+  const matchesLocation = locationFilter.length === 0 || locationFilter.some(filterLoc => {
+    const grantLocations = [
+      // From locations array (most common in your data)
+      ...(Array.isArray(grant.locations) ? grant.locations.map(l => l.name || l) : []),
+      // From direct location fields
+      grant.location,
+      grant.city,
+      grant.state,
+      grant.county
+    ].filter(Boolean);
+    return grantLocations.some(loc => loc.toLowerCase().includes(filterLoc.toLowerCase()) || filterLoc.toLowerCase().includes(loc.toLowerCase()));
+  });
 
-  // Legacy category filtering (keep for backward compatibility)
-  const categoryFilterArray = Array.isArray(categoryFilter) ? categoryFilter.map(c => c.toLowerCase()) : [];
-  const grantCats = Array.isArray(grant.categories) ? grant.categories.map(c => (c.name || '').toLowerCase()) : [];
-  const matchesCategory = 
-    categoryFilterArray.length === 0 || 
-    categoryFilterArray.some(filterCat => grantCats.includes(filterCat));
+  // Category matching (improved)
+  const matchesCategory = categoryFilter.length === 0 ||
+    categoryFilter.some(filterCat => {
+      const grantCategories = [
+        // Use category_names instead of categories
+        ...(Array.isArray(grant.category_names) ? grant.category_names : []),
+        // Keep these as fallbacks
+        ...(Array.isArray(grant.categories) ? grant.categories.map(c => c.name || c) : []),
+        grant.category,
+        grant.focus_area
+      ].filter(Boolean);
+      return grantCategories.some(cat =>
+        cat && cat.toLowerCase().includes(filterCat.toLowerCase())
+      );
+    });
 
-  // NEW: Taxonomy-based organization type filtering
-  const matchesTaxonomy = taxonomyFilter.length === 0 || 
-    (grant.eligible_organization_types && 
-     taxonomyFilter.some(taxonomyCode => 
-       grant.eligible_organization_types.includes(taxonomyCode) ||
-       // Also match parent taxonomy codes (e.g., "nonprofit" matches "nonprofit.501c3")
-       grant.eligible_organization_types.some(eligible => eligible.startsWith(taxonomyCode + '.'))
-     ));
+  // Grant type matching
+  const matchesGrantType = !grantTypeFilter ||
+    (grant.grant_type === grantTypeFilter || grant.grantType === grantTypeFilter);
 
-  // Organization type eligibility (if grant specifies eligible types)
-  const matchesEligibleOrgTypes = eligibleOrganizationTypes.length === 0 ||
-    !grant.eligible_organization_types ||
-    grant.eligible_organization_types.some(type => 
-      eligibleOrganizationTypes.some(userType => 
-        type === userType || type.startsWith(userType + '.') || userType.startsWith(type + '.')
-      )
-    );
-
-  // Funding amount filtering
-  const grantMinAmount = parseMinFundingAmount(grant.fundingAmount);
-  const grantMaxAmount = parseMaxFundingAmount(grant.fundingAmount);
-  const matchesMinFunding = !minFunding || grantMaxAmount >= parseFloat(minFunding);
-  const matchesMaxFunding = !maxFunding || grantMinAmount <= parseFloat(maxFunding);
-
-  const matchesGrantType = !grantTypeFilter || grant.grantType === grantTypeFilter;
-
+  // Status matching (improved)
   let matchesGrantStatus = true;
   if (grantStatusFilter) {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const grantDueDateString = grant.dueDate;
-    if (grantStatusFilter === 'Open') {
-      matchesGrantStatus = !grantDueDateString || new Date(grantDueDateString) >= today;
-    } else if (grantStatusFilter === 'Rolling') {
-      matchesGrantStatus = !grantDueDateString;
-    } else if (grantStatusFilter === 'Closed') {
-      matchesGrantStatus = grantDueDateString && new Date(grantDueDateString) < today;
+    const grantDueDate = grant.dueDate || grant.deadline ?
+      new Date(grant.dueDate || grant.deadline) : null;
+
+    switch (grantStatusFilter) {
+      case 'active':
+        matchesGrantStatus = !grantDueDate || grantDueDate >= today;
+        break;
+      case 'upcoming':
+        const grantStartDate = grant.start_date ? new Date(grant.start_date) : null;
+        matchesGrantStatus = grantStartDate && grantStartDate > today;
+        break;
+      case 'closing_soon':
+        if (grantDueDate) {
+          const thirtyDaysFromNow = new Date(today);
+          thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
+          matchesGrantStatus = grantDueDate >= today && grantDueDate <= thirtyDaysFromNow;
+        } else {
+          matchesGrantStatus = false;
+        }
+        break;
     }
   }
 
-  return matchesSearch && 
-         matchesLocation && 
-         matchesCategory && 
-         matchesTaxonomy && 
-         matchesEligibleOrgTypes && 
-         matchesMinFunding && 
-         matchesMaxFunding && 
-         matchesGrantType && 
+  return matchesSearch &&
+         matchesLocation &&
+         matchesCategory &&
+         matchesGrantType &&
          matchesGrantStatus;
 };
 

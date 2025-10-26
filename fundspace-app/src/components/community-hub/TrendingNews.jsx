@@ -5,6 +5,40 @@ import PropTypes from 'prop-types';
 import NewsCard from './NewsCard';
 import { rssNewsService as newsService } from '../../services/rssNewsService.js';
 
+const diversifyNewsSources = (newsArray) => {
+  if (!Array.isArray(newsArray)) return [];
+  
+  // First pass: get articles with max 2 per source
+  const firstPass = newsArray.reduce((acc, item) => {
+      const key = item.url || item.title;
+      const source = item.source_name || item.source || 'Unknown';
+      
+      if (acc.seen.has(key)) return acc;
+      
+      const sourceCount = acc.sourceCounts.get(source) || 0;
+      if (sourceCount < 2) {  // Allow up to 2 per source
+          acc.seen.add(key);
+          acc.sourceCounts.set(source, sourceCount + 1);
+          acc.items.push(item);
+      }
+      
+      return acc;
+  }, { seen: new Set(), items: [], sourceCounts: new Map() });
+  
+  // If we have less than 6 articles, add more from any source to reach up to 9
+  if (firstPass.items.length < 6) {
+      newsArray.forEach(item => {
+          const key = item.url || item.title;
+          if (!firstPass.seen.has(key) && firstPass.items.length < 9) {
+              firstPass.seen.add(key);
+              firstPass.items.push(item);
+          }
+      });
+  }
+  
+  return firstPass.items.slice(0, 9);
+};
+
 const TrendingNews = ({ channelType }) => {
   const [news, setNews] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -22,18 +56,7 @@ const TrendingNews = ({ channelType }) => {
           newsData = await newsService.getGlobalBreakingNews();
         }
         
-        // Deduplicate by URL (or title if URL not available)
-        const uniqueNews = Array.isArray(newsData) 
-          ? newsData.reduce((acc, item) => {
-              const key = item.url || item.title;
-              if (!acc.seen.has(key)) {
-                acc.seen.add(key);
-                acc.items.push(item);
-              }
-              return acc;
-            }, { seen: new Set(), items: [] }).items.slice(0, 9)
-          : [];
-        
+        const uniqueNews = diversifyNewsSources(newsData);
         setNews(uniqueNews);
       } catch (error) {
         console.error('Error fetching news:', error);

@@ -10,9 +10,41 @@ import FilterBar from './components/FilterBar.jsx';
 import Pagination from './components/Pagination.jsx';
 import AnimatedCounter from './components/AnimatedCounter.jsx';
 import { parseMaxFundingAmount } from './utils.js';
-import { GRANT_STATUSES } from './constants.js';
 import usePaginatedFilteredData from './hooks/usePaginatedFilteredData.js';
 import { filterGrantsWithTaxonomy } from './filtering.js';
+import { GRANT_STATUSES } from './constants.js';
+import { getGrantsWithCategories, getAvailableGrantCategories } from './utils/rpcClientFunctions.js';
+
+const filterGrantsByStatus = (grants, status) => {
+  // Default to 'active' if no status is selected (i.e., "All Statuses")
+  const effectiveStatus = status || 'active';
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const closingSoonDate = new Date(today);
+  closingSoonDate.setDate(today.getDate() + 14); // 2 weeks from now
+
+  return grants.filter(grant => {
+    // For rolling deadlines, only show if 'active' or 'all' (which defaults to active) is chosen.
+    if (!grant.dueDate) return effectiveStatus === 'active';
+
+    const dueDate = new Date(grant.dueDate);
+
+    switch (effectiveStatus) {
+      case 'active':
+        return dueDate >= today;
+      case 'closing_soon':
+        return dueDate >= today && dueDate <= closingSoonDate;
+      case 'closed':
+        // Only show closed if explicitly selected
+        return dueDate < today;
+      default:
+        return true;
+    }
+  });
+};
+
 import { SearchResultsSkeleton } from './components/SkeletonLoader.jsx';
 import { LayoutContext } from './App.jsx';
 
@@ -132,7 +164,12 @@ const GrantListItem = ({ grant, onOpenDetailModal, isSaved, onSave, onUnsave, se
     );
 };
 
-const GrantsPageContent = ({ isProfileView = false }) => {
+const GrantsPageContent = ({ 
+  isProfileView = false, 
+  isExploreTab = false, 
+  hideFilterBar = false,
+  initialFilters = {}
+}) => {
   const { setPageBgColor } = useContext(LayoutContext);
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -147,91 +184,91 @@ const GrantsPageContent = ({ isProfileView = false }) => {
 
   const [grants, setGrants] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filterConfig, setFilterConfig] = useState({ 
-    searchTerm: '', 
-    locationFilter: [], 
-    categoryFilter: [], 
+  const [filterConfig, setFilterConfig] = useState({
+    searchTerm: initialFilters.searchTerm || '', 
+    locationSearchTerm: initialFilters.locationSearchTerm || '',
+    locationFilter: initialFilters.locationFilter || [], 
+    categoryFilter: initialFilters.categoryFilter || [], 
     grantTypeFilter: '', 
-    grantStatusFilter: '', 
-    sortCriteria: 'dueDate_asc', 
-    taxonomyFilter: [],
+    grantStatusFilter: initialFilters.grantStatusFilter || '', 
+    sortCriteria: initialFilters.sortCriteria || 'dueDate_asc', 
+    taxonomyFilter: []
   });
+
+  useEffect(() => {
+    // Sync with parent filters when they change (for explore tab integration)
+    if (isExploreTab && initialFilters) {
+      setFilterConfig(prev => ({
+        ...prev,
+        searchTerm: initialFilters.searchTerm || '',
+        locationFilter: initialFilters.locationFilter || [],
+        categoryFilter: initialFilters.categoryFilter || [],
+        grantStatusFilter: initialFilters.grantStatusFilter || '',
+        grantTypeFilter: initialFilters.grantTypeFilter || '',
+        sortCriteria: initialFilters.sortCriteria || 'dueDate_asc'
+      }));
+    }
+  }, [isExploreTab, initialFilters]);
+
   // Trending/recent search feature removed
   const [currentPage, setCurrentPage] = useState(1);
   const [grantsPerPage, setGrantsPerPage] = useState(12);
   const [isDetailModalOpen, setIsDetailModal] = useState(false);
+  const [availableCategories, setAvailableCategories] = useState([]);
   const [selectedGrant, setSelectedGrant] = useState(null);
-  const [isMobileFiltersVisible, setIsMobileFiltersVisible] = useState(false);
+  const [viewMode, setViewMode] = useState('grid');
+  const [filtersVisible, setFiltersVisible] = useState(false);
   const [session, setSession] = useState(null);
   const [savedGrantIds, setSavedGrantIds] = useState(new Set());
-  const [viewMode, setViewMode] = useState('grid');
-  const [filtersVisible, setFiltersVisible] = useState(!isProfileView);
 
+  // REPLACE the existing fetchInitialData function:
   useEffect(() => {
     const fetchInitialData = async () => {
       setLoading(true);
-      const { data: { session } } = await supabase.auth.getSession();
-      setSession(session);
+      
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        setSession(session);
 
-      const { data: grantsData, error: grantsError } = await supabase
-        .from('grants_with_taxonomy')
-        .select('*')
-        .order('id', { ascending: false });
+        // NEW: Use the RPC function instead of direct query
+        const grantsResult = await getGrantsWithCategories();
+        const grantsData = grantsResult.grants || [];
 
-      if (grantsError) {
-        console.error('Error fetching grants:', grantsError);
-      } else {
-        const orgIds = [...new Set(grantsData.map(g => g.organization_id).filter(Boolean))];
-        const { data: orgsData } = await supabase
-          .from('organizations')
-          .select('id, name, image_url, banner_image_url, slug')
-          .in('id', orgIds);
-
-        const formattedData = grantsData.map(grant => {
-          const orgData = orgsData?.find(o => o.id === grant.organization_id);
-          
-          return {
-            ...grant,
-            foundationName: grant.funder_name || 'Unknown Funder',
-            funderSlug: grant.funder_slug || orgData?.slug || null,
-            fundingAmount: grant.max_funding_amount || grant.funding_amount_text || 'Not specified',
-            dueDate: grant.deadline,
-            grantType: grant.grant_type,
-            eligibility_criteria: grant.eligibility_criteria,
-            categories: grant.category_names ? grant.category_names.map((name, idx) => ({ id: idx, name })) : [],
-            locations: grant.location_names ? grant.location_names.map((name, idx) => ({ id: idx, name })) : [],
-            eligible_organization_types: grant.taxonomy_codes || [],
-            organization: {
-              image_url: orgData?.image_url || grant.funder_logo_url || null,
-              banner_image_url: orgData?.banner_image_url || null
-            },
-            save_count: 0 // Initialize to 0, will be updated below
-          };
-        });
-
-        const grantIds = formattedData.map(grant => grant.id);
+        // Update bookmark counts
+        const grantIds = grantsData.map(grant => grant.id);
         const bookmarkCounts = await refreshGrantBookmarkCounts(grantIds);
 
-        formattedData.forEach(grant => {
+        grantsData.forEach(grant => {
           grant.save_count = bookmarkCounts[grant.id] || 0;
         });
 
-        setGrants(formattedData);
-      }
+        setGrants(grantsData);
 
-      if (session) {
-        const { data: savedData, error: savedError } = await supabase
-          .from('saved_grants')
-          .select('grant_id')
-          .eq('user_id', session.user.id);
-        if (savedError) console.error('Error fetching saved grants:', savedError);
-        else setSavedGrantIds(new Set(savedData.map(g => g.grant_id)));
+        // NEW: Fetch available categories dynamically
+        const categories = await getAvailableGrantCategories();
+        setAvailableCategories(categories);
+
+        if (session) {
+          const { data: savedData, error: savedError } = await supabase
+            .from('saved_grants')
+            .select('grant_id')
+            .eq('user_id', session.user.id);
+          
+          if (savedError) {
+            console.error('Error fetching saved grants:', savedError);
+          } else {
+            setSavedGrantIds(new Set(savedData.map(g => g.grant_id)));
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching initial data:', error);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
-    
+
     fetchInitialData();
-    
+
     const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       if (session) {
@@ -249,6 +286,22 @@ const GrantsPageContent = ({ isProfileView = false }) => {
     
     return () => { authListener.subscription.unsubscribe(); };
   }, []);
+  
+  // ADD this useEffect:
+  useEffect(() => {
+    const fetchAvailableCategoriesData = async () => {
+      try {
+        // Use the already imported function from rpcClientFunctions.js
+        const categories = await getAvailableGrantCategories();
+        setAvailableCategories(categories);
+      } catch (error) {
+        console.error('Error fetching available grant categories:', error);
+        setAvailableCategories([]); // Fallback to empty array
+      }
+    };
+    
+    fetchAvailableCategoriesData();
+  }, []); // Empty dependency array to run once on mount
 
   const openDetail = useCallback((grant) => { 
     setSelectedGrant(grant); 
@@ -383,14 +436,16 @@ const GrantsPageContent = ({ isProfileView = false }) => {
   const uniqueGrantTypes = useMemo(() => Array.from(new Set(grants.map(g => g.grantType).filter(Boolean))).sort(), [grants]);
   const uniqueLocations = useMemo(() => Array.from(new Set(grants.flatMap(g => g.locations?.map(l => l.name) || []).filter(Boolean))).sort(), [grants]);
   
+  const grantsFilteredByStatus = useMemo(() => filterGrantsByStatus(grants, filterConfig.grantStatusFilter), [grants, filterConfig.grantStatusFilter]);
+
   const { paginatedItems: currentList = [], totalPages, totalFilteredItems, filteredAndSortedItems } = usePaginatedFilteredData(
-    grants, 
+    grantsFilteredByStatus,
     filterConfig, 
-    filterGrantsWithTaxonomy, 
-    filterConfig.sortCriteria, 
-    sortGrants, 
+    filterGrantsWithTaxonomy,
+    filterConfig.sortCriteria,
+    sortGrants,
     currentPage, 
-    grantsPerPage
+    grantsPerPage,
   );
   
   const totalFilteredFunding = useMemo(() => {
@@ -481,8 +536,13 @@ const GrantsPageContent = ({ isProfileView = false }) => {
   }, [filterConfig]);
 
   const filterBarProps = {
-            isMobileVisible: isMobileFiltersVisible,
-            // Remove searchTerm/onSearchChange/onSuggestionSelect for grants page filter bar
+            isMobileVisible: filtersVisible,
+            searchTerm: filterConfig.searchTerm,
+            onSearchChange: (val) => {
+              const searchValue = typeof val === 'string' ? val : val.text;
+              setFilterConfig(cfg => ({ ...cfg, searchTerm: searchValue }));
+              if (searchValue === '') setCurrentPage(1);
+            },
             locationFilter: filterConfig.locationFilter,
             setLocationFilter: (value) => handleFilterChange('locationFilter', value),
             categoryFilter: filterConfig.categoryFilter,
@@ -494,8 +554,8 @@ const GrantsPageContent = ({ isProfileView = false }) => {
             sortCriteria: filterConfig.sortCriteria,
             setSortCriteria: (value) => handleFilterChange('sortCriteria', value),
             taxonomyFilter: filterConfig.taxonomyFilter,
-            setTaxonomyFilter: handleTaxonomyChange,
-            uniqueCategories: uniqueCategories,
+            setTaxonomyFilter: handleTaxonomyChange,            
+            availableCategories: availableCategories, // Pass the fetched categories
             uniqueLocations: uniqueLocations,
             uniqueGrantTypes: uniqueGrantTypes,
             uniqueGrantStatuses: GRANT_STATUSES,
@@ -510,55 +570,12 @@ const GrantsPageContent = ({ isProfileView = false }) => {
     <>
       <div className={isProfileView ? "" : "container mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12 bg-[#faf7f5]"}>
         {/* Reserve space for filter dropdown to prevent layout shift */}
-        {!isProfileView && <div className="h-[110px] md:h-[110px] lg:h-[110px] w-full" style={{pointerEvents:'none',marginBottom:'-110px'}}></div>}
-        {/* Redesigned full-width search bar with integrated filters, kit.com inspired */}
-        {!isProfileView && (
-          <section className="mb-12 flex flex-col items-center w-full pt-14 sm:pt-20">
-            {/* Full-bleed search bar with recent/trending search logic */}
-            <div className="w-full flex flex-col items-center">
-              <div className="w-full flex items-center bg-white border border-slate-100 rounded-2xl shadow-xl px-4 py-2 focus-within:ring-2 focus-within:ring-blue-400 transition-all duration-200 ring-1 ring-slate-100 hover:ring-blue-200 hover:shadow-2xl relative" style={{ minHeight: 48, marginLeft: 0, marginRight: 0 }}>
-                <EnhancedSearchInput
-                  searchTerm={filterConfig.searchTerm}
-                  onSearchChange={val => {
-                    setFilterConfig(cfg => ({ ...cfg, searchTerm: typeof val === 'string' ? val : val.text }));
-                  }}
-                  onSuggestionSelect={val => {
-                    setFilterConfig(cfg => ({ ...cfg, searchTerm: typeof val === 'string' ? val : val.text }));
-                    setCurrentPage(1);
-                  }}
-                  placeholder="Search for grants..."
-                  className="flex-1 bg-transparent outline-none text-base text-slate-800 placeholder-slate-400 font-semibold tracking-wide"
-                  showRecentSearches={false}
-                />
-                <div className="h-8 w-px bg-slate-100 mx-4 hidden md:block" />
-                <button
-                  className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold rounded-2xl shadow-md hover:from-blue-700 hover:to-purple-700 hover:scale-[1.04] focus:ring-2 focus:ring-blue-400 transition-all duration-200 text-base tracking-wide ml-2"
-                  onClick={() => setIsMobileFiltersVisible(v => !v)}
-                  aria-expanded={isMobileFiltersVisible}
-                  style={{ minHeight: '48px' }}
-                >
-                  <SlidersHorizontal size={22} />
-                  <span className="hidden sm:inline">{isMobileFiltersVisible ? 'Hide Filters' : 'Show Filters'}</span>
-                  {activeGrantFilters.length > 0 && (
-                    <span className="ml-2 inline-flex items-center justify-center px-2 py-0.5 text-xs font-bold leading-none text-blue-600 bg-white rounded-full border border-blue-100 shadow-sm">
-                      {activeGrantFilters.length}
-                    </span>
-                  )}
-                </button>
-              </div>
-              {/* Seamless filter dropdown, visually attached to search bar */}
-              <div
-                className={`w-full max-w-6xl -mt-2 pt-0 pb-0 px-0 flex flex-col items-center transition-all duration-500 ease-in-out ${isMobileFiltersVisible ? 'opacity-100 translate-y-0 max-h-[500px]' : 'opacity-0 -translate-y-4 pointer-events-none max-h-0'}`}
-                style={{ willChange: 'opacity, transform, maxHeight', zIndex: 50, borderTopLeftRadius: 0, borderTopRightRadius: 0 }}
-              >
-                <FilterBar {...filterBarProps} isMobileVisible={true} />
-              </div>
-            </div>
-          </section>
-        )}
+        {!isProfileView && !hideFilterBar && <div className="h-[110px] md:h-[110px] lg:h-[110px] w-full" style={{pointerEvents:'none',marginBottom:'-110px'}}></div>}
+        {/* Redesigned full-width search bar with integrated filters, inspired by kit.com */}
+        {!isProfileView && !hideFilterBar && ( <section className="mb-12 flex flex-col items-center w-full pt-14 sm:pt-20"> <div className="w-full flex flex-col items-center"> <div className="w-full flex items-center bg-white border border-slate-100 rounded-2xl shadow-xl px-4 py-2 focus-within:ring-2 focus-within:ring-blue-400 transition-all duration-200 ring-1 ring-slate-100 hover:ring-blue-200 hover:shadow-2xl relative" style={{ minHeight: 48, marginLeft: 0, marginRight: 0 }}> <EnhancedSearchInput searchTerm={filterConfig.searchTerm} onSearchChange={val => { const searchValue = typeof val === 'string' ? val : val.text; handleFilterChange('searchTerm', searchValue); }} onSuggestionSelect={val => { const searchValue = typeof val === 'string' ? val : val.text; setFilterConfig(cfg => ({ ...cfg, searchTerm: searchValue })); setCurrentPage(1); }} placeholder="Search for grants..." className="flex-1 bg-transparent outline-none text-base text-slate-800 placeholder-slate-400 font-semibold tracking-wide" showRecentSearches={false} /> <div className="h-8 w-px bg-slate-100 mx-4 hidden md:block" /> <button className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold rounded-2xl shadow-md hover:from-blue-700 hover:to-purple-700 hover:scale-[1.04] focus:ring-2 focus:ring-blue-400 transition-all duration-200 text-base tracking-wide ml-2" onClick={() => setFiltersVisible(v => !v)} aria-expanded={filtersVisible} style={{ minHeight: '48px' }} > <SlidersHorizontal size={22} /> <span className="hidden sm:inline">{filtersVisible ? 'Hide Filters' : 'Show Filters'}</span> {activeGrantFilters.length > 0 && ( <span className="ml-2 inline-flex items-center justify-center px-2 py-0.5 text-xs font-bold leading-none text-blue-600 bg-white rounded-full border border-blue-100 shadow-sm"> {activeGrantFilters.length} </span> )} </button> <div className="h-6 w-px bg-slate-200 mx-2" /> <button onClick={handleClearFilters} className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors duration-200" > <XCircle className="w-4 h-4" /> Clear All </button> </div> <div className={`w-full max-w-6xl -mt-2 pt-0 pb-0 px-0 flex flex-col items-center transition-all duration-500 ease-in-out ${filtersVisible ? 'opacity-100 translate-y-0 max-h-[500px]' : 'opacity-0 -translate-y-4 pointer-events-none max-h-0'}`} style={{ willChange: 'opacity, transform, maxHeight', zIndex: 50, borderTopLeftRadius: 0, borderTopRightRadius: 0 }} > <FilterBar {...filterBarProps} isMobileVisible={true} /> </div> </div> </section> )}
 
         <section id="grants" className="scroll-mt-20">
-          {isProfileView && (
+          {isProfileView && !hideFilterBar && (
             <div className="bg-white/80 backdrop-blur-sm p-6 rounded-2xl shadow-lg border border-white/60 mb-8">
               <button 
                 onClick={() => setFiltersVisible(!filtersVisible)} 
@@ -578,68 +595,14 @@ const GrantsPageContent = ({ isProfileView = false }) => {
             </div>
           )}
 
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:gap-4 text-center sm:text-left w-full">
-                <h2 className="text-2xl md:text-3xl font-bold">
-                    <span className="text-slate-800">Available Grants </span>
-                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600 font-extrabold">
-                    ({totalFilteredItems})
-                    </span>
-                </h2>
-                {totalFilteredItems > 0 && !loading && (
-                    <div className="mt-2 sm:mt-0 flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-100 to-emerald-100 rounded-full border border-green-200 shadow-sm">
-                        <TrendingUpIcon size={20} className="text-green-600" />
-                        <span className="text-green-700 font-semibold">
-                            <AnimatedCounter 
-                                targetValue={totalFilteredFunding} 
-                                duration={1000} 
-                                formatValue={formatCurrency}
-                            /> Available
-                        </span>
-                    </div>
-                )}
-            </div>
-            
-            <div className="flex items-center gap-3 w-full sm:w-auto flex-shrink-0">
-                <div className="relative w-full sm:w-auto">
-                    <select 
-                      id="grants-per-page" 
-                      value={grantsPerPage} 
-                      onChange={handlePerPageChange} 
-                      className="w-full pl-4 pr-10 py-3 border border-slate-300 rounded-xl bg-white text-sm font-medium focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none appearance-none shadow-sm hover:shadow-md transition-shadow duration-300"
-                    >
-                        {[6, 12, 24, 48].map((option) => (
-                          <option key={option} value={option}>Show {option}</option>
-                        ))}
-                    </select>
-                    <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none text-slate-400" size={16} />
-                </div>
-                
-                <div className="flex items-center bg-white rounded-xl border border-slate-300 p-1 shadow-sm">
-                    <button 
-                      onClick={() => setViewMode('grid')} 
-                      className={`p-2.5 rounded-lg transition-all duration-300 flex items-center gap-2 ${viewMode === 'grid' ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg' : 'text-slate-500 hover:bg-slate-100'}`}
-                      title="Grid View"
-                    >
-                      <LayoutGrid size={18}/>
-                    </button>
-                    <button 
-                      onClick={() => setViewMode('list')} 
-                      className={`p-2.5 rounded-lg transition-all duration-300 flex items-center gap-2 ${viewMode === 'list' ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg' : 'text-slate-500 hover:bg-slate-100'}`}
-                      title="List View"
-                    >
-                      <List size={18}/>
-                    </button>
-                </div>
-            </div>
-          </div>
+          {/* The header has been moved to ExplorePage.jsx for consistency */}
 
           {loading ? (
              <SearchResultsSkeleton count={grantsPerPage} type="grant" />
           ) : currentList && currentList.length > 0 ? (
             <>
               {viewMode === 'grid' ? (
-                <div className={`grid grid-cols-1 md:grid-cols-2 ${isProfileView ? 'lg:grid-cols-2' : 'lg:grid-cols-3'} gap-8`}>
+                <div className={`grid grid-cols-1 md:grid-cols-2 ${isExploreTab ? 'lg:grid-cols-4' : isProfileView ? 'lg:grid-cols-2' : 'lg:grid-cols-3'} gap-8`}>
                   {currentList.map((grant) => ( 
                     <GrantCard 
                       key={grant.id} 

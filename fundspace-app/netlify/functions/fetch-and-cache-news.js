@@ -7,7 +7,7 @@ const parser = new Parser({ timeout: 10000 });
 
 // Constants
 const DB_BATCH_SIZE = 100;
-const ARTICLES_PER_FEED = 6; // Changed from 2 to 3
+const ARTICLES_PER_FEED = 10; // Increased to find more relevant articles
 
 // --- HELPER FUNCTIONS ---
 
@@ -42,24 +42,134 @@ function extractImage(item) {
 function isExcludedTopic(item, { excludedKeywords, allowedKeywords }) {
   const content = `${item.title || ''} ${item.contentSnippet || ''}`.toLowerCase();
   
-  // First check if it contains housing-related keywords
-  const housingKeywords = ['housing', 'homeless', 'shelter', 'rent', 'eviction', 'tenant', 'affordable'];
-  const hasHousingTopic = housingKeywords.some(keyword => 
-    new RegExp(`\\b${keyword}\\b`).test(content)
-  );
+  // EXCLUDE: Sports content
+  const sportsKeywords = [
+    'warriors', 'giants', '49ers', 'sharks', 'raiders', 'athletics', 'a\'s',
+    'nfl', 'nba', 'mlb', 'nhl', 'football', 'basketball', 'baseball', 'hockey',
+    'game', 'score', 'playoff', 'championship', 'coach', 'player', 'team',
+    'season', 'draft', 'trade', 'injury report', 'mvp', 'quarterback', 'pitcher'
+  ];
   
-  // Check for Bay Area/California location
-  const locationKeywords = ['california', 'bay area', 'san francisco', 'oakland', 'berkeley', 'sf'];
-  const hasRelevantLocation = locationKeywords.some(keyword => 
-    content.includes(keyword)
-  );
+  // EXCLUDE: Real estate/home sales
+  const realEstateKeywords = [
+    'home sales', 'real estate', 'property sold', 'million dollar home',
+    'most expensive', 'luxury home', 'mansion', 'penthouse', 'listing',
+    'market price', 'home prices', 'property values', 'zip code', 'median price',
+    'square feet', 'bedroom', 'bathroom', 'sold for', 'asking price'
+  ];
   
-  // Only keep articles about housing AND in the right location
-  if (!hasHousingTopic || !hasRelevantLocation) {
-    console.log(`Excluding (missing housing or location): "${item.title}"`);
+  // EXCLUDE: Celebrity/Entertainment
+  const celebrityKeywords = [
+    'celebrity', 'actor', 'actress', 'singer', 'musician', 'hollywood',
+    'red carpet', 'premiere', 'oscar', 'grammy', 'emmy', 'golden globe',
+    'breakup', 'dating', 'relationship', 'marriage', 'divorce', 'baby',
+    'instagram', 'tiktok', 'social media', 'influencer', 'viral'
+  ];
+  
+  // EXCLUDE: Lottery/gambling
+  const lotteryKeywords = [
+    'winning numbers', 'lottery', 'powerball', 'mega millions', 'jackpot',
+    'fantasy 5', 'pick 3', 'pick 4', 'cash pop', 'hit 5', 'gambling'
+  ];
+  
+  // EXCLUDE: Weather routine updates
+  const routineWeatherKeywords = [
+    'forecast:', 'temperature', 'sunny', 'cloudy', 'chance of rain',
+    'high of', 'low of', 'wind speed', 'humidity', 'uv index'
+  ];
+  
+  // EXCLUDE: Crime blotter/minor incidents
+  const minorCrimeKeywords = [
+    'burglary', 'theft', 'shoplifting', 'arrested for', 'traffic stop',
+    'dui', 'vandalism', 'trespassing', 'noise complaint', 'parking violation'
+  ];
+  
+  // Check if content contains excluded topics
+  const hasExcludedContent = [
+    ...sportsKeywords,
+    ...realEstateKeywords,
+    ...celebrityKeywords,
+    ...lotteryKeywords,
+    ...routineWeatherKeywords,
+    ...minorCrimeKeywords
+  ].some(keyword => content.includes(keyword));
+  
+  if (hasExcludedContent) {
+    console.log(`Excluding (filtered content): "${item.title}"`);
     return true;
   }
   
+  // INCLUDE: Important/trending topics we want
+  const importantKeywords = [
+    // Government/Politics
+    'city council', 'mayor', 'governor', 'election', 'vote', 'ballot',
+    'policy', 'legislation', 'ordinance', 'budget', 'tax', 'funding',
+    
+    // Housing/Development (important stories, not sales)
+    'housing crisis', 'homeless', 'development', 'zoning', 'rent control',
+    'affordable housing', 'displacement', 'gentrification', 'eviction',
+    'tenant rights', 'housing shortage', 'construction', 'planning commission',
+    
+    // Transportation/Infrastructure
+    'transit', 'bart', 'muni', 'highway', 'bridge', 'infrastructure',
+    'transportation', 'traffic', 'construction project', 'public works',
+    
+    // Environment/Climate
+    'climate', 'environment', 'pollution', 'air quality', 'water',
+    'sustainability', 'renewable energy', 'carbon', 'emissions',
+    
+    // Public Safety (major incidents)
+    'fire', 'earthquake', 'emergency', 'evacuation', 'disaster',
+    'shooting', 'accident', 'investigation', 'police', 'crime',
+    
+    // Economics/Business (significant)
+    'economy', 'business', 'startup', 'tech company', 'jobs', 'unemployment',
+    'recession', 'inflation', 'stock market', 'ipo', 'merger', 'acquisition',
+    
+    // Education
+    'school', 'university', 'education', 'students', 'teachers',
+    'graduation', 'enrollment', 'tuition', 'scholarship',
+    
+    // Health/Social Issues
+    'health', 'hospital', 'medical', 'pandemic', 'vaccine', 'outbreak',
+    'mental health', 'addiction', 'social services', 'welfare',
+    
+    // Arts/Culture (significant events)
+    'museum', 'art', 'festival', 'concert', 'theater', 'cultural',
+    'community event', 'celebration', 'exhibition'
+  ];
+  
+  // Check if content contains important/trending topics
+  const hasImportantContent = importantKeywords.some(keyword => 
+    content.includes(keyword)
+  );
+  
+  // If it doesn't have important content, exclude it
+  if (!hasImportantContent) {
+    console.log(`Excluding (not trending/important): "${item.title}"`);
+    return true;
+  }
+  
+  // Check Bay Area relevance
+  const bayAreaKeywords = [
+    'san francisco', 'sf', 'oakland', 'berkeley', 'san jose', 'palo alto',
+    'mountain view', 'sunnyvale', 'fremont', 'hayward', 'santa clara',
+    'san mateo', 'redwood city', 'marin', 'napa', 'sonoma', 'contra costa',
+    'alameda', 'peninsula', 'east bay', 'north bay', 'south bay',
+    'bay area', 'silicon valley', 'california', 'ca'
+  ];
+  
+  const hasBayAreaRelevance = bayAreaKeywords.some(keyword => 
+    content.includes(keyword)
+  );
+  
+  // For California category, require Bay Area relevance
+  if (!hasBayAreaRelevance) {
+    console.log(`Excluding (not Bay Area relevant): "${item.title}"`);
+    return true;
+  }
+  
+  // Allow through if it passes all filters
   return false;
 }
 

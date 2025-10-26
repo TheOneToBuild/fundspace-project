@@ -1091,6 +1091,118 @@ export const getAppInitData = async (userId) => {
   }
 };
 
+// ADD these new functions:
+export const getGrantsWithCategories = async (grantIds = null) => {
+  const cacheKey = getCacheKey('grants_with_categories', { grantIds });
+  const cached = getCachedData(cacheKey);
+  if (cached) return cached;
+
+  try {
+    const { data, error } = await supabase.rpc('get_grants_with_categories', {
+      p_grant_ids: grantIds
+    });
+
+    if (error) throw error;
+    setCachedData(cacheKey, data);
+    return data;
+  } catch (error) {
+    console.error('Error fetching grants with categories:', error);
+    
+    // Fallback to existing grants_with_taxonomy view
+    try {
+      let query = supabase.from('grants_with_taxonomy').select('*');
+      
+      if (grantIds && Array.isArray(grantIds) && grantIds.length > 0) {
+        query = query.in('id', grantIds);
+      }
+
+      const { data: grantsData, error: grantsError } = await query.order('id', { ascending: false });
+      if (grantsError) throw grantsError;
+
+      const result = {
+        grants: grantsData.map(grant => ({
+          ...grant,
+          foundationName: grant.funder_name || 'Unknown Funder',
+          funderSlug: grant.funder_slug || null,
+          fundingAmount: grant.max_funding_amount || grant.funding_amount_text || 'Not specified',
+          dueDate: grant.deadline,
+          grantType: grant.grant_type,
+          categories: grant.category_names ? grant.category_names.map((name, idx) => ({ id: idx, name })) : [],
+          locations: grant.location_names ? grant.location_names.map((name, idx) => ({ id: idx, name })) : [],
+          eligible_organization_types: grant.taxonomy_codes || [],
+          organization: {
+            image_url: grant.funder_logo_url || null,
+            banner_image_url: null
+          },
+          save_count: grant.save_count || 0
+        }))
+      };
+      
+      setCachedData(cacheKey, result);
+      return result;
+    } catch (fallbackError) {
+      console.error('Fallback query also failed:', fallbackError);
+      throw fallbackError;
+    }
+  }
+};
+
+export const getAvailableGrantCategories = async () => {
+  const cacheKey = getCacheKey('grant_categories', {});
+  const cached = getCachedData(cacheKey);
+  if (cached) return cached;
+
+  try {
+    // First try to get categories from grants that actually have category data
+    const { data: grantCategories, error: grantError } = await supabase
+      .from('grants_with_taxonomy')
+      .select('category_names')
+      .not('category_names', 'is', null)
+      .limit(100); // Limit to avoid large queries
+
+    if (!grantError && grantCategories && grantCategories.length > 0) {
+      // Extract unique category names from all grants
+      const categorySet = new Set();
+      grantCategories.forEach(grant => {
+        if (grant.category_names && Array.isArray(grant.category_names)) {
+          grant.category_names.forEach(name => {
+            if (name && typeof name === 'string') {
+              categorySet.add(name.trim());
+            }
+          });
+        }
+      });
+      
+      const categories = Array.from(categorySet).sort().map(name => ({ name }));
+      
+      if (categories.length > 0) {
+        setCachedData(cacheKey, categories);
+        return categories;
+      }
+    }
+
+    // Fallback: get categories from the categories table
+    const { data: categoriesData, error: categoriesError } = await supabase
+      .from('categories')
+      .select('id, name')
+      .order('name');
+
+    if (!categoriesError && categoriesData && categoriesData.length > 0) {
+      setCachedData(cacheKey, categoriesData);
+      return categoriesData;
+    }
+
+    // Final fallback: return static categories
+    const staticCategories = [ { name: 'Arts' }, { name: 'Culture' }, { name: 'Education' }, { name: 'Health' }, { name: 'Healthcare' }, { name: 'Environment' }, { name: 'Social Services' }, { name: 'Community Development' }, { name: 'Research' }, { name: 'Technology' }, { name: 'Youth Development' }, { name: 'Senior Services' }, { name: 'Animal Welfare' }, { name: 'Human Rights' } ];
+    setCachedData(cacheKey, staticCategories);
+    return staticCategories;
+  } catch (error) {
+    console.error('Error fetching available grant categories:', error);
+    const staticCategories = [ { name: 'Arts' }, { name: 'Culture' }, { name: 'Education' }, { name: 'Health' }, { name: 'Environment' }, { name: 'Social Services' } ];
+    return staticCategories;
+  }
+};
+
 export const invalidateCache = (pattern) => {
   if (pattern) {
     const keys = Array.from(cache.keys());

@@ -1,4 +1,5 @@
 // src/constants.js
+import { supabase } from './supabaseClient.js';
 
 export const CATEGORIES = [
   'Arts & Culture',
@@ -61,3 +62,34 @@ export const NONPROFIT_BUDGET_RANGES = [
   '$1M - $5M',
   '$5M+'
 ];
+
+// ADD new dynamic category function:
+export const getAvailableCategories = async () => {
+  try {
+    const { data, error } = await supabase
+      .from('categories')
+      .select(`
+        id,
+        name,
+        grant_categories!inner (
+          grant_id
+        )
+      `)
+      .order('name');
+
+    if (error) throw error;
+
+    return data
+      .map(category => ({
+        id: category.id,
+        name: category.name,
+        grant_count: category.grant_categories.length
+      }))
+      .filter(category => category.grant_count > 0)
+      .sort((a, b) => b.grant_count - a.grant_count || a.name.localeCompare(b.name));
+  } catch (error) {
+    console.error('Error fetching categories:', error);
+    // Fallback to static list
+    return CATEGORIES.map((name, index) => ({ id: index, name, grant_count: 0 }));
+  }
+};
