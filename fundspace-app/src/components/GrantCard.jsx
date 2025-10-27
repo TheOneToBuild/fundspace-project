@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { IconBriefcase, MapPin, DollarSign, Calendar, ExternalLink, ShieldCheck, Bookmark, Users, Building2, Clock, Zap, Target, ChevronRight, Sparkles } from './Icons.jsx';
 import { formatDate, getPillClasses, getGrantTypePillClasses, formatFundingDisplay } from '../utils.js';
 
@@ -145,10 +145,156 @@ const getLocationPillClasses = (locationName) => {
   return locationMap[locationName] || 'bg-gradient-to-r from-slate-100 to-gray-100 text-slate-700 border-slate-200';
 };
 
-const GrantCard = ({ grant, onOpenDetailModal, onFilterByCategory, onSave, onUnsave, isSaved, session, userOrganizationType = null }) => {
-    const navigate = useNavigate();
+const GrantCard = ({ grant, viewMode = 'grid', onClick, onFilterByCategory, onSaveToggle, isSaved, session, userOrganizationType = null }) => {
+    // Add list view rendering
+    if (viewMode === 'list') {
+  // Helper function to format funding amounts
+  const formatFunding = (amount) => {
+    if (!amount) return 'Not specified';
+    const numStr = amount.toString().replace(/[,$]/g, '');
+    const num = parseFloat(numStr);
+    if (isNaN(num)) return amount;
+    
+    if (num >= 1000000) {
+      return `$${(num / 1000000).toFixed(1)}M`;
+    } else if (num >= 1000) {
+      return `$${(num / 1000).toFixed(0)}K`;
+    }
+    return `$${num.toLocaleString()}`;
+  };
+
+  // Helper function to format locations
+  const formatLocations = (locations) => {
+    if (!locations || locations.length === 0) return [];
+    
+    // Check if it includes all major counties (simplified check)
+    const majorCounties = ['Alameda County', 'Contra Costa County', 'Marin County', 'San Francisco County', 'San Mateo County', 'Santa Clara County'];
+    const hasAllMajor = majorCounties.every(county => 
+      locations.some(loc => loc.name === county)
+    );
+    
+    if (hasAllMajor && locations.length >= 6) {
+      return [{ name: 'All Counties' }];
+    }
+    
+    return locations.slice(0, 3);
+  };
+
+  // Calculate days left
+  const getDaysLeft = (dueDate) => {
+    if (!dueDate) return null;
+    const today = new Date();
+    const due = new Date(dueDate);
+    const diffTime = due - today;
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays;
+  };
+
+  const daysLeft = getDaysLeft(grant.dueDate);
+  const formattedLocations = formatLocations(grant.locations);
+
+  return (
+    <div 
+      className="flex items-start py-3 px-4 bg-white border rounded-lg shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+      onClick={onClick}
+    >
+      {/* Organization logo - aligned with title */}
+      <div className="flex-shrink-0 mr-3 mt-1">
+        {grant.organization?.image_url || grant.funder_logo_url ? (
+          <img 
+            src={grant.organization?.image_url || grant.funder_logo_url} 
+            alt={grant.foundationName}
+            className="w-10 h-10 rounded-lg object-cover"
+          />
+        ) : (
+          <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center text-white font-bold text-sm">
+            {grant.foundationName?.charAt(0) || 'G'}
+          </div>
+        )}
+      </div>
+
+      {/* Main content */}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-start justify-between">
+          <div className="flex-1 min-w-0">
+            <h3 className="font-semibold text-lg text-gray-900 truncate leading-tight">{grant.title}</h3>
+            <p className="text-sm text-gray-600 mt-1">{grant.foundationName}</p>
+            <p className="text-sm text-gray-500 mt-1 line-clamp-2 leading-relaxed">
+              {grant.description?.substring(0, 120)}...
+            </p>
+          </div>
+          
+          {/* Right side - Key details */}
+          <div className="ml-4 flex-shrink-0 text-right min-w-[140px] flex flex-col items-end">
+            <div className="text-lg font-semibold text-green-600">
+              {formatFunding(grant.fundingAmount || grant.max_funding_amount)}
+            </div>
+            <div className="flex items-center mt-1 space-x-2">
+              {daysLeft !== null && (
+                <span className={`text-xs px-2 py-1 rounded-full ${
+                  daysLeft <= 7 ? 'bg-red-100 text-red-700' :
+                  daysLeft <= 30 ? 'bg-yellow-100 text-yellow-700' :
+                  'bg-green-100 text-green-700'
+                }`}>
+                  {daysLeft > 0 ? `${daysLeft}d left` : daysLeft === 0 ? 'Due today' : 'Overdue'}
+                </span>
+              )}
+              {!grant.dueDate && (
+                <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-700">
+                  Rolling
+                </span>
+              )}
+              
+              {/* Bigger bookmark button */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSaveToggle(grant.id);
+                }}
+                className={`p-2 rounded-lg transition-colors ${
+                  isSaved ? 'text-blue-600 bg-blue-50' : 'text-gray-400 hover:text-blue-600 hover:bg-blue-50'
+                }`}
+              >
+                <Bookmark className="w-5 h-5" fill={isSaved ? 'currentColor' : 'none'} />
+              </button>
+            </div>
+          </div>
+        </div>
+        
+        {/* Tags row - more compact */}
+        <div className="flex items-center mt-2 space-x-2 text-xs flex-wrap">
+          {/* Location tags */}
+          {formattedLocations.map((location, idx) => (
+            <span key={idx} className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
+              {location.name}
+            </span>
+          ))}
+          
+          {/* Category tags */}
+          {grant.categories?.slice(0, 2).map((category, idx) => (
+            <span key={idx} className="bg-purple-100 text-purple-800 px-2 py-1 rounded-full">
+              {category.name}
+            </span>
+          ))}
+          
+          {/* Grant type */}
+          <span className="bg-gray-100 text-gray-800 px-2 py-1 rounded-full">
+            {grant.grant_type || grant.grantType || 'Grant'}
+          </span>
+          
+          {/* Due date */}
+          <span className="bg-orange-100 text-orange-800 px-2 py-1 rounded-full">
+            Due: {grant.dueDate ? new Date(grant.dueDate).toLocaleDateString() : 'Rolling'}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
     const [isHovered, setIsHovered] = useState(false);
     
+    // Common data processing
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
@@ -192,15 +338,7 @@ const GrantCard = ({ grant, onOpenDetailModal, onFilterByCategory, onSave, onUns
 
     const handleSaveClick = (e) => {
         e.stopPropagation();
-        if (!session) {
-            navigate('/login');
-            return;
-        }
-        if (isSaved) {
-            onUnsave(grant.id);
-        } else {
-            onSave(grant.id);
-        }
+        onSaveToggle(grant.id);
     };
 
     return (
@@ -210,14 +348,14 @@ const GrantCard = ({ grant, onOpenDetailModal, onFilterByCategory, onSave, onUns
             } ${isEligibleForUser ? '' : 'opacity-80'} ${isExpired ? 'opacity-60' : ''}`}
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
-            onClick={() => onOpenDetailModal(grant)}
+            onClick={() => onClick(grant)}
         >
             <div className="relative">
                 <div className="h-28 bg-gradient-to-br from-slate-100 via-white to-slate-100">
                     {grant.organization?.banner_image_url && (
                         <img
                             src={grant.organization.banner_image_url}
-                            alt={`${grant.foundationName} banner`}
+                            alt={`${grant.foundationName || 'Funder'} banner`}
                             className="w-full h-full object-cover"
                         />
                     )}
@@ -229,7 +367,7 @@ const GrantCard = ({ grant, onOpenDetailModal, onFilterByCategory, onSave, onUns
                     {grant.organization?.image_url ? (
                         <img
                             src={grant.organization.image_url}
-                            alt={`${grant.foundationName} logo`}
+                            alt={`${grant.foundationName || 'Funder'} logo`}
                             className="h-16 w-16 rounded-xl object-cover border-4 border-white shadow-lg bg-white"
                         />
                     ) : (
@@ -267,7 +405,7 @@ const GrantCard = ({ grant, onOpenDetailModal, onFilterByCategory, onSave, onUns
             <div className="p-4 pt-12 relative z-0 flex-grow flex flex-col">
                 <div className="mb-3">
                     <Link 
-                        to={`/organizations/${grant.funderSlug}`} 
+                        to={grant.funderSlug ? `/organizations/${grant.funderSlug}` : '#'}
                         className="font-semibold text-slate-800 text-base hover:text-blue-600 transition-colors duration-300 block truncate"
                         onClick={(e) => { if(isExpired) e.preventDefault(); e.stopPropagation(); }}
                     >
@@ -395,8 +533,8 @@ const GrantCard = ({ grant, onOpenDetailModal, onFilterByCategory, onSave, onUns
             <div className="px-4 pb-4 flex justify-between items-center relative z-0 mt-auto">
                 <button
                     onClick={(e) => {
-                        e.stopPropagation();
-                        onOpenDetailModal(grant);
+                        e.stopPropagation(); // Already on the main div, but good for clarity
+                        onClick(grant);
                     }}
                     disabled={isExpired}
                     className={`group/btn flex items-center gap-2 px-4 py-2 font-semibold rounded-lg shadow-sm transition-all duration-300 transform hover:scale-105 hover:shadow-md disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none flex-1 mr-2 justify-center text-sm ${

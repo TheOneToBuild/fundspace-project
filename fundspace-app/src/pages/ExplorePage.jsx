@@ -1,5 +1,5 @@
 // fundspace-app/src/pages/ExplorePage.jsx
-import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react'; 
 import { Search, SlidersHorizontal, LayoutGrid, List, ChevronDown, XCircle, MapPin, Filter, Building } from 'lucide-react';
 import ExploreRequestsTab from '../components/explore/ExploreRequestsTab.jsx';
 import ExploreGrantsTab from '../components/explore/ExploreGrantsTab.jsx';
@@ -17,6 +17,7 @@ import { getOrganizationsWithCategories, getGrantsWithCategories } from '../util
 import { filterOrganizations, filterGrantsWithTaxonomy } from '../filtering.js';
 import { sortOrganizations } from '../sorting.js';
 import usePaginatedFilteredData from '../hooks/usePaginatedFilteredData.js';
+import { useNavigate as useRouterNavigate } from 'react-router-dom';
 import { parseMaxFundingAmount } from '../utils.js';
 
 const isGrantActive = (grant) => {
@@ -222,6 +223,7 @@ const AutocompleteInput = ({ items, selectedItems, onSelectionChange, placeholde
 };
 
 export default function ExplorePage() {
+  const navigate = useRouterNavigate();
   const [activeTab, setActiveTab] = useState('grants');
 
   // State for all grants data to populate filter dropdowns
@@ -599,8 +601,8 @@ export default function ExplorePage() {
   const tabs = [
     { id: 'grants', label: 'Available Grants' },
     { id: 'organizations', label: 'Organizations' },
-    { id: 'requests', label: 'Requests for Funds' },
-    { id: 'wins', label: 'Recent Fund Wins' }
+    { id: 'requests', label: 'Requests for Funds', comingSoon: true },
+    { id: 'wins', label: 'Recent Fund Wins', comingSoon: true }
   ];
 
   // Fetch grants data for filter options
@@ -627,21 +629,49 @@ export default function ExplorePage() {
     fetchGrantsData();
   }, []); // Fetch once on mount
 
+  // In ExplorePage.jsx, update the organization fetching:
   useEffect(() => {
     const fetchOrganizations = async () => {
       setLoading(true);
-      setError('');
       try {
-        const data = await getOrganizationsWithCategories(); // Use the new function
+        // Use the existing function
+        const { data, error } = await supabase.rpc('get_organizations_with_categories');
+        if (error) throw error;
+        
         setOrganizations(data || []);
       } catch (error) {
         console.error('Error fetching organizations:', error);
-        setError('Failed to load organizations');
+        
+        // Fallback to direct query
+        try {
+          const { data: orgsData, error: orgsError } = await supabase
+            .from('organizations')
+            .select(`
+              id, name, description, location, county, type,
+              organization_categories(categories(name))
+            `)
+            .order('name');
+            
+          if (orgsError) throw orgsError;
+          
+          const transformedData = orgsData.map(org => ({
+            ...org,
+            focus_areas: org.organization_categories?.map(oc => oc.categories?.name).filter(Boolean) || []
+          }));
+          
+          setOrganizations(transformedData);
+        } catch (fallbackError) {
+          console.error('Fallback failed:', fallbackError);
+          setError('Failed to load organizations');
+        }
       } finally {
         setLoading(false);
       }
     };
-    if (activeTab === 'organizations') fetchOrganizations();
+    
+    if (activeTab === 'organizations') {
+      fetchOrganizations();
+    }
   }, [activeTab]);
 
   const handleSearchChange = useCallback((value) => {
@@ -979,10 +1009,13 @@ export default function ExplorePage() {
           return (
             <ExploreGrantsTab 
               searchParams={{
-                ...searchParams,
+                ...grantFilterConfig,
                 onFilterChange: handleCurrentFilterChange,
-                // Add sorting function
-                sortGrants: sortGrants
+                uniqueGrantCategories,
+                uniqueGrantLocations,
+                uniqueGrantTypes,
+                allGrants,
+                viewMode: viewMode // Add this to pass the current view mode
               }}
             />
           );
@@ -1002,7 +1035,7 @@ export default function ExplorePage() {
       <div className="bg-[#faf7f4] pt-12 pb-8">
         <div className="max-w-7xl mx-auto px-6">
           <h1 className="text-4xl font-bold text-gray-900 text-center mb-3">
-            Explore Opportunities
+            Explore Community
           </h1>
           <p className="text-lg text-gray-600 text-center mb-10">
             Discover organizations, grants, and funding opportunities that match your mission
@@ -1101,7 +1134,14 @@ export default function ExplorePage() {
                         : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
                       }`}
                   >
-                    {tab.label}
+                    <div className="flex items-center justify-center gap-2">
+                      <span>{tab.label}</span>
+                      {tab.comingSoon && (
+                        <span className="px-1.5 py-0.5 text-[10px] font-semibold bg-yellow-100 text-yellow-800 rounded-full border border-yellow-200">
+                          SOON
+                        </span>
+                      )}
+                    </div>
                     {activeTab === tab.id && (
                       <div className="absolute bottom-0 left-0 right-0 h-1 bg-blue-600"></div>
                     )}
@@ -1184,12 +1224,17 @@ export default function ExplorePage() {
               <SearchResultsSkeleton count={orgsPerPage} type="organization" /> 
             ) : currentOrganizations.length > 0 ? (
               <>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div className={`w-full ${
+                  viewMode === 'list' 
+                    ? 'space-y-4' 
+                    : 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6'
+                }`}>
                   {currentOrganizations.map((organization) => (
                     <OrganizationCard 
                       key={organization.id} 
                       organization={organization} 
-                      handleFilterChange={handleCurrentFilterChange} 
+                      viewMode={viewMode}
+                      onClick={() => navigate(`/organizations/${organization.slug}`)}
                     />
                   ))}
                 </div>

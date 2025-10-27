@@ -59,14 +59,12 @@ export const getPostCommentsWithReactions = async (postId, userId, isOrgPost = f
 };
 
 export const getOrganizationsWithCategories = async () => {
-  const cacheKey = getCacheKey('orgs_with_categories', {});
-  // FIX: The user wants to use a different cache key.
-  // const cacheKey = getCacheKey('organizations_with_categories', {});
+  const cacheKey = getCacheKey('organizations_with_categories', {});
   const cached = getCachedData(cacheKey);
   if (cached) return cached;
 
   try {
-    const { data, error } = await supabase.rpc('get_organizations_with_categories');
+    const { data, error } = await supabase.rpc('get_organizations_with_categories'); // This should work now
 
     if (error) throw error;
     setCachedData(cacheKey, data);
@@ -74,7 +72,7 @@ export const getOrganizationsWithCategories = async () => {
   } catch (error) {
     console.error('Error fetching organizations with categories:', error);
     
-    // Fallback: manually join and aggregate
+    // Fallback query
     try {
       const { data: orgsData, error: orgsError } = await supabase
         .from('organizations')
@@ -93,7 +91,6 @@ export const getOrganizationsWithCategories = async () => {
         
       if (orgsError) throw orgsError;
       
-      // Transform the data to include focus_areas array
       const transformedData = orgsData.map(org => ({
         ...org,
         focus_areas: org.organization_categories?.map(oc => oc.categories?.name).filter(Boolean) || []

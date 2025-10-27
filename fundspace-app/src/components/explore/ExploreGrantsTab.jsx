@@ -10,7 +10,8 @@ const ExploreGrantsTab = ({ searchParams }) => {
     categoryFilter: searchParams?.categoryFilter || [],
     grantStatusFilter: searchParams?.grantStatusFilter || 'active',
     grantTypeFilter: searchParams?.grantTypeFilter || '',
-    sortCriteria: searchParams?.sortCriteria || 'dueDate_asc'
+    sortCriteria: searchParams?.sortCriteria || 'dueDate_asc',
+    viewMode: searchParams?.viewMode || 'grid' // Add this line
   }), [searchParams]);
 
   return (
@@ -21,6 +22,7 @@ const ExploreGrantsTab = ({ searchParams }) => {
         hideFilterBar={true}
         externalFilterConfig={filterConfig}
         onFilterChange={searchParams?.onFilterChange}
+        viewMode={searchParams?.viewMode}
         // Pass the categories and other data from parent
         availableCategories={searchParams?.uniqueGrantCategories || []}
         uniqueGrantLocations={searchParams?.uniqueGrantLocations || []}

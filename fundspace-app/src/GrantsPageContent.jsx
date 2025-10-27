@@ -112,80 +112,13 @@ const sortGrants = (grants, sort) => [...grants].sort((a,b)=>{
   }
 });
 
-const GrantListItem = ({ grant, onOpenDetailModal, isSaved, onSave, onUnsave, session }) => {
-    const dueDateText = grant.dueDate ? new Date(grant.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'Rolling';
-    const fundingText = grant.fundingAmount ? formatCurrency(parseMaxFundingAmount(grant.fundingAmount.toString())) : 'Not Specified';
-
-    const handleBookmarkClick = (e) => {
-        e.stopPropagation();
-        if (!session) return;
-        isSaved ? onUnsave(grant.id) : onSave(grant.id);
-    };
-
-  const getInitials = (name) => !name? '?' : name.split(' ').slice(0,2).map(w=>w[0]).join('').toUpperCase();
-
-    return (
-        <div 
-            onClick={() => onOpenDetailModal(grant)} 
-            className="group bg-white p-4 md:p-5 rounded-2xl border border-slate-200 hover:border-blue-400 hover:shadow-2xl transition-all duration-300 flex flex-col md:flex-row items-start md:items-center gap-4 cursor-pointer transform hover:-translate-y-1"
-        >
-            <div className="flex-shrink-0">{grant.organization?.image_url ? (<img src={grant.organization.image_url} alt={`${grant.foundationName} logo`} className="h-14 w-14 md:h-16 md:w-16 rounded-xl object-contain border-2 border-white shadow-lg group-hover:shadow-xl transition-shadow duration-300" />) : (<div className="h-14 w-14 md:h-16 md:w-16 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-xl shadow-lg group-hover:shadow-xl transition-shadow duration-300">{getInitials(grant.foundationName)}</div>)}</div>
-            
-            <div className="flex-grow min-w-0 w-full">
-                <div className="flex items-center gap-3 mb-1.5">
-                    <p className="text-sm text-slate-500 font-medium truncate">{grant.foundationName}</p>
-                    {grant.grantType && (
-                        <span className="flex-shrink-0 text-xs bg-gradient-to-r from-blue-100 to-indigo-100 text-blue-700 px-2 py-0.5 rounded-full font-medium border border-blue-200">
-                            {grant.grantType}
-                        </span>
-                    )}
-                </div>
-                <h4 className="font-bold text-slate-800 text-lg mb-3 group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r group-hover:from-blue-600 group-hover:to-purple-600 transition-all duration-300">
-                    {grant.title}
-                </h4>
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-slate-600">
-                    <div className="flex items-center gap-1.5" title="Funding Amount">
-                        <DollarSign size={14} className="text-green-600" />
-                        <span className="font-semibold text-green-700">{fundingText}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5" title="Due Date">
-                        <Calendar size={14} className="text-red-600" />
-                        <span className="font-semibold text-red-700">{dueDateText}</span>
-                    </div>
-                    {grant.eligible_organization_types && grant.eligible_organization_types.length > 0 && (
-                        <div className="flex items-center gap-1.5" title="Eligibility">
-                            <Users size={14} className="text-indigo-600" />
-                            <span className="font-semibold text-indigo-700">
-                                {TAXONOMY_DISPLAY_NAMES[grant.eligible_organization_types[0]] || grant.eligible_organization_types[0]}
-                                {grant.eligible_organization_types.length > 1 && (
-                                    <span className="text-slate-500 font-medium"> +{grant.eligible_organization_types.length - 1} more</span>
-                                )}
-                            </span>
-                        </div>
-                    )}
-                </div>
-            </div>
-            
-            <div className="w-full md:w-auto flex-shrink-0 flex flex-row items-center gap-3 mt-4 md:mt-0">
-                {session && (<button onClick={handleBookmarkClick} className={`p-3 rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105 ${isSaved? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white':'bg-white text-slate-500 border border-slate-200 hover:bg-slate-50'}`} aria-label={isSaved? 'Unsave grant':'Save grant'}><Bookmark size={18} fill={isSaved? 'currentColor':'none'} /></button>)}
-                <button
-                    onClick={(e) => { e.stopPropagation(); onOpenDetailModal(grant); }}
-                    className="w-full md:w-auto px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold rounded-xl hover:from-blue-700 hover:to-purple-700 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105 flex items-center justify-center gap-2"
-                >
-                    <Sparkles size={16} />
-                    Details
-                </button>
-            </div>
-        </div>
-    );
-};
-
 const GrantsPageContent = ({ 
   isProfileView = false, 
   isExploreTab = false, 
   hideFilterBar = false,
   externalFilterConfig,
   onFilterChange,
+  viewMode: externalViewMode,
   availableCategories: externalAvailableCategories,
   uniqueGrantLocations: externalGrantLocations,
   uniqueGrantTypes: externalGrantTypes,
@@ -241,10 +174,16 @@ const GrantsPageContent = ({
   const [isDetailModalOpen, setIsDetailModal] = useState(false);
   const [availableCategories, setAvailableCategories] = useState(externalAvailableCategories || []);
   const [selectedGrant, setSelectedGrant] = useState(null);
-  const [viewMode, setViewMode] = useState('grid');
+  const [viewMode, setViewMode] = useState(externalViewMode || 'grid');
   const [filtersVisible, setFiltersVisible] = useState(false);
   const [session, setSession] = useState(null);
   const [savedGrantIds, setSavedGrantIds] = useState(new Set());
+
+  useEffect(() => {
+    if (externalViewMode) {
+      setViewMode(externalViewMode);
+    }
+  }, [externalViewMode]);
 
   useEffect(() => {
     // Only fetch data if it's not provided externally (i.e., not in explore tab)
@@ -393,6 +332,11 @@ const GrantsPageContent = ({
         g.id === grantId ? { ...g, save_count: Math.max(0, (g.save_count || 1) - 1) } : g
       ));
     }
+  };
+
+  const handleSaveToggle = (grantId) => {
+    if (!session) return;
+    savedGrantIds.has(grantId) ? handleUnsaveGrant(grantId) : handleSaveGrant(grantId);
   };
 
   const handleUnsaveGrant = async (grantId) => {
@@ -629,36 +573,19 @@ const GrantsPageContent = ({
              <SearchResultsSkeleton count={grantsPerPage} type="grant" />
           ) : currentList && currentList.length > 0 ? (
             <>
-              {viewMode === 'grid' ? (
-                <div className={`grid grid-cols-1 md:grid-cols-2 ${isExploreTab ? 'lg:grid-cols-4' : isProfileView ? 'lg:grid-cols-2' : 'lg:grid-cols-3'} gap-8`}>
-                  {currentList.map((grant) => ( 
-                    <GrantCard 
-                      key={grant.id} 
-                      grant={grant} 
-                      session={session} 
-                      isSaved={savedGrantIds.has(grant.id)} 
-                      onSave={handleSaveGrant} 
-                      onUnsave={handleUnsaveGrant} 
-                      onOpenDetailModal={openDetail} 
-                      onFilterByCategory={handleFilterByCategory} 
-                    /> 
-                  ))}
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {currentList.map((grant) => ( 
-                    <GrantListItem 
-                      key={grant.id} 
-                      grant={grant} 
-                      session={session} 
-                      isSaved={savedGrantIds.has(grant.id)} 
-                      onSave={handleSaveGrant} 
-                      onUnsave={handleUnsaveGrant} 
-                      onOpenDetailModal={openDetail} 
-                    /> 
-                  ))}
-                </div>
-              )}
+              <div className={`w-full ${viewMode === 'list' ? 'space-y-4' : `grid grid-cols-1 md:grid-cols-2 ${isExploreTab ? 'lg:grid-cols-4' : isProfileView ? 'lg:grid-cols-2' : 'lg:grid-cols-3'} gap-6`}`}>
+                {currentList.map((grant) => (
+                  <GrantCard
+                    key={grant.id}
+                    grant={grant}
+                    viewMode={viewMode}
+                    onSaveToggle={handleSaveToggle}
+                    isSaved={savedGrantIds.has(grant.id)}
+                    onClick={() => openDetail(grant)}
+                    session={session}
+                  />
+                ))}
+              </div>
             </>
           ) : (
             <div className="text-center py-16 relative">

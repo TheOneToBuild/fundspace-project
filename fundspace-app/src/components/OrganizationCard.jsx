@@ -130,7 +130,91 @@ const getBudgetRange = (amount) => {
   return 'Over $100M';
 };
 
-const OrganizationCard = ({ organization, handleFilterChange, linkTo, buttonText = "View Profile" }) => {
+const OrganizationCard = ({ organization, viewMode, onClick, handleFilterChange, linkTo, buttonText = "View Profile" }) => {
+  // Add list view rendering
+  if (viewMode === 'list') {
+    return (
+      <div 
+        className="flex items-start py-3 px-4 bg-white border rounded-lg shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+        onClick={onClick}
+      >
+        {/* Organization logo - aligned with title */}
+        <div className="flex-shrink-0 mr-3 mt-1">
+          {organization.image_url ? (
+            <img 
+              src={organization.image_url} 
+              alt={organization.name}
+              className="w-10 h-10 rounded-lg object-cover"
+            />
+          ) : (
+            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center text-white font-bold text-sm">
+              {organization.name?.charAt(0) || 'O'}
+            </div>
+          )}
+        </div>
+
+        {/* Main content */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between">
+            <div className="flex-1 min-w-0">
+              <h3 className="font-semibold text-lg text-gray-900 truncate leading-tight">{organization.name}</h3>
+              <p className="text-sm text-gray-600 mt-1">{organization.type}</p>
+              <p className="text-sm text-gray-500 mt-1 line-clamp-2 leading-relaxed">
+                {organization.description?.substring(0, 120)}...
+              </p>
+            </div>
+            
+            {/* Right side - Key details */}
+            <div className="ml-4 flex-shrink-0 text-right min-w-[140px] flex flex-col items-end">
+              <div className="text-sm text-gray-600">
+                {organization.county || organization.location}
+              </div>
+              
+              {/* Action buttons */}
+              <div className="flex items-center mt-2 space-x-2">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    // Add follow functionality if needed
+                  }}
+                  className="p-2 rounded-lg transition-colors text-gray-400 hover:text-blue-600 hover:bg-blue-50"
+                >
+                  <Heart className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+          </div>
+          
+          {/* Tags row - more compact */}
+          <div className="flex items-center mt-2 space-x-2 text-xs flex-wrap">
+            {/* Location tag */}
+            <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded">
+              {organization.county || organization.location}
+            </span>
+            
+            {/* Type tag */}
+            <span className="bg-gray-100 text-gray-800 px-2 py-1 rounded">
+              {organization.type}
+            </span>
+            
+            {/* Focus areas */}
+            {organization.focus_areas?.slice(0, 2).map((area, idx) => (
+              <span key={idx} className="bg-purple-100 text-purple-800 px-2 py-1 rounded">
+                {area}
+              </span>
+            ))}
+            
+            {organization.focus_areas?.length > 2 && (
+              <span className="bg-gray-100 text-gray-600 px-2 py-1 rounded">
+                +{organization.focus_areas.length - 2} more
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const [isHovered, setIsHovered] = useState(false);
   
   const normalizedType = organization.type?.toLowerCase();
