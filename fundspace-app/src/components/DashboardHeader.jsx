@@ -226,6 +226,11 @@ export default function DashboardHeader({ profile }) {
             exact: true
         },
         {
+            label: 'Explore',
+            to: '/explore',
+            icon: <MapPin size={16} />
+        },
+        {
             label: 'Community Hub',
             to: '/profile/community-hub',
             icon: <Globe size={16} />
@@ -237,19 +242,9 @@ export default function DashboardHeader({ profile }) {
             icon: <MapPin size={16} />
         },
         {
-            label: 'Connections',
-            to: '/profile/connections',
-            icon: <Users size={16} />
-        },
-        {
             label: 'My Organization',
             to: '/profile/my-organization',
             icon: <Building size={16} />,
-        },
-        {
-            label: 'Explore',
-            to: '/explore',
-            icon: <MapPin size={16} />
         },
         ...(isOmegaAdmin ? [omegaAdminItem] : [])
     ];
@@ -348,8 +343,8 @@ export default function DashboardHeader({ profile }) {
 
                     <div className="flex items-center space-x-2 md:space-x-4">
                         
-                        <div className="hidden md:block">
-                            <div className="w-64 lg:w-80">
+                        <div className="hidden md:block relative z-50">
+                            <div className="w-64 lg:w-80 ">
                                 <GlobalSearch />
                             </div>
                         </div>
@@ -450,6 +445,13 @@ export default function DashboardHeader({ profile }) {
                                                 <Crown size={14} className="mr-2" /> Admin Panel
                                             </Link>
                                         )}
+                                        <Link 
+                                            to="/profile/connections" 
+                                            onClick={() => setIsUserMenuOpen(false)}
+                                            className="flex items-center w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-100"
+                                        >
+                                            <Users size={14} className="mr-2" /> Connections
+                                        </Link>
                                         <Link 
                                             to="/profile/settings" 
                                             onClick={() => setIsUserMenuOpen(false)}

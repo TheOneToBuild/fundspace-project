@@ -1146,32 +1146,19 @@ export const getAvailableGrantCategories = async () => {
   if (cached) return cached;
 
   try {
-    // First try to get categories from grants that actually have category data
+    // Get categories that are actually linked to one or more grants
     const { data: grantCategories, error: grantError } = await supabase
-      .from('grants_with_taxonomy')
-      .select('category_names')
-      .not('category_names', 'is', null)
-      .limit(100); // Limit to avoid large queries
+      .from('categories')
+      .select(`
+        id,
+        name,
+        grant_categories!inner(grant_id)
+      `)
+      .order('name');
 
     if (!grantError && grantCategories && grantCategories.length > 0) {
-      // Extract unique category names from all grants
-      const categorySet = new Set();
-      grantCategories.forEach(grant => {
-        if (grant.category_names && Array.isArray(grant.category_names)) {
-          grant.category_names.forEach(name => {
-            if (name && typeof name === 'string') {
-              categorySet.add(name.trim());
-            }
-          });
-        }
-      });
-      
-      const categories = Array.from(categorySet).sort().map(name => ({ name }));
-      
-      if (categories.length > 0) {
-        setCachedData(cacheKey, categories);
-        return categories;
-      }
+      setCachedData(cacheKey, grantCategories);
+      return grantCategories;
     }
 
     // Fallback: get categories from the categories table
