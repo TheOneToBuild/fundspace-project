@@ -143,7 +143,7 @@ const HowItWorksPage = () => {
                             </p>
                         </div>
                         <div className="flex flex-wrap gap-3 pt-2">
-                            <a href="/grants" className="inline-flex items-center justify-center px-6 py-3 rounded-full font-semibold bg-blue-600 text-white hover:bg-blue-700 shadow-lg hover:shadow-xl transition-all text-sm">Find Funding Now <Search className="ml-2 h-4 w-4" /></a>
+                            <a href="/explore" className="inline-flex items-center justify-center px-6 py-3 rounded-full font-semibold bg-blue-600 text-white hover:bg-blue-700 shadow-lg hover:shadow-xl transition-all text-sm">Find Funding Now <Search className="ml-2 h-4 w-4" /></a>
                             <a href="/login?view=signup" className="inline-flex items-center justify-center px-6 py-3 rounded-full font-semibold bg-slate-900 text-white hover:bg-slate-800 shadow-lg hover:shadow-xl transition-all text-sm">Join Community <ArrowRight className="ml-2 h-4 w-4" /></a>
                         </div>
                     </div>
@@ -319,7 +319,7 @@ const HowItWorksPage = () => {
                         </ul>
                         <div className="flex gap-4 pt-2">
                             <a href="/login?view=signup" className="inline-flex items-center px-6 py-3 rounded-full bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm shadow-lg">Try It Free <ArrowRight className="ml-2 h-4 w-4" /></a>
-                            <a href="/grants" className="inline-flex items-center px-6 py-3 rounded-full bg-slate-900 hover:bg-slate-800 text-white font-semibold text-sm shadow-lg">Browse Database</a>
+                            <a href="/explore" className="inline-flex items-center px-6 py-3 rounded-full bg-slate-900 hover:bg-slate-800 text-white font-semibold text-sm shadow-lg">Browse Database</a>
                         </div>
                     </div>
                     <div className="relative">
@@ -368,7 +368,7 @@ const HowItWorksPage = () => {
                             </p>
                             <div className="flex flex-col sm:flex-row gap-4">
                                 <a href="/login?view=signup" className="inline-flex items-center justify-center px-7 py-3 rounded-xl font-semibold bg-slate-900 text-white shadow-sm shadow-slate-900/30 hover:bg-slate-800 transition-colors text-sm md:text-base">Sign Up <ArrowRight className="ml-2 h-4 w-4" /></a>
-                                <a href="/grants" className="inline-flex items-center justify-center px-7 py-3 rounded-xl font-semibold bg-white/70 hover:bg-white text-slate-900 shadow-sm border border-slate-200/60 transition-colors text-sm md:text-base">Explore Database</a>
+                                <a href="/explore" className="inline-flex items-center justify-center px-7 py-3 rounded-xl font-semibold bg-white/70 hover:bg-white text-slate-900 shadow-sm border border-slate-200/60 transition-colors text-sm md:text-base">Explore Database</a>
                             </div>
                         </div>
                         <div className="relative w-full md:w-[40%] flex items-center justify-center">

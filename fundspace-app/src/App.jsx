@@ -162,7 +162,6 @@ const AppLayout = () => {
       '/profile/notifications',
       '/profile/members',
       '/organizations',
-      '/grants',
       '/faq',
       '/roadmap',
       '/about',

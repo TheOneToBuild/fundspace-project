@@ -131,7 +131,7 @@ export const CreatorTestimonialsSection = () => {
                 From discovery to impact—all in one place. <span className="magic-fundspace font-bold">Fundspace</span> helps you find funding, build your capacity, and showcase your impact, so you can focus on what matters most: <span className="magic-mission font-semibold">your mission</span>
               </p>
               <div className="mt-8 flex flex-col sm:flex-row gap-3">
-                <a href="/grants" className="inline-flex items-center justify-center px-6 py-3 rounded-full font-semibold bg-blue-100 text-blue-700 hover:bg-blue-200/70 transition-colors shadow-sm">
+                <a href="/explore" className="inline-flex items-center justify-center px-6 py-3 rounded-full font-semibold bg-blue-100 text-blue-700 hover:bg-blue-200/70 transition-colors shadow-sm">
                   Explore Funding <Icons.Search className="ml-2" size={18} />
                 </a>
                 <Link to="/login?view=signup" className="inline-flex items-center justify-center px-6 py-3 rounded-full font-semibold bg-blue-600 text-white hover:bg-blue-700 shadow-lg hover:shadow-xl transition-all duration-300">

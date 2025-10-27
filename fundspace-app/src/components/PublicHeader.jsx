@@ -69,7 +69,7 @@ export default function PublicHeader() {
 
     const mainNavLinks = [
         { 
-            to: "/grants", 
+            to: "/explore", 
             text: "Explore", 
             active: "text-blue-600 font-semibold",
             dropdown: {
@@ -77,8 +77,8 @@ export default function PublicHeader() {
                     {
                         title: "Find Opportunities",
                         links: [
-                            { to: "/grants", text: "Find Funding" },
-                            { to: "/organizations", text: "Explore Organizations" },
+                            { to: "/explore", text: "Find Funding" },
+                            { to: "/explore?tab=organizations", text: "Explore Organizations" },
                             { to: "/submit-grant", text: "Submit Grant", requiresAuth: true }
                         ]
                     }

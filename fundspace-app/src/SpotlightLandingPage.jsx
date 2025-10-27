@@ -129,7 +129,7 @@ const SpotlightLandingPage = () => {
               Explore All Organizations
             </a>
             <a
-              href="/grants"
+              href="/explore"
               className="inline-flex items-center justify-center px-6 py-3 font-semibold rounded-full text-orange-700 bg-orange-100 hover:bg-orange-200/70 transition-colors duration-300"
             >
               <TrendingUp className="mr-2" size={18} />

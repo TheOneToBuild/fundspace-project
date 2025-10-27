@@ -254,7 +254,7 @@ const TrendingGrantsSection = ({ currentUserProfile, onOpenGrantModal, trendingG
     };
 
     const handleViewMore = () => {
-        navigate('/grants');
+        navigate('/explore');
     };
 
     const handleGrantClick = (grant) => {

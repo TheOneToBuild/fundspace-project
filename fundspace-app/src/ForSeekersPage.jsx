@@ -171,7 +171,7 @@ const SnapshotGrantCard = ({ grant }) => {
                         <span className="text-[11px] font-medium text-slate-600">Rolling Deadline</span>
                     )}
                 </div>
-                <a href="/grants" className="text-[12px] font-semibold text-indigo-600 hover:text-indigo-700 inline-flex items-center gap-1">
+                <a href="/explore" className="text-[12px] font-semibold text-indigo-600 hover:text-indigo-700 inline-flex items-center gap-1">
                     View Details <span className="transition-transform group-hover:translate-x-0.5">→</span>
                 </a>
             </div>
@@ -259,7 +259,7 @@ const ForSeekersPage = () => {
                             <p className="text-slate-800/95 text-base md:text-lg leading-relaxed max-w-lg">Turn scattered grant hunting into a focused funding engine. Fundspace centralizes Bay Area opportunities, builds your reusable assets, and connects you with peers who have navigated the process before.</p>
                         </div>
                         <div className="flex flex-wrap gap-3 pt-2">
-                            <a href="/grants" className="inline-flex items-center justify-center px-6 py-3 rounded-full font-semibold bg-emerald-600 text-white hover:bg-emerald-700 shadow-lg hover:shadow-xl transition-all text-sm">Explore Grants <Search className="ml-2 h-4 w-4" /></a>
+                            <a href="/explore" className="inline-flex items-center justify-center px-6 py-3 rounded-full font-semibold bg-emerald-600 text-white hover:bg-emerald-700 shadow-lg hover:shadow-xl transition-all text-sm">Explore Grants <Search className="ml-2 h-4 w-4" /></a>
                             <a href="/login?view=signup" className="inline-flex items-center justify-center px-6 py-3 rounded-full font-semibold bg-slate-900 text-white hover:bg-slate-800 shadow-lg hover:shadow-xl transition-all text-sm">Create Free Account <ArrowRight className="ml-2 h-4 w-4" /></a>
                         </div>
                     </div>
@@ -354,7 +354,7 @@ const ForSeekersPage = () => {
                     )}
                 </div>
                 <motion.div variants={fadeIn} className="text-center mt-14">
-                    <a href="/grants" className="inline-flex items-center justify-center px-8 py-4 font-semibold rounded-2xl text-white bg-gradient-to-r from-indigo-600 via-violet-600 to-fuchsia-600 hover:shadow-xl shadow-lg transition-all hover:scale-105">
+                    <a href="/explore" className="inline-flex items-center justify-center px-8 py-4 font-semibold rounded-2xl text-white bg-gradient-to-r from-indigo-600 via-violet-600 to-fuchsia-600 hover:shadow-xl shadow-lg transition-all hover:scale-105">
                         <Search className="mr-2" size={20} /> Browse Full Database
                     </a>
                 </motion.div>
@@ -387,7 +387,7 @@ const ForSeekersPage = () => {
                         </div>
                         <div className="flex gap-4 pt-2">
                             <a href="/login?view=signup" className="inline-flex items-center px-6 py-3 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm shadow-lg">Create Account <ArrowRight className="ml-2 h-4 w-4" /></a>
-                            <a href="/grants" className="inline-flex items-center px-6 py-3 rounded-full bg-white text-slate-900 font-semibold text-sm border border-slate-200 shadow-sm hover:bg-slate-50">Browse Grants</a>
+                            <a href="/explore" className="inline-flex items-center px-6 py-3 rounded-full bg-white text-slate-900 font-semibold text-sm border border-slate-200 shadow-sm hover:bg-slate-50">Browse Grants</a>
                         </div>
                     </motion.div>
                     <motion.div variants={fadeIn} className="relative">
@@ -430,7 +430,7 @@ const ForSeekersPage = () => {
                     <p className="text-lg md:text-xl text-slate-700 max-w-2xl mx-auto leading-relaxed mb-12">Join the Bay Area organizations moving from reactive scrambling to strategic, data-informed funding momentum.</p>
                     <div className="flex flex-col sm:flex-row gap-4 justify-center">
                         <a href="/login?view=signup" className="inline-flex items-center justify-center px-8 py-4 rounded-2xl font-semibold bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg hover:shadow-xl transition-all">Create Free Account <ArrowRight className="ml-2 h-5 w-5" /></a>
-                        <a href="/grants" className="inline-flex items-center justify-center px-8 py-4 rounded-2xl font-semibold bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 shadow-sm transition-all">Browse Grants <Search className="ml-2 h-5 w-5" /></a>
+                        <a href="/explore" className="inline-flex items-center justify-center px-8 py-4 rounded-2xl font-semibold bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 shadow-sm transition-all">Browse Grants <Search className="ml-2 h-5 w-5" /></a>
                     </div>
                 </div>
             </section>

@@ -97,7 +97,7 @@ const ForFundersPage = () => {
                             <p className="text-slate-800/95 text-base md:text-lg leading-relaxed max-w-lg">Surface high-potential grassroots organizations, streamline intake, reduce diligence friction, and monitor impact in one collaborative ecosystem. Move from reactive cycles to strategic, data-informed deployment.</p>
                         </div>
                         <div className="flex flex-wrap gap-3 pt-2">
-                            <a href="/organizations" className="inline-flex items-center justify-center px-6 py-3 rounded-full font-semibold bg-indigo-600 text-white hover:bg-indigo-700 shadow-lg hover:shadow-xl transition-all text-sm">Explore Orgs <Search className="ml-2 h-4 w-4" /></a>
+                            <a href="/explore?tab=organizations" className="inline-flex items-center justify-center px-6 py-3 rounded-full font-semibold bg-indigo-600 text-white hover:bg-indigo-700 shadow-lg hover:shadow-xl transition-all text-sm">Explore Orgs <Search className="ml-2 h-4 w-4" /></a>
                             <a href="/contact" className="inline-flex items-center justify-center px-6 py-3 rounded-full font-semibold bg-slate-900 text-white hover:bg-slate-800 shadow-lg hover:shadow-xl transition-all text-sm">Partner With Us <ArrowRight className="ml-2 h-4 w-4" /></a>
                         </div>
                     </div>
@@ -142,7 +142,7 @@ const ForFundersPage = () => {
                         </ul>
                         <div className="flex gap-4 pt-2">
                             <a href="/contact" className="inline-flex items-center px-6 py-3 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm shadow-lg">Request Funder Preview <ArrowRight className="ml-2 h-4 w-4" /></a>
-                            <a href="/organizations" className="inline-flex items-center px-6 py-3 rounded-full bg-white text-slate-900 font-semibold text-sm border border-slate-200 shadow-sm hover:bg-slate-50">Browse Orgs</a>
+                            <a href="/explore?tab=organizations" className="inline-flex items-center px-6 py-3 rounded-full bg-white text-slate-900 font-semibold text-sm border border-slate-200 shadow-sm hover:bg-slate-50">Browse Orgs</a>
                         </div>
                     </motion.div>
                     <motion.div variants={fadeIn} className="relative">
@@ -248,7 +248,7 @@ const ForFundersPage = () => {
                     <p className="text-lg md:text-xl text-slate-700 max-w-2xl mx-auto leading-relaxed mb-12">Bring efficiency, transparency & inclusive reach to your grantmaking. Let's build the connective tissue for sustained community outcomes.</p>
                     <div className="flex flex-col sm:flex-row gap-4 justify-center">
                         <a href="/contact" className="inline-flex items-center justify-center px-8 py-4 rounded-2xl font-semibold bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg hover:shadow-xl transition-all">Request A Conversation <ArrowRight className="ml-2 h-5 w-5" /></a>
-                        <a href="/organizations" className="inline-flex items-center justify-center px-8 py-4 rounded-2xl font-semibold bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 shadow-sm transition-all">Explore Organizations <Search className="ml-2 h-5 w-5" /></a>
+                        <a href="/explore?tab=organizations" className="inline-flex items-center justify-center px-8 py-4 rounded-2xl font-semibold bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 shadow-sm transition-all">Explore Organizations <Search className="ml-2 h-5 w-5" /></a>
                     </div>
                 </div>
             </section>

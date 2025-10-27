@@ -135,7 +135,7 @@ const FaqPage = () => {
               Everything you need to know about using Fundspace to unlock capital, build capacity, and scale your impact. Can’t find your answer? <a href="/contact" className="text-blue-600 font-semibold hover:underline">Contact us</a>.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <a href="/grants" className="inline-flex items-center justify-center px-8 py-4 rounded-2xl font-semibold bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:shadow-xl transition-all">Browse Grants <Search className="ml-2 h-5 w-5" /></a>
+              <a href="/explore" className="inline-flex items-center justify-center px-8 py-4 rounded-2xl font-semibold bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:shadow-xl transition-all">Browse Grants <Search className="ml-2 h-5 w-5" /></a>
               <a href="/login?view=signup" className="inline-flex items-center justify-center px-8 py-4 rounded-2xl font-semibold bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 shadow-sm transition-all">Create Free Account <ArrowRight className="ml-2 h-5 w-5" /></a>
             </div>
           </div>

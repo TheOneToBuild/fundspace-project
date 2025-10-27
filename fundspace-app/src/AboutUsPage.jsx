@@ -73,7 +73,7 @@ const AboutUsPage = () => {
               <p className="text-slate-800/95 text-base md:text-lg leading-relaxed max-w-lg">Late-night spreadsheets. Vanishing RFP links. Rewriting the same narrative for an opportunity that never fit. We lived the fragmentation. We decided the infrastructure had to change—starting locally, building openly, and centering community intelligence over closed databases.</p>
             </div>
             <div className="flex flex-wrap gap-3 pt-2">
-              <a href="/grants" className="inline-flex items-center justify-center px-6 py-3 rounded-full font-semibold bg-blue-600 text-white hover:bg-blue-700 shadow-lg hover:shadow-xl transition-all text-sm">Explore Funding <Search className="ml-2 h-4 w-4" /></a>
+              <a href="/explore" className="inline-flex items-center justify-center px-6 py-3 rounded-full font-semibold bg-blue-600 text-white hover:bg-blue-700 shadow-lg hover:shadow-xl transition-all text-sm">Explore Funding <Search className="ml-2 h-4 w-4" /></a>
               <a href="/login?view=signup" className="inline-flex items-center justify-center px-6 py-3 rounded-full font-semibold bg-slate-900 text-white hover:bg-slate-800 shadow-lg hover:shadow-xl transition-all text-sm">Join Community <ArrowRight className="ml-2 h-4 w-4" /></a>
             </div>
           </motion.div>

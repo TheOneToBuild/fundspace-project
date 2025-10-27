@@ -17,7 +17,7 @@ import { getOrganizationsWithCategories, getGrantsWithCategories } from '../util
 import { filterOrganizations, filterGrantsWithTaxonomy } from '../filtering.js';
 import { sortOrganizations } from '../sorting.js';
 import usePaginatedFilteredData from '../hooks/usePaginatedFilteredData.js';
-import { useNavigate as useRouterNavigate } from 'react-router-dom';
+import { useNavigate as useRouterNavigate, useSearchParams } from 'react-router-dom';
 import { parseMaxFundingAmount } from '../utils.js';
 
 const isGrantActive = (grant) => {
@@ -224,7 +224,14 @@ const AutocompleteInput = ({ items, selectedItems, onSelectionChange, placeholde
 
 export default function ExplorePage() {
   const navigate = useRouterNavigate();
-  const [activeTab, setActiveTab] = useState('grants');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialTab = searchParams.get('tab') || 'grants';
+  const [activeTab, setActiveTab] = useState(initialTab);
+
+  const handleTabClick = (tabId) => {
+    setActiveTab(tabId);
+    setSearchParams({ tab: tabId });
+  };
 
   // State for all grants data to populate filter dropdowns
   const [allGrants, setAllGrants] = useState([]);
@@ -1128,7 +1135,7 @@ export default function ExplorePage() {
                 {tabs.map((tab) => (
                   <button
                     key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
+                    onClick={() => handleTabClick(tab.id)}
                     className={`flex-1 px-6 py-4 font-medium transition-all relative ${activeTab === tab.id
                         ? 'text-gray-900 bg-white'
                         : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'

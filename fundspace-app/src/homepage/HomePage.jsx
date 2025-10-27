@@ -24,8 +24,8 @@ export default function HomePage() {
     (async () => {
       try {
         const { data, error } = await supabase
-          .from('grants_with_taxonomy')
-          .select('max_funding_amount, funding_amount_text, deadline')
+          .from('grants')
+          .select('max_funding_amount,funding_amount_text,deadline')
           .limit(500);
         if (error) throw error;
         const sum = (data||[])
@@ -57,7 +57,7 @@ export default function HomePage() {
                 </h1>
                 
                 <a
-                  href="/grants"
+                  href="/explore"
                   aria-label="View all current funding opportunities on Fundspace"
                   className="group inline-flex flex-col items-start rounded-3xl border border-slate-200/70 bg-white/80 backdrop-blur-sm px-8 py-6 shadow-lg shadow-slate-900/5 hover:shadow-xl transition-all focus:outline-none focus-visible:ring-4 focus-visible:ring-blue-500/30 cursor-pointer"
                 >

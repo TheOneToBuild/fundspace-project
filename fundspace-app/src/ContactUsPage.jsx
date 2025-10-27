@@ -433,7 +433,7 @@ const ContactUsPage = () => {
                   Discover active grants and resources tailored for Bay Area organizations.
                 </p>
                 <a
-                  href="/grants"
+                  href="/explore"
                   className="inline-flex items-center justify-center w-full px-6 py-3 bg-white/20 hover:bg-white/30 backdrop-blur-sm border border-white/20 rounded-xl text-white font-bold text-sm transition-all duration-300 hover:scale-105"
                 >
                   <ArrowRight className="mr-2" size={16} /> 
@@ -463,7 +463,7 @@ const ContactUsPage = () => {
           </p>
           <div className="flex flex-col sm:flex-row gap-5 justify-center">
             <a 
-              href="/grants" 
+              href="/explore" 
               className="inline-flex items-center justify-center px-8 py-4 rounded-2xl font-bold bg-slate-900 hover:bg-slate-800 text-white shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
             >
               Browse Grants <ArrowRight className="ml-2 h-5 w-5" />

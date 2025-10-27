@@ -220,7 +220,7 @@ const RoadmapPage = () => {
             From a simple index to a connected ecosystemhere's how we're building the future of funding for Bay Area changemakers. Every phase is shaped by your feedback and our shared mission.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <a href="/grants" className="inline-flex items-center justify-center px-8 py-4 rounded-2xl font-semibold bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:shadow-xl transition-all">Browse Grants <Search className="ml-2 h-5 w-5" /></a>
+            <a href="/explore" className="inline-flex items-center justify-center px-8 py-4 rounded-2xl font-semibold bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:shadow-xl transition-all">Browse Grants <Search className="ml-2 h-5 w-5" /></a>
             <a href="/contact" className="inline-flex items-center justify-center px-8 py-4 rounded-2xl font-semibold bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 shadow-sm transition-all">Share Feedback <ArrowRight className="ml-2 h-5 w-5" /></a>
           </div>
         </div>
@@ -264,7 +264,7 @@ const RoadmapPage = () => {
           <p className="text-lg md:text-xl text-slate-700 max-w-2xl mx-auto leading-relaxed mb-12">Fundspace is built with and for the community. Your feedback, ideas, and partnership help us unlock new possibilities for every changemaker.</p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <a href="/contact" className="inline-flex items-center justify-center px-8 py-4 rounded-2xl font-semibold bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:shadow-xl transition-all">Share Your Ideas <ArrowRight className="ml-2 h-5 w-5" /></a>
-            <a href="/grants" className="inline-flex items-center justify-center px-8 py-4 rounded-2xl font-semibold bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 shadow-sm transition-all">Browse Grants <Search className="ml-2 h-5 w-5" /></a>
+            <a href="/explore" className="inline-flex items-center justify-center px-8 py-4 rounded-2xl font-semibold bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 shadow-sm transition-all">Browse Grants <Search className="ml-2 h-5 w-5" /></a>
           </div>
         </div>
       </Section>
