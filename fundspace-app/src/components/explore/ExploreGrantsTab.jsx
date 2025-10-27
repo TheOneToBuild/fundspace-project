@@ -3,12 +3,12 @@ import React, { useMemo } from 'react';
 import GrantsPageContent from '../../GrantsPageContent';
 
 const ExploreGrantsTab = ({ searchParams }) => {
-  // Create stable filter object to prevent unnecessary re-renders
-  const filterProps = useMemo(() => ({
+  // Pass the current filter config directly
+  const filterConfig = useMemo(() => ({
     searchTerm: searchParams?.searchTerm || '',
     locationFilter: searchParams?.locationFilter || [],
     categoryFilter: searchParams?.categoryFilter || [],
-    grantStatusFilter: searchParams?.grantStatusFilter || '',
+    grantStatusFilter: searchParams?.grantStatusFilter || 'active',
     grantTypeFilter: searchParams?.grantTypeFilter || '',
     sortCriteria: searchParams?.sortCriteria || 'dueDate_asc'
   }), [searchParams]);
@@ -19,7 +19,13 @@ const ExploreGrantsTab = ({ searchParams }) => {
         isProfileView={true} 
         isExploreTab={true}
         hideFilterBar={true}
-        initialFilters={filterProps}
+        externalFilterConfig={filterConfig}
+        onFilterChange={searchParams?.onFilterChange}
+        // Pass the categories and other data from parent
+        availableCategories={searchParams?.uniqueGrantCategories || []}
+        uniqueGrantLocations={searchParams?.uniqueGrantLocations || []}
+        uniqueGrantTypes={searchParams?.uniqueGrantTypes || []}
+        allGrants={searchParams?.allGrants || []}
       />
     </div>
   );

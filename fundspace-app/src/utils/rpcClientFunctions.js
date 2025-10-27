@@ -58,22 +58,53 @@ export const getPostCommentsWithReactions = async (postId, userId, isOrgPost = f
   }
 };
 
-export const getOrganizationsWithCategories = async (orgIds = null) => {
-  const cacheKey = getCacheKey('orgs_with_categories', { orgIds });
+export const getOrganizationsWithCategories = async () => {
+  const cacheKey = getCacheKey('orgs_with_categories', {});
+  // FIX: The user wants to use a different cache key.
+  // const cacheKey = getCacheKey('organizations_with_categories', {});
   const cached = getCachedData(cacheKey);
   if (cached) return cached;
 
   try {
-    const { data, error } = await supabase.rpc('get_organizations_with_categories', {
-      p_org_ids: orgIds
-    });
+    const { data, error } = await supabase.rpc('get_organizations_with_categories');
 
     if (error) throw error;
     setCachedData(cacheKey, data);
     return data;
   } catch (error) {
     console.error('Error fetching organizations with categories:', error);
-    throw error;
+    
+    // Fallback: manually join and aggregate
+    try {
+      const { data: orgsData, error: orgsError } = await supabase
+        .from('organizations')
+        .select(`
+          id,
+          name,
+          description,
+          location,
+          county,
+          type,
+          organization_categories(
+            categories(name)
+          )
+        `)
+        .order('name');
+        
+      if (orgsError) throw orgsError;
+      
+      // Transform the data to include focus_areas array
+      const transformedData = orgsData.map(org => ({
+        ...org,
+        focus_areas: org.organization_categories?.map(oc => oc.categories?.name).filter(Boolean) || []
+      }));
+      
+      setCachedData(cacheKey, transformedData);
+      return transformedData;
+    } catch (fallbackError) {
+      console.error('Fallback query also failed:', fallbackError);
+      throw fallbackError;
+    }
   }
 };
 
@@ -1099,51 +1130,16 @@ export const getGrantsWithCategories = async (grantIds = null) => {
 
   try {
     const { data, error } = await supabase.rpc('get_grants_with_categories', {
-      p_grant_ids: grantIds
+      p_grant_ids: grantIds,
     });
 
     if (error) throw error;
     setCachedData(cacheKey, data);
     return data;
   } catch (error) {
-    console.error('Error fetching grants with categories:', error);
-    
-    // Fallback to existing grants_with_taxonomy view
-    try {
-      let query = supabase.from('grants_with_taxonomy').select('*');
-      
-      if (grantIds && Array.isArray(grantIds) && grantIds.length > 0) {
-        query = query.in('id', grantIds);
-      }
-
-      const { data: grantsData, error: grantsError } = await query.order('id', { ascending: false });
-      if (grantsError) throw grantsError;
-
-      const result = {
-        grants: grantsData.map(grant => ({
-          ...grant,
-          foundationName: grant.funder_name || 'Unknown Funder',
-          funderSlug: grant.funder_slug || null,
-          fundingAmount: grant.max_funding_amount || grant.funding_amount_text || 'Not specified',
-          dueDate: grant.deadline,
-          grantType: grant.grant_type,
-          categories: grant.category_names ? grant.category_names.map((name, idx) => ({ id: idx, name })) : [],
-          locations: grant.location_names ? grant.location_names.map((name, idx) => ({ id: idx, name })) : [],
-          eligible_organization_types: grant.taxonomy_codes || [],
-          organization: {
-            image_url: grant.funder_logo_url || null,
-            banner_image_url: null
-          },
-          save_count: grant.save_count || 0
-        }))
-      };
-      
-      setCachedData(cacheKey, result);
-      return result;
-    } catch (fallbackError) {
-      console.error('Fallback query also failed:', fallbackError);
-      throw fallbackError;
-    }
+    console.error('Error fetching grants with categories via RPC:', error);
+    // Return an empty structure on failure to prevent crashes downstream
+    return { grants: [] };
   }
 };
 

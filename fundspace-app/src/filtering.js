@@ -281,12 +281,11 @@ export const filterOrganizations = (orgs, filters) => {
       (org.description || '').toLowerCase().includes(term) ||
       (org.focus_areas && org.focus_areas.some(area => area.toLowerCase().includes(term)));
 
-    // Location text search - NEW
+    // Location text search - use county instead of location
     const locationTerm = (typeof locationSearchTerm === 'string' ? locationSearchTerm.trim() : '').toLowerCase();
     const matchesLocationSearch = !locationTerm ||
-      (org.location || '').toLowerCase().includes(locationTerm) ||
-      (org.city || '').toLowerCase().includes(locationTerm) ||
-      (org.state || '').toLowerCase().includes(locationTerm);
+      (org.county || '').toLowerCase().includes(locationTerm) || // Use county
+      (org.location || '').toLowerCase().includes(locationTerm); // Keep location as fallback
 
     // Focus Area text search
     const focusTerm = (typeof focusAreaSearchTerm === 'string' ? focusAreaSearchTerm.trim() : '').toLowerCase();
@@ -298,9 +297,9 @@ export const filterOrganizations = (orgs, filters) => {
     const matchesTypeSearch = !typeTerm ||
       (org.type || '').toLowerCase().includes(typeTerm);
 
-    // Existing location filter (from dropdown)
+    // Existing location filter (from dropdown) - use county
     const matchesLocation = locationFilter.length === 0 ||
-      locationFilter.some(loc => (org.location || '').toLowerCase().includes(loc.toLowerCase()));
+      locationFilter.some(loc => (org.county || '').toLowerCase().includes(loc.toLowerCase()));
 
     // Existing filters...
     const matchesFocusArea = focusAreaFilter.length === 0 ||

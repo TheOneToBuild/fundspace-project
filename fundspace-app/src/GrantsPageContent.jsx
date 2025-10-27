@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo, useCallback, useContext } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import React, { useState, useEffect, useMemo, useCallback, useContext, useRef } from 'react';
+import { useSearchParams, useLocation } from 'react-router-dom';
 import { supabase } from './supabaseClient.js';
 import { refreshGrantBookmarkCounts } from './utils/grantUtils';
 import { Search, Users, Calendar, DollarSign, ChevronDown, XCircle, LayoutGrid, List, SlidersHorizontal, Bookmark, Sparkles, TrendingUp as TrendingUpIcon } from './components/Icons.jsx';
@@ -89,10 +89,26 @@ const sortGrants = (grants, sort) => [...grants].sort((a,b)=>{
   const dateOrMax = (g)=> g.dueDate? new Date(g.dueDate): new Date('9999-12-31');
   switch (sort){
     case 'dueDate_asc': return dateOrMax(a)-dateOrMax(b);
-    case 'dueDate_desc': return dateOrMax(b)-dateOrMax(a);
-    case 'amount_desc': return parseMaxFundingAmount(b.max_funding_amount)-parseMaxFundingAmount(a.max_funding_amount);
-    case 'amount_asc': return parseMaxFundingAmount(a.max_funding_amount)-parseMaxFundingAmount(b.max_funding_amount);
-    default: return 0;
+    case 'dueDate_desc': 
+      return dateOrMax(b)-dateOrMax(a);
+    case 'amount_desc': {
+      const valA = a.max_funding_amount ? a.max_funding_amount : parseMaxFundingAmount(a.funding_amount_text || '0');
+      const valB = b.max_funding_amount ? b.max_funding_amount : parseMaxFundingAmount(b.funding_amount_text || '0');
+      return valB - valA;
+    }
+    case 'amount_asc': {
+      const valA = a.max_funding_amount ? a.max_funding_amount : parseMaxFundingAmount(a.funding_amount_text || '0');
+      const valB = b.max_funding_amount ? b.max_funding_amount : parseMaxFundingAmount(b.funding_amount_text || '0');
+      return valA - valB;
+    }
+    default: 
+      // Default sort by due date if no criteria is matched
+      if (a.dueDate && b.dueDate) {
+        return new Date(a.dueDate) - new Date(b.dueDate);
+      } else if (a.dueDate) {
+        return -1;
+      }
+      return 0;
   }
 });
 
@@ -168,62 +184,72 @@ const GrantsPageContent = ({
   isProfileView = false, 
   isExploreTab = false, 
   hideFilterBar = false,
-  initialFilters = {}
+  externalFilterConfig,
+  onFilterChange,
+  availableCategories: externalAvailableCategories,
+  uniqueGrantLocations: externalGrantLocations,
+  uniqueGrantTypes: externalGrantTypes,
+  allGrants: externalAllGrants,
 }) => {
   const { setPageBgColor } = useContext(LayoutContext);
   const [searchParams, setSearchParams] = useSearchParams();
 
   useEffect(() => {
-    if (!isProfileView) {
+    // Only set the page background if this component is the main page view
+    if (!isProfileView && !isExploreTab) { 
       setPageBgColor('bg-[#faf7f5]');
     }
     return () => {
-      setPageBgColor('bg-white');
+      if (!isProfileView && !isExploreTab) { 
+        setPageBgColor('bg-white');
+      }
     };
-  }, [isProfileView, setPageBgColor]);
+  }, [isProfileView, isExploreTab, setPageBgColor]);
 
-  const [grants, setGrants] = useState([]);
+  // Use external grants if provided, otherwise use internal state
+  const [grants, setGrants] = useState(externalAllGrants || []);
   const [loading, setLoading] = useState(true);
-  const [filterConfig, setFilterConfig] = useState({
-    searchTerm: initialFilters.searchTerm || '', 
-    locationSearchTerm: initialFilters.locationSearchTerm || '',
-    locationFilter: initialFilters.locationFilter || [], 
-    categoryFilter: initialFilters.categoryFilter || [], 
-    grantTypeFilter: '', 
-    grantStatusFilter: initialFilters.grantStatusFilter || '', 
-    sortCriteria: initialFilters.sortCriteria || 'dueDate_asc', 
-    taxonomyFilter: []
-  });
+  const [filterConfig, setFilterConfig] = useState(
+    externalFilterConfig || {
+      searchTerm: '',
+      locationFilter: [],
+      categoryFilter: [],
+      taxonomyFilter: initialFilters.taxonomyFilter || [], // ADD THIS LINE
+      grantStatusFilter: initialFilters.grantStatusFilter || 'active', // Default to active
+      grantTypeFilter: initialFilters.grantTypeFilter || '',
+      sortCriteria: initialFilters.sortCriteria || 'dueDate_asc',
+    }
+  );
 
   useEffect(() => {
-    // Sync with parent filters when they change (for explore tab integration)
-    if (isExploreTab && initialFilters) {
-      setFilterConfig(prev => ({
-        ...prev,
-        searchTerm: initialFilters.searchTerm || '',
-        locationFilter: initialFilters.locationFilter || [],
-        categoryFilter: initialFilters.categoryFilter || [],
-        grantStatusFilter: initialFilters.grantStatusFilter || '',
-        grantTypeFilter: initialFilters.grantTypeFilter || '',
-        sortCriteria: initialFilters.sortCriteria || 'dueDate_asc'
-      }));
+    if (externalFilterConfig) {
+      setFilterConfig(externalFilterConfig);
     }
-  }, [isExploreTab, initialFilters]);
+  }, [externalFilterConfig]);
+
+  useEffect(() => {
+    if (externalAllGrants) {
+      setGrants(externalAllGrants);
+      // If grants are provided externally, we can assume loading is complete
+      setLoading(false);
+    }
+  }, [externalAllGrants]);
 
   // Trending/recent search feature removed
   const [currentPage, setCurrentPage] = useState(1);
   const [grantsPerPage, setGrantsPerPage] = useState(12);
   const [isDetailModalOpen, setIsDetailModal] = useState(false);
-  const [availableCategories, setAvailableCategories] = useState([]);
+  const [availableCategories, setAvailableCategories] = useState(externalAvailableCategories || []);
   const [selectedGrant, setSelectedGrant] = useState(null);
   const [viewMode, setViewMode] = useState('grid');
   const [filtersVisible, setFiltersVisible] = useState(false);
   const [session, setSession] = useState(null);
   const [savedGrantIds, setSavedGrantIds] = useState(new Set());
 
-  // REPLACE the existing fetchInitialData function:
   useEffect(() => {
-    const fetchInitialData = async () => {
+    // Only fetch data if it's not provided externally (i.e., not in explore tab)
+    if (!isExploreTab) {
+      const fetchInitialData = async () => {
       setLoading(true);
       
       try {
@@ -266,10 +292,11 @@ const GrantsPageContent = ({
         setLoading(false);
       }
     };
+      fetchInitialData();
+    }
 
-    fetchInitialData();
-
-    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+    // Auth listener should run regardless
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => { 
       setSession(session);
       if (session) {
         supabase
@@ -285,40 +312,18 @@ const GrantsPageContent = ({
     });
     
     return () => { authListener.subscription.unsubscribe(); };
-  }, []);
+  }, [isExploreTab]); // Re-run if the context changes
   
-  // ADD this useEffect:
-  useEffect(() => {
-    const fetchAvailableCategoriesData = async () => {
-      try {
-        // Use the already imported function from rpcClientFunctions.js
-        const categories = await getAvailableGrantCategories();
-        setAvailableCategories(categories);
-      } catch (error) {
-        console.error('Error fetching available grant categories:', error);
-        setAvailableCategories([]); // Fallback to empty array
-      }
-    };
-    
-    fetchAvailableCategoriesData();
-  }, []); // Empty dependency array to run once on mount
-
   const openDetail = useCallback((grant) => { 
     setSelectedGrant(grant); 
     setIsDetailModal(true); 
   }, []);
 
-  // Close modal automatically on route change
+  const location = useLocation();
   useEffect(() => {
-    // Listen for changes in the location (URL)
-    const unlisten = window.addEventListener('popstate', () => {
-      setIsDetailModal(false);
-      setSelectedGrant(null);
-    });
-    return () => {
-      window.removeEventListener('popstate', unlisten);
-    };
-  }, []);
+    // Close modal on route change
+    closeDetail();
+  }, [location.pathname]);
 
   const closeDetail = useCallback(() => { 
     setSelectedGrant(null); 
@@ -432,9 +437,24 @@ const GrantsPageContent = ({
     }
   };
 
-  const uniqueCategories = useMemo(() => Array.from(new Set(grants.flatMap(g => g.categories?.map(c => c.name) || []).filter(Boolean))).sort(), [grants]);
-  const uniqueGrantTypes = useMemo(() => Array.from(new Set(grants.map(g => g.grantType).filter(Boolean))).sort(), [grants]);
-  const uniqueLocations = useMemo(() => Array.from(new Set(grants.flatMap(g => g.locations?.map(l => l.name) || []).filter(Boolean))).sort(), [grants]);
+  const uniqueCategories = useMemo(() => {
+    const source = externalAvailableCategories || availableCategories;
+    if (!source || !Array.isArray(source)) return [];
+
+    return source.map(category => ({
+      name: category.name,
+      count: category.count || 0,
+      displayName: `${category.name} (${category.count || 0})`
+    }));
+  }, [availableCategories, externalAvailableCategories]);
+
+  const uniqueGrantTypes = useMemo(() => {
+    return externalGrantTypes || Array.from(new Set(grants.map(g => g.grantType).filter(Boolean))).sort();
+  }, [externalGrantTypes, grants]);
+
+  const uniqueLocations = useMemo(() => {
+    return externalGrantLocations || Array.from(new Set(grants.flatMap(g => g.locations?.map(l => l.name) || []).filter(Boolean))).sort();
+  }, [externalGrantLocations, grants]);
   
   const grantsFilteredByStatus = useMemo(() => filterGrantsByStatus(grants, filterConfig.grantStatusFilter), [grants, filterConfig.grantStatusFilter]);
 
@@ -457,9 +477,14 @@ const GrantsPageContent = ({
   }, [filteredAndSortedItems]);
 
   const handleFilterChange = useCallback((key, value) => { 
-    setFilterConfig(prev => ({ ...prev, [key]: value })); 
-    setCurrentPage(1); 
-  }, []);
+    setFilterConfig(prev => ({ ...prev, [key]: value }));
+    setCurrentPage(1);
+    
+    // If there's an external filter change handler, call it
+    if (onFilterChange) {
+      onFilterChange(key, value);
+    }
+  }, [onFilterChange]);
 
   const handleTaxonomyChange = useCallback((selectedTaxonomies) => {
     handleFilterChange('taxonomyFilter', selectedTaxonomies);
@@ -521,17 +546,20 @@ const GrantsPageContent = ({
   const activeGrantFilters = useMemo(() => {
     let filters = [];
     if (filterConfig.searchTerm) filters.push({ key: 'searchTerm', label: `Search: "${filterConfig.searchTerm}"` });
-    if (filterConfig.locationFilter.length > 0) { 
-      filters = filters.concat(filterConfig.locationFilter.map(loc => ({ key: 'locationFilter', label: `Location: ${loc}`, value: loc }))); 
+    if (filterConfig.locationFilter && filterConfig.locationFilter.length > 0) {
+      filters = filters.concat(filterConfig.locationFilter.map(loc => ({ key: 'locationFilter', label: `Location: ${loc}`, value: loc })));
     }
-    if (filterConfig.categoryFilter.length > 0) { 
-      filters = filters.concat(filterConfig.categoryFilter.map(cat => ({ key: 'categoryFilter', label: `Category: ${cat}`, value: cat }))); 
+    if (filterConfig.categoryFilter && filterConfig.categoryFilter.length > 0) {
+      filters = filters.concat(filterConfig.categoryFilter.map(cat => ({ key: 'categoryFilter', label: `Category: ${cat}`, value: cat })));
     }
-    if (filterConfig.taxonomyFilter.length > 0) {
+    if (filterConfig.taxonomyFilter && filterConfig.taxonomyFilter.length > 0) {
       filters = filters.concat(filterConfig.taxonomyFilter.map(tax => ({ key: 'taxonomyFilter', label: `Org Type: ${tax}`, value: tax })));
     }
     if (filterConfig.grantTypeFilter) filters.push({ key: 'grantTypeFilter', label: `Type: ${filterConfig.grantTypeFilter}` });
-    if (filterConfig.grantStatusFilter) filters.push({ key: 'grantStatusFilter', label: `Status: ${filterConfig.grantStatusFilter}` });
+    if (filterConfig.grantStatusFilter) {
+      const statusLabel = GRANT_STATUSES.find(s => s.value === filterConfig.grantStatusFilter)?.label || filterConfig.grantStatusFilter;
+      filters.push({ key: 'grantStatusFilter', label: `Status: ${statusLabel}` });
+    }
     return filters;
   }, [filterConfig]);
 

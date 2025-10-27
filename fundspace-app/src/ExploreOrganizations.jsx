@@ -210,7 +210,7 @@ const ExploreOrganizations = ({ isProfileView = false }) => {
         setError('');
         try {
             const result = await getOrganizationsWithCategories();
-            setOrganizations(result.organizations || []);
+            setOrganizations(result || []);
         } catch (error) {
             console.error('Error:', error);
             setError('Failed to load organizations');
