@@ -3,7 +3,7 @@ import { useCallback } from 'react';
 import { supabase } from '../../../../supabaseClient.js';
 
 export const useTrackingActions = (session, userMembership, refreshCallbacks) => {
-  
+
   // Function to mark a grant as applied
   const markAsApplied = useCallback(async (grantId, notes = '') => {
     if (!session?.user?.id) return false;
@@ -42,11 +42,8 @@ export const useTrackingActions = (session, userMembership, refreshCallbacks) =>
       }
 
       // Refresh data immediately
-      if (refreshCallbacks?.loadApplications) {
-        refreshCallbacks.loadApplications();
-      }
-      if (refreshCallbacks?.loadSavedGrants) {
-        refreshCallbacks.loadSavedGrants();
+      if (refreshCallbacks?.fetchData) {
+        refreshCallbacks.fetchData();
       }
       
       return true;
@@ -55,7 +52,7 @@ export const useTrackingActions = (session, userMembership, refreshCallbacks) =>
       console.error('Error in markAsApplied:', error);
       return false;
     }
-  }, [session?.user?.id, userMembership, refreshCallbacks]);
+  }, [session?.user?.id, userMembership?.organizations?.id, refreshCallbacks]);
 
   // Function to mark a grant as received/awarded
   const markAsReceived = useCallback(async (grantId, awardAmount = null, notes = '') => {
@@ -96,8 +93,8 @@ export const useTrackingActions = (session, userMembership, refreshCallbacks) =>
       }
 
       // Refresh data immediately
-      if (refreshCallbacks?.loadReceivedGrants) {
-        refreshCallbacks.loadReceivedGrants();
+      if (refreshCallbacks?.fetchData) {
+        refreshCallbacks.fetchData();
       }
       
       return true;
@@ -106,7 +103,7 @@ export const useTrackingActions = (session, userMembership, refreshCallbacks) =>
       console.error('Error in markAsReceived:', error);
       return false;
     }
-  }, [session?.user?.id, userMembership, refreshCallbacks]);
+  }, [session?.user?.id, userMembership?.organizations?.id, refreshCallbacks]);
 
   // Function to remove application status - Clean optimistic approach
   const removeApplication = useCallback(async (grantId) => {
@@ -174,11 +171,8 @@ export const useTrackingActions = (session, userMembership, refreshCallbacks) =>
       }
 
       // Refresh UI immediately - no delays
-      if (refreshCallbacks?.loadApplications) {
-        refreshCallbacks.loadApplications();
-      }
-      if (refreshCallbacks?.loadSavedGrants) {
-        refreshCallbacks.loadSavedGrants();
+      if (refreshCallbacks?.fetchData) {
+        refreshCallbacks.fetchData();
       }
       
       return true;
@@ -187,7 +181,7 @@ export const useTrackingActions = (session, userMembership, refreshCallbacks) =>
       console.error('Error in removeApplication:', error);
       return false;
     }
-  }, [session?.user?.id, userMembership, refreshCallbacks]);
+  }, [session?.user?.id, userMembership?.role, userMembership?.organizations?.id, refreshCallbacks]);
 
   // Function to remove award status
   const removeAward = useCallback(async (awardId) => {
@@ -203,8 +197,8 @@ export const useTrackingActions = (session, userMembership, refreshCallbacks) =>
       }
 
       // Refresh data immediately
-      if (refreshCallbacks?.loadReceivedGrants) {
-        refreshCallbacks.loadReceivedGrants();
+      if (refreshCallbacks?.fetchData) {
+        refreshCallbacks.fetchData();
       }
       
       return true;

@@ -156,7 +156,6 @@ const AppLayout = () => {
       '/profile/settings',
       '/profile/followers',
       '/profile/following',
-      '/profile/grants',
       '/profile/organizations',
       '/profile/my-organization',
       '/profile/notifications',

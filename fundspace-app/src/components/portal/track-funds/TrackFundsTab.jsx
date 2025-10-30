@@ -85,34 +85,19 @@ const TrackFundsTab = ({ session, userMembership }) => {
   // Use custom hooks for data and actions
   const { 
     data, 
-    loading, 
-    loadSectionData, 
-    loadSavedGrants, 
-    loadApplications, 
-    loadReceivedGrants
+    loading,
+    fetchData
   } = useTrackingData(session, userMembership);
   
   const { markAsApplied, markAsReceived, removeApplication, removeAward } = useTrackingActions(
     session, 
     userMembership, 
     { 
-      loadSavedGrants, 
-      loadApplications, 
-      loadReceivedGrants
+      fetchData
     }
   );
 
-  // Load data when section changes and ensure counts are updated
-  useEffect(() => {
-    loadSectionData(activeSection);
-    // Also refresh all sections to ensure counts are accurate
-    if (activeSection === 'saved') {
-      setTimeout(() => {
-        loadApplications();
-        loadReceivedGrants();
-      }, 200);
-    }
-  }, [activeSection, loadSectionData, loadApplications, loadReceivedGrants]);
+  // No need for a separate useEffect to load data, useTrackingData handles it.
 
   // Filter and pagination logic
   const currentData = data[activeSection] || [];
@@ -208,27 +193,30 @@ const TrackFundsTab = ({ session, userMembership }) => {
   }, [filterConfig]);
 
   const filterBarProps = {
-    isMobileVisible: true,
     searchTerm: filterConfig.searchTerm,
-    setSearchTerm: (value) => handleFilterChange('searchTerm', value),
     locationFilter: filterConfig.locationFilter,
-    setLocationFilter: (value) => handleFilterChange('locationFilter', value),
     categoryFilter: filterConfig.categoryFilter,
-    setCategoryFilter: (value) => handleFilterChange('categoryFilter', value),
     grantStatusFilter: filterConfig.grantStatusFilter,
-    setGrantStatusFilter: (value) => handleFilterChange('grantStatusFilter', value),
     grantTypeFilter: filterConfig.grantTypeFilter,
-    setGrantTypeFilter: (value) => handleFilterChange('grantTypeFilter', value),
-    sortCriteria: filterConfig.sortCriteria,
-    setSortCriteria: (value) => handleFilterChange('sortCriteria', value),
-    uniqueCategories,
-    uniqueLocations,
-    uniqueGrantTypes,
-    uniqueGrantStatuses: GRANT_STATUSES,
+    handleFilterChange,
+    totalCount: filteredAndSortedData.length,
+    loading,
+    availableCategories: uniqueCategories,
+    availableGrantTypes: uniqueGrantTypes,
+    availableLocations: uniqueLocations,
+    availableGrantStatuses: GRANT_STATUSES,
     pageType: "grants",
     onClearFilters: handleClearFilters,
     activeFilters: activeGrantFilters,
     onRemoveFilter: handleRemoveGrantFilter,
+    organizationTypes: [], // Empty since this is for grants, not organizations
+    minAmount: null,
+    maxAmount: null,
+    deadlineAfter: null,
+    selectedCategories: filterConfig.categoryFilter,
+    selectedLocations: filterConfig.locationFilter,
+    selectedGrantTypes: filterConfig.grantTypeFilter ? [filterConfig.grantTypeFilter] : [],
+    selectedGrantStatuses: filterConfig.grantStatusFilter ? [filterConfig.grantStatusFilter] : []
   };
 
   const sections = [

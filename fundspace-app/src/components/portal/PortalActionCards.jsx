@@ -1,10 +1,10 @@
 // src/components/portal/PortalActionCards.jsx
 import React from 'react';
-import { Search, DollarSign, Plus, Heart, Users, Building2 } from '../Icons.jsx';
+import { Search, DollarSign, Plus, Heart, Users, Building2, BarChart3 } from 'lucide-react';
 
 const ActionCard = ({ isActive, onClick, gradient, icon: Icon, title, description, activeColor }) => (
   <div 
-    className={`group relative overflow-hidden rounded-3xl cursor-pointer transition-all duration-300 hover:scale-105 hover:shadow-xl ${
+    className={`group relative overflow-hidden cursor-pointer transition-all duration-300 hover:scale-105 hover:shadow-xl bg-white rounded-2xl shadow-lg border border-slate-200 ${
       isActive ? `ring-2 ring-${activeColor}` : ''
     }`}
     onClick={onClick}
@@ -73,11 +73,19 @@ const PortalActionCards = ({ activeTab, setActiveTab, userMembership }) => {
       icon: Building2,
       gradient: 'from-rose-100 via-rose-50 to-pink-100',
       activeColor: 'rose-500'
+    },
+    {
+      id: 'landscape',
+      title: 'Landscape Data',
+      description: 'Community insights',
+      icon: BarChart3,
+      gradient: 'from-indigo-100 via-indigo-50 to-blue-100',
+      activeColor: 'indigo-500'
     }
   ];
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6 mb-8">
+    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-6 mb-8">
       {cards.map((card) => (
         <ActionCard
           key={card.id}

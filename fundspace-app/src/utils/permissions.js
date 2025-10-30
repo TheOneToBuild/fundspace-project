@@ -13,7 +13,8 @@ export const PERMISSIONS = {
   MANAGE_MEMBERS: 'manage_members',
   APPOINT_SUPER_ADMIN: 'appoint_super_admin',
   DELETE_ORGANIZATION: 'delete_organization',
-  VIEW_ORGANIZATION: 'view_organization'
+  VIEW_ORGANIZATION: 'view_organization',
+  PORTAL_ACCESS: 'portal_access'  // Add this line
 };
 
 export function hasPermission(userRole, permission, isOmegaAdmin = false) {
@@ -28,12 +29,14 @@ export function hasPermission(userRole, permission, isOmegaAdmin = false) {
       PERMISSIONS.MANAGE_MEMBERS,
       PERMISSIONS.APPOINT_SUPER_ADMIN,
       PERMISSIONS.DELETE_ORGANIZATION,
-      PERMISSIONS.VIEW_ORGANIZATION
+      PERMISSIONS.VIEW_ORGANIZATION,
+      PERMISSIONS.PORTAL_ACCESS  // Add this
     ],
     [ROLES.ADMIN]: [
       PERMISSIONS.EDIT_ORGANIZATION,  // ✅ FIXED: Now admins can edit organization
       PERMISSIONS.MANAGE_MEMBERS,
-      PERMISSIONS.VIEW_ORGANIZATION
+      PERMISSIONS.VIEW_ORGANIZATION,
+      PERMISSIONS.PORTAL_ACCESS  // Add this
     ],
     [ROLES.MEMBER]: [
       PERMISSIONS.VIEW_ORGANIZATION

@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { MapPin, Building, DollarSign, MessageSquare, ArrowUpRight, Clock } from 'lucide-react';
 import { BAY_AREA_COUNTIES } from '../data/locationData.js';
 import { useDashboardStats } from '../hooks/useDashboardStats.js';
-import StatsCards from './StatsCards.jsx';
 import DemographicsSection from './DemographicsSection.jsx';
 import DashboardBanner from './DashboardBanner.jsx';
 import OrganizationCard from './OrganizationCard.jsx';
@@ -70,124 +69,6 @@ const AnimationStyles = () => {
     return null;
 };
 
-const OverviewGrid = ({ locationData, setActiveTab, isVisible }) => {
-    const sections = [
-        {
-            title: 'Top Organizations',
-            subtitle: 'Leading community impact',
-            icon: Building,
-            gradient: 'from-blue-400 to-blue-600',
-            data: locationData?.organizations || [
-                { id: 1, name: 'Bay Area Legal Aid', type: 'Legal Services', image_url: null },
-                { id: 2, name: 'Silicon Valley Community Foundation', type: 'Foundation', image_url: null },
-                { id: 3, name: 'Oakland Museum of California', type: 'Arts & Culture', image_url: null }
-            ]
-        },
-        {
-            title: 'Active Grants',
-            subtitle: 'Available funding opportunities',
-            icon: DollarSign,
-            gradient: 'from-emerald-400 to-emerald-600',
-            data: locationData?.grants || [
-                { id: 1, title: 'Youth Education Initiative', amount: '$50,000', deadline: '2024-12-15' },
-                { id: 2, title: 'Community Health Program', amount: '$25,000', deadline: '2024-11-30' },
-                { id: 3, title: 'Environmental Conservation', amount: '$75,000', deadline: '2025-01-15' }
-            ]
-        },
-        {
-            title: 'Recent Posts',
-            subtitle: 'Community updates',
-            icon: MessageSquare,
-            gradient: 'from-purple-400 to-purple-600',
-            data: locationData?.posts || [
-                { id: 1, content: 'Excited to announce our new partnership!', author: 'Bay Area Foundation', date: '2024-10-15' },
-                { id: 2, content: 'Join us for our annual community gathering', author: 'Oakland Museum', date: '2024-10-14' },
-                { id: 3, content: 'Thank you for your continued support', author: 'Legal Aid Society', date: '2024-10-13' }
-            ]
-        }
-    ];
-
-    return (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
-            {sections.map((section, sectionIndex) => (
-                <div 
-                    key={sectionIndex} 
-                    className="bg-white rounded-3xl shadow-lg border border-slate-200 p-6 hover:shadow-xl transition-all duration-300 hover:-translate-y-1"
-                    style={{
-                        animation: isVisible ? `slideInUp 0.6s ease-out ${sectionIndex * 0.2}s both` : 'none'
-                    }}
-                >
-                    <div className="flex items-center gap-4 mb-6">
-                        <div className={`w-12 h-12 bg-gradient-to-br ${section.gradient} rounded-2xl flex items-center justify-center shadow-lg`}>
-                            <section.icon className="w-6 h-6 text-white" />
-                        </div>
-                        <div>
-                            <h3 className="font-bold text-slate-900 text-lg">{section.title}</h3>
-                            <p className="text-sm text-slate-600">{section.subtitle}</p>
-                        </div>
-                    </div>
-                    
-                    <div className="space-y-4">
-                        {section.data.slice(0, 3).map((item, index) => (
-                            <div key={item.id} className="group">
-                                {section.title === 'Top Organizations' && (
-                                    <div className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 transition-colors cursor-pointer">
-                                        <div className="w-10 h-10 bg-gradient-to-br from-slate-100 to-slate-200 rounded-xl flex items-center justify-center">
-                                            <Building className="w-5 h-5 text-slate-600" />
-                                        </div>
-                                        <div className="flex-1">
-                                            <p className="font-semibold text-slate-900 text-sm group-hover:text-blue-600 transition-colors">
-                                                {item.name}
-                                            </p>
-                                            <p className="text-xs text-slate-600">{item.type}</p>
-                                        </div>
-                                        <ArrowUpRight className="w-4 h-4 text-slate-400 group-hover:text-blue-500 transition-colors" />
-                                    </div>
-                                )}
-                                
-                                {section.title === 'Active Grants' && (
-                                    <div className="p-3 rounded-xl border border-slate-100 hover:border-emerald-200 hover:bg-emerald-50/50 transition-all cursor-pointer group">
-                                        <div className="flex items-start justify-between mb-2">
-                                            <p className="font-semibold text-slate-900 text-sm group-hover:text-emerald-700 transition-colors line-clamp-1">
-                                                {item.title}
-                                            </p>
-                                            <span className="text-xs font-bold text-emerald-600 bg-emerald-100 px-2 py-1 rounded-full">
-                                                {item.amount}
-                                            </span>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <Clock className="w-3 h-3 text-slate-400" />
-                                            <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                                                new Date(item.deadline) < new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) 
-                                                    ? 'text-red-700 bg-red-50' 
-                                                    : 'text-orange-700 bg-orange-50'
-                                            }`}>
-                                                {item.deadline}
-                                            </span>
-                                        </div>
-                                    </div>
-                                )}
-                                
-                                {section.title === 'Recent Posts' && (
-                                    <div className="p-3 rounded-xl hover:bg-purple-50/50 transition-colors cursor-pointer group">
-                                        <p className="text-sm text-slate-700 mb-2 line-clamp-2 group-hover:text-purple-700 transition-colors">
-                                            {item.content}
-                                        </p>
-                                        <div className="flex items-center justify-between text-xs text-slate-500">
-                                            <span>{item.author}</span>
-                                            <span>{item.date}</span>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            ))}
-        </div>
-    );
-};
-
 const TabContent = ({ activeTab, locationData, isVisible, dashboardStats }) => {
     const EmptyState = ({ icon: Icon, title, description, bgColor }) => (
         <div className="text-center py-16">
@@ -205,100 +86,86 @@ const TabContent = ({ activeTab, locationData, isVisible, dashboardStats }) => {
                 {locationData?.demographics && (
                     <DemographicsSection 
                         demographics={locationData.demographics}
-                        isVisible={isVisible} // Changed
+                        isVisible={isVisible}
                     />
                 )}
-                <StatsCards 
-                    stats={{
-                        totalOrgs: dashboardStats.totalOrganizations,
-                        totalGrants: locationData?.stats?.totalGrants ?? 0,
-                        totalPosts: locationData?.stats?.totalPosts ?? 0
-                    }} 
-                    isVisible={isVisible} 
+            </div>
+        );
+    }
+
+    if (activeTab === 'organizations') {
+        const organizations = locationData?.organizations || [];
+        
+        if (organizations.length === 0) {
+            return (
+                <EmptyState 
+                    icon={Building}
+                    title="No organizations found"
+                    description="We're still gathering data for this community. Check back soon!"
+                    bgColor="from-blue-100 to-blue-200"
                 />
-                <OverviewGrid locationData={locationData} setActiveTab={() => {}} isVisible={isVisible} />
+            );
+        }
+
+        return (
+            <div className="space-y-6">
+                <p className="text-slate-600 text-center">
+                    Showing {organizations.length} organizations in this community
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {organizations.map((organization, index) => (
+                        <OrganizationCard 
+                            key={organization.id || index}
+                            organization={organization}
+                            index={index}
+                            isVisible={isVisible}
+                        />
+                    ))}
+                </div>
+            </div>
+        );
+    }
+
+    if (activeTab === 'grants') {
+        const grants = locationData?.grants || [];
+        
+        if (grants.length === 0) {
+            return (
+                <EmptyState 
+                    icon={DollarSign}
+                    title="No active grants found"
+                    description="We're constantly updating our grant database. New opportunities may be available soon!"
+                    bgColor="from-green-100 to-green-200"
+                />
+            );
+        }
+
+        return (
+            <div className="space-y-6">
+                <p className="text-slate-600 text-center">
+                    Showing {grants.length} active grants for this community
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {grants.map((grant, index) => (
+                        <GrantCard 
+                            key={grant.id || index}
+                            grant={grant}
+                            index={index}
+                            isVisible={isVisible}
+                        />
+                    ))}
+                </div>
             </div>
         );
     }
 
     return (
-        <div 
-            className="bg-white rounded-3xl shadow-lg border border-slate-200 p-8"
-            style={{
-                animation: isVisible ? 'fadeIn 0.6s ease-out both' : 'none'
-            }}
-        >
-            <div className="space-y-6">
-                {activeTab === 'organizations' && (
-                    <>
-                        {(locationData?.organizations || []).map((org, index) => (
-                            <div
-                                key={org.id}
-                                style={{
-                                    animation: isVisible ? `slideInUp 0.4s ease-out ${index * 0.1}s both` : 'none'
-                                }}
-                            >
-                                <OrganizationCard organization={org} />
-                            </div>
-                        ))}
-                        {(!locationData?.organizations || locationData.organizations.length === 0) && (
-                            <EmptyState 
-                                icon={Building}
-                                title="No organizations found"
-                                description="There are no organizations in this area yet."
-                                bgColor="from-blue-100 to-blue-200"
-                            />
-                        )}
-                    </>
-                )}
-
-                {activeTab === 'grants' && (
-                    <>
-                        {(locationData?.grants || []).map((grant, index) => (
-                            <div
-                                key={grant.id}
-                                style={{
-                                    animation: isVisible ? `slideInUp 0.4s ease-out ${index * 0.1}s both` : 'none'
-                                }}
-                            >
-                                <GrantCard grant={grant} />
-                            </div>
-                        ))}
-                        {(!locationData?.grants || locationData.grants.length === 0) && (
-                            <EmptyState 
-                                icon={DollarSign}
-                                title="No grants found"
-                                description="There are no active grants in this area yet."
-                                bgColor="from-emerald-100 to-emerald-200"
-                            />
-                        )}
-                    </>
-                )}
-
-                {activeTab === 'posts' && (
-                    <>
-                        {(locationData?.posts || []).map((post, index) => (
-                            <div
-                                key={post.id}
-                                style={{
-                                    animation: isVisible ? `slideInUp 0.4s ease-out ${index * 0.1}s both` : 'none'
-                                }}
-                            >
-                                <PostCard post={post} />
-                            </div>
-                        ))}
-                        {(!locationData?.posts || locationData.posts.length === 0) && (
-                            <EmptyState 
-                                icon={MessageSquare}
-                                title="No posts found"
-                                description="There are no community posts in this area yet."
-                                bgColor="from-purple-100 to-purple-200"
-                            />
-                        )}
-                    </>
-                )}
-            </div>
-        </div>
+        <EmptyState 
+            icon={MessageSquare}
+            title="Coming Soon"
+            description="This section is under development. Stay tuned for updates!"
+            bgColor="from-purple-100 to-purple-200"
+        />
     );
 };
 
@@ -313,8 +180,9 @@ export default function ContentSection({
     loading, 
     activeTab, 
     setActiveTab 
-}) {const [isDashboardVisible, setIsDashboardVisible] = useState(false);
-const [isContentVisible, setIsContentVisible] = useState(false);
+}) {
+    const [isDashboardVisible, setIsDashboardVisible] = useState(false);
+    const [isContentVisible, setIsContentVisible] = useState(false);
     const [previousLocation, setPreviousLocation] = useState(selectedLocation);
     const [previousTab, setPreviousTab] = useState(activeTab);
     
@@ -371,30 +239,23 @@ const [isContentVisible, setIsContentVisible] = useState(false);
     return (
         <>
             <AnimationStyles />
-            
-            <DashboardBanner 
-                selectedLocation={selectedLocation}
-                locationName={locationName}
-                viewType={viewType}
-                setViewType={setViewType}
-                setSelectedLocation={setSelectedLocation}
-                searchQuery={searchQuery}
-                setSearchQuery={setSearchQuery}
-                isVisible={isDashboardVisible}  // Use isDashboardVisible instead of isVisible
-            />
+            <div className="space-y-8">
+                <DashboardBanner 
+                    selectedLocation={selectedLocation}
+                    setSelectedLocation={setSelectedLocation}
+                    viewType={viewType}
+                    setViewType={setViewType}
+                    dashboardStats={dashboardStats}
+                    isVisible={isDashboardVisible}
+                />
 
-            <TabNavigation 
-                activeTab={activeTab}
-                setActiveTab={setActiveTab}
-                stats={dashboardStats}
-            />
-
-            <TabContent 
-                activeTab={activeTab} 
-                locationData={locationData} 
-                isVisible={isContentVisible}  // Use isContentVisible instead of isVisible
-                dashboardStats={dashboardStats}
-            />
+                <TabContent 
+                    activeTab={activeTab}
+                    locationData={locationData}
+                    isVisible={isContentVisible}
+                    dashboardStats={dashboardStats}
+                />
+            </div>
         </>
     );
-}
+};

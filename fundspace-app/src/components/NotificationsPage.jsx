@@ -298,7 +298,7 @@ const NotificationItem = ({ notification, onViewPost, onMarkAsRead, onDelete, cu
                 navigate(`/grants?open_grant_slug=${grantSlugs[0]}`);
             } else {
                 // Fallback to general grants page for successful submissions without slugs
-                navigate('/grants');
+                navigate('/explore');
             }
             return;
         }
@@ -436,7 +436,7 @@ const NotificationItem = ({ notification, onViewPost, onMarkAsRead, onDelete, cu
                                             navigate(`/grants?open_grant_slug=${grantSlugs[0]}`);
                                         } else {
                                             // Fallback to general grants page
-                                            navigate('/grants');
+                                            navigate('/explore');
                                         }
                                     }}
                                     className="text-xs bg-blue-100 text-blue-700 px-3 py-1.5 rounded-full hover:bg-blue-200 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -450,7 +450,7 @@ const NotificationItem = ({ notification, onViewPost, onMarkAsRead, onDelete, cu
                                 <button 
                                     onClick={(e) => {
                                         e.stopPropagation();
-                                        navigate('/grants');
+                                        navigate('/explore');
                                     }}
                                     className="text-xs bg-gray-100 text-gray-700 px-3 py-1.5 rounded-full hover:bg-gray-200 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500"
                                 >

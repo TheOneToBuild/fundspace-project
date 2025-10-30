@@ -691,15 +691,18 @@ export const getUserTrackedGrants = async (userId, organizationId = null) => {
   
   try {
     const { data, error } = await supabase.rpc('get_user_tracked_grants', {
-      p_user_id: userId,
-      p_organization_id: organizationId
+      p_user_id: userId
     });
     
     if (error) throw error;
+
+    // The RPC function returns an object with 'saved', 'applications', and 'received' keys.
+    // Ensure a consistent return shape even if the RPC returns null.
+    const result = data || { saved: [], applications: [], received: [] };    
     
-    setCachedData(cacheKey, data);
+    setCachedData(cacheKey, result);
     trackRPCUsage('get_user_tracked_grants', true);
-    return data;
+    return result;
   } catch (error) {
     console.error('Error fetching tracked grants:', error);
     trackRPCUsage('get_user_tracked_grants', false);

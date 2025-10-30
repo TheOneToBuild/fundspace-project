@@ -8,6 +8,7 @@ import PortalBanner from './portal/PortalBanner.jsx';
 import PortalActionCards from './portal/PortalActionCards.jsx';
 import ExploreFundsTab from './portal/ExploreFundsTab.jsx';
 import TrackFundsTab from './portal/track-funds/TrackFundsTab.jsx';
+import LandscapeDataTab from './portal/LandscapeDataTab.jsx';
 import { 
   CreateFundsTab, 
   RequestFundsTab, 
@@ -38,16 +39,37 @@ const GrantsPortalPage = () => {
       if (!profile) return;
       setCheckingAccess(true);
       try {
-        const canAccessPortal = hasPermission(profile, PERMISSIONS.PORTAL_ACCESS);
-        setHasAccess(canAccessPortal);
-        if (canAccessPortal && session?.user?.id) {
-          const { data: membership } = await supabase
+        // Check if user is omega admin first
+        if (profile?.is_omega_admin) {
+          setHasAccess(true);
+          setCheckingAccess(false);
+          return;
+        }
+  
+        // Get user's organization memberships (may be multiple)
+        const { data: memberships, error } = await supabase
             .from('organization_memberships')
-            .select(`*, organizations (*)`)
-            .eq('user_id', session.user.id)
-            .eq('status', 'active')
-            .single();
-          setUserMembership(membership);
+            .select(`role, organization_id, organization_type, organizations (*)`)
+            .eq('profile_id', session?.user?.id);
+  
+        if (error) {
+          console.error('Error fetching membership:', error);
+          setHasAccess(false);
+        } else if (memberships && memberships.length > 0) {
+          // Check if ANY membership has admin privileges
+          const hasAdminRole = memberships.some(membership => 
+            hasPermission(membership.role, PERMISSIONS.PORTAL_ACCESS, profile?.is_omega_admin)
+          );
+          
+          setHasAccess(hasAdminRole);
+          
+          // Set the first admin membership, or first membership if none are admin
+          const adminMembership = memberships.find(m => 
+            hasPermission(m.role, PERMISSIONS.PORTAL_ACCESS, profile?.is_omega_admin)
+          );
+          setUserMembership(adminMembership || memberships[0]);
+        } else {
+          setHasAccess(false);
         }
       } catch (error) {
         console.error('Error checking permissions:', error);
@@ -182,8 +204,14 @@ const GrantsPortalPage = () => {
 
   const filterBarProps = useMemo(() => ({
     totalCount: grants.length,
-    availableCategories: [...new Set(grants.flatMap(g => g.category_names || []))],
-    availableLocations: [...new Set(grants.flatMap(g => g.location_names || []))],
+    availableCategories: [...new Set(grants
+      .flatMap(g => Array.isArray(g.category_names) ? g.category_names : [])
+      .filter(Boolean)
+    )],
+    availableLocations: [...new Set(grants
+      .flatMap(g => Array.isArray(g.location_names) ? g.location_names : [])
+      .filter(Boolean)
+    )],
     loading
   }), [grants, loading]);
 
@@ -214,6 +242,8 @@ const GrantsPortalPage = () => {
         return <CreateFundsTab />;
       case 'request':
         return <RequestFundsTab />;
+      case 'landscape':
+        return <LandscapeDataTab />;
       default:
         return null;
     }

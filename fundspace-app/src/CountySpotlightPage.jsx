@@ -403,7 +403,7 @@ const CountySpotlightPage = () => {
                 
                 <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
                   <a 
-                    href="/grants" 
+                    href="/explore" 
                     className="inline-flex items-center justify-center px-8 py-4 bg-white text-slate-900 hover:bg-gray-100 rounded-2xl font-semibold transition-all duration-300 hover:scale-105 shadow-lg"
                   >
                     <Search className="mr-2" size={20} />

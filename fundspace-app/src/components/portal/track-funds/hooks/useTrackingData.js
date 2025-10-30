@@ -1,5 +1,5 @@
 // src/components/portal/track-funds/hooks/useTrackingData.js
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { getUserTrackedGrants } from '../../../../utils/rpcClientFunctions.js';
 
 export const useTrackingData = (session, userMembership) => {
@@ -9,6 +9,7 @@ export const useTrackingData = (session, userMembership) => {
     applications: [],
     received: []
   });
+
   const fetchData = useCallback(async () => {
     if (!session?.user?.id) return;
     
@@ -30,9 +31,14 @@ export const useTrackingData = (session, userMembership) => {
     }
   }, [session?.user?.id, userMembership?.organization_id]);
 
+  // Fetch all data on initial mount
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
   return {
     loading,
     data,
-    fetchData
+    fetchData // Keep exporting fetchData for manual refresh
   };
 };

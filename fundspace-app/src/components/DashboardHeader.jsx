@@ -196,7 +196,7 @@ export default function DashboardHeader({ profile }) {
     }, []);
 
     const grantsPortalItem = {
-        label: 'Fund Portal',
+        label: 'Dashboard',
         to: '/profile/grants-portal',
         icon: <FileText size={16} />
     };
@@ -208,7 +208,7 @@ export default function DashboardHeader({ profile }) {
             { label: 'Dashboard', to: '/profile/omega-admin', icon: <Home size={14} /> },
             { label: 'Organizations', to: '/profile/omega-admin/organizations', icon: <Building size={14} /> },
             { label: 'Users', to: '/profile/omega-admin/users', icon: <FileText size={14} /> },
-            { label: 'Grants', to: '/profile/omega-admin/grants', icon: <FileText size={14} /> }
+            { label: 'Grants', to: '/profile/omega-admin/explore', icon: <FileText size={14} /> }
         ]
     };
 
@@ -228,7 +228,7 @@ export default function DashboardHeader({ profile }) {
         {
             label: 'Explore',
             to: '/explore',
-            icon: <MapPin size={16} />
+            icon: <Building size={16} />
         },
         {
             label: 'Community Hub',
@@ -236,11 +236,6 @@ export default function DashboardHeader({ profile }) {
             icon: <Globe size={16} />
         },
         ...(isOmegaAdmin || hasOrganizationAccess ? [grantsPortalItem] : []),
-        {
-            label: 'Discover',
-            to: '/profile/discover',
-            icon: <MapPin size={16} />
-        },
         {
             label: 'My Organization',
             to: '/profile/my-organization',

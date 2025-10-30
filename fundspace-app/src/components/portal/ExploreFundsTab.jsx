@@ -149,37 +149,63 @@ const GrantListItem = ({ grant, onOpenDetailModal, isSaved, onSave, onUnsave, se
 };
 
 const ExploreFundsTab = ({
-  // State
-  showFilters,
-  setShowFilters,
-  filterConfig,
-  handleFilterChange,
-  activeGrantFilters,
+  grants,
   loading,
-  currentList,
-  totalFilteredItems,
-  totalFilteredFunding,
-  grantsPerPage,
-  handlePerPageChange,
-  viewMode,
-  setViewMode,
-  totalPages,
-  currentPage,
-  paginate,
-  handleClearFilters,
-  
-  // Grant handlers
   session,
   savedGrantIds,
   handleSaveGrant,
   handleUnsaveGrant,
   openDetail,
   handleFilterByCategory,
-  
-  // Filter bar props
   filterBarProps,
   formatCurrency
 }) => {
+  // Add local state for the missing props
+  const [showFilters, setShowFilters] = React.useState(false);
+  const [viewMode, setViewMode] = React.useState('grid');
+  const [grantsPerPage, setGrantsPerPage] = React.useState(12);
+  const [currentPage, setCurrentPage] = React.useState(1);
+  const [searchTerm, setSearchTerm] = React.useState('');
+
+  // Calculate derived values
+  const filteredGrants = grants.filter(grant => 
+    !searchTerm || grant.title.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+  
+  const totalFilteredItems = filteredGrants.length;
+  const totalFilteredFunding = filteredGrants.reduce((sum, grant) => {
+    const amount = parseMaxFundingAmount(grant.fundingAmount);
+    return sum + (amount || 0);
+  }, 0);
+  
+  const totalPages = Math.ceil(totalFilteredItems / grantsPerPage);
+  const startIndex = (currentPage - 1) * grantsPerPage;
+  const currentList = filteredGrants.slice(startIndex, startIndex + grantsPerPage);
+
+  const handlePerPageChange = (e) => {
+    setGrantsPerPage(Number(e.target.value));
+    setCurrentPage(1);
+  };
+
+  const paginate = (pageNumber) => {
+    setCurrentPage(pageNumber);
+  };
+
+  const handleClearFilters = () => {
+    setSearchTerm('');
+    setCurrentPage(1);
+  };
+
+  const filterConfig = { searchTerm };
+  const handleFilterChange = (key, value) => {
+    if (key === 'searchTerm') {
+      setSearchTerm(value);
+      setCurrentPage(1);
+    }
+  };
+
+  const activeGrantFilters = []; // Empty for now since you're not implementing complex filtering yet
+
   return (
     <div>
       {/* Search and Filter Section */}
