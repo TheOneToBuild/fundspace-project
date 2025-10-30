@@ -3,12 +3,12 @@ import { motion } from 'framer-motion';
 import {
     Briefcase, CheckCircle, Search, Calendar, Bot, Users, TrendingUp, Filter, ShieldCheck, Sparkles, ArrowRight, Target, Heart,
     BarChart3, Network, Rocket, Layers, FileText, Mail, Zap
-} from './components/Icons.jsx';
-import OrganizationCard from './components/OrganizationCard.jsx';
-import GrantCard from './components/GrantCard.jsx';
-import { supabase } from './supabaseClient.js';
-import { refreshGrantBookmarkCounts } from './utils/grantUtils';
-import { LayoutContext } from './App.jsx';
+} from '../components/Icons.jsx';
+import OrganizationCard from '../components/OrganizationCard.jsx';
+import GrantCard from '../components/GrantCard.jsx';
+import { supabase } from '../supabaseClient.js';
+import { refreshGrantBookmarkCounts } from '../utils/grantUtils';
+import { LayoutContext } from '../App.jsx';
 
 const STATIC_IMAGES = {
     heroIllustration: 'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?q=80&w=1200&auto=format&fit=crop',

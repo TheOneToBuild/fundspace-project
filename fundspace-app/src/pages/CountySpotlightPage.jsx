@@ -2,11 +2,11 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { supabase } from './supabaseClient.js';
-import { countySpotlightData } from './spotlightData.js';
-import { Users, DollarSign, MapPin, Loader, ExternalLink, Map, ArrowRight, Search, Sparkles, Heart, Building, TrendingUp } from './components/Icons.jsx';
-import OrganizationCard from './components/OrganizationCard.jsx';
-import { LayoutContext } from './App.jsx';
+import { supabase } from '../supabaseClient.js';
+import { countySpotlightData } from '../spotlightData.js';
+import { Users, DollarSign, MapPin, Loader, ExternalLink, Map, ArrowRight, Search, Sparkles, Heart, Building, TrendingUp } from '../components/Icons.jsx';
+import OrganizationCard from '../components/OrganizationCard.jsx';
+import { LayoutContext } from '../App.jsx';
 
 const CountySpotlightPage = () => {
   const { setPageBgColor } = useContext(LayoutContext);
@@ -249,7 +249,7 @@ const CountySpotlightPage = () => {
                   className="text-center mt-12"
                 >
                   <a 
-                    href="/organizations" 
+                    href="/explore?tab=organizations" 
                     className="inline-flex items-center justify-center px-8 py-4 font-semibold rounded-2xl text-white bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
                   >
                     <Users className="mr-2" size={20} />
@@ -322,7 +322,7 @@ const CountySpotlightPage = () => {
                   className="text-center mt-12"
                 >
                   <a 
-                    href="/organizations?prefilter=foundation" 
+                    href="/explore?tab=organizations" 
                     className="inline-flex items-center justify-center px-8 py-4 font-semibold rounded-2xl text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
                   >
                     <Building className="mr-2" size={20} />

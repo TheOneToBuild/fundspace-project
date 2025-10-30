@@ -1,7 +1,7 @@
 import React, { useEffect, useContext } from 'react';
 import { motion } from 'framer-motion';
-import { Map, CheckCircle2, Rocket, Users, Bot, BarChart3, Globe, Sparkles, ArrowRight, Search, Target, Layers, Filter, FileText } from './components/Icons.jsx';
-import { LayoutContext } from './App.jsx';
+import { Map, CheckCircle2, Rocket, Users, Bot, BarChart3, Globe, Sparkles, ArrowRight, Search, Target, Layers, Filter, FileText } from '../components/Icons.jsx';
+import { LayoutContext } from '../App.jsx';
 
 const fade = { hidden: { opacity: 0, y: 28 }, visible: { opacity: 1, y: 0, transition: { duration: 0.75 } } };
 const Section = ({ children, className = 'py-28 md:py-40' }) => (

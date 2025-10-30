@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { supabase } from './supabaseClient.js';
+import { supabase } from '../supabaseClient.js';
 import { motion } from 'framer-motion';
-import { LayoutContext } from './App.jsx';
+import { LayoutContext } from '../App.jsx';
 import {
     Search, BarChart3, Users, Handshake, Target, Rocket, Sparkles, ArrowRight, UploadCloud, Loader, CheckCircle2, MessageSquare, Briefcase, Zap, Heart, TrendingUp
-} from './components/Icons.jsx';
-import AnimatedCounter from './components/AnimatedCounter.jsx';
+} from '../components/Icons.jsx';
+import AnimatedCounter from '../components/AnimatedCounter.jsx';
 
 const fadeIn = { hidden: { opacity: 0, y: 22 }, visible: { opacity: 1, y: 0, transition: { duration: 0.75 } } };
 const Section = ({ children, className = 'py-32 md:py-44' }) => (

@@ -1,8 +1,8 @@
 // src/SubmitGrantPage.jsx
 import React, { useState, useEffect, useContext } from 'react';
-import { supabase } from './supabaseClient.js';
-import { UploadCloud, Loader, CheckCircle2, XCircle, Sparkles, Heart, Users, Target, Search, ArrowRight } from './components/Icons.jsx';
-import { LayoutContext } from './App.jsx';
+import { supabase } from '../supabaseClient.js';
+import { UploadCloud, Loader, CheckCircle2, XCircle, Sparkles, Heart, Users, Target, Search, ArrowRight } from '../components/Icons.jsx';
+import { LayoutContext } from '../App.jsx';
 
 const SubmitGrantPage = () => {
   const { setPageBgColor } = useContext(LayoutContext);

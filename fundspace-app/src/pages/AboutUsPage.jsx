@@ -1,8 +1,8 @@
 import React, { useEffect, useContext } from 'react';
 import { motion } from 'framer-motion';
-import { Users, BarChart3, Briefcase, Heart, Sparkles, TrendingUp, Star, Clock, Target, Zap, Bot, Shield, Search, ArrowRight, Building } from './components/Icons.jsx';
-import AnimatedCounter from './components/AnimatedCounter.jsx';
-import { LayoutContext } from './App.jsx';
+import { Users, BarChart3, Briefcase, Heart, Sparkles, TrendingUp, Star, Clock, Target, Zap, Bot, Shield, Search, ArrowRight, Building } from '../components/Icons.jsx';
+import AnimatedCounter from '../components/AnimatedCounter.jsx';
+import { LayoutContext } from '../App.jsx';
 
 const ADVISORY = [
   { name: 'Linda Prieto', title: 'Chief Program & Advancement Officer, Silicon Valley Social Venture Fund', imageUrl: 'https://bqiamumgqbezdumzquda.supabase.co/storage/v1/object/public/avatars/LindaPrieto.jpg', linkedinUrl: 'https://www.linkedin.com/in/linda-prieto/' },

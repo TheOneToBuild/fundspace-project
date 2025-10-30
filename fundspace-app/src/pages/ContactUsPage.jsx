@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { supabase } from './supabaseClient.js';
-import { LayoutContext } from './App.jsx';
+import { supabase } from '../supabaseClient.js';
+import { LayoutContext } from '../App.jsx';
 import {
   Mail, MessageSquare, User, Send, MapPin, Heart, Sparkles, UploadCloud, Loader, CheckCircle2, ExternalLink, Coffee, Target, ArrowRight, Shield
-} from './components/Icons.jsx';
+} from '../components/Icons.jsx';
 
 const ContactUsPage = () => {
   const { setPageBgColor } = useContext(LayoutContext);

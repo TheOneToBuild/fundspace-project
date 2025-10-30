@@ -2,11 +2,11 @@
 
 import React, { useEffect, useContext, useState } from 'react';
 import { motion } from 'framer-motion';
-import PublicPageLayout from './components/PublicPageLayout.jsx';
+import PublicPageLayout from '../components/PublicPageLayout.jsx';
 import {
   HelpCircle, Users, Shield, Search, MessageSquare, Sparkles, ArrowRight, CheckCircle2, BarChart3, Target, Layers, Filter, FileText, Bot
-} from './components/Icons.jsx';
-import { LayoutContext } from './App.jsx';
+} from '../components/Icons.jsx';
+import { LayoutContext } from '../App.jsx';
 
 const fade = { hidden: { opacity: 0, y: 24 }, visible: { opacity: 1, y: 0, transition: { duration: 0.7 } } };
 const Section = ({ children, className = 'py-24 md:py-36' }) => (

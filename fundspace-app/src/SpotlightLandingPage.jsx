@@ -122,7 +122,7 @@ const SpotlightLandingPage = () => {
             className="flex flex-col sm:flex-row items-center justify-center gap-4"
           >
             <a
-              href="/organizations"
+              href="/explore?tab=organizations"
               className="inline-flex items-center justify-center px-6 py-3 font-semibold rounded-full text-white bg-gradient-to-r from-rose-600 to-orange-600 hover:from-rose-700 hover:to-orange-700 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
             >
               <Search className="mr-2" size={18} />
