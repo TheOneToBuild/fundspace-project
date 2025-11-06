@@ -1,4 +1,3 @@
-// fundspace-app/src/pages/ExplorePage.jsx
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react'; 
 import { Search, SlidersHorizontal, LayoutGrid, List, ChevronDown, XCircle, MapPin, Filter, Building } from 'lucide-react';
 import ExploreRequestsTab from '../components/explore/ExploreRequestsTab.jsx';
@@ -6,11 +5,10 @@ import ExploreGrantsTab from '../components/explore/ExploreGrantsTab.jsx';
 import ExploreWinsTab from '../components/explore/ExploreWinsTab.jsx';
 import FilterBar from '../components/FilterBar.jsx'; 
 import { supabase } from '../supabaseClient.js';
-
 import { CATEGORIES as COMPREHENSIVE_CATEGORIES } from '../constants.js';
-import Pagination from '../components/Pagination.jsx'; // This is unused in the provided code, but I'll leave it.
+import Pagination from '../components/Pagination.jsx';
 import OrganizationCard from '../components/OrganizationCard.jsx';
-import AnimatedCounter from '../components/AnimatedCounter.jsx'; // The user mentioned this file, but it's not in context. I'll assume it exists.
+import AnimatedCounter from '../components/AnimatedCounter.jsx';
 import { SearchResultsSkeleton } from '../components/SkeletonLoader.jsx';
 import EnhancedSearchInput from '../components/EnhancedSearchInput.jsx';
 import { getOrganizationsWithCategories, getGrantsWithCategories } from '../utils/rpcClientFunctions';
@@ -28,17 +26,15 @@ const isGrantActive = (grant) => {
 };
 
 const getSortableFundingAmount = (grant) => {
-  // Prioritize the numeric `max_funding_amount` field if it exists and is a number.
   if (typeof grant.max_funding_amount === 'number') {
     return grant.max_funding_amount;
   }
-  // Otherwise, parse the text representation.
   return parseMaxFundingAmount(grant.funding_amount_text || '0');
 };
 
 const sortGrants = (grants, sort) => [...grants].sort((a,b)=>{
   const aAct = isGrantActive(a), bAct = isGrantActive(b);
-  if (aAct !== bAct) return aAct ? -1 : 1; // Active grants first
+  if (aAct !== bAct) return aAct ? -1 : 1;
   const dateOrMax = (g) => g.dueDate ? new Date(g.dueDate) : new Date('9999-12-31');
 
   switch (sort){
@@ -67,33 +63,27 @@ const AutocompleteInput = ({ items, selectedItems, onSelectionChange, placeholde
   const inputRef = useRef(null);
   const dropdownRef = useRef(null);
 
-  // Get the single selected category (first item in array, or empty string)
   const selectedItem = selectedItems?.[0] || '';
 
-  // Filter categories based on search term
   const filteredItems = items.filter(item => {
     const name = typeof item === 'string' ? item : item.name;
     const label = typeof item === 'object' ? (item.label || item.displayName || item.name) : name;
     return label?.toLowerCase().includes(searchTerm.toLowerCase());
   });
 
-  // Handle category selection - single select only
   const handleItemSelect = (item) => {
     const itemName = typeof item === 'string' ? item : item.name;
-    onSelectionChange([itemName]); // Always pass array with single item (just the name)
+    onSelectionChange([itemName]);
     setSearchTerm('');
     setIsOpen(false);
     setHighlightedIndex(-1);
   };
 
-  // Handle clearing selection
   const handleClear = () => {
     onSelectionChange([]);
     setSearchTerm('');
     setIsOpen(false);
   };
-
-  // Handle keyboard navigation
   const handleKeyDown = (e) => {
     if (!isOpen) {
       if (e.key === 'ArrowDown' || e.key === 'Enter') {
@@ -130,7 +120,6 @@ const AutocompleteInput = ({ items, selectedItems, onSelectionChange, placeholde
     }
   };
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -143,18 +132,15 @@ const AutocompleteInput = ({ items, selectedItems, onSelectionChange, placeholde
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Reset highlighted index when filtered categories change
   useEffect(() => {
     setHighlightedIndex(-1);
   }, [searchTerm]);
 
-  // Display value: show selected category or search term
   const displayValue = selectedItem && !isOpen ? selectedItem : searchTerm;
   const displayPlaceholder = selectedItem ? selectedItem : placeholder;
 
   return (
     <div className="flex-1 relative" ref={dropdownRef}>
-      {/* Search Input */}
       <input
         ref={inputRef}
         type="text"
@@ -162,14 +148,12 @@ const AutocompleteInput = ({ items, selectedItems, onSelectionChange, placeholde
         onChange={(e) => {
           setSearchTerm(e.target.value);
           setIsOpen(true);
-          // Clear selection when typing
           if (selectedItem) {
             onSelectionChange([]);
           }
         }}
         onFocus={() => {
           setIsOpen(true);
-          // If there's a selected category, clear it and show search
           if (selectedItem) {
             setSearchTerm('');
           }
@@ -179,7 +163,6 @@ const AutocompleteInput = ({ items, selectedItems, onSelectionChange, placeholde
         className="w-full flex-1 bg-transparent outline-none text-base text-slate-800 placeholder-slate-400 font-medium truncate"
       />
 
-      {/* Dropdown - Show categories with counts */}
       {isOpen && (
         <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-300 rounded-xl shadow-2xl max-h-80 overflow-y-auto z-[9999] min-w-[300px]">
           {filteredItems.length > 0 ? (
@@ -233,13 +216,11 @@ export default function ExplorePage() {
     setSearchParams({ tab: tabId });
   };
 
-  // State for all grants data to populate filter dropdowns
   const [allGrants, setAllGrants] = useState([]);
   const [loadingGrants, setLoadingGrants] = useState(true);
 
   const [fetchedGrantCategories, setFetchedGrantCategories] = useState([]);
 
-  // Common grant types for fallback
   const COMMON_GRANT_TYPES = [
     'Project/Program', 'General Operating', 'Capacity Building', 'Capital/Infrastructure',
     'Research', 'Fellowship/Scholarship', 'Emergency/Disaster Relief', 'Planning/Development',
@@ -250,21 +231,19 @@ export default function ExplorePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   
-  // Add grant-specific filter state
   const [grantFilterConfig, setGrantFilterConfig] = useState({
     searchTerm: '',
-    locationSearchTerm: '', // ADD THIS
+    locationSearchTerm: '',
     locationFilter: [],
-    categoryFilter: [], // for grants
+    categoryFilter: [],
     grantStatusFilter: 'active',
-    grantTypeFilter: '', // ADDED: Grant type filter
+    grantTypeFilter: '',
     sortCriteria: 'dueDate_asc'
-    // grantsPerPage will be managed inside GrantsPageContent
   });
 
   const [filterConfig, setFilterConfig] = useState({ 
-    searchTerm: '', 
-    typeSearchTerm: '', // Add this
+    searchTerm: '',
+    typeSearchTerm: '',
     focusAreaSearchTerm: '',
     locationSearchTerm: '',
     locationFilter: [],
@@ -273,7 +252,6 @@ export default function ExplorePage() {
     sortCriteria: 'name_asc' 
   });
 
-  // Add this useEffect to fetch categories separately:
   useEffect(() => {
     const fetchGrantCategories = async () => {
       try {
@@ -291,13 +269,10 @@ export default function ExplorePage() {
     }
   }, [activeTab]);
 
-  // Derived unique lists for grant filters
   const uniqueGrantCategories = useMemo(() => {
     if (activeTab !== 'grants') return [];
   
-    // Apply current filters EXCEPT category filter
     const filteredGrants = allGrants.filter(grant => {
-      // Status filter
       if (grantFilterConfig.grantStatusFilter === 'closing_soon') {
         if (!grant.deadline) return false;
         const today = new Date();
@@ -312,7 +287,6 @@ export default function ExplorePage() {
         today.setHours(0, 0, 0, 0);
         if (new Date(grant.deadline) >= today) return false;
       } else {
-        // Default to active grants
         if (grant.deadline) {
           const today = new Date();
           today.setHours(0, 0, 0, 0);
@@ -320,7 +294,6 @@ export default function ExplorePage() {
         }
       }
   
-      // Location filter
       if (grantFilterConfig.locationFilter?.length > 0) {
         const hasMatchingLocation = grant.locations?.some(loc =>
           grantFilterConfig.locationFilter.includes(loc.name)
@@ -328,12 +301,10 @@ export default function ExplorePage() {
         if (!hasMatchingLocation) return false;
       }
   
-      // Grant type filter
       if (grantFilterConfig.grantTypeFilter) {
         if (grant.grant_type !== grantFilterConfig.grantTypeFilter) return false;
       }
   
-      // Search term filter
       if (grantFilterConfig.searchTerm) {
         const searchLower = grantFilterConfig.searchTerm.toLowerCase();
         const matchesSearch = 
@@ -343,12 +314,9 @@ export default function ExplorePage() {
         if (!matchesSearch) return false;
       }
   
-      // NOTE: Do NOT apply category filter here since we're calculating category counts
-  
       return true;
     });
   
-    // Count categories from the filtered grants
     const categoryCount = new Map();
     
     filteredGrants.forEach(grant => {
@@ -375,9 +343,7 @@ export default function ExplorePage() {
   const uniqueGrantTypes = useMemo(() => {
     if (activeTab !== 'grants') return [];
   
-    // Apply current filters EXCEPT grant type filter
     const filteredGrants = allGrants.filter(grant => {
-      // Status filter
       if (grantFilterConfig.grantStatusFilter === 'closing_soon') {
         if (!grant.deadline) return false;
         const today = new Date();
@@ -392,7 +358,6 @@ export default function ExplorePage() {
         today.setHours(0, 0, 0, 0);
         if (new Date(grant.deadline) >= today) return false;
       } else {
-        // Default to active grants
         if (grant.deadline) {
           const today = new Date();
           today.setHours(0, 0, 0, 0);
@@ -400,7 +365,6 @@ export default function ExplorePage() {
         }
       }
   
-      // Location filter
       if (grantFilterConfig.locationFilter?.length > 0) {
         const hasMatchingLocation = grant.locations?.some(loc =>
           grantFilterConfig.locationFilter.includes(loc.name)
@@ -408,7 +372,6 @@ export default function ExplorePage() {
         if (!hasMatchingLocation) return false;
       }
   
-      // Category filter
       if (grantFilterConfig.categoryFilter?.length > 0) {
         const hasMatchingCategory = grant.categories?.some(cat =>
           grantFilterConfig.categoryFilter.includes(cat.name)
@@ -416,7 +379,6 @@ export default function ExplorePage() {
         if (!hasMatchingCategory) return false;
       }
   
-      // Search term filter
       if (grantFilterConfig.searchTerm) {
         const searchLower = grantFilterConfig.searchTerm.toLowerCase();
         const matchesSearch = 
@@ -426,12 +388,9 @@ export default function ExplorePage() {
         if (!matchesSearch) return false;
       }
   
-      // NOTE: Do NOT apply grant type filter here since we're calculating grant type counts
-  
       return true;
     });
   
-    // Count grant types from the filtered grants
     const typeCount = new Map();
     
     filteredGrants.forEach(grant => {
@@ -454,9 +413,7 @@ export default function ExplorePage() {
   const availableOrgTypesForFilter = useMemo(() => {
     if (activeTab !== 'organizations') return [];
 
-    // Apply current filters EXCEPT type filter
     const filteredOrgs = organizations.filter(org => {
-      // Search term filter
       if (filterConfig.searchTerm) {
         const searchLower = filterConfig.searchTerm.toLowerCase();
         const matchesSearch = 
@@ -466,7 +423,6 @@ export default function ExplorePage() {
         if (!matchesSearch) return false;
       }
 
-      // County filter (updated to use county)
       if (filterConfig.locationFilter?.length > 0) {
         const hasMatchingCounty = filterConfig.locationFilter.some(loc =>
           org.county?.toLowerCase().includes(loc.toLowerCase())
@@ -474,7 +430,6 @@ export default function ExplorePage() {
         if (!hasMatchingCounty) return false;
       }
 
-      // Focus area filter
       if (filterConfig.focusAreaFilter?.length > 0) {
         const hasMatchingFocusArea = org.focus_areas?.some(area =>
           filterConfig.focusAreaFilter.includes(area)
@@ -482,12 +437,9 @@ export default function ExplorePage() {
         if (!hasMatchingFocusArea) return false;
       }
 
-      // NOTE: Do NOT apply type filter here since we're calculating type counts
-
       return true;
     });
 
-    // Count types from filtered organizations
     const typeCount = new Map();
     
     filteredOrgs.forEach(org => {
@@ -510,9 +462,7 @@ export default function ExplorePage() {
   const uniqueGrantLocations = useMemo(() => {
     if (activeTab !== 'grants') return [];
   
-    // Apply current filters EXCEPT location filter
     const filteredGrants = allGrants.filter(grant => {
-      // Status filter
       if (grantFilterConfig.grantStatusFilter === 'closing_soon') {
         if (!grant.deadline) return false;
         const today = new Date();
@@ -527,7 +477,6 @@ export default function ExplorePage() {
         today.setHours(0, 0, 0, 0);
         if (new Date(grant.deadline) >= today) return false;
       } else {
-        // Default to active grants
         if (grant.deadline) {
           const today = new Date();
           today.setHours(0, 0, 0, 0);
@@ -535,7 +484,6 @@ export default function ExplorePage() {
         }
       }
   
-      // Category filter
       if (grantFilterConfig.categoryFilter?.length > 0) {
         const hasMatchingCategory = grant.categories?.some(cat =>
           grantFilterConfig.categoryFilter.includes(cat.name)
@@ -543,7 +491,6 @@ export default function ExplorePage() {
         if (!hasMatchingCategory) return false;
       }
   
-      // Search term filter
       if (grantFilterConfig.searchTerm) {
         const searchLower = grantFilterConfig.searchTerm.toLowerCase();
         const matchesSearch = 
@@ -553,17 +500,13 @@ export default function ExplorePage() {
         if (!matchesSearch) return false;
       }
   
-      // Grant type filter
       if (grantFilterConfig.grantTypeFilter) {
         if (grant.grant_type !== grantFilterConfig.grantTypeFilter) return false;
       }
   
-      // NOTE: Do NOT apply location filter here since we're calculating location counts
-  
       return true;
     });
   
-    // Count locations from the filtered grants
     const locationCount = new Map();
     filteredGrants.forEach(grant => {
       if (grant.locations?.length) {
@@ -586,16 +529,13 @@ export default function ExplorePage() {
   
   }, [activeTab, allGrants, grantFilterConfig.grantStatusFilter, grantFilterConfig.categoryFilter, grantFilterConfig.searchTerm, grantFilterConfig.grantTypeFilter]);
 
-  // Grant statuses for the dropdown
-  // This is already defined, keeping it as is.
   const grantStatuses = [
     { value: '', label: 'All Statuses' },
-    { value: 'active', label: 'Active' }, // Deadline is in the future
-    { value: 'closing_soon', label: 'Closing Soon' }, // Deadline within 2 weeks
-    { value: 'closed', label: 'Closed' } // Deadline has passed
+    { value: 'active', label: 'Active' },
+    { value: 'closing_soon', label: 'Closing Soon' },
+    { value: 'closed', label: 'Closed' }
   ];
 
-  // Dynamic filter config based on active tab
   const currentFilterConfig = activeTab === 'grants' ? grantFilterConfig : filterConfig;
   const setCurrentFilterConfig = activeTab === 'grants' ? setGrantFilterConfig : setFilterConfig;
 
@@ -612,17 +552,15 @@ export default function ExplorePage() {
     { id: 'wins', label: 'Recent Fund Wins', comingSoon: true }
   ];
 
-  // Fetch grants data for filter options
   useEffect(() => {
     const fetchGrantsData = async () => {
       setLoadingGrants(true);
       try {
-        // NEW: Use the RPC function instead of direct query
         const grantsResult = await getGrantsWithCategories();
         const grantsData = grantsResult.grants || [];
 
         grantsData.forEach(grant => {
-          grant.save_count = 0; // Placeholder
+          grant.save_count = 0;
         });
 
         setAllGrants(grantsData);
@@ -634,22 +572,18 @@ export default function ExplorePage() {
       }
     };
     fetchGrantsData();
-  }, []); // Fetch once on mount
+  }, []);
 
-  // In ExplorePage.jsx, update the organization fetching:
   useEffect(() => {
     const fetchOrganizations = async () => {
       setLoading(true);
       try {
-        // Use the existing function
         const { data, error } = await supabase.rpc('get_organizations_with_categories');
         if (error) throw error;
         
         setOrganizations(data || []);
       } catch (error) {
         console.error('Error fetching organizations:', error);
-        
-        // Fallback to direct query
         try {
           const { data: orgsData, error: orgsError } = await supabase
             .from('organizations')
@@ -685,7 +619,7 @@ export default function ExplorePage() {
     if (activeTab === 'grants') {
       setGrantFilterConfig(prev => ({
         ...prev,
-        searchTerm: value // This will trigger immediate filtering
+        searchTerm: value
       }));
     } else {
       setFilterConfig(prev => ({
@@ -701,7 +635,7 @@ export default function ExplorePage() {
         searchTerm: '',
         locationFilter: [],
         categoryFilter: [],
-        grantStatusFilter: 'active', // Keep active instead of clearing
+        grantStatusFilter: 'active',
         grantTypeFilter: '',
         sortCriteria: 'dueDate_asc'
       });
@@ -717,7 +651,6 @@ export default function ExplorePage() {
     setCurrentPage(1);
   }, [activeTab]);
 
-  // New unified filter change handler
   const handleCurrentFilterChange = useCallback((key, value) => {
     if (activeTab === 'grants') {
       setGrantFilterConfig(prev => ({ ...prev, [key]: value }));
@@ -754,9 +687,7 @@ export default function ExplorePage() {
   const uniqueFocusAreas = useMemo(() => {
   if (activeTab !== 'organizations') return [];
 
-  // Apply current filters EXCEPT focus area filter
   const filteredOrgs = organizations.filter(org => {
-    // Search term filter
     if (filterConfig.searchTerm) {
       const searchLower = filterConfig.searchTerm.toLowerCase();
       const matchesSearch = 
@@ -766,7 +697,6 @@ export default function ExplorePage() {
       if (!matchesSearch) return false;
     }
 
-    // County filter (updated to use county)
     if (filterConfig.locationFilter?.length > 0) {
       const hasMatchingCounty = filterConfig.locationFilter.some(loc =>
         org.county?.toLowerCase().includes(loc.toLowerCase())
@@ -774,18 +704,14 @@ export default function ExplorePage() {
       if (!hasMatchingCounty) return false;
     }
 
-    // Type filter
     if (filterConfig.typeFilter?.length > 0) {
       const hasMatchingType = filterConfig.typeFilter.includes(org.type);
       if (!hasMatchingType) return false;
     }
 
-    // NOTE: Do NOT apply focus area filter here since we're calculating focus area counts
-
     return true;
   });
 
-  // Count focus areas from filtered organizations
   const focusAreaCount = new Map();
   
   filteredOrgs.forEach(org => {
@@ -811,9 +737,7 @@ export default function ExplorePage() {
   const uniqueLocations = useMemo(() => {
     if (activeTab !== 'organizations') return [];
   
-    // Apply current filters EXCEPT location filter
     const filteredOrgs = organizations.filter(org => {
-      // Search term filter
       if (filterConfig.searchTerm) {
         const searchLower = filterConfig.searchTerm.toLowerCase();
         const matchesSearch = 
@@ -823,7 +747,6 @@ export default function ExplorePage() {
         if (!matchesSearch) return false;
       }
   
-      // Focus area filter
       if (filterConfig.focusAreaFilter?.length > 0) {
         const hasMatchingFocusArea = org.focus_areas?.some(area =>
           filterConfig.focusAreaFilter.includes(area)
@@ -831,7 +754,6 @@ export default function ExplorePage() {
         if (!hasMatchingFocusArea) return false;
       }
   
-      // Type filter
       if (filterConfig.typeFilter?.length > 0) {
         const hasMatchingType = filterConfig.typeFilter.includes(org.type);
         if (!hasMatchingType) return false;
@@ -840,11 +762,10 @@ export default function ExplorePage() {
       return true;
     });
   
-    // Count counties (not cities) from filtered organizations
     const locationCount = new Map();
     
     filteredOrgs.forEach(org => {
-      if (org.county) { // Use county instead of location
+      if (org.county) {
         const count = locationCount.get(org.county) || 0;
         locationCount.set(org.county, count + 1);
       }
@@ -871,7 +792,6 @@ export default function ExplorePage() {
     orgsPerPage
   );
 
-  // In ExplorePage.jsx, add this calculation after the usePaginatedFilteredData for grants
   const { paginatedItems: currentGrants, totalPages: totalGrantPages, totalFilteredItems: totalFilteredGrants, filteredAndSortedItems: allFilteredGrants } = usePaginatedFilteredData(
     allGrants,
     currentFilterConfig,
@@ -882,17 +802,14 @@ export default function ExplorePage() {
     grantsPerPage
   );
 
-  // Calculate total funding from filtered grants
   const totalFilteredFunding = useMemo(() => {
     if (!allFilteredGrants || allFilteredGrants.length === 0) return 0;
     
     return allFilteredGrants.reduce((sum, grant) => {
-      // Use max_funding_amount if available, otherwise parse funding_amount_text
       if (grant.max_funding_amount) {
         return sum + grant.max_funding_amount;
       }
       if (grant.funding_amount_text) {
-        // Parse funding amount from text
         const cleanText = grant.funding_amount_text.toLowerCase().replace(/[$,\s]/g, '');
         const mMatch = cleanText.match(/(\d+(?:\.\d+)?)\s*m/);
         if (mMatch) return sum + (parseFloat(mMatch[1]) * 1000000);
@@ -911,7 +828,6 @@ export default function ExplorePage() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [totalPages]);
 
-  // Dynamic content based on active tab
   const formatCurrency = (amount) => {
     if (amount >= 1000000) return `$${(amount / 1000000).toFixed(1)}M+`;
     if (amount >= 1000) return `$${(amount / 1000).toFixed(0)}K+`;
@@ -997,7 +913,6 @@ export default function ExplorePage() {
             grantStatusFilter: grantFilterConfig.grantStatusFilter,
             sortCriteria: grantFilterConfig.sortCriteria,
             onFilterChange: handleCurrentFilterChange,
-            // Pass the calculated categories and data
             uniqueGrantCategories: uniqueGrantCategories,
             uniqueGrantLocations: uniqueGrantLocations,
             uniqueGrantTypes: uniqueGrantTypes,
@@ -1022,7 +937,7 @@ export default function ExplorePage() {
                 uniqueGrantLocations,
                 uniqueGrantTypes,
                 allGrants,
-                viewMode: viewMode // Add this to pass the current view mode
+                viewMode: viewMode
               }}
             />
           );
@@ -1048,12 +963,9 @@ export default function ExplorePage() {
             Discover organizations, grants, and funding opportunities that match your mission
           </p>
 
-          {/* Search Bar - Full width */}
           <div className="w-full max-w-[95%] mx-auto relative z-10">
             <div className="bg-white rounded-2xl shadow-xl border border-slate-100 overflow-visible">
-              {/* Search Input Row */}
               <div className="flex items-center gap-4 px-6 py-2 border-b border-gray-200" style={{ minHeight: '56px' }}>
-                {/* Main Search */}
                 <div className="flex-[2] flex items-center bg-white rounded-2xl">
                   <Search className="w-5 h-5 text-gray-400 flex-shrink-0 mr-3" />
                   <EnhancedSearchInput
@@ -1064,15 +976,12 @@ export default function ExplorePage() {
 
                 <div className="h-6 w-px bg-slate-200" />
 
-                {/* Location Dropdown for Grants */}
                 <div className="flex-1 flex items-center gap-2 min-w-[140px]">
                   {getSecondDropdownContent()}
                 </div>
 
                 <div className="h-6 w-px bg-slate-200" />
 
-                {/* All Types Dropdown */}
-                {/* Replaced with conditional dropdown */}
                 <div className="flex-1 flex items-center gap-2 min-w-[130px]">
                   <Building className="w-5 h-5 text-gray-400 flex-shrink-0" />
                   {activeTab === 'grants' ? (
@@ -1094,13 +1003,11 @@ export default function ExplorePage() {
                 
                 <div className="h-6 w-px bg-slate-200" />
 
-                {/* Dynamic Third Dropdown - Focus Areas OR Categories */}
                 <div className="flex-1 flex items-center gap-2 min-w-[130px]">
                   {getThirdDropdownContent()}
                 </div>
 
                 {activeTab === 'grants' && <div className="h-6 w-px bg-slate-200" />}
-                {/* Dynamic Fourth Dropdown - All Statuses (grants only) */}
                 {activeTab === 'grants' && (
                   <div className="flex-1 flex items-center gap-2 min-w-[130px]">
                     <SlidersHorizontal className="w-5 h-5 text-gray-400 flex-shrink-0" />
@@ -1118,7 +1025,6 @@ export default function ExplorePage() {
                 )}
                 <div className="h-6 w-px bg-slate-200" />
 
-                {/* Clear All Filters Button */}
                 <div className="flex-shrink-0">
                   <button
                     onClick={handleClearFilters}
@@ -1130,7 +1036,6 @@ export default function ExplorePage() {
                 </div>
               </div>
 
-              {/* Tabs Row */}
               <div className="flex gap-0 bg-gray-50 border-t border-gray-200">
                 {tabs.map((tab) => (
                   <button
@@ -1160,7 +1065,6 @@ export default function ExplorePage() {
         </div>
       </div>
 
-      {/* Organizations Content */}
       {activeTab === 'organizations' && (
         <div className="w-full px-4 sm:px-6 lg:px-8 py-8 bg-[#faf7f5]">
           <div className="max-w-[98%] mx-auto">
@@ -1186,7 +1090,6 @@ export default function ExplorePage() {
                   <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none text-slate-400" size={16} />
                 </div>
                 
-                {/* Sorting Dropdown */}
                 <div className="relative">
                   <select 
                     value={currentFilterConfig.sortCriteria}
@@ -1273,11 +1176,9 @@ export default function ExplorePage() {
         </div>
       )}
 
-      {/* Other Tabs Content */}
       {activeTab !== 'organizations' && (
         <div className="w-full px-4 sm:px-6 lg:px-8 py-8 bg-[#faf7f5]">
           <div className="max-w-[98%] mx-auto">
-            {/* Header section for non-organization tabs */}
             {activeTab === 'grants' && (
               <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-6">
                 <div className="text-center md:text-left">
@@ -1312,7 +1213,6 @@ export default function ExplorePage() {
                     <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none text-slate-400" size={16} />
                   </div>
                   
-                  {/* Sorting Dropdown */}
                   <div className="relative">
                     <select 
                       value={grantFilterConfig.sortCriteria}

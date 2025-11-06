@@ -1,16 +1,16 @@
-import React, { useState, useEffect, createContext, useRef } from 'react';
-import { BrowserRouter, Routes, Route, Link, NavLink, Outlet, useOutletContext, useLocation, Navigate, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, createContext } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useOutletContext, useLocation, useNavigate, Outlet } from 'react-router-dom';
 import ScrollToTop from './components/ScrollToTop.jsx';
 import { supabase } from './supabaseClient';
-import { clearAllNotifications, markAllAsRead } from './utils/notificationCleanup';
+import { clearAllNotifications, markAllAsRead } from './utils/notificationCleanup'; // Added back markAllAsRead as it was in original imports
+import { getProfileById } from './utils/profileHelpers'; // Re-added helper imports
+import { getUserProfileComplete, invalidateCache, getAppInitData } from './utils/rpcClientFunctions'; // Simplified RPC imports
 import HomePage from './homepage/HomePage.jsx';
 import CommunityHub from './components/community-hub/CommunityHub.jsx';
-import OmegaAdminUsers from './components/omega-admin/OmegaAdminUsers.jsx';
-import OmegaAdminGrants from './components/omega-admin/OmegaAdminGrants.jsx';
 import GrantsPageContent from './GrantsPageContent.jsx';
 import CommunityDiscoverPage from './components/discover/CommunityDiscoverPage.jsx';
 import ExplorePage from './pages/ExplorePage.jsx';
-import SpotlightLandingPage from './SpotlightLandingPage.jsx';
+import SpotlightLandingPage from './pages/SpotlightLandingPage.jsx';
 import CountySpotlightPage from './pages/CountySpotlightPage.jsx';
 import CitySpotlightPage from './pages/CitySpotlightPage.jsx';
 import AboutUsPage from './pages/AboutUsPage.jsx';
@@ -25,6 +25,14 @@ import LoginPage from './LoginPage.jsx';
 import ProfilePage from './ProfilePage.jsx';
 import SettingsPage from './SettingsPage.jsx';
 import MemberProfilePage from './MemberProfilePage.jsx';
+import OrganizationProfilePage from './pages/OrganizationProfilePage.jsx';
+import SignUpWizard from './components/auth/SignUpWizard.jsx';
+import OnboardingWizard from './components/OnboardingWizard.jsx';
+import ResetPasswordForm from './components/auth/ResetPasswordForm';
+import AuthLayout from './components/auth/AuthLayout';
+import GrantsPortalPage from './components/GrantsPortalPage.jsx';
+// --- Components from the `components` root folder or shallow imports ---
+import OmegaAdminEditOrg from './components/OmegaAdminEditOrg.jsx'; // 👈 CORRECTED PATH
 import HomeDashboard from './components/HomeDashboard.jsx';
 import HelloWorldChannel from './components/HelloWorldChannel.jsx';
 import HelloCommunityRoute from './components/HelloCommunityRoute.jsx';
@@ -32,66 +40,18 @@ import FollowersPage from './components/FollowersPage.jsx';
 import FollowingPage from './components/FollowingPage.jsx';
 import OmegaAdminDashboard from './components/OmegaAdminDashboard.jsx';
 import OmegaAdminOrgSelector from './components/OmegaAdminOrgSelector.jsx';
-import OmegaAdminEditOrg from './components/OmegaAdminEditOrg.jsx';
 import OmegaAdminManageMembers from './components/OmegaAdminManageMembers.jsx';
 import MyOrganizationPage from './components/MyOrganizationPage.jsx';
-import OrganizationProfilePage from './pages/OrganizationProfilePage.jsx';
-import SignUpWizard from './components/auth/SignUpWizard.jsx';
-import OnboardingWizard from './components/OnboardingWizard.jsx';
-import AuthButton from './components/AuthButton.jsx';
+import ConnectionsPage from './components/ConnectionsPage.jsx';
+import NotificationsPage from './components/NotificationsPage.jsx';
 import Footer from './components/Footer.jsx';
 import DashboardHeader from './components/DashboardHeader.jsx';
 import PublicHeader from './components/PublicHeader.jsx';
 import './components/skeleton-animations.css';
-import headerLogoImage from './assets/fundspace-logo2.png';
-import { PlusCircle, Menu, X } from './components/Icons.jsx';
-import NotificationsPage from './components/NotificationsPage.jsx';
-import ResetPasswordForm from './components/auth/ResetPasswordForm';
-import AuthLayout from './components/auth/AuthLayout';
-import ConnectionsPage from './components/ConnectionsPage.jsx';
-import { getProfileById } from './utils/profileHelpers';
-import GrantsPortalPage from './components/GrantsPortalPage.jsx';
-import { getUserProfileComplete, getDashboardData, invalidateCache, getAppInitData, togglePostLike } from './utils/rpcClientFunctions';
 
-if (import.meta.env.DEV) {
-  // RPC Tracking - Development Only
-  window.__rpcStats = { rpc: 0, api: 0 };
-  
-  const originalFetch = window.fetch;
-  let rpcCallCount = 0;
-  let apiCallCount = 0;
-  
-  window.fetch = function(...args) {
-    const url = args[0];
-    if (typeof url === 'string' && url.includes('supabase.co/rest/v1/')) {
-      const isRPCCall = url.includes('/rpc/');
-      const endpoint = url.split('/rest/v1/')[1]?.split('?')[0];
-      
-      if (isRPCCall) {
-        rpcCallCount++;
-        window.__rpcStats.rpc++;
-        console.log(`🚀 RPC Call #${rpcCallCount}: ${endpoint}`);
-      } else {
-        apiCallCount++;
-        window.__rpcStats.api++;
-        console.log(`📡 API Call #${apiCallCount}: ${endpoint}`);
-      }
-    }
-    return originalFetch.apply(this, args);
-  };
-  
-  setInterval(() => {
-    if (rpcCallCount + apiCallCount > 0) {
-      const total = rpcCallCount + apiCallCount;
-      const rpcPercentage = ((rpcCallCount / total) * 100).toFixed(1);
-      console.log(`📊 Last minute: ${rpcCallCount} RPC, ${apiCallCount} API (${rpcPercentage}% RPC)`);
-      
-      rpcCallCount = 0;
-      apiCallCount = 0;
-      window.__rpcStats = { rpc: 0, api: 0 };
-    }
-  }, 60000);
-}
+// --- Omega Admin components inside its folder ---
+import OmegaAdminUsers from './components/omega-admin/OmegaAdminUsers.jsx';
+import OmegaAdminGrants from './components/omega-admin/OmegaAdminGrants.jsx';
 
 export const LayoutContext = createContext({ setPageBgColor: () => {} });
 
@@ -223,11 +183,8 @@ export default function App() {
       setLoading(false);
       return;
     }
-
     try {
-      // ✅ NEW: Single batched call instead of 2 separate calls
       const { profile: profileData, notifications: notificationsData } = await getAppInitData(session.user.id);
-
       setProfile(profileData);
       setNotifications(notificationsData);
       setUnreadCount(notificationsData.filter(n => !n.is_read).length);
@@ -243,7 +200,6 @@ export default function App() {
 
   const refreshProfile = async () => {
     if (!session?.user?.id) return;
-    
     try {
       const profileData = await getUserProfileComplete(session.user.id);
       if (profileData) {
@@ -252,9 +208,6 @@ export default function App() {
       }
     } catch (error) {
       console.error('Error refreshing profile:', error);
-      // The RPC call is considered reliable, so we won't use a fallback.
-      // If it fails, the error is logged, and the UI will show the stale profile data
-      // until the next successful refresh.
     }
   };
 
@@ -313,12 +266,12 @@ export default function App() {
       }
     };
     getInitialSession();
-    
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, newSession) => {
       setSession(newSession);
       fetchSessionData(newSession);
     });
-    
+
     return () => subscription.unsubscribe();
   }, []);
 
@@ -332,7 +285,7 @@ export default function App() {
         table: 'notifications',
         filter: `user_id=eq.${session.user.id}`
       }, async (payload) => {
-        try { // Use the more efficient RPC call
+        try {
           const actor = await getUserProfileComplete(payload.new.actor_id);
           if (actor) {
             setNotifications(current => [{ ...payload.new, actor_id: actor }, ...current]);

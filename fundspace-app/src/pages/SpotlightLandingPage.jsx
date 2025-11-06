@@ -1,9 +1,9 @@
 import React, { useEffect, useContext } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { countySpotlightData } from './spotlightData.js';
-import { MapPin, Users, Briefcase, TrendingUp, ArrowRight, Sparkles, Search, Heart } from './components/Icons.jsx';
-import { LayoutContext } from './App.jsx';
+import { countySpotlightData } from '../spotlightData.js';
+import { MapPin, Users, Briefcase, TrendingUp, ArrowRight, Sparkles, Search, Heart } from '../components/Icons.jsx';
+import { LayoutContext } from '../App.jsx';
 
 const CountyCard = ({ slug, county, index }) => (
   <motion.div
